@@ -1,0 +1,6 @@
+# Keep line endings right for every teammate's OS
+* text=auto
+*.bat text eol=crlf
+*.sh text eol=lf
+*.jpg binary
+*.png binary
