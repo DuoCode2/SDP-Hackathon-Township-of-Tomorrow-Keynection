@@ -73,15 +73,16 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
     <svg className={`plan ${previewing ? 'previewing' : ''}`} viewBox="0 0 720 400" role="group" aria-label={view === 'terrace' ? 'Plan of Jalan Demo 1' : 'Section through Block A'}>
       <defs>
         <pattern id="hatch-works" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="7" stroke="#e8710a" strokeWidth="2" opacity="0.45" />
+          <line x1="0" y1="0" x2="0" y2="7" style={{ stroke: 'var(--works)' }} strokeWidth="2" opacity="0.45" />
         </pattern>
         <pattern id="hatch-wall" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <rect width="5" height="5" fill="#fff4e6" />
-          <line x1="0" y1="0" x2="0" y2="5" stroke="#e8710a" strokeWidth="2.4" />
+          <rect width="5" height="5" style={{ fill: 'var(--works-bg)' }} />
+          <line x1="0" y1="0" x2="0" y2="5" style={{ stroke: 'var(--works)' }} strokeWidth="2.4" />
         </pattern>
         <linearGradient id="me-fill" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#12b8a6" />
-          <stop offset="100%" stopColor="#2f8cf5" />
+          {/* the face's own gradient, so the map's "you" matches the legend on both faces */}
+          <stop offset="0%" style={{ stopColor: 'var(--grad-a)' }} />
+          <stop offset="100%" style={{ stopColor: 'var(--grad-b)' }} />
         </linearGradient>
       </defs>
 

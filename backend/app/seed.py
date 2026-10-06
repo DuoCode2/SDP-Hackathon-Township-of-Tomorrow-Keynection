@@ -8,6 +8,16 @@ from datetime import date, datetime, timedelta, timezone
 
 MALAYSIA = timezone(timedelta(hours=8))
 HANDOVER_DAYS_AGO = 14
+# Version of the plain-language privacy notice a household agrees to when it joins (PDPA consent).
+CONSENT_VERSION = "pilot-2026-10"
+
+# Households that have not joined Jiran5 yet. Until they do, neighbours see their unit number only, never a name,
+# and renovation notices reach them on paper through the estate office.
+NOT_JOINED = {"T-23"}
+# Households that use easy mode (bigger text, fewer options). Private to the household itself.
+EASY_MODE = {"T-20"}
+# Family helpers already set up at handover: (unit, helper name, relationship).
+SEED_HELPERS = [("T-20", "Mei Fong", "child")]
 
 PHASE = {
     "id": "demo",
@@ -80,6 +90,7 @@ BIOS = {
     "Sofia": "Re-doing the bathroom in October. Sorry in advance!",
     "Arjun": "Works from home. Big on football.",
     "Suresh": "Retired engineer, happy to look at a leak with you.",
+    "Ah Hock": "Retired. Voice messages are easiest for me; my daughter helps with the app.",
 }
 
 

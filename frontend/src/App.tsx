@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Building2, Camera, CalendarClock, CircleUserRound, Columns2, Compass, HandHeart, Hexagon, Languages, LayoutDashboard, MessagesSquare, Network, ShieldHalf } from 'lucide-react'
+import { Building2, Calculator, Camera, CalendarClock, CircleUserRound, Columns2, Compass, Grid3x3, HandHeart, Hexagon, Languages, LayoutDashboard, MessagesSquare, Network, ShieldHalf, Smartphone } from 'lucide-react'
 import { api, type UnitInfo } from './api'
 import { Avatar, formatDate, ToastProvider } from './ui'
 import type { GuideLang, TabId } from './guide'
@@ -16,6 +16,10 @@ import HistoryView from './screens/HistoryView'
 import DashboardView from './screens/DashboardView'
 import SafeguardsView from './screens/SafeguardsView'
 import MeView from './screens/MeView'
+import JoinView from './screens/JoinView'
+import PlannerView from './screens/PlannerView'
+import ImpactView from './screens/ImpactView'
+import ChannelsView from './screens/ChannelsView'
 
 // Labels come from the dictionary: nav.<id>, nav.<id>.sub, nav.<id>.short.
 const NAV = [
@@ -30,7 +34,15 @@ const NAV = [
       { id: 'me', icon: CircleUserRound, dock: true },
     ],
   },
-  { group: 'sdp', items: [{ id: 'sdp', icon: LayoutDashboard, dock: false }] },
+  {
+    group: 'sdp',
+    items: [
+      { id: 'sdp', icon: LayoutDashboard, dock: false },
+      { id: 'planner', icon: Grid3x3, dock: false },
+      { id: 'impact', icon: Calculator, dock: false },
+      { id: 'channels', icon: Smartphone, dock: false },
+    ],
+  },
   { group: 'trust', items: [{ id: 'safeguards', icon: ShieldHalf, dock: false }] },
 ] as const
 
@@ -46,6 +58,8 @@ type PaneState = { me: string; tab: TabId; peer?: string }
 
 // Two faces: people screens are warm; records (works, evidence, log, SDP) keep the blueprint look.
 const WARM: TabId[] = ['circle', 'chats', 'me']
+// A household that hasn't joined sees the join page on these; its home log (the property's record) stays viewable.
+const NEEDS_JOIN: TabId[] = ['circle', 'chats', 'works', 'evidence', 'me']
 const faceOf = (tab: TabId) => (WARM.includes(tab) ? 'face-warm' : 'face-blueprint')
 
 function storedLang(): GuideLang {
@@ -164,7 +178,7 @@ function Shell() {
     )
   }
 
-  const groupTitle = (g: string) => (g === 'sdp' ? 'Sime Darby Property' : t(`group.${g}`))
+  const groupTitle = (g: string) => t(`group.${g}`)
 
   return (
     <div className={`app ${faceOf(cur.tab)} ${guideOpen ? 'guide-on' : ''}`}>
@@ -284,6 +298,21 @@ function Pane({ index, pane, units, active, split, version, onChange, onFocus, o
   const helper = useHelper(pane.me)
   const { setActing } = useActing()
   const [pending, setPending] = useState(0)
+  const [easy, setEasy] = useState(false)
+  const joined = me?.joined ?? true
+
+  // Easy mode is a private household setting, so it is read from the household's own profile.
+  useEffect(() => {
+    if (!joined) {
+      setEasy(false)
+      return
+    }
+    let live = true
+    api.profile(pane.me).then((p) => live && setEasy(p.easy_mode)).catch(() => live && setEasy(false))
+    return () => {
+      live = false
+    }
+  }, [pane.me, version, joined])
 
   // Amber dot on Evidence when a repair is waiting for this household's confirmation.
   useEffect(() => {
@@ -292,7 +321,7 @@ function Pane({ index, pane, units, active, split, version, onChange, onFocus, o
 
   const tab = (t: TabId) => onUpdate({ tab: t, peer: undefined })
   const screen = me && (
-    <div key={`${pane.tab}-${pane.me}`} className="screen-wrap">
+    <div key={`${pane.tab}-${pane.me}`} className={`screen-wrap ${easy ? 'easy' : ''}`}>
       {helper && (
         <div className="helper-banner" role="status">
           <HandHeart size={17} />
@@ -300,16 +329,21 @@ function Pane({ index, pane, units, active, split, version, onChange, onFocus, o
           <button className="btn btn-sm" onClick={() => setActing(null)}>{t('helpers.stop')}</button>
         </div>
       )}
-      {lang !== 'en' && !WARM.includes(pane.tab) && <div className="records-note"><Languages size={14} /> {t('records.english')}</div>}
+      {lang !== 'en' && !WARM.includes(pane.tab) && !(me && !me.joined && NEEDS_JOIN.includes(pane.tab)) && <div className="records-note"><Languages size={14} /> {t('records.english')}</div>}
+      {!me.joined && NEEDS_JOIN.includes(pane.tab) ? <JoinView me={me} onJoined={onChange} /> : <>
       {pane.tab === 'circle' && <CircleView me={me} units={units} version={version} onChange={onChange}
         onViewAs={(id) => onUpdate({ me: id })} onOpenChat={(peer) => onUpdate({ tab: 'chats', peer })} />}
       {pane.tab === 'chats' && <ChatsView me={me} version={version} onChange={onChange} peer={pane.peer} onPeer={(peer) => onUpdate({ peer })} />}
       {pane.tab === 'works' && <WorksView me={me} units={units} version={version} onChange={onChange} />}
       {pane.tab === 'evidence' && <EvidenceView me={me} version={version} onChange={onChange} />}
       {pane.tab === 'log' && <HistoryView me={me} version={version} />}
-      {pane.tab === 'sdp' && <DashboardView version={version} onChange={onChange} />}
+      {pane.tab === 'sdp' && <DashboardView version={version} onChange={onChange} onViewAs={(id) => onUpdate({ me: id, tab: 'circle', peer: undefined })} />}
+      {pane.tab === 'planner' && <PlannerView />}
+      {pane.tab === 'impact' && <ImpactView />}
+      {pane.tab === 'channels' && <ChannelsView me={me} version={version} />}
       {pane.tab === 'safeguards' && <SafeguardsView onGo={tab} />}
       {pane.tab === 'me' && <MeView me={me} version={version} onChange={onChange} onGo={tab} />}
+      </>}
     </div>
   )
 

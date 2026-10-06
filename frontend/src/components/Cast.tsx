@@ -49,8 +49,8 @@ export default function CastPicker({ units, me, onPick, compact = false }: {
       <button className={`cast-chip ${open ? 'on' : ''}`} onClick={() => setOpen((o) => !o)} aria-expanded={open} title={t('cast.title')}>
         <Avatar name={current.resident_name} size={compact ? 24 : 28} />
         <span className="cast-who">
-          <b>{current.resident_name} <i>· {current.label}</i></b>
-          {!compact && <small>{roleOf(current.id, t)}</small>}
+          <b>{current.joined ? <>{current.resident_name} <i>· {current.label}</i></> : current.label}</b>
+          {!compact && <small>{current.joined ? roleOf(current.id, t) : t('cast.notJoined')}</small>}
         </span>
         <ChevronDown size={15} />
       </button>
@@ -79,7 +79,7 @@ export default function CastPicker({ units, me, onPick, compact = false }: {
             {units.filter((u) => !CAST.includes(u.id)).map((u) => (
               <button key={u.id} className={u.id === me ? 'on' : ''} onClick={() => pick(u.id)} title={`${u.label} · ${u.resident_name}`}>
                 {u.kind === 'terrace' ? u.label.replace('No. ', '') : u.label.slice(2)}
-                <small>{u.resident_name}</small>
+                <small>{u.joined ? u.resident_name : t('cast.notJoined')}</small>
               </button>
             ))}
           </div>

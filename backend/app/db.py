@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from . import ledger
-from .seed import BIOS, PHASE, demo_notices, demo_units, handover_date
+from .seed import BIOS, CONSENT_VERSION, EASY_MODE, NOT_JOINED, PHASE, SEED_HELPERS, demo_notices, demo_units, handover_date
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS phases (
@@ -25,7 +25,12 @@ CREATE TABLE IF NOT EXISTS units (
     floor INTEGER,
     pos INTEGER,
     lang TEXT NOT NULL DEFAULT 'en',
-    handover_date TEXT NOT NULL
+    handover_date TEXT NOT NULL,
+    -- The name on SDP's sales record. Never shown to neighbours: it only pre-fills the join form for the owner.
+    record_name TEXT,
+    -- Set when the household joins and agrees to the privacy notice. Until then resident_name is the unit label.
+    joined_at TEXT,
+    consent_version TEXT
 );
 CREATE TABLE IF NOT EXISTS intros (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -203,7 +208,27 @@ CREATE TABLE IF NOT EXISTS profiles (
     accept_requests INTEGER NOT NULL DEFAULT 1,
     allow_waves INTEGER NOT NULL DEFAULT 1,
     quiet_mode INTEGER NOT NULL DEFAULT 0,
-    notices_read_at TEXT
+    notices_read_at TEXT,
+    easy_mode INTEGER NOT NULL DEFAULT 0,
+    whatsapp_alerts INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS join_codes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    unit_id TEXT NOT NULL REFERENCES units(id),
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT
+);
+CREATE TABLE IF NOT EXISTS paper_notices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    intro_id INTEGER NOT NULL REFERENCES intros(id),
+    unit_id TEXT NOT NULL REFERENCES units(id),
+    status TEXT NOT NULL DEFAULT 'to_print' CHECK (status IN ('to_print', 'printed', 'delivered', 'superseded')),
+    created_at TEXT NOT NULL,
+    printed_at TEXT,
+    delivered_at TEXT,
+    delivered_by TEXT
 );
 CREATE TABLE IF NOT EXISTS notices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -238,8 +263,8 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 6
-TABLES = ("delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
+SCHEMA_VERSION = 7
+TABLES = ("paper_notices", "join_codes", "delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
           "warranty_tickets", "gate_logs", "passes", "incidents", "photos",
           "intro_recipients", "intros", "events", "units", "phases")
 
@@ -264,16 +289,22 @@ def _seed(conn: sqlite3.Connection) -> None:
     conn.execute("INSERT INTO phases (id, name, note) VALUES (?, ?, ?)", (PHASE["id"], PHASE["name"], PHASE["note"]))
     handover = handover_date()
     for u in demo_units():
+        joined = u["id"] not in NOT_JOINED
         conn.execute(
             "INSERT INTO units (id, phase_id, kind, label, resident_name, terrace_row, facing_row, block, floor, pos,"
-            " lang, handover_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (u["id"], u["phase_id"], u["kind"], u["label"], u["resident_name"],
-             u.get("row"), u.get("facing_row"), u.get("block"), u.get("floor"), u["pos"], u["lang"], handover),
+            " lang, handover_date, record_name, joined_at, consent_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (u["id"], u["phase_id"], u["kind"], u["label"], u["resident_name"] if joined else u["label"],
+             u.get("row"), u.get("facing_row"), u.get("block"), u.get("floor"), u["pos"], u["lang"], handover,
+             u["resident_name"], handover if joined else None, CONSENT_VERSION if joined else None),
         )
         # Every home history starts with SDP's handover record.
         append_event(conn, u["id"], "handover", {"note": "Vacant possession; SDP handover inspection recorded",
                                                  "vacant_possession": handover})
-        conn.execute("INSERT INTO profiles (unit_id, bio) VALUES (?, ?)", (u["id"], BIOS.get(u["resident_name"], "")))
+        conn.execute("INSERT INTO profiles (unit_id, bio, easy_mode) VALUES (?, ?, ?)",
+                     (u["id"], BIOS.get(u["resident_name"], "") if joined else "", int(u["id"] in EASY_MODE)))
+    for unit_id, name, relation in SEED_HELPERS:
+        cur = conn.execute("INSERT INTO delegates (unit_id, name, relation, created_at) VALUES (?, ?, ?, ?)", (unit_id, name, relation, now()))
+        append_event(conn, unit_id, "delegate_added", {"delegate_id": cur.lastrowid, "name": name, "relation": relation})
     for audience, title, body in demo_notices():
         conn.execute("INSERT INTO notices (phase_id, audience, title, body, author, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                      (PHASE["id"], audience, title, body, "SDP Estate Team", now()))

@@ -20,7 +20,7 @@ export default function IntroWizard({ open, onClose, me, circle, onSent }: {
   const toast = useToast()
   const helper = useHelper(me.id)
   const [step, setStep] = useState(0)
-  const [picked, setPicked] = useState<Set<string>>(() => new Set(circle.filter((n) => !n.known).map((n) => n.id)))
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(circle.filter((n) => n.joined && !n.known).map((n) => n.id)))
   const [lang, setLang] = useState<Lang>(me.lang)
   const [draft, setDraft] = useState<string | null>(null)
   const [consent, setConsent] = useState(false)
@@ -71,12 +71,12 @@ export default function IntroWizard({ open, onClose, me, circle, onSent }: {
           <p className="wizard-lead">{t('intro.lead')}</p>
           <div className="pick-list">
             {circle.map((n) => (
-              <button key={n.id} className={`pick ${picked.has(n.id) ? 'on' : ''}`} onClick={() => toggle(n.id)} aria-pressed={picked.has(n.id)}>
+              <button key={n.id} className={`pick ${picked.has(n.id) ? 'on' : ''}`} onClick={() => toggle(n.id)} aria-pressed={picked.has(n.id)} disabled={!n.joined}>
                 <span className="pick-box">{picked.has(n.id) && <Check size={12} strokeWidth={3} />}</span>
                 <Avatar name={n.resident_name} size={32} />
                 <span className="grow">
-                  <b>{n.resident_name} <i>· {n.label}</i></b>
-                  <small>{t(`rel.${n.relation}`)}{n.known ? ` · ${t('intro.met')}` : ''}</small>
+                  <b>{n.joined ? <>{n.resident_name} <i>· {n.label}</i></> : n.label}</b>
+                  <small>{t(`rel.${n.relation}`)}{!n.joined ? ` · ${t('nj.status')}` : n.known ? ` · ${t('intro.met')}` : ''}</small>
                 </span>
               </button>
             ))}
@@ -121,7 +121,7 @@ export default function IntroWizard({ open, onClose, me, circle, onSent }: {
 
       <div className="wizard-foot">
         <button className="btn" onClick={step === 0 ? close : () => setStep(step - 1)}>{t(step === 0 ? 'btn.cancel' : 'btn.back')}</button>
-        <span className="muted small">{t('intro.selected', { n: picked.size, m: circle.length })}</span>
+        <span className="muted small">{t('intro.selected', { n: picked.size, m: circle.filter((n) => n.joined).length })}</span>
         {step < 2 ? (
           <button className="btn btn-primary" disabled={picked.size === 0} onClick={() => setStep(step + 1)}>{t('btn.next')}</button>
         ) : (

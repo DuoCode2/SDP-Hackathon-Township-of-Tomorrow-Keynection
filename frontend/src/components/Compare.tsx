@@ -13,7 +13,7 @@ interface Props {
   scan?: boolean
 }
 
-const HUD_COLOR = '#f0375f'
+const HUD_COLOR = 'var(--red-bright)'
 
 export default function Compare({ before, after, overlay, regions, leftLabel, rightLabel, scan = true }: Props) {
   const frame = useRef<HTMLDivElement>(null)

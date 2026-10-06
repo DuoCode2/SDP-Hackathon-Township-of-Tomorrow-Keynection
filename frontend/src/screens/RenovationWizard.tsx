@@ -25,13 +25,15 @@ const WORKS: { id: WorksType; icon: typeof Bath; scope: string }[] = [
 ]
 
 /** Register a renovation. Who gets the notice is worked out from the plan, not chosen by the owner. */
-export default function RenovationWizard({ open, onClose, me, units, names, onSent }: {
+export default function RenovationWizard({ open, onClose, me, units, names, onSent, estate }: {
   open: boolean
   onClose: () => void
   me: UnitInfo
   units: UnitInfo[]
   names: Record<string, string>
   onSent: () => void
+  /** Set when the estate office registers the renovation for an owner who signed the paper form. */
+  estate?: { staff: string }
 }) {
   const t = useT()
   const toast = useToast()
@@ -89,7 +91,9 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   async function send() {
     setSending(true)
     try {
-      const r = await api.sendIntro({ from_unit_id: me.id, message, lang, renovation: full, delegate_id: helper?.id })
+      const r = estate
+        ? await api.estateRenovation({ unit_id: me.id, staff_name: estate.staff, owner_signed: true, message, lang, renovation: full })
+        : await api.sendIntro({ from_unit_id: me.id, message, lang, renovation: full, delegate_id: helper?.id })
       toast(t('reno.sent', { n: r.recipients.length }))
       onSent()
       close()
@@ -110,7 +114,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
     <Sheet open={open} onClose={close} wide>
       <div className="wizard-head">
         <div>
-          <div className="eyebrow">{t('reno.eyebrow')}</div>
+          <div className="eyebrow">{estate ? `Estate office · for ${me.resident_name} (${me.label})` : t('reno.eyebrow')}</div>
           <div className="card-title" style={{ fontSize: 19 }}>{t('reno.title')}</div>
         </div>
         <Steps steps={STEPS.map((k) => t(k))} current={step} onJump={setStep} />
@@ -146,8 +150,8 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
               {zone?.map((z) => (
                 <li key={z.id}>
                   <b>{z.label}</b>
-                  <span>{z.resident_name ?? t('reno.hidden')}</span>
-                  <small>{t(`reason.${z.reason_key}`)}</small>
+                  <span>{z.joined === false ? t('nj.status') : z.resident_name ?? t('reno.hidden')}</span>
+                  <small>{t(`reason.${z.reason_key}`)}{z.joined === false ? ` · ${t('nj.paper')}` : ''}</small>
                 </li>
               ))}
               {zone?.length === 0 && <li className="muted">{t('reno.none')}</li>}

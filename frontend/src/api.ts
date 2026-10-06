@@ -15,6 +15,8 @@ export interface UnitInfo {
   lang: Lang
   handover_date: string
   renovating?: boolean
+  /** False until the household joins and agrees to the privacy notice; resident_name is then just the unit label. */
+  joined: boolean
 }
 
 export type Lang = 'en' | 'ms' | 'zh'
@@ -49,7 +51,7 @@ export interface NearbyHome extends Omit<UnitInfo, 'resident_name' | 'lang' | 'h
 }
 
 export interface Directory {
-  circle: (Neighbour & { known: boolean; bio?: string })[]
+  circle: (Neighbour & { known: boolean; bio?: string; lang: Lang | null })[]
   nearby: NearbyHome[]
   works: string[]
   ring2_label: string
@@ -272,7 +274,77 @@ export interface Profile {
   allow_waves: boolean
   quiet_mode: boolean
   lang: Lang
+  easy_mode: boolean
+  whatsapp_alerts: boolean
+  joined: boolean
   blocked: { id: string; label: string; resident_name: string }[]
+}
+
+export interface JoinInfo {
+  unit_id: string
+  label: string
+  kind: 'terrace' | 'apartment'
+  phase: string
+  suggested_name: string
+  lang: Lang
+  consent_version: string
+  circle_size: number
+  expires_at: string
+}
+
+export interface PaperNotice {
+  id: number
+  status: 'to_print' | 'printed' | 'delivered' | 'superseded'
+  created_at: string
+  printed_at: string | null
+  delivered_at: string | null
+  delivered_by: string | null
+  unit_id: string
+  unit_label: string
+  lang: Lang
+  intro_id: number
+  from_label: string
+  from_name: string
+  sent_by: string | null
+  message: string
+  renovation: Renovation | null
+}
+
+export interface FrontDesk {
+  households: number
+  joined: number
+  not_joined: { id: string; label: string; kind: string; code_issued_at: string | null; code_expires_at: string | null }[]
+  paper_notices: PaperNotice[]
+}
+
+export interface WhatsAppOutbox {
+  channel: 'whatsapp' | 'app' | 'paper'
+  lang: Lang
+  business_name?: string
+  messages: { at: string; kind: string; text: string; buttons: string[] }[]
+}
+
+export interface PhaseLayout {
+  lorongs: number
+  houses_per_row: number
+  facing: boolean
+  blocks: number
+  floors: number
+  units_per_floor: number
+}
+
+export interface PhasePlan {
+  homes: number
+  terrace_homes: number
+  apartment_homes: number
+  circle_sizes: Record<string, number>
+  avg_circle: number
+  fewer_neighbours: number
+  avg_ring2: number
+  notice_zone: Record<WorksType, { avg: number; max: number }>
+  took_ms: number
+  checks: string[]
+  units: { id: string; label: string; kind: string; circle: string[] }[]
 }
 
 export interface Official {
@@ -408,6 +480,8 @@ export interface HistoryEvent {
 
 export interface Dashboard {
   households: number
+  households_joined: number
+  paper_notices_pending: number
   intros_sent: number
   reply_rate: number | null
   households_with_a_known_neighbour: number
@@ -588,4 +662,15 @@ export const api = {
   reports: () => request<ModerationReport[]>('/api/moderation/reports'),
   reviewReport: (id: number, outcome: 'warned' | 'dismissed') => request(`/api/reports/${id}/review`, json('POST', { outcome })),
   resetDemo: () => request('/api/demo/reset', { method: 'POST' }),
+  issueJoinCode: (unitId: string) => request<{ token: string; expires_at: string }>(`/api/units/${unitId}/join-code`, { method: 'POST' }),
+  joinLookup: (token: string) => request<JoinInfo>('/api/join/lookup', json('POST', { token })),
+  join: (body: { token: string; display_name: string; lang: Lang; consent: boolean; whatsapp_alerts: boolean; easy_mode: boolean }) =>
+    request<UnitInfo>('/api/join', json('POST', body)),
+  frontDesk: () => request<FrontDesk>('/api/estate/frontdesk?phase_id=demo'),
+  paperStep: (id: number, step: 'printed' | 'delivered', staff: string) =>
+    request<PaperNotice>(`/api/paper-notices/${id}/${step}`, json('POST', { staff_name: staff })),
+  estateRenovation: (body: { unit_id: string; staff_name: string; owner_signed: boolean; message: string; lang: Lang; renovation: Renovation }) =>
+    request<{ id: number; recipients: string[]; paper_notices: string[] }>('/api/estate/renovations', json('POST', body)),
+  whatsapp: (unitId: string) => request<WhatsAppOutbox>(`/api/units/${unitId}/whatsapp`),
+  planPhase: (layout: PhaseLayout) => request<PhasePlan>('/api/planner/preview', json('POST', layout)),
 }

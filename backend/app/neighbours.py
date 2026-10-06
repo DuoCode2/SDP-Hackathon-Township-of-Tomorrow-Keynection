@@ -49,16 +49,24 @@ def inverse_relation(relation: str) -> str:
     return _INVERSE[relation]
 
 
-def neighbour_circle(unit: Unit, units: list[Unit]) -> list[Neighbour]:
+def slot_index(units: list[Unit]) -> dict[str, dict[tuple, Unit]]:
+    """Where every home sits, for fast lookups when the same layout is asked about many times."""
+    return {
+        "terrace": {(u.row, u.pos): u for u in units if u.kind == "terrace"},
+        "apartment": {(u.block, u.floor, u.pos): u for u in units if u.kind == "apartment"},
+    }
+
+
+def neighbour_circle(unit: Unit, units: list[Unit], index: dict | None = None) -> list[Neighbour]:
     if unit.kind == "terrace":
-        return _terrace_circle(unit, units)
+        return _terrace_circle(unit, units, index)
     if unit.kind == "apartment":
-        return _apartment_circle(unit, units)
+        return _apartment_circle(unit, units, index)
     raise ValueError(f"unknown unit kind: {unit.kind}")
 
 
-def _terrace_circle(unit: Unit, units: list[Unit]) -> list[Neighbour]:
-    by_slot = {(u.row, u.pos): u for u in units if u.kind == "terrace"}
+def _terrace_circle(unit: Unit, units: list[Unit], index: dict | None = None) -> list[Neighbour]:
+    by_slot = index["terrace"] if index else {(u.row, u.pos): u for u in units if u.kind == "terrace"}
     wanted = [
         ((unit.row, unit.pos - 1), "left"),
         ((unit.row, unit.pos + 1), "right"),
@@ -69,8 +77,8 @@ def _terrace_circle(unit: Unit, units: list[Unit]) -> list[Neighbour]:
     return [Neighbour(by_slot[slot].id, relation) for slot, relation in wanted if slot in by_slot]
 
 
-def _apartment_circle(unit: Unit, units: list[Unit]) -> list[Neighbour]:
-    by_slot = {(u.block, u.floor, u.pos): u for u in units if u.kind == "apartment"}
+def _apartment_circle(unit: Unit, units: list[Unit], index: dict | None = None) -> list[Neighbour]:
+    by_slot = index["apartment"] if index else {(u.block, u.floor, u.pos): u for u in units if u.kind == "apartment"}
     wanted = [
         ((unit.block, unit.floor, unit.pos - 1), "left"),
         ((unit.block, unit.floor, unit.pos + 1), "right"),
@@ -80,7 +88,7 @@ def _apartment_circle(unit: Unit, units: list[Unit]) -> list[Neighbour]:
     return [Neighbour(by_slot[slot].id, relation) for slot, relation in wanted if slot in by_slot]
 
 
-def impact_zone(unit: Unit, units: list[Unit], works_type: str) -> list[Neighbour]:
+def impact_zone(unit: Unit, units: list[Unit], works_type: str, index: dict | None = None) -> list[Neighbour]:
     """Who must be told before a renovation starts, by type of work.
 
     wet (bathroom, kitchen, plumbing): leaks travel down, so two floors below as well.
@@ -90,9 +98,9 @@ def impact_zone(unit: Unit, units: list[Unit], works_type: str) -> list[Neighbou
     if works_type not in WORKS_TYPES:
         raise ValueError(f"unknown works type: {works_type}")
     if unit.kind == "terrace":
-        circle = _terrace_circle(unit, units)
+        circle = _terrace_circle(unit, units, index)
         return [n for n in circle if n.relation in ("left", "right")] if works_type == "light" else circle
-    by_slot = {(u.block, u.floor, u.pos): u for u in units if u.kind == "apartment"}
+    by_slot = index["apartment"] if index else {(u.block, u.floor, u.pos): u for u in units if u.kind == "apartment"}
     b, f, p = unit.block, unit.floor, unit.pos
     wanted = [((b, f, p - 1), "left"), ((b, f, p + 1), "right")]
     if works_type == "wet":

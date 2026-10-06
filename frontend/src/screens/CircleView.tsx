@@ -84,7 +84,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
   const names: Record<string, string> = { [me.id]: me.resident_name }
   circle.forEach((n) => { names[n.id] = n.resident_name })
   nearby.forEach((n) => { if (n.resident_name) names[n.id] = n.resident_name })
-  const unknown = circle.filter((n) => !n.known).length
+  const unknown = circle.filter((n) => n.joined && !n.known).length
   const pendingIn = reqs?.incoming.filter((r) => r.status === 'pending') ?? []
 
   async function wave(n: Member) {
@@ -114,16 +114,16 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
     <section className="screen">
       <ScreenTitle eyebrow={`${me.label} · ${me.kind === 'terrace' ? 'Jalan Demo 1' : t('place.block', { b: me.block ?? '' })}`} title={t('circle.title')}
         subtitle={t('circle.subtitle')}
-        aside={<Segmented value={mode} onChange={setMode} options={[{ id: 'people', label: t('circle.people') }, { id: 'map', label: t('circle.map') }]} />} />
+        aside={<span className="hide-easy"><Segmented value={mode} onChange={setMode} options={[{ id: 'people', label: t('circle.people') }, { id: 'map', label: t('circle.map') }]} /></span>} />
 
       {!dir ? <Card><Skeleton lines={6} /></Card> : mode === 'people' ? (
         <>
           <div className="stories" role="list" aria-label="Your circle">
             {circle.map((n) => (
-              <button key={n.id} role="listitem" className={`story ${works.has(n.id) ? 'works' : n.known ? 'known' : 'new'}`} onClick={() => setProfile(n)}>
+              <button key={n.id} role="listitem" className={`story ${!n.joined ? 'off' : works.has(n.id) ? 'works' : n.known ? 'known' : 'new'}`} onClick={() => setProfile(n)}>
                 <span className="story-ring"><Avatar name={n.resident_name} size={58} /></span>
                 <b>{n.resident_name}</b>
-                <small>{works.has(n.id) ? t('story.renovating') : n.known ? n.label : t('story.sayHi')}</small>
+                <small>{!n.joined ? t('nj.story') : works.has(n.id) ? t('story.renovating') : n.known ? n.label : t('story.sayHi')}</small>
               </button>
             ))}
           </div>
@@ -154,7 +154,19 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
 
           <div className="section-label">{t('section.nextDoor')}</div>
           <div className="people-grid">
-            {circle.map((n) => (
+            {circle.map((n) => !n.joined ? (
+              <article key={n.id} className="person-card off">
+                <button className="person-card-top" onClick={() => setProfile(n)}>
+                  <Avatar name={n.resident_name} size={46} />
+                  <span className="grow">
+                    <b>{n.label}</b>
+                    <small>{shares(t, n.relation)}</small>
+                  </span>
+                </button>
+                <div className="person-status">{t('nj.status')}</div>
+                <p className="person-bio muted">{t('nj.note')}</p>
+              </article>
+            ) : (
               <article key={n.id} className={`person-card ${works.has(n.id) ? 'works' : ''}`}>
                 <button className="person-card-top" onClick={() => setProfile(n)}>
                   <Avatar name={n.resident_name} size={46} />
@@ -179,7 +191,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
             ))}
           </div>
 
-          <div className="section-label">{t('section.ring2', { place: dir.ring2_label })}</div>
+          <div className="section-label ring2-label">{t('section.ring2', { place: dir.ring2_label })}</div>
           <p className="ring2-note"><Lock size={12} /> {t('ring2.note')}</p>
           <div className="nearby-grid">
             {nearby.map((h) => (
@@ -257,6 +269,19 @@ function ProfileSheet({ n, works, onClose, onMessage, onWave, onViewAs }: {
   onViewAs: () => void
 }) {
   const t = useT()
+  if (!n.joined) {
+    return (
+      <Sheet open onClose={onClose}>
+        <div className="profile-hero">
+          <span className="story-ring big off"><Avatar name={n.resident_name} size={84} /></span>
+          <h2>{n.label}</h2>
+          <div className="profile-sub">{shares(t, n.relation)} · {t('nj.status')}</div>
+        </div>
+        <div className="wizard-note"><Lock size={13} /> {t('nj.note')}</div>
+        <button className="link-btn demo-link" onClick={onViewAs}><Eye size={13} /> {t('panel.viewAs')}</button>
+      </Sheet>
+    )
+  }
   return (
     <Sheet open onClose={onClose}>
       <div className="profile-hero">
@@ -304,6 +329,17 @@ function HomePanel({ id, me, units, dir, reqs, works, onClose, onMessage, onView
   let body
   if (id === me.id) {
     body = <div className="home-panel-body"><b>{t('panel.you')}</b><small>{t('demo.role', { role: roleOf(me.id, t) })} · {t('panel.reads', { lang: langName(t, me.lang) })}</small></div>
+  } else if (member && !member.joined) {
+    body = (
+      <>
+        <div className="home-panel-who">
+          <span className="unit-chip">{short}</span>
+          <div className="grow"><b>{member.label}</b><small>{shares(t, member.relation)} · {t('nj.status')}</small></div>
+          <Badge tone="brand">{t('badge.circle')}</Badge>
+        </div>
+        <p className="home-panel-note">{t('nj.note')}</p>
+      </>
+    )
   } else if (member) {
     body = (
       <>
@@ -427,13 +463,14 @@ function Welcome({ me, circle, onShown, onClose, onIntro }: {
         <p>{t('welcome.body', { label: me.label, date: formatDate(me.handover_date), n: circle.length })}</p>
         <div className="welcome-doors">
           {circle.map((n, i) => (
-            <div key={n.id} className="welcome-door" style={{ ['--i' as string]: i }}>
+            <div key={n.id} className={`welcome-door ${n.joined ? '' : 'off'}`} style={{ ['--i' as string]: i }}>
               <Avatar name={n.resident_name} size={64} />
               <b>{n.resident_name}</b>
-              <small>{shares(t, n.relation)}</small>
+              <small>{n.joined ? shares(t, n.relation) : t('nj.status')}</small>
             </div>
           ))}
         </div>
+        {circle.some((n) => !n.joined) && <small className="welcome-nj">{t('nj.welcome', { n: circle.filter((n) => !n.joined).length })}</small>}
         <div className="welcome-actions">
           <button className="btn" onClick={() => onClose(hide)}>{t('welcome.later')}</button>
           <button className="btn btn-primary" onClick={() => { onClose(hide); onIntro() }}>👋 {t('welcome.hello')}</button>

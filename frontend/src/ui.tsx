@@ -105,7 +105,12 @@ export function CountUp({ value, suffix = '' }: { value: number; suffix?: string
       if (p < 1) frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
+    // Animation frames pause in background tabs; make sure the real number always lands.
+    const done = window.setTimeout(() => setShown(value), 800)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.clearTimeout(done)
+    }
   }, [value])
   return (
     <>
@@ -129,8 +134,8 @@ export function Ring({ value, label }: { value: number | null; label: string }) 
         <svg viewBox="0 0 74 74" aria-hidden>
           <defs>
             <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#12b8a6" />
-              <stop offset="100%" stopColor="#2f8cf5" />
+              <stop offset="0%" style={{ stopColor: 'var(--grad-a)' }} />
+              <stop offset="100%" style={{ stopColor: 'var(--grad-b)' }} />
             </linearGradient>
           </defs>
           <circle className="track" cx="37" cy="37" r={r} />

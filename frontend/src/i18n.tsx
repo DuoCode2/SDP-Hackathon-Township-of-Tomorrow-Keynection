@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import { ApiError } from './api'
 
 // Interface language for the resident (warm) screens: English, Bahasa Melayu, 中文.
@@ -194,7 +194,7 @@ const D: Record<string, Entry> = {
   'private.title': ['Keep contact details private', 'Rahsiakan butiran hubungan', '联系方式请保密'],
   'private.body': ['Please don’t put phone numbers, emails or links here. Exchange numbers in a chat when you both agree.', 'Jangan letak nombor telefon, e-mel atau pautan di sini. Tukar nombor dalam sembang apabila anda berdua bersetuju.', '这里不要写电话号码、电邮或链接。双方同意后，可以在聊天里交换号码。'],
   'official.title': ['Name not allowed', 'Nama tidak dibenarkan', '不能用这个名字'],
-  'official.body': ['A helper’s name can’t look like SDP, the estate office or an official account.', 'Nama pembantu tidak boleh menyerupai SDP, pejabat estet atau akaun rasmi.', '代办人的名字不能像 SDP、物业办公室或官方帐号。'],
+  'official.body': ['A name can’t look like SDP, the estate office or an official account.', 'Nama tidak boleh menyerupai SDP, pejabat estet atau akaun rasmi.', '名字不能像 SDP、物业办公室或官方帐号。'],
   'records.english': ['', 'Rekod rasmi kekal dalam Bahasa Inggeris, supaya SDP, kontraktor dan Tribunal Tuntutan Pembeli Rumah membaca rekod yang sama.', '正式纪录统一用英文，让 SDP、承包商和购屋者索偿审裁庭看到同一份内容。'],
   'thread.arrives': ['{name} receives: “{text}”', '{name} menerima: “{text}”', '{name} 收到的是：「{text}」'],
   'tone.title': ['Tone check', 'Semakan nada', '语气提醒'],
@@ -281,6 +281,69 @@ const D: Record<string, Entry> = {
   'data.download': ['Download my data', 'Muat turun data saya', '下载我的资料'], 'data.downloading': ['Your data file is downloading', 'Fail data anda sedang dimuat turun', '正在下载你的资料'],
   'data.note': ['Other residents appear by unit only. Voice messages are deleted after 30 days.', 'Penduduk lain dipaparkan mengikut unit sahaja. Mesej suara dipadam selepas 30 hari.', '其他住户只以门牌显示；语音讯息会在 30 天后删除。'],
   'data.leave': ['Leaving Jiran5 removes your profile and chats; the home log stays with the unit as part of the property’s record. (Pilot)', 'Meninggalkan Jiran5 membuang profil dan sembang anda; log rumah kekal bersama unit sebagai rekod hartanah. (Perintis)', '退出 Jiran5 会删除你的资料和聊天；屋历会留在这间房子，作为房产纪录。（试点）'],
+
+  // new SDP pages (nav only: the pages themselves are records screens, in English)
+  'group.sdp': ['Sime Darby Property', 'Sime Darby Property', 'Sime Darby Property'],
+  'nav.planner': ['Phase setup', 'Tetapan fasa', '新 phase 设定'], 'nav.planner.sub': ['Circles from the site plan', 'Bulatan daripada pelan tapak', '从平面图算出邻里圈'], 'nav.planner.short': ['Setup', 'Tetapan', '设定'],
+  'nav.impact': ['Impact model', 'Model impak', '影响估算'], 'nav.impact.sub': ['Assumptions you can change', 'Andaian yang boleh diubah', '可以调整的假设'], 'nav.impact.short': ['Impact', 'Impak', '影响'],
+  'nav.channels': ['Channels', 'Saluran', '触达管道'], 'nav.channels.sub': ['SDP App & WhatsApp', 'Aplikasi SDP & WhatsApp', 'SDP App 与 WhatsApp'], 'nav.channels.short': ['Channels', 'Saluran', '管道'],
+
+  // households that haven't joined yet
+  'nj.status': ['Not on Jiran5 yet', 'Belum menyertai Jiran5', '还没加入 Jiran5'],
+  'nj.note': ['They haven’t joined yet, so their name stays private. The estate office gives them formal notices on paper.', 'Mereka belum menyertai, jadi nama mereka dirahsiakan. Pejabat estet menyampaikan notis rasmi secara bercetak.', '对方还没加入，所以名字保密。物业办公室会把正式通知印出来交给他们。'],
+  'nj.story': ['Not joined', 'Belum sertai', '未加入'],
+  'nj.paper': ['Not on Jiran5: the estate office delivers a paper notice', 'Belum di Jiran5: pejabat estet menghantar notis bercetak', '还没加入：由物业办公室送纸本通知'],
+  'nj.welcome': ['{n} of these homes isn’t on Jiran5 yet. The estate office gives them your notices on paper.', '{n} daripada rumah ini belum di Jiran5. Pejabat estet menyampaikan notis anda secara bercetak.', '其中 {n} 户还没加入 Jiran5，物业办公室会把你的通知印出来交给他们。'],
+  'cast.notJoined': ['Not joined yet', 'Belum menyertai', '还没加入'],
+
+  // joining at handover
+  'join.eyebrow': ['Welcome to {phase}', 'Selamat datang ke {phase}', '欢迎来到 {phase}'],
+  'join.title': ['{label} isn’t on Jiran5 yet', '{label} belum menyertai Jiran5', '{label} 还没加入 Jiran5'],
+  'join.lead': ['Your join code is in the welcome pack from SDP’s handover team. Scan the QR code, or ask the estate office for a new one.', 'Kod penyertaan anda ada dalam pek selamat datang daripada pasukan serah kunci SDP. Imbas kod QR, atau minta kod baharu di pejabat estet.', '加入码在 SDP 交屋团队给你的欢迎礼包里。扫描 QR 码，或到物业办公室领一个新的。'],
+  'join.paste': ['Join code', 'Kod penyertaan', '加入码'], 'join.use': ['Use this code', 'Guna kod ini', '使用这个码'],
+  'join.demo': ['Get a code from the front desk (demo)', 'Dapatkan kod dari kaunter (demo)', '向物业柜台领码（演示）'],
+  'join.steps.home': ['Your home', 'Rumah anda', '你的家'], 'join.steps.you': ['You', 'Anda', '你'], 'join.steps.privacy': ['Privacy', 'Privasi', '隐私'],
+  'join.homeTitle': ['{label} · {phase}', '{label} · {phase}', '{label} · {phase}'],
+  'join.homeBody': ['{n} homes share a wall, a slab or a road with yours. Jiran5 introduces you to them, and keeps renovations and repairs fair and on record.', '{n} rumah berkongsi dinding, lantai atau jalan dengan rumah anda. Jiran5 memperkenalkan anda kepada mereka, dan memastikan ubah suai serta pembaikan adil dan direkodkan.', '有 {n} 户跟你共用墙、楼板或面对面。Jiran5 帮你认识他们，也让装修和维修公平、有纪录。'],
+  'join.b1': ['Say hello and chat with the homes around you, in your language', 'Bertegur sapa dan berbual dengan jiran di sekeliling, dalam bahasa anda', '用你的语言，跟身边的住户打招呼、聊天'],
+  'join.b2': ['Get renovation notices before work starts, and raise concerns privately', 'Terima notis ubah suai sebelum kerja bermula, dan luahkan kebimbangan secara peribadi', '开工前收到装修通知，可以私下反映问题'],
+  'join.b3': ['Keep photo evidence and follow SDP repairs until you are satisfied', 'Simpan bukti foto dan ikuti pembaikan SDP sehingga anda berpuas hati', '保存照片证据，跟进 SDP 维修直到你满意'],
+  'join.name': ['Name your neighbours will see', 'Nama yang dilihat jiran', '邻居看到的名字'],
+  'join.nameHint': ['Your first name or what neighbours call you. No surname, phone number or email.', 'Nama pertama atau panggilan anda. Tanpa nama keluarga, nombor telefon atau e-mel.', '你的名字或邻居怎么称呼你。不要写姓氏、电话或电邮。'],
+  'join.lang': ['Language you read', 'Bahasa bacaan anda', '你阅读的语言'],
+  'join.easy': ['Easy mode: bigger text and buttons, fewer options', 'Mod mudah: teks dan butang lebih besar, pilihan lebih sedikit', '简易模式：字和按钮更大、选项更少'],
+  'join.privacyTitle': ['How Jiran5 uses your information', 'Bagaimana Jiran5 menggunakan maklumat anda', 'Jiran5 怎样使用你的资料'],
+  'join.p1t': ['What we keep', 'Apa yang kami simpan', '我们保存什么'],
+  'join.p1': ['The name you chose, your unit, your language, your messages, photos you upload and your home log.', 'Nama pilihan anda, unit, bahasa, mesej, foto yang dimuat naik dan log rumah anda.', '你选的名字、门牌、语言、讯息、上传的照片和屋历。'],
+  'join.p2t': ['Who sees what', 'Siapa nampak apa', '谁看得到什么'],
+  'join.p2': ['Your circle sees your name. Others see only your unit number. Your phone number stays private unless you both agree.', 'Bulatan anda nampak nama anda. Orang lain hanya nampak nombor unit. Nombor telefon kekal rahsia kecuali anda berdua bersetuju.', '邻里圈看得到你的名字，其他人只看到门牌。除非双方同意，电话号码保密。'],
+  'join.p3t': ['How long', 'Berapa lama', '保存多久'],
+  'join.p3': ['Voice messages: 30 days. Records: the defect liability period plus one year. The home log stays with the unit.', 'Mesej suara: 30 hari. Rekod: tempoh liabiliti kecacatan ditambah satu tahun. Log rumah kekal bersama unit.', '语音：30 天。纪录：保修期再加一年。屋历跟着这间房子。'],
+  'join.p4t': ['Your rights', 'Hak anda', '你的权利'],
+  'join.p4': ['Download your data any time, correct it, or ask the estate office to close your account.', 'Muat turun data anda bila-bila masa, betulkannya, atau minta pejabat estet menutup akaun anda.', '随时下载、更正你的资料，或请物业办公室关闭帐户。'],
+  'join.consent': ['I have read this privacy notice ({version}) and agree to it.', 'Saya telah membaca notis privasi ini ({version}) dan bersetuju.', '我已阅读这份隐私声明（{version}）并同意。'],
+  'join.wa': ['Send me short alerts on WhatsApp (never the content of messages)', 'Hantar notifikasi ringkas melalui WhatsApp (tanpa isi mesej)', '用 WhatsApp 发简短通知给我（不会有讯息内容）'],
+  'join.finish': ['Join Jiran5', 'Sertai Jiran5', '加入 Jiran5'],
+  'join.done': ['Welcome to Jiran5, {name}!', 'Selamat datang ke Jiran5, {name}!', '{name}，欢迎加入 Jiran5！'],
+  'join.expired': ['This join code isn’t valid any more. Ask the estate office for a new one.', 'Kod ini tidak sah lagi. Minta kod baharu di pejabat estet.', '这个加入码已失效，请到物业办公室领新的。'],
+  'join.expires': ['Code valid until {date}, once', 'Kod sah sehingga {date}, sekali sahaja', '这个码在 {date} 前有效，只能用一次'],
+
+  // easy mode and WhatsApp alerts
+  'me.easy': ['Easy mode', 'Mod mudah', '简易模式'],
+  'me.easySub': ['Bigger text and buttons, fewer options. Only you see this setting.', 'Teks dan butang lebih besar, pilihan lebih sedikit. Hanya anda nampak tetapan ini.', '字和按钮更大、选项更少，只有你看得到这个设定。'],
+  'me.easyOn': ['Easy mode on', 'Mod mudah dihidupkan', '已开启简易模式'], 'me.easyOff': ['Easy mode off', 'Mod mudah dimatikan', '已关闭简易模式'],
+  'me.wa': ['WhatsApp alerts', 'Notifikasi WhatsApp', 'WhatsApp 通知'],
+  'me.waSub': ['Short alerts from the Jiran5 account. What neighbours write stays in Jiran5.', 'Notifikasi ringkas daripada akaun Jiran5. Apa yang ditulis jiran kekal dalam Jiran5.', '来自 Jiran5 帐号的简短通知，邻居写的内容留在 Jiran5。'],
+
+  // paper notice (printed by the estate office)
+  'paper.title': ['Renovation notice', 'Notis ubah suai', '装修通知'],
+  'paper.to': ['To the residents of {label}', 'Kepada penghuni {label}', '致 {label} 的住户'],
+  'paper.from': ['From {name} ({label}), who is renovating nearby', 'Daripada {name} ({label}), yang mengubah suai berhampiran', '来自在附近装修的 {name}（{label}）'],
+  'paper.registered': ['Registered by {who}', 'Didaftarkan oleh {who}', '由 {who} 登记'],
+  'paper.photo': ['Before work starts, take photos of your walls, ceiling and floor on the side facing the works. They protect you if anything changes.', 'Sebelum kerja bermula, ambil foto dinding, siling dan lantai di bahagian yang menghadap kerja. Foto ini melindungi anda jika ada perubahan.', '开工前，请拍下靠近工程那一边的墙、天花板和地板。万一有变化，这些照片能保护你。'],
+  'paper.concern': ['Worried about noise, debris or damage? Tell the estate office: they will pass it on and keep a record.', 'Bimbang tentang bising, sisa binaan atau kerosakan? Beritahu pejabat estet: mereka akan menyampaikannya dan merekodkannya.', '担心噪音、垃圾或损坏？请告诉物业办公室，他们会转达并留下纪录。'],
+  'paper.join': ['You can also join Jiran5 with the code in your SDP welcome pack, to get notices on your phone.', 'Anda juga boleh menyertai Jiran5 dengan kod dalam pek selamat datang SDP untuk menerima notis di telefon.', '你也可以用 SDP 欢迎礼包里的加入码加入 Jiran5，在手机上收通知。'],
+  'paper.delivered': ['Delivered by the estate office', 'Dihantar oleh pejabat estet', '由物业办公室送达'],
 }
 
 export type Translate = (key: string, vars?: Record<string, string | number>) => string
@@ -298,6 +361,9 @@ function translate(lang: UiLang, key: string, vars?: Record<string, string | num
 export function refusal(e: unknown): string | null {
   return e instanceof ApiError && (e.code === 'tone' || e.code === 'private' || e.code === 'official') ? e.code : null
 }
+
+/** A translator fixed to one language, e.g. a printed notice in the recipient's language. */
+export const tIn = (lang: UiLang): Translate => (k, v) => translate(lang, k, v)
 
 /** English only: for the records screens and the SDP side, whatever the interface language. */
 export const tEn: Translate = (k, v) => translate('en', k, v)
@@ -334,6 +400,12 @@ export function LangProvider({ children }: { children: ReactNode }) {
   }, [])
   const t = useCallback<Translate>((k, v) => translate(lang, k, v), [lang])
   return <LangContext.Provider value={{ lang, setLang, t }}>{children}</LangContext.Provider>
+}
+
+/** SDP-side screens that reuse a resident component (e.g. the renovation form at the front desk) stay in English. */
+export function EnglishOnly({ children }: { children: ReactNode }) {
+  const value = useMemo(() => ({ lang: 'en' as UiLang, setLang: () => {}, t: tEn }), [])
+  return <LangContext.Provider value={value}>{children}</LangContext.Provider>
 }
 
 export const useLang = () => useContext(LangContext)

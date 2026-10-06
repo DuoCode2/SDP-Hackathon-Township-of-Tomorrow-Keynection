@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  ArrowUpRight, BellOff, Ban, Check, Download, EyeOff, Hand, HandHeart, Hexagon, Languages, Lock, ShieldHalf, UserPlus, UserRound,
+  ArrowUpRight, BellOff, Ban, Check, Download, EyeOff, Hand, HandHeart, Hexagon, Languages, Lock, MessageCircle, ShieldHalf, Type, UserPlus, UserRound,
 } from 'lucide-react'
 import { api, type Delegate, type Lang, type Profile, type UnitInfo } from '../api'
 import type { TabId } from '../guide'
@@ -95,6 +95,10 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
               on={p.allow_waves} disabled={saving || p.quiet_mode} onChange={(v) => update({ allow_waves: v })} />
             <ToggleRow icon={<BellOff size={16} />} title={t('me.quiet')} sub={t('me.quietSub')}
               on={p.quiet_mode} disabled={saving} onChange={(v) => update({ quiet_mode: v }, t(v ? 'me.quietOn' : 'me.quietOff'))} />
+            <ToggleRow icon={<MessageCircle size={16} />} title={t('me.wa')} sub={t('me.waSub')}
+              on={p.whatsapp_alerts} disabled={saving} onChange={(v) => update({ whatsapp_alerts: v })} />
+            <ToggleRow icon={<Type size={16} />} title={t('me.easy')} sub={t('me.easySub')}
+              on={p.easy_mode} disabled={saving} onChange={(v) => update({ easy_mode: v }, t(v ? 'me.easyOn' : 'me.easyOff'))} />
           </Card>
 
           <Helpers me={me} version={version} onChange={onChange} />

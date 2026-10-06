@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Activity, Building2, Clock4, Flag, Handshake, HeartHandshake, House, Inbox, KeyRound, Megaphone, MessagesSquare, MicOff, RotateCcw, Send, ShieldCheck, ShieldX, Sparkles, Wrench } from 'lucide-react'
+import { Activity, Building2, Clock4, Flag, Handshake, HeartHandshake, House, Inbox, KeyRound, Megaphone, MessagesSquare, MicOff, RotateCcw, Send, ShieldCheck, ShieldX, Sparkles, UserCheck, Wrench } from 'lucide-react'
 import { api, type Concern, type Dashboard, type ModerationReport, type Notice, type WarrantyTicket } from '../api'
 import ConcernCard from '../components/ConcernCard'
+import FrontDesk from '../components/FrontDesk'
 import WarrantyClock from '../components/WarrantyClock'
 import { Badge, Card, CardHead, CountUp, Empty, formatDate, Ring, ScreenTitle, Segmented, Skeleton, useToast } from '../ui'
 import { TICKET_BADGE } from './RepairView'
@@ -9,14 +10,14 @@ import { replayWelcome } from './CircleView'
 
 const SUBCONTRACTORS = ['Jaya Plaster Sdn Bhd', 'Kemas Waterproofing', 'Bina Teguh Builders']
 
-export default function DashboardView({ version, onChange }: { version: number; onChange: () => void }) {
+export default function DashboardView({ version, onChange, onViewAs }: { version: number; onChange: () => void; onViewAs?: (unitId: string) => void }) {
   const toast = useToast()
   const [d, setD] = useState<Dashboard | null>(null)
   const [queue, setQueue] = useState<WarrantyTicket[]>([])
   const [concerns, setConcerns] = useState<Concern[]>([])
   const [reports, setReports] = useState<ModerationReport[]>([])
   const [notices, setNotices] = useState<Notice[]>([])
-  const [desk, setDesk] = useState<'warranty' | 'estate' | 'safety' | 'notices'>('warranty')
+  const [desk, setDesk] = useState<'warranty' | 'estate' | 'safety' | 'notices' | 'frontdesk'>('warranty')
 
   useEffect(() => {
     let live = true
@@ -36,7 +37,7 @@ export default function DashboardView({ version, onChange }: { version: number; 
   async function reset() {
     await api.resetDemo()
     try {
-      Object.keys(sessionStorage).filter((k) => k.startsWith('j5pass:')).forEach((k) => sessionStorage.removeItem(k))
+      Object.keys(sessionStorage).filter((k) => k.startsWith('j5pass:') || k.startsWith('j5join:')).forEach((k) => sessionStorage.removeItem(k))
       replayWelcome()
     } catch {
       /* storage blocked */
@@ -56,6 +57,7 @@ export default function DashboardView({ version, onChange }: { version: number; 
       ) : (
         <>
           <div className="kpi-strip">
+            <Kpi icon={<UserCheck size={14} />} label="Joined Jiran5" value={d.households_joined} sub={`of ${d.households} homes · ${d.paper_notices_pending} on paper`} />
             <Kpi icon={<House size={14} />} label="Know a neighbour" value={d.households_with_a_known_neighbour} sub={`of ${d.households} homes`} />
             <Kpi icon={<MessagesSquare size={14} />} label="Messages" value={d.messages_sent} sub={`${d.intros_sent} intros · ${d.contact_requests_accepted}/${d.contact_requests} requests accepted`} />
             <Kpi icon={<Handshake size={14} />} label="Settled by neighbours" value={d.concerns_settled_by_neighbours} sub={`of ${d.concerns_raised} concerns`} />
@@ -71,6 +73,7 @@ export default function DashboardView({ version, onChange }: { version: number; 
                 { id: 'estate', label: `Estate · ${d.concerns_with_estate}` },
                 { id: 'safety', label: `Safety · ${d.reports_open}` },
                 { id: 'notices', label: 'Notices' },
+                { id: 'frontdesk', label: `Front desk · ${d.households - d.households_joined + d.paper_notices_pending}` },
               ]} />
               {desk === 'warranty' && (
                 <Card>
@@ -110,6 +113,7 @@ export default function DashboardView({ version, onChange }: { version: number; 
                 </Card>
               )}
               {desk === 'notices' && <NoticeDesk notices={notices} onChange={onChange} />}
+              {desk === 'frontdesk' && <FrontDesk version={version} onChange={onChange} onViewAs={onViewAs} />}
             </div>
 
             <div className="col sticky">

@@ -1,7 +1,7 @@
 // Text for the guide panel: what each screen does and the demo route, in Chinese (for the team) and English (for judges).
 
 export type GuideLang = 'zh' | 'en'
-export type TabId = 'circle' | 'chats' | 'works' | 'evidence' | 'log' | 'me' | 'sdp' | 'safeguards'
+export type TabId = 'circle' | 'chats' | 'works' | 'evidence' | 'log' | 'me' | 'sdp' | 'planner' | 'impact' | 'channels' | 'safeguards'
 
 type Text = Record<GuideLang, string>
 type List = Record<GuideLang, string[]>
@@ -45,6 +45,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         '同一条 lorong 或同一栋（像「你可能认识的人」）：只看到门牌，按「Request」写原因，对方接受才看到名字、才能聊',
         '右上角切到「Map」：建筑蓝图平面图，公寓有楼层剖面图和「YOUR STACK」',
         '没有住户名册、没有大群组；物业公告移到 Chats 里的官方帐号',
+        '还没加入的邻居（No. 23）只显示门牌、不能传讯息；装修通知由物业办公室印纸本送过去',
       ],
       en: [
         'A row of faces at the top (like IG stories): orange ring + 🔨 is renovating, blue dot is not met yet, green ring is known; tap for a mini profile',
@@ -53,6 +54,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Your lorong or block (like "people you may know"): unit numbers only; Request with a reason, names and chat once accepted',
         'Switch to "Map" for the blueprint plan; apartments get a floor section with "YOUR STACK"',
         'No resident directory, no group chat; estate notices live in an official account in Chats',
+        'A neighbour who hasn’t joined (No. 23) shows as a unit number and can’t be messaged; the estate office delivers their renovation notices on paper',
       ],
     },
     why: {
@@ -189,6 +191,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         '数据：多少不满在邻居之间就解决了、回覆率、开工前照片覆盖率、屋主关单比例',
         '邻里关系：隔壁之间互相认识的比例、从交屋到第一次打招呼的天数、30 天内活跃的邻里圈（只有数字，看不到谁跟谁聊、聊什么）',
         '讯息审核也能播放被检举的语音（检举的语音会保留到审核完，其他语音 30 天自动删除）',
+        '物业柜台（Front desk）：交屋时发一次性加入码（QR）、列印给未加入住户的纸本通知并记录送达、替偏好纸本的屋主登记装修（职员名字记录在案）',
         '页底「Reset demo data」：彩排前清空示范资料',
       ],
       en: [
@@ -198,6 +201,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Numbers: share of concerns settled between neighbours, reply rate, pre-work photo coverage, owner-closed repairs',
         'Neighbour relationships: share of next-door pairs who know each other, days from keys to a first hello, circles active in 30 days (counts only, never who or what)',
         'Moderation can play a reported voice message (reported voice is kept until reviewed; all other voice is deleted after 30 days)',
+        'Front desk: one-time join codes (QR) at handover, printed notices for households not on Jiran5 with delivery recorded, and renovations registered for owners who prefer paper (the staff name goes on record)',
         '"Reset demo data" at the bottom clears everything before a rehearsal',
       ],
     },
@@ -222,6 +226,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         '家人代办：屋主可以授权最多 2 位家人（例如替长辈操作），他们做的每件事都会以他们的名字记录；按「以 Adam 的身份使用」即可示范',
         '下载我的资料（PDPA）：一个档案包含 Jiran5 保存的所有关于这户的资料，其他住户只显示门牌',
         '介面语言：顶栏 EN / BM / 中 切换住户页面的语言',
+        '简易模式：字和按钮更大、选项更少（只有自己看得到这个设定）；WhatsApp 通知开关（通知里不会有讯息内容）',
         '捷径：我的屋历',
       ],
       en: [
@@ -232,12 +237,93 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Family helpers: the owner can add up to two family members (for example to help an elderly parent); everything they do is recorded under their name. Tap "Use the app as Adam" to demo it',
         'Download my data (PDPA): one file with everything Jiran5 holds about the household; other residents appear by unit only',
         'Interface language: EN / BM / 中 in the top bar switches the resident screens',
+        'Easy mode: bigger text and buttons, fewer options (private to the household); WhatsApp alerts on or off (alerts never include message content)',
         'Shortcut to your home log',
       ],
     },
     why: {
       zh: '用户自己决定被联系的程度，才会放心加入；但安全相关的通知不能被关掉。',
       en: 'People join when they control how reachable they are, but safety notices can’t be switched off.',
+    },
+  },
+  planner: {
+    layer: { zh: 'SDP 后台', en: 'SDP view' },
+    title: { zh: '新 phase 设定', en: 'Phase setup' },
+    what: {
+      zh: 'SDP 输入平面图的基本布局（几条 lorong、每排几间、几栋公寓、几层、每层几户），系统用跟 app 一模一样的规则算出每一户的邻里圈和每种装修要通知谁。不会存任何资料。',
+      en: 'SDP enters the basic layout from the site plan (lorongs, houses per row, blocks, floors, units per floor) and Jiran5 works out every circle and notice list with the same rules as the app. Nothing is saved.',
+    },
+    features: {
+      zh: [
+        '三个预设：Taman Demo、纯排屋、混合 phase，也可以自己调',
+        '结果：总户数、平均邻里圈大小、邻居比较少的户数（边间、转角、顶楼和最低层）、几毫秒算完',
+        '邻里圈大小分布图、四种装修平均要通知几户',
+        '示意图：第一条 lorong 和第一栋公寓，颜色越深表示邻居越少（物业要人工确认的就是这些）',
+        '下载每户的邻里圈清单（CSV，只有门牌，没有住户资料）',
+      ],
+      en: [
+        'Three presets (Taman Demo, landed, mixed) or your own numbers',
+        'Results: homes, average circle, homes with fewer neighbours (end lots, corners, top and lowest floors), and setup time in milliseconds',
+        'Circle-size chart and the average notice list for each type of work',
+        'Sample drawing of the first lorong and block, darker where there are fewer neighbours (what the estate office checks by hand)',
+        'Download every home’s circle as CSV (homes only, no resident data)',
+      ],
+    },
+    why: {
+      zh: '证明 Jiran5 可以很快复制到 SDP 的其他 township：一个上千户的 phase 不到一秒就设定好，物业只需要检查不规则的地段。',
+      en: 'Shows Jiran5 can be copied to SDP’s other townships quickly: a phase of a thousand homes is set up in under a second, and the estate office only checks irregular plots.',
+    },
+  },
+  impact: {
+    layer: { zh: 'SDP 后台', en: 'SDP view' },
+    title: { zh: '影响估算', en: 'Impact model' },
+    what: {
+      zh: '估算一个 phase 交屋后两年，Jiran5 可能帮 SDP 省下多少物业工时和成本。左边每个数字都是假设，可以直接改，右边马上重算，每个结果都写出公式。',
+      en: 'Estimates how much estate staff time and money Jiran5 could save in a phase’s first two years. Every number on the left is an assumption you can change; results recalculate instantly and show their formulas.',
+    },
+    features: {
+      zh: [
+        '假设：装修比例、引起投诉的比例、每宗投诉的工时、邻居自行解决的比例、争议理赔、人力成本、WhatsApp 讯息费',
+        '户数会自动带入「新 phase 设定」最近算的结果',
+        '结果：省下的工时、扣掉 WhatsApp 费用后的净节省、今天 vs 有 Jiran5 的工时对比',
+        '页首清楚写明：这是示意模型，不是预测；试点时用 SDP 自己的数字替换，后台会量出真实比例',
+      ],
+      en: [
+        'Assumptions: renovation share, complaint share, staff hours per complaint, share settled by neighbours, disputed claims, staff cost, WhatsApp fees',
+        'The number of homes comes from the latest Phase setup run',
+        'Results: staff hours saved, net saving after WhatsApp costs, and hours today versus with Jiran5',
+        'Clearly labelled as an illustrative model, not a forecast; the pilot replaces each assumption with SDP’s own data, measured on the command view',
+      ],
+    },
+    why: {
+      zh: '商业价值（10%）和影响力（25%）需要数字，但不能编造。把假设摊开让 SDP 自己调，比一个漂亮的数字更可信。',
+      en: 'Commercial value (10%) and impact (25%) need numbers, but they must not be invented. Showing the assumptions and letting SDP change them is more credible than one impressive figure.',
+    },
+  },
+  channels: {
+    layer: { zh: 'SDP 后台', en: 'SDP view' },
+    title: { zh: '触达管道', en: 'Channels' },
+    what: {
+      zh: '两支手机：左边是 Jiran5 放在 SDP App 里的样子（同一个登入），右边是这一户在 WhatsApp 收到的通知（用他的语言）。',
+      en: 'Two phones: Jiran5 as a module inside the SDP App (same sign-in), and the WhatsApp alerts this household receives, in its own language.',
+    },
+    features: {
+      zh: [
+        'SDP App 里的「Neighbours · Jiran5」入口，显示未读数和最近的聊天（版面是示意，不是 SDP 真正的 app）',
+        'WhatsApp 通知按真实资料产生：装修通知（完整内容）、新讯息提醒（不含讯息内容）、问题进度、物业公告、维修确认',
+        '安静模式只挡聊天提醒，正式通知照样送达；还没加入的住户改用纸本，关掉 WhatsApp 的只在 app 里看',
+        '换顶栏的住户，就能看到不同人、不同语言收到的通知',
+      ],
+      en: [
+        'A "Neighbours · Jiran5" entry inside the SDP App with unread counts and recent chats (illustrative layout, not SDP’s actual app)',
+        'WhatsApp alerts built from real data: full renovation notices, new-message alerts without the content, concern updates, estate notices, repair checks',
+        'Quiet mode holds back chat alerts only; households not on Jiran5 get paper instead, and those with alerts off see everything in the app',
+        'Switch household in the top bar to see what someone else receives, in their language',
+      ],
+    },
+    why: {
+      zh: '回答评审最常问的「住户真的会用吗？」：不用装新 app，通知走大家每天都在用的 WhatsApp。',
+      en: 'Answers the judges’ usual question, "will residents actually use it?": no new app to install, and alerts arrive on the WhatsApp everyone already uses.',
     },
   },
   safeguards: {
@@ -348,6 +434,27 @@ export const ROUTE: RouteStep[] = [
     text: {
       zh: '屋历：不满、升级、保修、维修、屋主确认全部在链上，显示 CHAIN VERIFIED',
       en: 'Home log: concern, escalation, warranty, repair and sign-off are all chained; CHAIN VERIFIED',
+    },
+  },
+  {
+    tab: 'sdp',
+    text: {
+      zh: '（加入与纸本，可选）SDP 后台 → Front desk：Aiman 的装修通知里 No. 23 还没加入 → 按 Print 看纸本通知 → Delivered；再为 No. 23 按 Issue code → 用演示按钮打开加入页 → 选名字、语言、同意隐私声明',
+      en: '(Joining and paper, optional) Command view → Front desk: No. 23 isn’t on Jiran5, so Aiman’s notice is on paper → Print → Delivered; then Issue code for No. 23 → open the join page (demo) → name, language, privacy consent',
+    },
+  },
+  {
+    tab: 'circle', unit: 'T-20',
+    text: {
+      zh: '（长者，可选）Ah Hock（No. 20）开着简易模式：字大、选项少；女儿 Mei Fong 是他的家人代办',
+      en: '(Elder, optional) Ah Hock (No. 20) uses easy mode: big text, fewer options; his daughter Mei Fong is his family helper',
+    },
+  },
+  {
+    tab: 'planner',
+    text: {
+      zh: 'SDP 的规模化：新 phase 设定（上千户不到一秒算完）→ 影响估算（所有假设可调）→ 触达管道（SDP App 和 WhatsApp）',
+      en: 'Scaling for SDP: Phase setup (a thousand homes in under a second) → Impact model (every assumption editable) → Channels (SDP App and WhatsApp)',
     },
   },
   {
