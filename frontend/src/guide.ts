@@ -1,7 +1,7 @@
 // Text for the guide panel: what each screen does and the demo route, in Chinese (for the team) and English (for judges).
 
 export type GuideLang = 'zh' | 'en'
-export type TabId = 'circle' | 'chats' | 'works' | 'evidence' | 'log' | 'sdp' | 'safeguards'
+export type TabId = 'circle' | 'chats' | 'works' | 'evidence' | 'log' | 'me' | 'sdp' | 'safeguards'
 
 type Text = Record<GuideLang, string>
 type List = Record<GuideLang, string[]>
@@ -32,28 +32,32 @@ export const UI: Record<string, Text> = {
 export const PAGES: Record<TabId, PageGuide> = {
   circle: {
     layer: { zh: '第 1 层 · 认识', en: 'Layer 1 · Know' },
-    title: { zh: '邻里圈', en: 'Neighbour circle' },
+    title: { zh: '你的邻居（像社交 app 一样用）', en: 'Your neighbours, like a social app' },
     what: {
-      zh: '根据平面图自动算出跟你最近的 5 户：排屋是左右两户加对面 3 户，公寓是左右和楼上楼下。',
-      en: 'Your five closest homes, worked out from the floor plan: left, right and three across for a terrace; left, right, above and below for an apartment.',
+      zh: '打开就看到身边有谁、可以跟谁聊。不用学：操作跟 IG、WhatsApp、Facebook 一样。',
+      en: 'Open it and see who lives around you and who you can talk to. Nothing new to learn: it works like IG, WhatsApp and Facebook.',
     },
     features: {
       zh: [
-        '地图画成真的房屋平面：粗线是共用墙，跟你共用的墙会发亮；正在装修的房子有橙色斜线，共用墙变成「施工中」警示',
-        '点任何一户：看到住户、跟你的关系、用什么语言；可以直接发讯息，或「以这户的身份查看」',
-        '用英文、马来文或中文写自我介绍，经 WhatsApp 发给 5 户',
-        '勾选「I\'m planning renovation」：通知附上工期、吵闹时段、承包商、CIDB 注册和地方政府（PBT）准证',
+        '顶部一排头像（像 IG 限时动态）：橙圈＋🔨 是正在装修，蓝点是还没认识，绿圈是已经认识；点头像看小档案',
+        '邻居卡片：名字、门牌、跟你的关系（共用墙、楼上楼下）、语言、一句自我介绍，按「Message」或「👋 Wave」',
+        '「Introduce yourself」：一次跟还没认识的邻居打招呼（三步流程，要勾同意才能发）',
+        '同一条 lorong 或同一栋（像「你可能认识的人」）：只看到门牌，按「Request」写原因，对方接受才看到名字、才能聊',
+        '右上角切到「Map」：建筑蓝图平面图，公寓有楼层剖面图和「YOUR STACK」',
+        '没有住户名册、没有大群组；物业公告移到 Chats 里的官方帐号',
       ],
       en: [
-        'A real plan: thick lines are party walls; yours glow, and walls next to renovation turn into orange "works" hatching',
-        'Click any home to see who lives there, how they relate to you and their language; message them or view as them',
-        'Write an intro in English, Malay or Chinese and send it to all five on WhatsApp',
-        'Tick "I\'m planning renovation" to add dates, noisy hours, contractor, CIDB status and the council (PBT) permit',
+        'A row of faces at the top (like IG stories): orange ring + 🔨 is renovating, blue dot is not met yet, green ring is known; tap for a mini profile',
+        'Neighbour cards: name, unit, how they relate to you (shared wall, upstairs), language and a one-line bio, with Message and 👋 Wave',
+        '"Introduce yourself": one hello to everyone you haven’t met (three steps, consent required)',
+        'Your lorong or block (like "people you may know"): unit numbers only; Request with a reason, names and chat once accepted',
+        'Switch to "Map" for the blueprint plan; apartments get a floor section with "YOUR STACK"',
+        'No resident directory, no group chat; estate notices live in an official account in Chats',
       ],
     },
     why: {
-      zh: '很多邻里装修纠纷一开始只是「不认识、没被通知」。先认识，之后出事比较好谈。',
-      en: 'Many renovation disputes start with "we never met and nobody told us". Knowing each other first makes later problems easier to settle.',
+      zh: '居民不会为了一个新 app 重新学习。用大家每天在用的方式，最快在出事之前就认识邻居；但联系有层次，所以不会变成骚扰或吵架的地方。',
+      en: 'Residents won’t learn a new app. Using what they already know gets neighbours acquainted before trouble starts, while layered contact keeps it from becoming a place for harassment or fights.',
     },
   },
   chats: {
@@ -183,6 +187,8 @@ export const PAGES: Record<TabId, PageGuide> = {
         '物业队列：邻居升级上来的不满，可以「提醒装修户遵守屋规」或「结案」',
         '讯息审核：被检举的讯息，可以警告发送者（只有他看得到）或驳回',
         '数据：多少不满在邻居之间就解决了、回覆率、开工前照片覆盖率、屋主关单比例',
+        '邻里关系：隔壁之间互相认识的比例、从交屋到第一次打招呼的天数、30 天内活跃的邻里圈（只有数字，看不到谁跟谁聊、聊什么）',
+        '讯息审核也能播放被检举的语音（检举的语音会保留到审核完，其他语音 30 天自动删除）',
         '页底「Reset demo data」：彩排前清空示范资料',
       ],
       en: [
@@ -190,12 +196,48 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Estate queue: concerns escalated by neighbours; remind the owner of the house rules, or close the concern',
         'Moderation: reported messages; warn the sender privately or dismiss',
         'Numbers: share of concerns settled between neighbours, reply rate, pre-work photo coverage, owner-closed repairs',
+        'Neighbour relationships: share of next-door pairs who know each other, days from keys to a first hello, circles active in 30 days (counts only, never who or what)',
+        'Moderation can play a reported voice message (reported voice is kept until reviewed; all other voice is deleted after 30 days)',
         '"Reset demo data" at the bottom clears everything before a rehearsal',
       ],
     },
     why: {
       zh: 'SDP 第一次能看到社区关系和保修品质的真实数据，也能证明自己在法定时限内修好，而不是只看投诉数字。',
       en: 'SDP sees real numbers on community health and repair quality, and can show repairs were done within the statutory window, instead of only counting complaints.',
+    },
+  },
+  me: {
+    layer: { zh: '我', en: 'Me' },
+    title: { zh: '个人页与隐私设定', en: 'Profile and privacy' },
+    what: {
+      zh: '像所有社交 app 的个人页：邻居看到的你，以及谁可以联系你。',
+      en: 'Like any social app’s profile: how neighbours see you, and who may contact you.',
+    },
+    features: {
+      zh: [
+        '一句自我介绍（80 字以内），只有影响圈和已接受联系的人看得到；会提醒不要写作息或出远门的日期',
+        '阅读语言：快捷回复会翻成这个语言',
+        '开关：接受联系请求、接受 👋 Wave、安静模式（邻居不能发讯息，但装修通知和不满仍会送达）',
+        '已封锁名单，可以解除封锁',
+        '家人代办：屋主可以授权最多 2 位家人（例如替长辈操作），他们做的每件事都会以他们的名字记录；按「以 Adam 的身份使用」即可示范',
+        '下载我的资料（PDPA）：一个档案包含 Jiran5 保存的所有关于这户的资料，其他住户只显示门牌',
+        '介面语言：顶栏 EN / BM / 中 切换住户页面的语言',
+        '捷径：我的屋历',
+      ],
+      en: [
+        'A one-line bio (80 characters), visible only to your circle and accepted contacts; a reminder not to share schedules or travel dates',
+        'Reading language: quick replies are translated into it',
+        'Switches: accept contact requests, accept 👋 waves, quiet mode (no chats, but renovation notices and concerns still arrive)',
+        'Blocked neighbours, with unblock',
+        'Family helpers: the owner can add up to two family members (for example to help an elderly parent); everything they do is recorded under their name. Tap "Use the app as Adam" to demo it',
+        'Download my data (PDPA): one file with everything Jiran5 holds about the household; other residents appear by unit only',
+        'Interface language: EN / BM / 中 in the top bar switches the resident screens',
+        'Shortcut to your home log',
+      ],
+    },
+    why: {
+      zh: '用户自己决定被联系的程度，才会放心加入；但安全相关的通知不能被关掉。',
+      en: 'People join when they control how reachable they are, but safety notices can’t be switched off.',
     },
   },
   safeguards: {
@@ -234,15 +276,29 @@ export const ROUTE: RouteStep[] = [
   {
     tab: 'circle', unit: 'T-12',
     text: {
-      zh: '扮演 No. 12 Aiman：看平面图上的共用墙 → 勾「I\'m planning renovation」（含 PBT 准证）→ Send on WhatsApp',
-      en: 'As No. 12 Aiman: see the party walls on the plan → tick "I\'m planning renovation" (with PBT permit) → Send on WhatsApp',
+      zh: 'Aiman（No. 12）：看顶部头像和邻居卡片 → 对 Siti 按「👋 Wave」→ 切到「Map」→ 点 No. 15 →「Request to connect」',
+      en: 'Aiman (No. 12): see the faces and cards → 👋 Wave at Siti → switch to Map → tap No. 15 → Request to connect',
+    },
+  },
+  {
+    tab: 'works', unit: 'T-12',
+    text: {
+      zh: 'Aiman：Works 右上角「Register renovation」→ 选 Extension → 图上标出谁会被通知 → 填完发送',
+      en: 'Aiman: Works → Register renovation → Extension → the plan marks who is told → send',
+    },
+  },
+  {
+    tab: 'circle', unit: 'A-15-3',
+    text: {
+      zh: '（公寓，可选）Sofia（A-15-3）：Works →「Register renovation」→ 浴室 → 剖面图显示楼下两层也被通知，A-13-3 名字隐藏',
+      en: '(Apartment, optional) Sofia (A-15-3): Works → Register renovation → Bathroom → two floors below are told; A-13-3 stays anonymous',
     },
   },
   {
     tab: 'chats', unit: 'T-11',
     text: {
-      zh: '按顶栏「Both sides」开分屏（左 Aiman、右 Siti）→ Siti 在 Chats 按 Wave back，再按快捷回复「宝宝午睡」→ 左边 Aiman 看到英文翻译',
-      en: 'Turn on "Both sides" (Aiman left, Siti right) → Siti waves back and taps the baby-nap quick reply → Aiman sees it in English',
+      zh: '按顶栏「Both sides」开分屏（左 Aiman、右 Siti）→ Siti 在 Chats 回 👋、按表情 ❤️、按快捷回复「宝宝午睡」→ 左边 Aiman 看到英文翻译；也可以按麦克风录语音',
+      en: 'Turn on "Both sides" (Aiman left, Siti right) → Siti waves back, reacts ❤️ and taps the baby-nap quick reply → Aiman sees it in English; the mic records a voice note',
     },
   },
   {

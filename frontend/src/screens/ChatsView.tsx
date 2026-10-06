@@ -1,19 +1,26 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  ArrowLeft, Ban, Car, Flag, Hammer, Hand, HardHat, House, Languages, Lock, MessageSquareWarning, MoreHorizontal,
-  Phone, PhoneCall, SendHorizontal, ShieldCheck, Sparkles, Trash2, Volume2, CircleHelp, TriangleAlert,
+  ArrowLeft, BadgeCheck, Ban, Building2, Car, CircleHelp, Flag, Hammer, Hand, HardHat, House, Languages, Lock, Megaphone,
+  MessageSquareWarning, Mic, MicOff, MoreHorizontal, Pause, Phone, PhoneCall, Play, SendHorizontal, ShieldCheck, Smile, Sparkles, Trash2,
+  TriangleAlert, Volume2, X,
 } from 'lucide-react'
-import { api, ApiError, type ChatIntro, type ChatMessage, type ConcernCategory, type Conversation, type Thread, type UnitInfo } from '../api'
-import { RELATION_LABEL } from '../messages'
+import {
+  api, type ChatIntro, type ChatMessage, type ChatWave, type ConcernCategory, type Conversation, type Official, type Thread,
+  type UnitInfo,
+} from '../api'
+import { byWho, refusal, useT, type Translate } from '../i18n'
+import { useHelper } from '../helper'
 import { LANG_TAG } from '../components/Cast'
 import ConcernCard from '../components/ConcernCard'
-import { Avatar, Empty, formatDate, formatTime, Sheet, shortRange, Skeleton, Stamp, useToast } from '../ui'
+import { Avatar, Empty, formatDate, formatTime, Sheet, shortRange, Skeleton, Stamp, useCelebrate, useToast } from '../ui'
 
-const LANG_NAME: Record<string, string> = { en: 'English', ms: 'Bahasa Melayu', zh: '中文' }
+const langName = (t: Translate, code: string) => t(`lang.${code}`)
 const CATEGORY_ICON: Record<ConcernCategory, typeof Volume2> = {
   noise_hours: Volume2, debris: Trash2, access: Car, damage: House, workers: HardHat, other: CircleHelp,
 }
-const PERMIT: Record<string, string> = { approved: 'Council permit approved', applied: 'Council permit applied for', not_needed: 'No council permit needed' }
+const REACTIONS = ['👍', '❤️', '🙏', '😂', '😮']
+const ESTATE = '__estate'
+const DAY = 86_400_000
 
 export default function ChatsView({ me, version, onChange, peer, onPeer }: {
   me: UnitInfo
@@ -22,11 +29,16 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
   peer?: string
   onPeer: (id?: string) => void
 }) {
+  const t = useT()
   const root = useRef<HTMLElement>(null)
   const [wide, setWide] = useState(false)
   const [convos, setConvos] = useState<Conversation[] | null>(null)
+  const [official, setOfficial] = useState<Official | null>(null)
 
-  const load = useCallback(() => api.conversations(me.id).then(setConvos).catch(() => setConvos([])), [me.id])
+  const load = useCallback(() => {
+    api.conversations(me.id).then(setConvos).catch(() => setConvos([]))
+    api.official(me.id).then(setOfficial).catch(() => setOfficial(null))
+  }, [me.id])
   useEffect(() => { load() }, [load, version])
 
   useLayoutEffect(() => {
@@ -37,19 +49,34 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
     return () => ro.disconnect()
   }, [])
 
-  const selected = peer ?? (wide ? convos?.[0]?.id : undefined)
+  const selected = peer ?? (wide ? convos?.[0]?.id ?? ESTATE : undefined)
+  const latest = official?.notices[0]
 
   return (
     <section ref={root} className={`chat ${wide ? 'wide' : ''} ${selected ? 'has-thread' : ''}`}>
       <aside className="chat-list">
         <div className="chat-list-head">
           <div>
-            <div className="eyebrow">Layer 1 · Know & talk</div>
-            <h2>Your circle</h2>
+            <div className="eyebrow">{t('chats.eyebrow')}</div>
+            <h2>{t('chats.title')}</h2>
           </div>
-          <span className="lang-tag" title={`You read ${LANG_NAME[me.lang]}`}>{LANG_TAG[me.lang]}</span>
+          <span className="lang-tag" title={t('profile.reads', { lang: langName(t, me.lang) })}>{LANG_TAG[me.lang]}</span>
         </div>
-        <div className="chat-privacy"><Lock size={12} /> Alerts arrive on WhatsApp. Your number stays private until you both agree.</div>
+        <div className="chat-privacy"><Lock size={12} /> {t('chats.privacy')}</div>
+
+        <button className={`chat-row official ${selected === ESTATE ? 'on' : ''}`} onClick={() => onPeer(ESTATE)}>
+          <span className="official-avatar"><Building2 size={18} /></span>
+          <span className="grow">
+            <span className="chat-row-top">
+              <b>{t('estate.name')} <BadgeCheck size={13} className="verified" /></b>
+              {latest && <small>{formatDate(latest.created_at)}</small>}
+            </span>
+            <span className="chat-row-rel">{t('estate.readonly')}</span>
+            <span className="chat-row-last">{latest ? latest.title : t('estate.none')}</span>
+          </span>
+          <span className="chat-row-flags">{official && official.unread > 0 && <span className="unread">{official.unread}</span>}</span>
+        </button>
+
         {!convos && <div style={{ padding: 14 }}><Skeleton lines={5} /></div>}
         {convos?.map((c) => (
           <button key={c.id} className={`chat-row ${c.id === selected ? 'on' : ''}`} onClick={() => onPeer(c.id)}>
@@ -59,8 +86,8 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
                 <b>{c.resident_name} <i>· {c.label}</i></b>
                 {c.last_at && <small>{formatTime(c.last_at)}</small>}
               </span>
-              <span className="chat-row-rel">{RELATION_LABEL[c.relation]}{c.relation === 'left' || c.relation === 'right' ? ' · shared wall' : c.relation === 'above' || c.relation === 'below' ? ' · shared slab' : ''}</span>
-              <span className="chat-row-last">{c.blocked ? 'Blocked' : c.last ?? 'Say hello'}</span>
+              <span className="chat-row-rel">{t(`rel.${c.relation}`)}{c.relation === 'left' || c.relation === 'right' ? ` · ${t('share.wallShort')}` : c.relation === 'above' || c.relation === 'below' ? ` · ${t('share.slab')}` : ''}</span>
+              <span className="chat-row-last">{c.blocked ? t('chats.blocked') : c.last ?? t('chats.sayHello')}</span>
             </span>
             <span className="chat-row-flags">
               {c.unread > 0 && <span className="unread">{c.unread}</span>}
@@ -73,18 +100,58 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
       </aside>
 
       <div className="chat-main">
-        {selected ? (
+        {selected === ESTATE ? (
+          <OfficialThread key={`${me.id}-estate`} me={me} data={official} onRead={load} onBack={wide ? undefined : () => onPeer(undefined)} />
+        ) : selected ? (
           <ChatThread key={`${me.id}-${selected}`} me={me} other={selected} version={version} onChange={onChange} onRead={load}
             onBack={wide ? undefined : () => onPeer(undefined)} />
         ) : (
           <div className="chat-empty">
-            <Empty icon={<Hand size={24} />} title="Pick a neighbour">Talk, agree on renovation hours, or raise a concern. Everything important is kept on record.</Empty>
+            <Empty art="chat" title={t('chats.pick')}>{t('chats.pickBody')}</Empty>
           </div>
         )}
       </div>
     </section>
   )
 }
+
+// ---------- the estate office: read-only, like a WhatsApp channel ----------
+
+function OfficialThread({ me, data, onRead, onBack }: { me: UnitInfo; data: Official | null; onRead: () => void; onBack?: () => void }) {
+  const t = useT()
+  useEffect(() => {
+    if (data && data.unread > 0) api.officialRead(me.id).then(onRead).catch(() => {})
+  }, [data, me.id, onRead])
+  return (
+    <div className="thread">
+      <header className="thread-head">
+        {onBack && <button className="icon-btn" onClick={onBack} aria-label="Back to list"><ArrowLeft size={16} /></button>}
+        <span className="official-avatar lg"><Building2 size={20} /></span>
+        <div className="grow">
+          <b>{t('estate.full')} <BadgeCheck size={14} className="verified" /></b>
+          <small><Megaphone size={11} /> {t('estate.sub', { place: t(me.kind === 'terrace' ? 'place.lorong' : 'place.blockWord') })}</small>
+        </div>
+      </header>
+      <div className="thread-body">
+        <div className="sys-note"><ShieldCheck size={12} /> {t('estate.verified')}</div>
+        {!data && <Skeleton lines={4} />}
+        {data?.notices.slice().reverse().map((n) => (
+          <div key={n.id} className="official-notice">
+            <div className="official-notice-top">
+              <Stamp tone="blue" tilt={0}>{t(n.audience === 'phase' ? 'audience.phase' : n.audience === 'terrace' ? 'audience.terrace' : 'audience.block')}</Stamp>
+              <small>{formatDate(n.created_at)} · {formatTime(n.created_at)}</small>
+            </div>
+            <b>{n.title}</b>
+            <p>{n.body}</p>
+          </div>
+        ))}
+      </div>
+      <div className="composer-blocked readonly"><Lock size={14} /> {t('estate.footer')}</div>
+    </div>
+  )
+}
+
+// ---------- one-to-one thread ----------
 
 function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   me: UnitInfo
@@ -94,7 +161,10 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   onRead: () => void
   onBack?: () => void
 }) {
+  const tr = useT()
   const toast = useToast()
+  const celebrate = useCelebrate()
+  const helper = useHelper(me.id)
   const [t, setT] = useState<Thread | null>(null)
   const [text, setText] = useState('')
   const [tone, setTone] = useState<string | null>(null)
@@ -102,8 +172,19 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   const [concernOpen, setConcernOpen] = useState(false)
   const [reporting, setReporting] = useState<ChatMessage | null>(null)
   const [menu, setMenu] = useState(false)
+  const [picker, setPicker] = useState<number | null>(null)
   const [showOriginal, setShowOriginal] = useState<Set<number>>(new Set())
   const body = useRef<HTMLDivElement>(null)
+
+  const sendVoice = async (blob: Blob, seconds: number) => {
+    try {
+      await api.sendVoice(me.id, other, blob, seconds, helper?.id)
+      onChange()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not send voice message', 'error')
+    }
+  }
+  const rec = useRecorder(sendVoice, (msg) => toast(msg, 'error'))
 
   useEffect(() => {
     let live = true
@@ -123,74 +204,92 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
 
   if (!t) return <div style={{ padding: 18 }}><Skeleton lines={6} /></div>
   const n = t.neighbour
+  const wavedToday = t.items.some((i) => i.type === 'wave' && i.from_unit_id === me.id && Date.now() - new Date(i.created_at).getTime() < DAY)
 
   async function send(msg: { body?: string; quick_key?: string }) {
     setSending(true)
     setTone(null)
     try {
-      await api.sendMessage(me.id, other, msg)
+      await api.sendMessage(me.id, other, msg, helper?.id)
       if (msg.body) setText('')
       onChange()
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'tone') setTone(e.message)
+      if (refusal(e)) setTone(refusal(e))
       else toast(e instanceof Error ? e.message : 'Could not send', 'error')
     } finally {
       setSending(false)
     }
   }
 
-  async function wave(introId: number) {
+  async function waveAt() {
+    try {
+      await api.wave(me.id, other)
+      celebrate('👋', tr('celebrate.wave', { name: n.resident_name }))
+      onChange()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not wave', 'error')
+    }
+  }
+
+  async function react(id: number, emoji: string) {
+    setPicker(null)
+    await api.react(id, me.id, emoji)
+    onChange()
+  }
+
+  async function ackIntro(introId: number) {
     await api.waveBack(introId, me.id)
-    toast(`You waved back to ${n.resident_name}`)
+    toast(tr('wave.backDone'))
     onChange()
   }
 
   async function contact() {
     const r = await api.shareContact(me.id, other)
-    toast(r.contact === 'mutual' ? 'Numbers exchanged' : `${n.resident_name} will be asked to agree`)
+    toast(r.contact === 'mutual' ? tr('thread.exchanged') : tr('thread.willAsk', { name: n.resident_name }))
     onChange()
   }
 
   async function block(on: boolean) {
     await api.setBlock(me.id, other, on)
     setMenu(false)
-    toast(on ? `${n.resident_name} is blocked. They won't be told.` : `${n.resident_name} is unblocked`)
+    toast(tr(on ? 'thread.blockedToast' : 'me.unblocked', { name: n.resident_name }))
     onChange()
   }
 
   let lastDay = ''
   return (
-    <div className="thread">
+    <div className="thread" onClick={() => picker !== null && setPicker(null)}>
       <header className="thread-head">
         {onBack && <button className="icon-btn" onClick={onBack} aria-label="Back to list"><ArrowLeft size={16} /></button>}
         <Avatar name={n.resident_name} size={40} />
         <div className="grow">
           <b>{n.resident_name} <i>· {n.label}</i></b>
-          <small><Languages size={11} /> Reads {LANG_NAME[n.lang]} · {RELATION_LABEL[n.relation]}</small>
+          <small><Languages size={11} /> {tr('thread.reads', { lang: langName(tr, n.lang) })} · {tr(`rel.${n.relation}`)}</small>
         </div>
+        <button className="icon-btn wave-btn" onClick={waveAt} disabled={wavedToday || t.blocked} title={wavedToday ? tr('thread.wavedToday') : tr('thread.waveAt', { name: n.resident_name })}>👋</button>
         {t.contact === 'mutual' ? (
-          <span className="contact-ok"><PhoneCall size={13} /> Numbers shared</span>
+          <span className="contact-ok"><PhoneCall size={13} /> {tr('thread.numbersShared')}</span>
         ) : t.contact === 'requested_by_me' ? (
-          <span className="contact-wait">Waiting for {n.resident_name}</span>
+          <span className="contact-wait">{tr('thread.waiting', { name: n.resident_name })}</span>
         ) : (
           <button className={`btn btn-sm ${t.contact === 'requested_by_them' ? 'btn-primary' : ''}`} onClick={contact} disabled={t.blocked}>
-            <Phone size={13} /> {t.contact === 'requested_by_them' ? 'Accept number exchange' : 'Exchange numbers'}
+            <Phone size={13} /> {tr(t.contact === 'requested_by_them' ? 'thread.acceptExchange' : 'thread.exchange')}
           </button>
         )}
         <div className="menu-wrap">
           <button className="icon-btn" onClick={() => setMenu((m) => !m)} aria-label="More"><MoreHorizontal size={16} /></button>
           {menu && (
             <div className="menu">
-              <button onClick={() => block(!t.blocked)}><Ban size={14} /> {t.blocked ? `Unblock ${n.resident_name}` : `Block ${n.resident_name}`}</button>
-              <p>Blocking is silent. Formal notices and concerns stay on record either way.</p>
+              <button onClick={() => block(!t.blocked)}><Ban size={14} /> {tr(t.blocked ? 'thread.unblock' : 'thread.block', { name: n.resident_name })}</button>
+              <p>{tr('thread.blockNote')}</p>
             </div>
           )}
         </div>
       </header>
 
       <div className="thread-body" ref={body}>
-        <div className="sys-note"><ShieldCheck size={12} /> Private between you two. Notices, concerns and decisions are also written to both home logs.</div>
-        {t.items.length === 0 && <div className="sys-note">No messages yet. A quick hello goes a long way.</div>}
+        <div className="sys-note"><ShieldCheck size={12} /> {tr('thread.private')}</div>
+        {t.items.length === 0 && <div className="sys-note">{tr('thread.empty')}</div>}
         {t.items.map((item) => {
           const day = formatDate(item.created_at)
           const sep = day !== lastDay ? <div className="day-sep"><span>{day}</span></div> : null
@@ -198,7 +297,8 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
           const key = `${item.type}-${item.id}`
           const wrap = (node: ReactNode) => <Fragment key={key}>{sep}{node}</Fragment>
           if (item.type === 'concern') return wrap(<ConcernCard concern={item} viewer={me.id} onChanged={onChange} />)
-          if (item.type === 'intro') return wrap(<IntroCard item={item} mine={item.from_unit_id === me.id} onWave={() => wave(item.id)} />)
+          if (item.type === 'intro') return wrap(<IntroCard item={item} mine={item.from_unit_id === me.id} onWave={() => ackIntro(item.id)} />)
+          if (item.type === 'wave') return wrap(<WaveItem item={item} mine={item.from_unit_id === me.id} name={n.resident_name} canWaveBack={!wavedToday && !t.blocked} onWaveBack={waveAt} />)
           if (item.kind === 'system') {
             return wrap(
               <div className="sys-msg">
@@ -210,24 +310,47 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
           }
           const mine = item.from_unit_id === me.id
           const original = showOriginal.has(item.id)
+          const counts = REACTIONS.map((e) => ({ e, n: item.reactions.filter((r) => r.emoji === e).length, me: item.reactions.some((r) => r.emoji === e && r.unit_id === me.id) })).filter((x) => x.n > 0)
           return wrap(
             <div className={`msg ${mine ? 'mine' : 'theirs'}`}>
-              <div className="msg-bubble">
-                <p>{original && item.original ? item.original : item.text}</p>
-                <div className="msg-meta">
-                  {item.kind === 'quick' && (
-                    item.translated ? (
-                      <button className="msg-tr" onClick={() => setShowOriginal((s) => { const x = new Set(s); if (x.has(item.id)) x.delete(item.id); else x.add(item.id); return x })}>
-                        <Languages size={11} /> {original ? `Original · ${LANG_NAME[item.lang]}` : `Translated from ${LANG_NAME[item.lang]}`}
-                      </button>
-                    ) : <span className="msg-tr"><Sparkles size={11} /> Quick reply</span>
+              <div className="msg-col">
+                <div className="msg-bubble">
+                  {item.kind === 'voice' ? (
+                    item.expired ? (
+                      <div className="voice-gone"><MicOff size={14} /> {tr('thread.voiceExpired')}</div>
+                    ) : (
+                      <VoiceNote src={api.voiceUrl(item.id, me.id)} duration={item.duration ?? 0} seed={item.id} />
+                    )
+                  ) : (
+                    <p>{original && item.original ? item.original : item.text}</p>
                   )}
-                  <span>{formatTime(item.created_at)}</span>
+                  <div className="msg-meta">
+                    {item.kind === 'quick' && (
+                      item.translated ? (
+                        <button className="msg-tr" onClick={() => setShowOriginal((s) => { const x = new Set(s); if (x.has(item.id)) x.delete(item.id); else x.add(item.id); return x })}>
+                          <Languages size={11} /> {tr(original ? 'thread.original' : 'thread.translated', { lang: langName(tr, item.lang) })}
+                        </button>
+                      ) : <span className="msg-tr"><Sparkles size={11} /> {tr('thread.quick')}</span>
+                    )}
+                    {item.sent_by && <span className="msg-by">{tr('thread.sentBy', { who: byWho(tr, item.sent_by) })}</span>}
+                    <span>{formatTime(item.created_at)}</span>
+                  </div>
                 </div>
+                {counts.length > 0 && (
+                  <div className="reactions">
+                    {counts.map((c) => <button key={c.e} className={c.me ? 'mine' : ''} onClick={() => react(item.id, c.e)}>{c.e}{c.n > 1 ? ` ${c.n}` : ''}</button>)}
+                  </div>
+                )}
               </div>
-              {!mine && (
-                <button className="msg-report" onClick={() => setReporting(item)} title="Report this message" aria-label="Report this message"><Flag size={12} /></button>
-              )}
+              <div className="msg-tools">
+                <button className="msg-tool" onClick={(e) => { e.stopPropagation(); setPicker(picker === item.id ? null : item.id) }} aria-label={tr('msg.react')}><Smile size={13} /></button>
+                {!mine && !item.expired && <button className="msg-tool report" onClick={() => setReporting(item)} title={tr('msg.report')} aria-label={tr('msg.report')}><Flag size={12} /></button>}
+                {picker === item.id && (
+                  <div className="react-picker" onClick={(e) => e.stopPropagation()}>
+                    {REACTIONS.map((e) => <button key={e} onClick={() => react(item.id, e)}>{e}</button>)}
+                  </div>
+                )}
+              </div>
             </div>,
           )
         })}
@@ -235,70 +358,188 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
 
       {t.blocked ? (
         <div className="composer-blocked">
-          <Ban size={15} /> You blocked {n.resident_name}.
-          <button className="btn btn-sm" onClick={() => block(false)}>Unblock</button>
+          <Ban size={15} /> {tr('thread.youBlocked', { name: n.resident_name })}
+          <button className="btn btn-sm" onClick={() => block(false)}>{tr('btn.unblock')}</button>
         </div>
       ) : (
         <div className="chat-composer">
           {tone && (
             <div className="tone-check">
               <TriangleAlert size={15} />
-              <div><b>Tone check</b>{tone}</div>
+              <div><b>{tr(`${tone}.title`)}</b>{tr(`${tone}.body`)}</div>
               <button className="icon-btn" onClick={() => setTone(null)} aria-label="Dismiss">×</button>
             </div>
           )}
           <div className="quick-row">
             {t.quick_replies.map((q) => (
-              <button key={q.key} className="quick" disabled={sending} onClick={() => send({ quick_key: q.key })} title={`Arrives in ${LANG_NAME[n.lang]}`}>{q.text}</button>
+              <button key={q.key} className="quick" disabled={sending} onClick={() => send({ quick_key: q.key })} title={q.arrives ? tr('thread.arrives', { name: n.resident_name, text: q.arrives }) : langName(tr, n.lang)}>{q.text}</button>
             ))}
           </div>
-          <div className="compose-row">
-            {t.their_renovations.length > 0 && (
-              <button className="btn btn-sm concern-btn" onClick={() => setConcernOpen(true)}><MessageSquareWarning size={14} /> Raise a concern</button>
-            )}
-            <textarea className="compose-input" rows={1} maxLength={500} placeholder={`Message ${n.resident_name}…`} value={text}
-              onChange={(e) => { setText(e.target.value); setTone(null) }}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && text.trim()) { e.preventDefault(); send({ body: text }) } }} />
-            <button className="send-btn" disabled={!text.trim() || sending} onClick={() => send({ body: text })} aria-label="Send"><SendHorizontal size={17} /></button>
-          </div>
-          <div className="compose-foot"><Languages size={11} /> Quick replies arrive in {LANG_NAME[n.lang]}. Typed messages are sent as written.</div>
+          {rec.state === 'recording' ? (
+            <div className="compose-row recording">
+              <button className="icon-btn" onClick={rec.cancel} aria-label="Cancel recording"><X size={16} /></button>
+              <span className="rec-dot" />
+              <span className="rec-time">{Math.floor(rec.secs / 60)}:{String(Math.floor(rec.secs % 60)).padStart(2, '0')} / 1:00</span>
+              <span className="grow rec-hint">{tr('thread.recording')}</span>
+              <button className="send-btn" onClick={rec.stop} aria-label="Send voice message"><SendHorizontal size={17} /></button>
+            </div>
+          ) : (
+            <div className="compose-row">
+              {t.their_renovations.length > 0 && (
+                <button className="btn btn-sm concern-btn" onClick={() => setConcernOpen(true)}><MessageSquareWarning size={14} /> {tr('thread.concern')}</button>
+              )}
+              <textarea className="compose-input" rows={1} maxLength={500} placeholder={tr('thread.placeholder', { name: n.resident_name })} value={text}
+                onChange={(e) => { setText(e.target.value); setTone(null) }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && text.trim()) { e.preventDefault(); send({ body: text }) } }} />
+              {text.trim() ? (
+                <button className="send-btn" disabled={sending} onClick={() => send({ body: text })} aria-label="Send"><SendHorizontal size={17} /></button>
+              ) : (
+                <button className="send-btn mic" onClick={rec.begin} aria-label={tr('thread.record')} title={tr('thread.recordTitle')}><Mic size={17} /></button>
+              )}
+            </div>
+          )}
+          <div className="compose-foot"><Languages size={11} /> {tr('thread.foot', { lang: langName(tr, n.lang) })}</div>
         </div>
       )}
 
-      <ConcernSheet open={concernOpen} onClose={() => setConcernOpen(false)} me={me} t={t} onRaised={onChange} />
+      <ConcernSheet open={concernOpen} onClose={() => setConcernOpen(false)} me={me} t={t} helperId={helper?.id} onRaised={onChange} />
       <ReportSheet message={reporting} me={me} name={n.resident_name} onClose={() => setReporting(null)} />
     </div>
   )
 }
 
+function WaveItem({ item, mine, name, canWaveBack, onWaveBack }: { item: ChatWave; mine: boolean; name: string; canWaveBack: boolean; onWaveBack: () => void }) {
+  const t = useT()
+  return (
+    <div className={`wave-item ${mine ? 'mine' : ''}`}>
+      <span className="wave-hand" aria-hidden>👋</span>
+      <span className="grow"><b>{t(mine ? 'wave.mine' : 'wave.theirs', { name })}</b><small>{formatTime(item.created_at)}</small></span>
+      {!mine && canWaveBack && <button className="btn btn-sm" onClick={onWaveBack}>{t('wave.back')}</button>}
+    </div>
+  )
+}
+
+/** Voice note player: play/pause, simple bars, duration. */
+function VoiceNote({ src, duration, seed }: { src: string; duration: number; seed: number }) {
+  const audio = useRef<HTMLAudioElement>(null)
+  const [playing, setPlaying] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const bars = Array.from({ length: 24 }, (_, i) => 30 + ((seed * 37 + i * 53) % 70))
+  const toggle = () => {
+    const a = audio.current
+    if (!a) return
+    if (a.paused) a.play().catch(() => setPlaying(false))
+    else a.pause()
+  }
+  return (
+    <div className="voice">
+      <button className="voice-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Play voice message'}>{playing ? <Pause size={15} /> : <Play size={15} />}</button>
+      <div className="voice-bars" aria-hidden>
+        {bars.map((h, i) => <i key={i} style={{ height: `${h}%` }} className={i / bars.length < progress ? 'on' : ''} />)}
+      </div>
+      <span className="voice-len">0:{String(duration).padStart(2, '0')}</span>
+      <audio ref={audio} src={src} preload="none" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
+        onEnded={() => { setPlaying(false); setProgress(0) }}
+        onTimeUpdate={(e) => { const a = e.currentTarget; setProgress(a.duration && isFinite(a.duration) ? a.currentTime / a.duration : a.currentTime / Math.max(duration, 1)) }} />
+    </div>
+  )
+}
+
+/** Record up to a minute with the browser's own recorder. Nothing is kept unless it's sent. */
+function useRecorder(onDone: (blob: Blob, seconds: number) => void, onError: (message: string) => void) {
+  const [state, setState] = useState<'idle' | 'recording'>('idle')
+  const [secs, setSecs] = useState(0)
+  const rec = useRef<MediaRecorder | null>(null)
+  const chunks = useRef<Blob[]>([])
+  const started = useRef(0)
+  const timer = useRef<number | undefined>(undefined)
+  const cancelled = useRef(false)
+
+  useEffect(() => () => {
+    cancelled.current = true
+    if (rec.current?.state === 'recording') rec.current.stop()
+    window.clearInterval(timer.current)
+  }, [])
+
+  async function begin() {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      onError('Voice messages need a microphone and a browser that can record.')
+      return
+    }
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch {
+      onError('Microphone permission was not given.')
+      return
+    }
+    const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].find((x) => MediaRecorder.isTypeSupported(x))
+    const r = new MediaRecorder(stream, type ? { mimeType: type } : undefined)
+    chunks.current = []
+    cancelled.current = false
+    r.ondataavailable = (e) => { if (e.data.size) chunks.current.push(e.data) }
+    r.onstop = () => {
+      stream.getTracks().forEach((track) => track.stop())
+      window.clearInterval(timer.current)
+      const seconds = (Date.now() - started.current) / 1000
+      setState('idle')
+      setSecs(0)
+      if (!cancelled.current && seconds >= 0.8) onDone(new Blob(chunks.current, { type: (r.mimeType || 'audio/webm').split(';')[0] }), seconds)
+    }
+    r.start()
+    rec.current = r
+    started.current = Date.now()
+    setState('recording')
+    timer.current = window.setInterval(() => {
+      const s = (Date.now() - started.current) / 1000
+      setSecs(s)
+      if (s >= 60 && r.state === 'recording') r.stop()
+    }, 200)
+  }
+
+  const stop = () => { if (rec.current?.state === 'recording') rec.current.stop() }
+  const cancel = () => { cancelled.current = true; stop() }
+  return { state, secs, begin, stop, cancel }
+}
+
 function IntroCard({ item, mine, onWave }: { item: ChatIntro; mine: boolean; onWave: () => void }) {
+  const t = useT()
   const r = item.renovation
   return (
     <div className={`notice ${mine ? 'mine' : ''}`}>
       <div className="notice-head">
-        <Stamp tone={r ? 'amber' : 'brand'} tilt={-2}>{r ? 'Renovation notice' : 'Introduction'}</Stamp>
-        <small>{mine ? 'You sent this' : 'Sent to your circle'} · {formatTime(item.created_at)}</small>
+        <Stamp tone={r ? 'amber' : 'brand'} tilt={-2}>{t(r ? 'notice.reno' : 'notice.intro')}</Stamp>
+        <small>{t(mine ? 'notice.mine' : 'notice.theirs')} · {formatTime(item.created_at)}{item.sent_by ? ` · ${t('thread.sentBy', { who: byWho(t, item.sent_by) })}` : ''}</small>
       </div>
       <p>{item.text}</p>
       {r && (
         <dl className="notice-grid">
-          <div><dt>Work</dt><dd>{r.scope}</dd></div>
-          <div><dt>Dates</dt><dd>{shortRange(r.start, r.end)}</dd></div>
-          <div><dt>Noisy work</dt><dd>{r.noisy_hours}</dd></div>
-          <div><dt>Contractor</dt><dd>{r.contractor || '–'}{r.contractor_cidb_registered ? ' · CIDB ✓' : ''}</dd></div>
-          {r.council_permit && <div className="wide"><dt>Permit</dt><dd>{PERMIT[r.council_permit]}{r.permit_ref ? ` · ${r.permit_ref}` : ''}</dd></div>}
+          <div><dt>{t('reno.work')}</dt><dd>{r.scope}</dd></div>
+          <div><dt>{t('reno.dates')}</dt><dd>{shortRange(r.start, r.end)}</dd></div>
+          <div><dt>{t('reno.noisy')}</dt><dd>{r.noisy_hours}</dd></div>
+          <div><dt>{t('reno.contractor')}</dt><dd>{r.contractor || '–'}{r.contractor_cidb_registered ? ' · CIDB ✓' : ''}</dd></div>
+          {r.management_approval && <div><dt>{t('notice.jmb')}</dt><dd>{t(r.management_approval === 'approved' ? 'notice.approved' : 'notice.waiting')}</dd></div>}
+          {r.council_permit && <div className={r.management_approval ? '' : 'wide'}><dt>{t('notice.permit')}</dt><dd>{t(`permit.${r.council_permit}`)}{r.permit_ref ? ` · ${r.permit_ref}` : ''}</dd></div>}
         </dl>
       )}
       {!mine && (item.acked_at ? (
-        <div className="notice-done"><Hand size={13} /> You waved back</div>
+        <div className="notice-done"><Hand size={13} /> {t('wave.backDone')}</div>
       ) : (
-        <button className="btn btn-sm" onClick={onWave}><Hand size={14} /> Wave back</button>
+        <button className="btn btn-sm" onClick={onWave}><Hand size={14} /> {t('wave.back')}</button>
       ))}
     </div>
   )
 }
 
-function ConcernSheet({ open, onClose, me, t, onRaised }: { open: boolean; onClose: () => void; me: UnitInfo; t: Thread; onRaised: () => void }) {
+function ConcernSheet({ open, onClose, me, t, helperId, onRaised }: {
+  open: boolean
+  onClose: () => void
+  me: UnitInfo
+  t: Thread
+  helperId?: number
+  onRaised: () => void
+}) {
+  const tr = useT()
   const toast = useToast()
   const [category, setCategory] = useState<ConcernCategory>('noise_hours')
   const [note, setNote] = useState('')
@@ -312,13 +553,13 @@ function ConcernSheet({ open, onClose, me, t, onRaised }: { open: boolean; onClo
     setBusy(true)
     setTone(null)
     try {
-      await api.raiseConcern(me.id, reno.intro_id, category, note)
-      toast(`Sent privately to ${t.neighbour.resident_name}`)
+      await api.raiseConcern(me.id, reno.intro_id, category, note, helperId)
+      toast(tr('concern.sent', { name: t.neighbour.resident_name }))
       setNote('')
       onClose()
       onRaised()
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'tone') setTone(e.message)
+      if (refusal(e)) setTone(refusal(e))
       else toast(e instanceof Error ? e.message : 'Could not send', 'error')
     } finally {
       setBusy(false)
@@ -327,15 +568,15 @@ function ConcernSheet({ open, onClose, me, t, onRaised }: { open: boolean; onClo
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <div className="eyebrow">Raise a concern</div>
-      <div className="card-title" style={{ fontSize: 18 }}>Tell {t.neighbour.resident_name} first</div>
+      <div className="eyebrow">{tr('concern.eyebrow')}</div>
+      <div className="card-title" style={{ fontSize: 18 }}>{tr('concern.title', { name: t.neighbour.resident_name })}</div>
       <ol className="ladder-intro">
-        <li><b>1</b> {t.neighbour.resident_name} hears it privately, not in a group chat.</li>
-        <li><b>2</b> They reply or fix it. Most things end here.</li>
-        <li><b>3</b> Still not sorted? Hand it to SDP’s estate team with the full record.</li>
+        <li><b>1</b> {tr('concern.s1', { name: t.neighbour.resident_name })}</li>
+        <li><b>2</b> {tr('concern.s2')}</li>
+        <li><b>3</b> {tr('concern.s3')}</li>
       </ol>
       {t.their_renovations.length > 1 && (
-        <label className="field">About
+        <label className="field">{tr('concern.about')}
           <select value={reno?.intro_id} onChange={(e) => setIntroId(Number(e.target.value))}>
             {t.their_renovations.map((r) => <option key={r.intro_id} value={r.intro_id}>{r.scope} · {shortRange(r.start, r.end)}</option>)}
           </select>
@@ -347,40 +588,35 @@ function ConcernSheet({ open, onClose, me, t, onRaised }: { open: boolean; onClo
           return (
             <button key={k} className={`category ${category === k ? 'on' : ''}`} onClick={() => setCategory(k)}>
               <Icon size={18} />
-              <span>{t.concern_categories[k]}</span>
+              <span>{tr(`cat.${k}`)}</span>
             </button>
           )
         })}
       </div>
       {category === 'damage' && (
-        <div className="hint-inline"><House size={14} /> For cracks or leaks, also use <b>Evidence</b>: it compares your pre-work photo and can open an SDP warranty ticket.</div>
+        <div className="hint-inline"><House size={14} /> {tr('concern.damageHint')}</div>
       )}
-      <textarea className="input" rows={3} maxLength={300} placeholder="What happened, and when? e.g. drilling at 7.30pm on Tuesday"
+      <textarea className="input" rows={3} maxLength={300} placeholder={tr('concern.placeholder')}
         value={note} onChange={(e) => { setNote(e.target.value); setTone(null) }} />
-      {tone && <div className="tone-check"><TriangleAlert size={15} /><div><b>Tone check</b>{tone}</div></div>}
+      {tone && <div className="tone-check"><TriangleAlert size={15} /><div><b>{tr(`${tone}.title`)}</b>{tr(`${tone}.body`)}</div></div>}
       <button className="btn btn-primary btn-block" onClick={submit} disabled={busy || !reno}>
-        <MessageSquareWarning size={16} /> {busy ? 'Sending…' : `Send to ${t.neighbour.resident_name}`}
+        <MessageSquareWarning size={16} /> {busy ? tr('btn.sending') : tr('concern.send', { name: t.neighbour.resident_name })}
       </button>
     </Sheet>
   )
 }
 
-const REASONS = [
-  { id: 'harassment', label: 'Harassment or insults' },
-  { id: 'threat', label: 'Threat or intimidation' },
-  { id: 'spam', label: 'Spam or selling' },
-  { id: 'privacy', label: 'Shares someone’s private information' },
-  { id: 'other', label: 'Something else' },
-]
+const REPORT_REASONS = ['harassment', 'threat', 'spam', 'privacy', 'other']
 
 function ReportSheet({ message, me, name, onClose }: { message: ChatMessage | null; me: UnitInfo; name: string; onClose: () => void }) {
+  const t = useT()
   const toast = useToast()
   const [reason, setReason] = useState('harassment')
   async function submit() {
     if (!message) return
     try {
       await api.reportMessage(message.id, me.id, reason)
-      toast(`Reported to the SDP estate team. ${name} won't know it was you.`)
+      toast(t('report.sent', { name }))
       onClose()
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Could not report', 'error')
@@ -388,17 +624,17 @@ function ReportSheet({ message, me, name, onClose }: { message: ChatMessage | nu
   }
   return (
     <Sheet open={!!message} onClose={onClose}>
-      <div className="eyebrow">Report a message</div>
-      <blockquote className="report-quote">“{message?.text}”</blockquote>
+      <div className="eyebrow">{t('report.eyebrow')}</div>
+      <blockquote className="report-quote">{message?.kind === 'voice' ? t('report.voice') : `“${message?.text}”`}</blockquote>
       <div className="choices">
-        {REASONS.map((r) => (
-          <button key={r.id} className={`choice ${reason === r.id ? 'on' : ''}`} onClick={() => setReason(r.id)}>
-            <Flag size={16} /><span>{r.label}</span>
+        {REPORT_REASONS.map((r) => (
+          <button key={r} className={`choice ${reason === r ? 'on' : ''}`} onClick={() => setReason(r)}>
+            <Flag size={16} /><span>{t(`report.${r}`)}</span>
           </button>
         ))}
       </div>
-      <div className="small dim">The estate team reviews reports within one working day. You can also block {name} from the ⋯ menu.</div>
-      <button className="btn btn-danger btn-block" onClick={submit}><Flag size={15} /> Send report</button>
+      <div className="small dim">{t('report.note', { name })}</div>
+      <button className="btn btn-danger btn-block" onClick={submit}><Flag size={15} /> {t('report.send')}</button>
     </Sheet>
   )
 }

@@ -51,15 +51,15 @@ def test_reset_wipes_demo_activity(client):
     client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi"})
     assert client.post("/api/demo/reset").status_code == 200
     d = client.get("/api/dashboard").json()
-    assert d["intros_sent"] == 0 and d["households"] == 24 and d["home_histories_verified"] == 24
+    assert d["intros_sent"] == 0 and d["households"] == 36 and d["home_histories_verified"] == 36
 
 
 def test_dashboard_counts(client):
     intro_id = client.post("/api/intros", json={"from_unit_id": "A-14-3", "message": "Hi"}).json()["id"]
     client.post(f"/api/intros/{intro_id}/ack", json={"unit_id": "A-13-3"})
     d = client.get("/api/dashboard").json()
-    assert d["households"] == 24
+    assert d["households"] == 36
     assert d["intros_sent"] == 1
     assert d["reply_rate"] == 0.25
     assert d["households_with_a_known_neighbour"] == 2
-    assert d["home_histories_verified"] == 24
+    assert d["home_histories_verified"] == 36

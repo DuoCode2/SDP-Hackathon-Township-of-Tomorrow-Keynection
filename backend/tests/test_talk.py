@@ -163,11 +163,14 @@ def test_neighbour_settled_concern_counts_on_dashboard(client):
 
 # ---------- warranty clock, permits, map flags ----------
 
-def test_units_carry_language_handover_and_renovating_flag(client):
-    _reno(client)
+def test_units_carry_language_and_handover_date(client):
+    from datetime import date, timedelta
+
+    from app.seed import HANDOVER_DAYS_AGO, today_my
+
     units = {u["id"]: u for u in client.get("/api/units").json()}
-    assert units["T-11"]["lang"] == "ms" and units["T-12"]["handover_date"] == "2026-03-16"
-    assert units["T-12"]["renovating"] is True and units["T-11"]["renovating"] is False
+    handed_over = date.fromisoformat(units["T-12"]["handover_date"])
+    assert units["T-11"]["lang"] == "ms" and handed_over == today_my() - timedelta(days=HANDOVER_DAYS_AGO)
 
 
 def test_renovation_keeps_council_permit(client):

@@ -1,5 +1,7 @@
+import asyncio
 import hashlib
 import json
+import logging
 import os
 import re
 import secrets
@@ -19,8 +21,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
 from . import db, ledger, talk, vision
-from .neighbours import Unit, inverse_relation, neighbour_circle
+from .neighbours import Unit, impact_reason, impact_zone, inverse_relation, neighbour_circle, street_or_block
 from .triage import triage_hint
+
+log = logging.getLogger("jiran5")
 
 DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "app.db"
 DEMO_PHOTO_DIR = Path(__file__).resolve().parent / "demo_photos"
@@ -60,9 +64,30 @@ def demo_mode() -> bool:
 async def lifespan(_: FastAPI):
     conn = db.connect(db_path())
     db.init_db(conn)
+    _expire_voice(conn)
     conn.close()
     vision.warm_up()  # pay OpenCV's start-up cost now, not during the first demo comparison
+    sweeper = asyncio.create_task(_voice_sweeper())
     yield
+    sweeper.cancel()
+
+
+def _sweep_once() -> int:
+    conn = db.connect(db_path())
+    try:
+        return _expire_voice(conn)
+    finally:
+        conn.close()
+
+
+async def _voice_sweeper() -> None:
+    """Delete expired voice notes every hour while the server runs, not only at start-up or when a chat opens."""
+    while True:
+        await asyncio.sleep(VOICE_SWEEP_SECONDS)
+        try:
+            await asyncio.to_thread(_sweep_once)
+        except Exception:  # never let a clean-up error stop the server
+            log.exception("voice clean-up failed")
 
 
 app = FastAPI(title="Jiran5 prototype API", version="0.2.0", lifespan=lifespan)
@@ -119,11 +144,20 @@ def _today() -> str:
     return datetime.now(MALAYSIA).strftime("%Y-%m-%d")
 
 
-def _circle(conn: sqlite3.Connection, unit_id: str) -> list[dict[str, Any]]:
+def _phase(conn: sqlite3.Connection, unit_id: str) -> tuple[sqlite3.Row, dict[str, sqlite3.Row], list[Unit]]:
     me = _unit_row(conn, unit_id)
     rows = {r["id"]: r for r in conn.execute("SELECT * FROM units WHERE phase_id = ?", (me["phase_id"],))}
-    phase_units = [_to_unit(r) for r in rows.values()]
+    return me, rows, [_to_unit(r) for r in rows.values()]
+
+
+def _circle(conn: sqlite3.Connection, unit_id: str) -> list[dict[str, Any]]:
+    me, rows, phase_units = _phase(conn, unit_id)
     return [{**_unit_json(rows[n.unit_id]), "relation": n.relation} for n in neighbour_circle(_to_unit(me), phase_units)]
+
+
+def _unit_public(row: sqlite3.Row) -> dict[str, Any]:
+    """A home outside your circle: where it is, never who lives there."""
+    return {k: v for k, v in _unit_json(row).items() if k not in ("resident_name", "lang", "handover_date")}
 
 
 def _intro(conn: sqlite3.Connection, intro_id: int | None) -> dict[str, Any] | None:
@@ -219,7 +253,9 @@ SUBJECT_BY_RELATION = {
     "left": "Shared wall with {label}",
     "right": "Shared wall with {label}",
     "above": "Ceiling below {label}",
+    "above-2": "Ceiling, two floors below {label}",
     "below": "Floor above {label}",
+    "below-2": "Floor, two floors above {label}",
 }
 
 
@@ -235,6 +271,10 @@ class Renovation(BaseModel):
     weekdays_only: bool = True
     contractor: str | None = Field(None, max_length=80)
     contractor_cidb_registered: bool | None = None
+    # Decides who is notified: wet jobs reach two floors down, hacking two floors up and down.
+    works_type: Literal["wet", "hacking", "structural", "light"] = "hacking"
+    # Strata buildings: the JMB/MC approves renovations and holds the deposit.
+    management_approval: Literal["approved", "pending"] | None = None
     # Local-authority (PBT) approval: extensions and structural work need one; re-tiling usually does not.
     council_permit: Literal["approved", "applied", "not_needed"] | None = None
     permit_ref: str | None = Field(None, max_length=40, pattern=r"^[A-Za-z0-9/ .-]*$")
@@ -253,6 +293,9 @@ class IntroIn(BaseModel):
     message: str = Field(..., min_length=1, max_length=1000)
     lang: Literal["en", "ms", "zh", "ta"] = "en"
     renovation: Renovation | None = None
+    # A hello can go to part of the circle; a renovation notice always goes to the whole impact zone.
+    to_unit_ids: list[str] | None = Field(None, max_length=8)
+    delegate_id: int | None = None
 
 
 class AckIn(BaseModel):
@@ -306,6 +349,7 @@ class RepairDemoIn(BaseModel):
 class OwnerResponseIn(BaseModel):
     unit_id: str = Field(..., pattern=UNIT_ID)
     decision: Literal["accept", "reject"]
+    delegate_id: int | None = None
     note: str = Field("", max_length=300)
 
 
@@ -323,11 +367,74 @@ def phases(conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]
 
 @app.get("/api/units")
 def units(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+    """The phase layout. Names are included only in demo mode (for the demo cast); a real deployment never
+    exposes a resident directory. Who is renovating is not here either: see /directory."""
+    rows = conn.execute("SELECT * FROM units WHERE phase_id = ? ORDER BY id", (phase_id,)).fetchall()
+    return [_unit_json(r) if demo_mode() else _unit_public(r) for r in rows]
+
+
+def _works_visible_to(conn: sqlite3.Connection, unit_id: str) -> set[str]:
+    """Homes whose renovation this household may know about: its own, and those that notified it.
+    The rest of the township cannot see who is renovating (an empty house is a burglary risk)."""
     today = _today()
-    renovating = {r["from_unit_id"] for r in conn.execute("SELECT from_unit_id, renovation FROM intros WHERE renovation IS NOT NULL")
-                  if json.loads(r["renovation"])["end"] >= today}
-    return [{**_unit_json(r), "renovating": r["id"] in renovating}
-            for r in conn.execute("SELECT * FROM units WHERE phase_id = ? ORDER BY id", (phase_id,))]
+    seen = set()
+    for r in conn.execute(
+        "SELECT i.from_unit_id, i.renovation FROM intros i LEFT JOIN intro_recipients r ON r.intro_id = i.id AND r.unit_id = ?"
+        " WHERE i.renovation IS NOT NULL AND (i.from_unit_id = ? OR r.unit_id IS NOT NULL)",
+        (unit_id, unit_id),
+    ):
+        if json.loads(r["renovation"])["end"] >= today:
+            seen.add(r["from_unit_id"])
+    return seen
+
+
+def _request_between(conn: sqlite3.Connection, a: str, b: str) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM contact_requests WHERE (from_unit_id = ? AND to_unit_id = ?) OR (from_unit_id = ? AND to_unit_id = ?)"
+        " ORDER BY id DESC LIMIT 1", (a, b, b, a)).fetchone()
+
+
+def _connected(conn: sqlite3.Connection, a: str, b: str) -> bool:
+    r = _request_between(conn, a, b)
+    return r is not None and r["status"] == "accepted"
+
+
+@app.get("/api/units/{unit_id}/directory")
+def directory(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Everything one household may see about the homes around it, by ring."""
+    me, rows, phase_units = _phase(conn, unit_id)
+    card = neighbour_card(unit_id, conn)
+    nearby = []
+    for n in street_or_block(_to_unit(me), phase_units):
+        row = rows[n.unit_id]
+        req = _request_between(conn, unit_id, n.unit_id)
+        if req is None:
+            state = "none"
+        elif req["status"] == "accepted":
+            state = "connected"
+        elif req["status"] == "pending":
+            state = "requested" if req["from_unit_id"] == unit_id else "incoming"
+        else:
+            state = "declined"
+        item = {**_unit_public(row), "hint": n.hint, "hint_key": n.key, "hint_n": n.n, "contact": state}
+        if state == "connected":
+            item["resident_name"] = row["resident_name"]
+        nearby.append(item)
+    return {"circle": card["neighbours"], "nearby": nearby, "works": sorted(_works_visible_to(conn, unit_id)),
+            "ring2_label": "Jalan Demo 1" if me["kind"] == "terrace" else f"Block {me['block']}",
+            "township_homes": len(rows)}
+
+
+@app.get("/api/units/{unit_id}/impact")
+def impact(unit_id: str, works_type: Literal["wet", "hacking", "structural", "light"] = "hacking",
+           conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+    """Who a renovation of this type would notify, and why. Homes outside the circle are shown by unit only."""
+    me, rows, phase_units = _phase(conn, unit_id)
+    circle = {n.unit_id for n in neighbour_circle(_to_unit(me), phase_units)}
+    return [{**(_unit_json(rows[n.unit_id]) if n.unit_id in circle else _unit_public(rows[n.unit_id])),
+             "relation": n.relation, "reason": impact_reason(n.relation, works_type),
+             "reason_key": n.relation + ("_wet" if works_type == "wet" and n.relation.startswith("below") else "")}
+            for n in impact_zone(_to_unit(me), phase_units, works_type)]
 
 
 @app.get("/api/units/{unit_id}/neighbours")
@@ -337,12 +444,24 @@ def neighbours(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> li
 
 @app.post("/api/intros", status_code=201)
 def send_intro(body: IntroIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
-    _unit_row(conn, body.from_unit_id)
-    circle = _circle(conn, body.from_unit_id)
+    me, _, phase_units = _phase(conn, body.from_unit_id)
     renovation = body.renovation.model_dump() if body.renovation else None
+    if renovation:
+        # The notice goes to everyone the work can affect; the sender cannot leave anyone out.
+        circle = [{"id": n.unit_id, "relation": n.relation} for n in impact_zone(_to_unit(me), phase_units, renovation["works_type"])]
+    else:
+        circle = _circle(conn, body.from_unit_id)
+        if body.to_unit_ids is not None:
+            allowed = {n["id"] for n in circle}
+            if not set(body.to_unit_ids) <= allowed:
+                raise HTTPException(403, "An introduction can only go to the homes in your circle.")
+            circle = [n for n in circle if n["id"] in body.to_unit_ids]
+            if not circle:
+                raise HTTPException(422, "Pick at least one neighbour.")
+    sent_by = _delegate_name(conn, body.from_unit_id, body.delegate_id)
     cur = conn.execute(
-        "INSERT INTO intros (from_unit_id, message, lang, renovation, created_at) VALUES (?, ?, ?, ?, ?)",
-        (body.from_unit_id, body.message, body.lang, json.dumps(renovation) if renovation else None, db.now()),
+        "INSERT INTO intros (from_unit_id, message, lang, renovation, sent_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (body.from_unit_id, body.message, body.lang, json.dumps(renovation) if renovation else None, sent_by, db.now()),
     )
     intro_id = cur.lastrowid
     for n in circle:
@@ -350,7 +469,7 @@ def send_intro(body: IntroIn, conn: sqlite3.Connection = Depends(get_conn)) -> d
                      (intro_id, n["id"], n["relation"]))
     if renovation:
         db.append_event(conn, body.from_unit_id, "renovation_registered",
-                        {**renovation, "neighbours_notified": [n["id"] for n in circle]})
+                        {**renovation, "neighbours_notified": [n["id"] for n in circle], **({"acted_by": sent_by} if sent_by else {})})
     conn.commit()
     return {"id": intro_id, "recipients": [n["id"] for n in circle]}
 
@@ -396,8 +515,30 @@ def neighbour_card(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
             " WHERE i.from_unit_id = ? AND r.unit_id = ? AND r.acked_at IS NOT NULL",
             (n["id"], unit_id),
         ).fetchone() is not None
-        out.append({**n, "known": they_replied or i_replied})
+        since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
+        waved = conn.execute("SELECT 1 FROM waves WHERE from_unit_id = ? AND to_unit_id = ? AND created_at > ?",
+                             (unit_id, n["id"], since)).fetchone() is not None
+        out.append({**n, "known": they_replied or i_replied or _mutual(conn, unit_id, n["id"]), "bio": _profile_row(conn, n["id"])["bio"],
+                    "waved_today": waved, "allow_waves": bool(_profile_row(conn, n["id"])["allow_waves"])})
     return {"unit_id": unit_id, "neighbours": out, "known_count": sum(n["known"] for n in out)}
+
+
+def _mutual(conn: sqlite3.Connection, a: str, b: str) -> bool:
+    """Known once both sides have reached out: waves or messages in each direction."""
+    def reached(x: str, y: str) -> bool:
+        return conn.execute(
+            "SELECT 1 FROM waves WHERE from_unit_id = ? AND to_unit_id = ? UNION ALL"
+            " SELECT 1 FROM messages WHERE from_unit_id = ? AND to_unit_id = ? AND kind != 'system' LIMIT 1",
+            (x, y, x, y)).fetchone() is not None
+    return reached(a, b) and reached(b, a)
+
+
+def _profile_row(conn: sqlite3.Connection, unit_id: str) -> sqlite3.Row:
+    row = conn.execute("SELECT * FROM profiles WHERE unit_id = ?", (unit_id,)).fetchone()
+    if row is None:
+        conn.execute("INSERT OR IGNORE INTO profiles (unit_id) VALUES (?)", (unit_id,))
+        row = conn.execute("SELECT * FROM profiles WHERE unit_id = ?", (unit_id,)).fetchone()
+    return row
 
 
 # ---------- layer 1b: talk (messages between neighbours, concerns, safety) ----------
@@ -406,6 +547,8 @@ MAX_MESSAGES_PER_DAY = 30
 MAX_OPEN_CONCERNS = 5
 ESCALATE_AFTER = timedelta(hours=24)
 ESTATE = "SDP Estate Team"
+PRIVATE_MESSAGE = ("Please don't put phone numbers, emails or links here. "
+                   "Exchange numbers in a chat when you both agree.")
 TONE_MESSAGE = ("This may come across as hostile. Try calmer words or a quick reply: messages stay on record "
                 "and can be reported.")
 
@@ -415,6 +558,7 @@ class MessageIn(BaseModel):
     to_unit_id: str = Field(..., pattern=UNIT_ID)
     body: str | None = Field(None, max_length=500)
     quick_key: str | None = Field(None, pattern=r"^[a-z_]{1,30}$")
+    delegate_id: int | None = None
 
     @model_validator(mode="after")
     def one_kind(self) -> "MessageIn":
@@ -442,6 +586,7 @@ class ConcernIn(BaseModel):
     intro_id: int
     category: Literal["noise_hours", "debris", "access", "damage", "workers", "other"]
     note: str = Field("", max_length=300)
+    delegate_id: int | None = None
 
 
 class ConcernActionIn(BaseModel):
@@ -458,11 +603,31 @@ class ReviewIn(BaseModel):
     outcome: Literal["warned", "dismissed"]
 
 
+def _talk_partners(conn: sqlite3.Connection, unit_id: str) -> list[dict[str, Any]]:
+    """Who this household may message: its circle, anyone a renovation notice connects it with, and
+    accepted contact requests. Nobody else."""
+    partners = {n["id"]: n for n in _circle(conn, unit_id)}
+    for r in conn.execute(
+        "SELECT i.from_unit_id, r.unit_id, r.relation FROM intro_recipients r JOIN intros i ON i.id = r.intro_id"
+        " WHERE i.renovation IS NOT NULL AND (i.from_unit_id = ? OR r.unit_id = ?)", (unit_id, unit_id),
+    ):
+        other, rel = (r["unit_id"], r["relation"]) if r["from_unit_id"] == unit_id else (r["from_unit_id"], inverse_relation(r["relation"]))
+        if other not in partners:
+            partners[other] = {**_unit_json(_unit_row(conn, other)), "relation": rel}
+    for r in conn.execute("SELECT * FROM contact_requests WHERE status = 'accepted' AND (from_unit_id = ? OR to_unit_id = ?)",
+                          (unit_id, unit_id)):
+        other = r["to_unit_id"] if r["from_unit_id"] == unit_id else r["from_unit_id"]
+        if other not in partners:
+            partners[other] = {**_unit_json(_unit_row(conn, other)), "relation": "contact"}
+    return list(partners.values())
+
+
 def _require_neighbours(conn: sqlite3.Connection, unit_id: str, other_id: str) -> dict[str, Any]:
     _unit_row(conn, unit_id)
-    n = next((x for x in _circle(conn, unit_id) if x["id"] == other_id), None)
+    n = next((x for x in _talk_partners(conn, unit_id) if x["id"] == other_id), None)
     if n is None:
-        raise HTTPException(403, "You can only talk with the households in your circle.")
+        raise HTTPException(403, "You can only talk with your circle, homes a renovation notice connects you with, "
+                                 "or neighbours who accepted your contact request.")
     return n
 
 
@@ -484,10 +649,14 @@ def _system_message(conn: sqlite3.Connection, to_unit: str, thread_with: str, te
     )
 
 
-def _message_json(row: sqlite3.Row, viewer_lang: str) -> dict[str, Any]:
+def _message_json(row: sqlite3.Row, viewer_lang: str, reactions: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     out = {"type": "message", "id": row["id"], "kind": row["kind"], "from_unit_id": row["from_unit_id"],
            "to_unit_id": row["to_unit_id"], "author": row["author"], "text": row["body"], "lang": row["lang"],
-           "translated": False, "original": None, "created_at": row["created_at"], "read_at": row["read_at"]}
+           "translated": False, "original": None, "created_at": row["created_at"], "read_at": row["read_at"],
+           "reactions": reactions or [], "duration": int(row["body"]) if row["kind"] == "voice" else None,
+           "expired": row["kind"] == "voice" and not row["media_id"], "sent_by": row["sent_by"]}
+    if row["kind"] == "voice":
+        out["text"] = "Voice message"
     if row["kind"] == "quick" and row["quick_key"] in talk.QUICK_REPLIES:
         out["text"] = talk.quick_text(row["quick_key"], viewer_lang)
         out["translated"] = viewer_lang != row["lang"]
@@ -510,7 +679,7 @@ def _concern_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
             "to_unit_id": row["to_unit_id"], "to_label": owner["label"], "to_name": owner["resident_name"],
             "category": row["category"], "category_label": talk.CONCERN_CATEGORIES[row["category"]], "note": row["note"],
             "status": row["status"], "response_note": row["response_note"], "estate_note": row["estate_note"],
-            "reminders": row["reminders"], "created_at": row["created_at"], "acknowledged_at": row["acknowledged_at"],
+            "reminders": row["reminders"], "acted_by": row["acted_by"], "created_at": row["created_at"], "acknowledged_at": row["acknowledged_at"],
             "resolved_at": row["resolved_at"], "escalated_at": row["escalated_at"], "closed_at": row["closed_at"]}
 
 
@@ -522,7 +691,7 @@ def _thread_items(conn: sqlite3.Connection, me: str, other: str, viewer_lang: st
         (me, other, other, me),
     ):
         items.append({"type": "intro", "id": r["id"], "from_unit_id": r["from_unit_id"], "to_unit_id": r["to_unit_id"],
-                      "text": r["message"], "lang": r["lang"], "acked_at": r["acked_at"], "created_at": r["created_at"],
+                      "text": r["message"], "lang": r["lang"], "acked_at": r["acked_at"], "created_at": r["created_at"], "sent_by": r["sent_by"],
                       "renovation": json.loads(r["renovation"]) if r["renovation"] else None})
     for r in conn.execute(
         "SELECT * FROM messages WHERE (from_unit_id = ? AND to_unit_id = ?) OR (from_unit_id = ? AND to_unit_id = ?)"
@@ -533,7 +702,11 @@ def _thread_items(conn: sqlite3.Connection, me: str, other: str, viewer_lang: st
             continue  # sent while I had them blocked
         if r["private"] and r["to_unit_id"] != me:
             continue
-        items.append(_message_json(r, viewer_lang))
+        items.append(_message_json(r, viewer_lang, _reactions(conn, r["id"])))
+    for r in conn.execute("SELECT * FROM waves WHERE (from_unit_id = ? AND to_unit_id = ?) OR (from_unit_id = ? AND to_unit_id = ?)",
+                          (me, other, other, me)):
+        items.append({"type": "wave", "id": r["id"], "from_unit_id": r["from_unit_id"], "to_unit_id": r["to_unit_id"],
+                      "created_at": r["created_at"], "seen_at": r["seen_at"]})
     for r in conn.execute(
         "SELECT * FROM concerns WHERE (from_unit_id = ? AND to_unit_id = ?) OR (from_unit_id = ? AND to_unit_id = ?)",
         (me, other, other, me),
@@ -559,22 +732,28 @@ def _preview(item: dict[str, Any] | None) -> str | None:
         return f"Concern: {item['category_label']}"
     if item["type"] == "intro":
         return "Renovation notice" if item["renovation"] else item["text"]
+    if item["type"] == "wave":
+        return "👋 Wave"
+    if item.get("kind") == "voice":
+        return f"🎤 Voice message ({item['duration']}s)"
     return item["text"]
 
 
 @app.get("/api/units/{unit_id}/conversations")
 def conversations(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
     me = _unit_row(conn, unit_id)
+    _expire_voice(conn)
     today = _today()
     out = []
-    for n in _circle(conn, unit_id):
+    for n in _talk_partners(conn, unit_id):
         items = _thread_items(conn, unit_id, n["id"], me["lang"])
         last = items[-1] if items else None
         unread = conn.execute(
             "SELECT COUNT(*) FROM messages WHERE to_unit_id = ? AND read_at IS NULL AND withheld = 0"
             " AND (from_unit_id = ? OR (kind = 'system' AND thread_with = ?))",
             (unit_id, n["id"], n["id"]),
-        ).fetchone()[0]
+        ).fetchone()[0] + conn.execute(
+            "SELECT COUNT(*) FROM waves WHERE to_unit_id = ? AND from_unit_id = ? AND seen_at IS NULL", (unit_id, n["id"])).fetchone()[0]
         out.append({**n, "last": _preview(last), "last_at": last["created_at"] if last else None, "unread": unread,
                     "blocked": _blocked(conn, unit_id, n["id"]), "contact": _contact_state(conn, unit_id, n["id"]),
                     "open_concerns": sum(1 for i in items if i["type"] == "concern" and i["status"] in ("open", "acknowledged", "escalated")),
@@ -590,7 +769,8 @@ def thread(unit_id: str, other_id: str, conn: sqlite3.Connection = Depends(get_c
     return {"neighbour": n, "my_lang": me["lang"], "items": _thread_items(conn, unit_id, other_id, me["lang"]),
             "contact": _contact_state(conn, unit_id, other_id), "blocked": _blocked(conn, unit_id, other_id),
             "their_renovations": _renovations_from(conn, other_id, unit_id),
-            "quick_replies": [{"key": k, "text": talk.quick_text(k, me["lang"])} for k in talk.QUICK_REPLIES],
+            "quick_replies": [{"key": k, "text": talk.quick_text(k, me["lang"]), "arrives": talk.quick_text(k, n["lang"])}
+                              for k in talk.QUICK_REPLIES],
             "concern_categories": talk.CONCERN_CATEGORIES}
 
 
@@ -602,6 +782,8 @@ def mark_read(unit_id: str, other_id: str, conn: sqlite3.Connection = Depends(ge
         " AND (from_unit_id = ? OR (kind = 'system' AND thread_with = ?))",
         (db.now(), unit_id, other_id, other_id),
     )
+    conn.execute("UPDATE waves SET seen_at = ? WHERE to_unit_id = ? AND from_unit_id = ? AND seen_at IS NULL",
+                 (db.now(), unit_id, other_id))
     conn.commit()
     return {"ok": True}
 
@@ -610,8 +792,7 @@ def mark_read(unit_id: str, other_id: str, conn: sqlite3.Connection = Depends(ge
 def send_message(body: MessageIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     sender = _unit_row(conn, body.from_unit_id)
     _require_neighbours(conn, body.from_unit_id, body.to_unit_id)
-    if _blocked(conn, body.from_unit_id, body.to_unit_id):
-        raise HTTPException(409, "You blocked this neighbour. Unblock them to send a message.")
+    _check_can_reach(conn, body.from_unit_id, body.to_unit_id)
     since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
     sent = conn.execute("SELECT COUNT(*) FROM messages WHERE from_unit_id = ? AND to_unit_id = ? AND created_at > ?",
                         (body.from_unit_id, body.to_unit_id, since)).fetchone()[0]
@@ -627,10 +808,11 @@ def send_message(body: MessageIn, conn: sqlite3.Connection = Depends(get_conn)) 
             raise HTTPException(422, {"code": "tone", "message": TONE_MESSAGE})
     # If the recipient has blocked the sender, the message is kept (for the record) but never shown to them.
     withheld = int(_blocked(conn, body.to_unit_id, body.from_unit_id))
+    sent_by = _delegate_name(conn, body.from_unit_id, body.delegate_id)
     cur = conn.execute(
-        "INSERT INTO messages (from_unit_id, to_unit_id, kind, body, quick_key, lang, withheld, created_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (body.from_unit_id, body.to_unit_id, kind, text, body.quick_key, sender["lang"], withheld, db.now()),
+        "INSERT INTO messages (from_unit_id, to_unit_id, kind, body, quick_key, lang, withheld, sent_by, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (body.from_unit_id, body.to_unit_id, kind, text, body.quick_key, sender["lang"], withheld, sent_by, db.now()),
     )
     conn.commit()
     return _message_json(conn.execute("SELECT * FROM messages WHERE id = ?", (cur.lastrowid,)).fetchone(), sender["lang"])
@@ -698,11 +880,13 @@ def raise_concern(body: ConcernIn, conn: sqlite3.Connection = Depends(get_conn))
         raise HTTPException(429, f"You already have {MAX_OPEN_CONCERNS} open concerns about this renovation.")
     if talk.tone_problem(body.note):
         raise HTTPException(422, {"code": "tone", "message": TONE_MESSAGE})
+    acted_by = _delegate_name(conn, body.from_unit_id, body.delegate_id)
     cur = conn.execute(
-        "INSERT INTO concerns (intro_id, from_unit_id, to_unit_id, category, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-        (body.intro_id, body.from_unit_id, intro["from_unit_id"], body.category, body.note, db.now()),
+        "INSERT INTO concerns (intro_id, from_unit_id, to_unit_id, category, note, acted_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (body.intro_id, body.from_unit_id, intro["from_unit_id"], body.category, body.note, acted_by, db.now()),
     )
-    payload = {"concern_id": cur.lastrowid, "category": body.category, "raised_by": body.from_unit_id, "about": intro["from_unit_id"]}
+    payload = {"concern_id": cur.lastrowid, "category": body.category, "raised_by": body.from_unit_id, "about": intro["from_unit_id"],
+               **({"acted_by": acted_by} if acted_by else {})}
     db.append_event(conn, body.from_unit_id, "concern_raised", payload)
     db.append_event(conn, intro["from_unit_id"], "concern_raised", payload)
     conn.commit()
@@ -793,17 +977,33 @@ def estate_action(concern_id: int, body: EstateActionIn, conn: sqlite3.Connectio
 @app.get("/api/moderation/reports")
 def moderation_reports(conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
     rows = conn.execute(
-        "SELECT r.*, m.body, m.from_unit_id, m.to_unit_id, m.created_at AS sent_at FROM reports r"
+        "SELECT r.*, m.body, m.kind, m.media_id, m.from_unit_id, m.to_unit_id, m.created_at AS sent_at FROM reports r"
         " JOIN messages m ON m.id = r.message_id ORDER BY CASE r.status WHEN 'open' THEN 0 ELSE 1 END, r.id DESC"
     ).fetchall()
     out = []
     for r in rows:
         sender, reporter = _unit_row(conn, r["from_unit_id"]), _unit_row(conn, r["reporter_unit_id"])
+        voice = r["kind"] == "voice"
         out.append({"id": r["id"], "reason": r["reason"], "status": r["status"], "created_at": r["created_at"],
-                    "message": {"id": r["message_id"], "text": r["body"], "sent_at": r["sent_at"],
+                    "message": {"id": r["message_id"], "kind": r["kind"], "text": "Voice message" if voice else r["body"],
+                                "duration": int(r["body"]) if voice else None, "sent_at": r["sent_at"],
+                                "voice_url": f"/api/moderation/reports/{r['id']}/voice" if voice and r["media_id"] else None,
                                 "from_label": sender["label"], "from_name": sender["resident_name"]},
                     "reporter_label": reporter["label"]})
     return out
+
+
+@app.get("/api/moderation/reports/{report_id}/voice")
+def reported_voice(report_id: int, conn: sqlite3.Connection = Depends(get_conn)) -> FileResponse:
+    """The estate team can play a reported voice note. Off outside demo mode until moderators sign in."""
+    _require_sign_in_or_demo()
+    row = conn.execute("SELECT m.media_id FROM reports r JOIN messages m ON m.id = r.message_id WHERE r.id = ? AND m.kind = 'voice'",
+                       (report_id,)).fetchone()
+    if row is None or not row["media_id"]:
+        raise HTTPException(404, "voice message not found")
+    ext = row["media_id"].rsplit(".", 1)[-1]
+    media = next((k for k, v in VOICE_TYPES.items() if v == ext), "application/octet-stream")
+    return FileResponse(data_dir("voice") / row["media_id"], media_type=media, headers={"Cache-Control": "no-store"})
 
 
 @app.post("/api/reports/{report_id}/review")
@@ -822,6 +1022,461 @@ def review_report(report_id: int, body: ReviewIn, conn: sqlite3.Connection = Dep
                         "repeated reports can pause your messaging.", private=True)
     conn.commit()
     return {"status": body.outcome}
+
+
+
+# ---------- ring 2: contact requests; ring 3: community notices ----------
+
+MAX_REQUESTS_PER_DAY = 3
+REQUEST_REASONS = {
+    "parking": "Parking or access", "noise": "Noise", "leak": "Water leak or seepage",
+    "delivery": "Parcel or delivery", "safety": "Safety concern", "other": "Something else",
+}
+
+
+class ContactRequestIn(BaseModel):
+    from_unit_id: str = Field(..., pattern=UNIT_ID)
+    to_unit_id: str = Field(..., pattern=UNIT_ID)
+    reason: Literal["parking", "noise", "leak", "delivery", "safety", "other"]
+    note: str = Field("", max_length=200)
+
+
+class RespondIn(BaseModel):
+    unit_id: str = Field(..., pattern=UNIT_ID)
+    accept: bool
+
+
+class NoticeIn(BaseModel):
+    audience: Literal["phase", "terrace", "block:A"]
+    title: str = Field(..., min_length=3, max_length=80)
+    body: str = Field(..., min_length=3, max_length=400)
+
+
+def _request_json(conn: sqlite3.Connection, row: sqlite3.Row, viewer: str) -> dict[str, Any]:
+    sender, recipient = _unit_row(conn, row["from_unit_id"]), _unit_row(conn, row["to_unit_id"])
+    accepted = row["status"] == "accepted"
+    # Until accepted, each side sees the other only as a unit, never a name.
+    def side(r: sqlite3.Row) -> dict[str, Any]:
+        return _unit_json(r) if accepted else _unit_public(r)
+    return {"id": row["id"], "from": side(sender), "to": side(recipient), "reason": row["reason"],
+            "reason_label": REQUEST_REASONS[row["reason"]], "note": row["note"], "status": row["status"],
+            "created_at": row["created_at"], "responded_at": row["responded_at"], "mine": row["from_unit_id"] == viewer}
+
+
+@app.post("/api/contact-requests", status_code=201)
+def request_contact(body: ContactRequestIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    me, rows, phase_units = _phase(conn, body.from_unit_id)
+    ring2 = {n.unit_id for n in street_or_block(_to_unit(me), phase_units)}
+    if body.to_unit_id in {n["id"] for n in _circle(conn, body.from_unit_id)}:
+        raise HTTPException(409, "This home is already in your circle: message them directly.")
+    if body.to_unit_id not in ring2:
+        raise HTTPException(403, "Contact requests only reach your own lorong or block. For anything else, ask the estate office.")
+    target = _profile_row(conn, body.to_unit_id)
+    if _blocked(conn, body.to_unit_id, body.from_unit_id) or not target["accept_requests"] or target["quiet_mode"]:
+        raise HTTPException(409, "This household isn't accepting requests.")
+    last = _request_between(conn, body.from_unit_id, body.to_unit_id)
+    if last is not None and last["status"] in ("pending", "accepted"):
+        raise HTTPException(409, "There is already a request between you.")
+    if last is not None and last["status"] == "declined" and last["from_unit_id"] == body.from_unit_id:
+        raise HTTPException(409, "This household declined your earlier request.")
+    since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
+    sent = conn.execute("SELECT COUNT(*) FROM contact_requests WHERE from_unit_id = ? AND created_at > ?",
+                        (body.from_unit_id, since)).fetchone()[0]
+    if sent >= MAX_REQUESTS_PER_DAY:
+        raise HTTPException(429, f"At most {MAX_REQUESTS_PER_DAY} contact requests a day.")
+    if talk.tone_problem(body.note):
+        raise HTTPException(422, {"code": "tone", "message": TONE_MESSAGE})
+    cur = conn.execute("INSERT INTO contact_requests (from_unit_id, to_unit_id, reason, note, created_at) VALUES (?, ?, ?, ?, ?)",
+                       (body.from_unit_id, body.to_unit_id, body.reason, body.note.strip(), db.now()))
+    conn.commit()
+    return _request_json(conn, conn.execute("SELECT * FROM contact_requests WHERE id = ?", (cur.lastrowid,)).fetchone(), body.from_unit_id)
+
+
+@app.get("/api/units/{unit_id}/contact-requests")
+def contact_requests(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, list[dict[str, Any]]]:
+    _unit_row(conn, unit_id)
+    rows = conn.execute("SELECT * FROM contact_requests WHERE from_unit_id = ? OR to_unit_id = ? ORDER BY id DESC",
+                        (unit_id, unit_id)).fetchall()
+    return {"incoming": [_request_json(conn, r, unit_id) for r in rows if r["to_unit_id"] == unit_id],
+            "outgoing": [_request_json(conn, r, unit_id) for r in rows if r["from_unit_id"] == unit_id]}
+
+
+@app.post("/api/contact-requests/{request_id}/respond")
+def respond_contact(request_id: int, body: RespondIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    row = conn.execute("SELECT * FROM contact_requests WHERE id = ?", (request_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "request not found")
+    if row["to_unit_id"] != body.unit_id:
+        raise HTTPException(403, "Only the household that received the request can answer it.")
+    if row["status"] != "pending":
+        raise HTTPException(409, "This request has already been answered.")
+    conn.execute("UPDATE contact_requests SET status = ?, responded_at = ? WHERE id = ?",
+                 ("accepted" if body.accept else "declined", db.now(), request_id))
+    conn.commit()
+    return _request_json(conn, conn.execute("SELECT * FROM contact_requests WHERE id = ?", (request_id,)).fetchone(), body.unit_id)
+
+
+def _audiences(unit: sqlite3.Row) -> tuple[str, ...]:
+    return ("phase", "terrace") if unit["kind"] == "terrace" else ("phase", f"block:{unit['block']}")
+
+
+@app.get("/api/units/{unit_id}/notices")
+def notices_for(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+    me = _unit_row(conn, unit_id)
+    a = _audiences(me)
+    rows = conn.execute(f"SELECT * FROM notices WHERE phase_id = ? AND audience IN ({','.join('?' * len(a))}) ORDER BY id DESC",
+                        (me["phase_id"], *a)).fetchall()
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/notices")
+def all_notices(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+    return [dict(r) for r in conn.execute("SELECT * FROM notices WHERE phase_id = ? ORDER BY id DESC", (phase_id,))]
+
+
+@app.post("/api/notices", status_code=201)
+def post_notice(body: NoticeIn, phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Estate team only (no sign-in in the prototype). One-way: residents cannot reply to the whole township."""
+    cur = conn.execute("INSERT INTO notices (phase_id, audience, title, body, author, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                       (phase_id, body.audience, body.title.strip(), body.body.strip(), ESTATE, db.now()))
+    conn.commit()
+    return dict(conn.execute("SELECT * FROM notices WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+
+
+# ---------- social: waves, reactions, voice notes, profile & privacy, the estate office account ----------
+
+MAX_WAVES_PER_DAY = 10
+REACTIONS = ("👍", "❤️", "🙏", "😂", "😮")
+VOICE_TYPES = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "m4a", "audio/mpeg": "mp3", "audio/wav": "wav", "audio/x-wav": "wav"}
+MAX_VOICE_BYTES = 1_500_000
+MAX_VOICE_SECONDS = 60
+
+
+class WaveIn(BaseModel):
+    from_unit_id: str = Field(..., pattern=UNIT_ID)
+    to_unit_id: str = Field(..., pattern=UNIT_ID)
+
+
+class ReactIn(BaseModel):
+    unit_id: str = Field(..., pattern=UNIT_ID)
+    emoji: str = Field(..., max_length=4)
+
+
+class ProfileIn(BaseModel):
+    bio: str | None = Field(None, max_length=80)
+    accept_requests: bool | None = None
+    allow_waves: bool | None = None
+    quiet_mode: bool | None = None
+    lang: Literal["en", "ms", "zh"] | None = None
+
+
+def _check_can_reach(conn: sqlite3.Connection, sender: str, recipient: str) -> None:
+    """Shared gate for messages, voice notes and waves."""
+    if _blocked(conn, sender, recipient):
+        raise HTTPException(409, "You blocked this neighbour. Unblock them to send a message.")
+    if _profile_row(conn, recipient)["quiet_mode"]:
+        raise HTTPException(409, "This neighbour has quiet mode on. Renovation notices and concerns still reach them.")
+
+
+def _reactions(conn: sqlite3.Connection, message_id: int) -> list[dict[str, Any]]:
+    return [{"emoji": r["emoji"], "unit_id": r["unit_id"]} for r in conn.execute(
+        "SELECT emoji, unit_id FROM reactions WHERE message_id = ? ORDER BY created_at", (message_id,))]
+
+
+@app.post("/api/waves", status_code=201)
+def wave(body: WaveIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """A one-tap hello. One per neighbour per day, so it can't become a nuisance."""
+    _require_neighbours(conn, body.from_unit_id, body.to_unit_id)
+    _check_can_reach(conn, body.from_unit_id, body.to_unit_id)
+    if not _profile_row(conn, body.to_unit_id)["allow_waves"]:
+        raise HTTPException(409, "This neighbour has turned waves off. You can still send a message.")
+    since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
+    if conn.execute("SELECT 1 FROM waves WHERE from_unit_id = ? AND to_unit_id = ? AND created_at > ?",
+                    (body.from_unit_id, body.to_unit_id, since)).fetchone():
+        raise HTTPException(409, "You already waved today.")
+    if conn.execute("SELECT COUNT(*) FROM waves WHERE from_unit_id = ? AND created_at > ?",
+                    (body.from_unit_id, since)).fetchone()[0] >= MAX_WAVES_PER_DAY:
+        raise HTTPException(429, f"At most {MAX_WAVES_PER_DAY} waves a day.")
+    cur = conn.execute("INSERT INTO waves (from_unit_id, to_unit_id, created_at) VALUES (?, ?, ?)",
+                       (body.from_unit_id, body.to_unit_id, db.now()))
+    conn.commit()
+    return {"type": "wave", "id": cur.lastrowid, "from_unit_id": body.from_unit_id, "to_unit_id": body.to_unit_id}
+
+
+@app.post("/api/messages/{message_id}/react")
+def react(message_id: int, body: ReactIn, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+    row = conn.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "message not found")
+    if body.unit_id not in (row["from_unit_id"], row["to_unit_id"]) or row["kind"] == "system":
+        raise HTTPException(403, "You can only react to messages in your own chats.")
+    if body.emoji not in REACTIONS:
+        raise HTTPException(422, "Unsupported reaction.")
+    current = conn.execute("SELECT emoji FROM reactions WHERE message_id = ? AND unit_id = ?", (message_id, body.unit_id)).fetchone()
+    conn.execute("DELETE FROM reactions WHERE message_id = ? AND unit_id = ?", (message_id, body.unit_id))
+    if current is None or current["emoji"] != body.emoji:  # same emoji again removes it
+        conn.execute("INSERT INTO reactions (message_id, unit_id, emoji, created_at) VALUES (?, ?, ?, ?)",
+                     (message_id, body.unit_id, body.emoji, db.now()))
+    conn.commit()
+    return _reactions(conn, message_id)
+
+
+@app.post("/api/messages/voice", status_code=201)
+def send_voice(from_unit_id: str = Form(..., pattern=UNIT_ID), to_unit_id: str = Form(..., pattern=UNIT_ID),
+               duration: int = Form(..., ge=1, le=MAX_VOICE_SECONDS), file: UploadFile = File(...),
+               delegate_id: int | None = Form(None), conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Voice notes: how many residents, older ones especially, already use WhatsApp."""
+    sender = _unit_row(conn, from_unit_id)
+    _require_neighbours(conn, from_unit_id, to_unit_id)
+    _check_can_reach(conn, from_unit_id, to_unit_id)
+    ext = VOICE_TYPES.get((file.content_type or "").split(";")[0].strip())
+    if ext is None:
+        raise HTTPException(415, "Please send an audio recording.")
+    raw = file.file.read(MAX_VOICE_BYTES + 1)
+    if len(raw) > MAX_VOICE_BYTES:
+        raise HTTPException(413, "Voice messages can be up to one minute.")
+    if len(raw) < 64:
+        raise HTTPException(400, "That recording is empty.")
+    media_id = f"{uuid.uuid4().hex}.{ext}"
+    (data_dir("voice") / media_id).write_bytes(raw)
+    withheld = int(_blocked(conn, to_unit_id, from_unit_id))
+    sent_by = _delegate_name(conn, from_unit_id, delegate_id)
+    cur = conn.execute(
+        "INSERT INTO messages (from_unit_id, to_unit_id, kind, body, media_id, lang, withheld, sent_by, created_at)"
+        " VALUES (?, ?, 'voice', ?, ?, ?, ?, ?, ?)",
+        (from_unit_id, to_unit_id, str(duration), media_id, sender["lang"], withheld, sent_by, db.now()),
+    )
+    _expire_voice(conn)
+    conn.commit()
+    return _message_json(conn.execute("SELECT * FROM messages WHERE id = ?", (cur.lastrowid,)).fetchone(), sender["lang"])
+
+
+@app.get("/api/messages/{message_id}/voice")
+def voice_file(message_id: int, unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> FileResponse:
+    row = conn.execute("SELECT * FROM messages WHERE id = ? AND kind = 'voice'", (message_id,)).fetchone()
+    if row is None or unit_id not in (row["from_unit_id"], row["to_unit_id"]) or (row["withheld"] and unit_id == row["to_unit_id"]):
+        raise HTTPException(404, "voice message not found")
+    if not row["media_id"]:
+        raise HTTPException(410, f"Voice messages are deleted after {VOICE_RETENTION_DAYS} days.")
+    ext = row["media_id"].rsplit(".", 1)[-1]
+    media = next((k for k, v in VOICE_TYPES.items() if v == ext), "application/octet-stream")
+    return FileResponse(data_dir("voice") / row["media_id"], media_type=media, headers={"Cache-Control": "private, max-age=86400"})
+
+
+def _profile_json(conn: sqlite3.Connection, unit_id: str) -> dict[str, Any]:
+    p, unit = _profile_row(conn, unit_id), _unit_row(conn, unit_id)
+    blocked = [r["blocked_unit_id"] for r in conn.execute("SELECT blocked_unit_id FROM blocks WHERE unit_id = ?", (unit_id,))]
+    return {"unit_id": unit_id, "bio": p["bio"], "accept_requests": bool(p["accept_requests"]), "allow_waves": bool(p["allow_waves"]),
+            "quiet_mode": bool(p["quiet_mode"]), "lang": unit["lang"],
+            "blocked": [{"id": b, "label": _unit_row(conn, b)["label"], "resident_name": _unit_row(conn, b)["resident_name"]} for b in blocked]}
+
+
+@app.get("/api/units/{unit_id}/profile")
+def get_profile(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    _unit_row(conn, unit_id)
+    out = _profile_json(conn, unit_id)
+    conn.commit()
+    return out
+
+
+@app.put("/api/units/{unit_id}/profile")
+def update_profile(unit_id: str, body: ProfileIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    _unit_row(conn, unit_id)
+    _profile_row(conn, unit_id)
+    if body.bio is not None:
+        _check_shared_text(body.bio)
+        conn.execute("UPDATE profiles SET bio = ? WHERE unit_id = ?", (body.bio.strip(), unit_id))
+    for field in ("accept_requests", "allow_waves", "quiet_mode"):
+        value = getattr(body, field)
+        if value is not None:
+            conn.execute(f"UPDATE profiles SET {field} = ? WHERE unit_id = ?", (int(value), unit_id))
+    if body.lang is not None:
+        conn.execute("UPDATE units SET lang = ? WHERE id = ?", (body.lang, unit_id))
+    conn.commit()
+    return _profile_json(conn, unit_id)
+
+
+@app.get("/api/units/{unit_id}/official")
+def official_account(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """The estate office as a read-only account in the chat list (like a WhatsApp channel)."""
+    notices = notices_for(unit_id, conn)
+    last_read = int(_profile_row(conn, unit_id)["notices_read_at"] or 0)  # id of the newest notice already seen
+    conn.commit()
+    return {"name": "Taman Demo Estate Office", "verified": True, "notices": notices,
+            "unread": sum(1 for n in notices if n["id"] > last_read)}
+
+
+@app.post("/api/units/{unit_id}/official/read")
+def official_read(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, bool]:
+    _profile_row(conn, unit_id)
+    newest = conn.execute("SELECT COALESCE(MAX(id), 0) FROM notices").fetchone()[0]
+    conn.execute("UPDATE profiles SET notices_read_at = ? WHERE unit_id = ?", (str(newest), unit_id))
+    conn.commit()
+    return {"ok": True}
+
+
+
+# ---------- care: family helpers, voice retention, "download my data" ----------
+
+VOICE_RETENTION_DAYS = 30
+REPORTED_VOICE_MAX_DAYS = 90  # an open report keeps the audio for review, up to this limit
+VOICE_SWEEP_SECONDS = 3600
+MAX_DELEGATES = 2
+DELEGATE_RELATIONS = ("child", "spouse", "sibling", "caregiver", "other")
+
+
+class DelegateIn(BaseModel):
+    name: str = Field(..., min_length=2, max_length=40)
+    relation: Literal["child", "spouse", "sibling", "caregiver", "other"]
+    consent: bool
+
+
+class RevokeIn(BaseModel):
+    unit_id: str = Field(..., pattern=UNIT_ID)
+
+
+def _expire_voice(conn: sqlite3.Connection) -> int:
+    """Delete voice notes older than the retention period. A note with an open report is kept for the estate team,
+    but never longer than REPORTED_VOICE_MAX_DAYS, so an unreviewed report can't keep audio forever."""
+    now = datetime.now(timezone.utc)
+    cutoff = (now - timedelta(days=VOICE_RETENTION_DAYS)).isoformat(timespec="seconds")
+    hard_cutoff = (now - timedelta(days=REPORTED_VOICE_MAX_DAYS)).isoformat(timespec="seconds")
+    rows = conn.execute(
+        "SELECT id, media_id FROM messages WHERE kind = 'voice' AND media_id IS NOT NULL AND created_at < ?"
+        " AND (created_at < ? OR id NOT IN (SELECT message_id FROM reports WHERE status = 'open'))",
+        (cutoff, hard_cutoff)).fetchall()
+    for r in rows:
+        (data_dir("voice") / r["media_id"]).unlink(missing_ok=True)
+        conn.execute("UPDATE messages SET media_id = NULL WHERE id = ?", (r["id"],))
+    if rows:
+        conn.commit()
+    return len(rows)
+
+
+def _require_sign_in_or_demo() -> None:
+    if not demo_mode():
+        raise HTTPException(403, "This needs sign-in, which comes with the pilot.")
+
+
+def _check_shared_text(text: str) -> None:
+    """Text other residents will see (bio, helper name): no insults, and no phone numbers, emails or links,
+    which would side-step the rule that numbers are exchanged only when both households agree."""
+    if talk.tone_problem(text):
+        raise HTTPException(422, {"code": "tone", "message": TONE_MESSAGE})
+    if talk.contact_details(text):
+        raise HTTPException(422, {"code": "private", "message": PRIVATE_MESSAGE})
+
+
+def _delegate_name(conn: sqlite3.Connection, unit_id: str, delegate_id: int | None) -> str | None:
+    """A family helper acting for the household. Their name goes on the record of everything they do."""
+    if delegate_id is None:
+        return None
+    row = conn.execute("SELECT * FROM delegates WHERE id = ? AND unit_id = ? AND revoked_at IS NULL", (delegate_id, unit_id)).fetchone()
+    if row is None:
+        raise HTTPException(403, "This helper isn't authorised for this household.")
+    return f"{row['name']} ({row['relation']})"
+
+
+def _delegate_json(row: sqlite3.Row) -> dict[str, Any]:
+    return {"id": row["id"], "name": row["name"], "relation": row["relation"], "created_at": row["created_at"]}
+
+
+@app.get("/api/units/{unit_id}/delegates")
+def delegates(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+    _unit_row(conn, unit_id)
+    return [_delegate_json(r) for r in conn.execute(
+        "SELECT * FROM delegates WHERE unit_id = ? AND revoked_at IS NULL ORDER BY id", (unit_id,))]
+
+
+@app.post("/api/units/{unit_id}/delegates", status_code=201)
+def add_delegate(unit_id: str, body: DelegateIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """The owner authorises a family member to use Jiran5 for them (for residents who are not online)."""
+    _unit_row(conn, unit_id)
+    if not body.consent:
+        raise HTTPException(422, "The owner must agree before a helper is added.")
+    _check_shared_text(body.name)
+    if talk.official_sounding(body.name):
+        raise HTTPException(422, {"code": "official", "message": "A helper's name can't look like SDP, the estate office or an official account."})
+    active = conn.execute("SELECT COUNT(*) FROM delegates WHERE unit_id = ? AND revoked_at IS NULL", (unit_id,)).fetchone()[0]
+    if active >= MAX_DELEGATES:
+        raise HTTPException(409, f"At most {MAX_DELEGATES} helpers per household.")
+    cur = conn.execute("INSERT INTO delegates (unit_id, name, relation, created_at) VALUES (?, ?, ?, ?)",
+                       (unit_id, body.name.strip(), body.relation, db.now()))
+    db.append_event(conn, unit_id, "delegate_added", {"delegate_id": cur.lastrowid, "name": body.name.strip(), "relation": body.relation})
+    conn.commit()
+    return _delegate_json(conn.execute("SELECT * FROM delegates WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+
+@app.post("/api/delegates/{delegate_id}/revoke")
+def revoke_delegate(delegate_id: int, body: RevokeIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, bool]:
+    row = conn.execute("SELECT * FROM delegates WHERE id = ?", (delegate_id,)).fetchone()
+    if row is None or row["unit_id"] != body.unit_id:
+        raise HTTPException(404, "helper not found")
+    if row["revoked_at"] is None:
+        conn.execute("UPDATE delegates SET revoked_at = ? WHERE id = ?", (db.now(), delegate_id))
+        db.append_event(conn, body.unit_id, "delegate_removed", {"delegate_id": delegate_id, "name": row["name"]})
+        conn.commit()
+    return {"ok": True}
+
+
+@app.get("/api/units/{unit_id}/export")
+def export_my_data(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> JSONResponse:
+    """PDPA right of access: everything Jiran5 holds about this household, as one file.
+    Other residents appear by unit only, never by name. It bundles a whole household's records, so outside demo mode
+    it stays off until residents sign in (WhatsApp one-time code in the pilot)."""
+    _require_sign_in_or_demo()
+    me = _unit_row(conn, unit_id)
+    label = lambda uid: _unit_row(conn, uid)["label"] if uid else "Estate team"  # noqa: E731
+    p = _profile_row(conn, unit_id)
+    sent = []
+    for r in conn.execute("SELECT * FROM intros WHERE from_unit_id = ? ORDER BY id", (unit_id,)):
+        recips = [label(x["unit_id"]) for x in conn.execute("SELECT unit_id FROM intro_recipients WHERE intro_id = ?", (r["id"],))]
+        sent.append({"created_at": r["created_at"], "message": r["message"], "sent_by": r["sent_by"],
+                     "renovation": json.loads(r["renovation"]) if r["renovation"] else None, "delivered_to": recips})
+    received = [{"created_at": r["created_at"], "from": label(r["from_unit_id"]), "message": r["message"],
+                 "renovation": json.loads(r["renovation"]) if r["renovation"] else None}
+                for r in conn.execute("SELECT i.* FROM intros i JOIN intro_recipients x ON x.intro_id = i.id WHERE x.unit_id = ? ORDER BY i.id",
+                                      (unit_id,))]
+    messages = []
+    for r in conn.execute("SELECT * FROM messages WHERE (from_unit_id = ? OR to_unit_id = ?) ORDER BY id", (unit_id, unit_id)):
+        if r["to_unit_id"] == unit_id and r["withheld"]:
+            continue
+        if r["private"] and r["to_unit_id"] != unit_id:
+            continue
+        mine = r["from_unit_id"] == unit_id
+        messages.append({"created_at": r["created_at"], "direction": "sent" if mine else "received",
+                         "with": label(r["to_unit_id"] if mine else (r["from_unit_id"] or None)), "kind": r["kind"],
+                         "text": f"Voice message ({r['body']}s)" if r["kind"] == "voice" else r["body"], "sent_by": r["sent_by"]})
+    data = {
+        "exported_at": db.now(),
+        "about": "Your data held by Jiran5 (prototype). Other residents are listed by unit, not by name.",
+        "household": {"unit": me["label"], "kind": me["kind"], "reading_language": me["lang"], "handover_date": me["handover_date"]},
+        "profile": {"bio": p["bio"], "accept_requests": bool(p["accept_requests"]), "allow_waves": bool(p["allow_waves"]),
+                    "quiet_mode": bool(p["quiet_mode"])},
+        "family_helpers": delegates(unit_id, conn),
+        "introductions_sent": sent,
+        "introductions_received": received,
+        "messages": messages,
+        "waves": [{"created_at": r["created_at"], "direction": "sent" if r["from_unit_id"] == unit_id else "received",
+                   "with": label(r["to_unit_id"] if r["from_unit_id"] == unit_id else r["from_unit_id"])}
+                  for r in conn.execute("SELECT * FROM waves WHERE from_unit_id = ? OR to_unit_id = ? ORDER BY id", (unit_id, unit_id))],
+        "concerns": [{"created_at": r["created_at"], "role": "raised" if r["from_unit_id"] == unit_id else "about my renovation",
+                      "category": r["category"], "note": r["note"], "status": r["status"]}
+                     for r in conn.execute("SELECT * FROM concerns WHERE from_unit_id = ? OR to_unit_id = ? ORDER BY id", (unit_id, unit_id))],
+        "contact_requests": [{"created_at": r["created_at"], "direction": "sent" if r["from_unit_id"] == unit_id else "received",
+                              "with": label(r["to_unit_id"] if r["from_unit_id"] == unit_id else r["from_unit_id"]),
+                              "reason": r["reason"], "status": r["status"]}
+                             for r in conn.execute("SELECT * FROM contact_requests WHERE from_unit_id = ? OR to_unit_id = ? ORDER BY id",
+                                                   (unit_id, unit_id))],
+        "photos": [{"kind": r["kind"], "subject": r["subject"], "sha256": r["sha256"], "created_at": r["created_at"]}
+                   for r in conn.execute("SELECT * FROM photos WHERE unit_id = ? ORDER BY created_at", (unit_id,))],
+        "warranty_tickets": [{"subject": r["subject"], "status": r["status"], "opened_at": r["opened_at"], "closed_at": r["closed_at"]}
+                             for r in conn.execute("SELECT * FROM warranty_tickets WHERE unit_id = ? ORDER BY id", (unit_id,))],
+        "home_log": db.unit_events(conn, unit_id),
+    }
+    conn.commit()
+    return JSONResponse(data, headers={"Content-Disposition": f'attachment; filename="jiran5-{me["label"].replace(" ", "").replace(".", "")}-my-data.json"'})
 
 
 # ---------- layer 3: prove ----------
@@ -1255,16 +1910,18 @@ def owner_response(ticket_id: int, body: OwnerResponseIn, conn: sqlite3.Connecti
         raise HTTPException(403, "Only the homeowner can confirm or reject this repair.")
     if ticket["status"] != "repair_submitted":
         raise HTTPException(409, "There is no repair waiting for confirmation.")
+    acted = _delegate_name(conn, body.unit_id, body.delegate_id)
+    extra = {"acted_by": acted} if acted else {}
     if body.decision == "accept":
         conn.execute("UPDATE warranty_tickets SET status = 'closed', owner_note = ?, closed_at = ? WHERE id = ?",
                      (body.note, db.now(), ticket_id))
         db.append_event(conn, body.unit_id, "warranty_closed_by_owner",
-                        {"ticket_id": ticket_id, "repair_photo_id": ticket["repair_photo_id"], "note": body.note})
+                        {"ticket_id": ticket_id, "repair_photo_id": ticket["repair_photo_id"], "note": body.note, **extra})
     else:
         conn.execute("UPDATE warranty_tickets SET status = 'open', owner_note = ?, reopen_count = reopen_count + 1 WHERE id = ?",
                      (body.note, ticket_id))
         db.append_event(conn, body.unit_id, "repair_rejected_by_owner",
-                        {"ticket_id": ticket_id, "repair_photo_id": ticket["repair_photo_id"], "note": body.note})
+                        {"ticket_id": ticket_id, "repair_photo_id": ticket["repair_photo_id"], "note": body.note, **extra})
     conn.commit()
     return _ticket_json(conn, _ticket_row(conn, ticket_id))
 
@@ -1306,11 +1963,37 @@ def reset_demo(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
     if not demo_mode():
         raise HTTPException(403, "demo mode is off")
     db.drop_all(conn)
-    for folder in ("photos", "compare"):
+    for folder in ("photos", "compare", "voice"):
         shutil.rmtree(data_dir(folder))
     db.init_db(conn)
     return {"status": "reset"}
 
+
+
+def _community_health(conn: sqlite3.Connection, unit_ids: list[str]) -> dict[str, Any]:
+    """How connected the phase is: pairs of next-door homes who know each other, how soon people say hello after
+    handover, and how many circles were active in the last 30 days."""
+    pairs, known = set(), set()
+    for u in unit_ids:
+        for n in neighbour_card(u, conn)["neighbours"]:
+            key = tuple(sorted((u, n["id"])))
+            pairs.add(key)
+            if n["known"]:
+                known.add(key)
+    days, active = [], 0
+    since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat(timespec="seconds")
+    q = ("SELECT created_at FROM intros WHERE from_unit_id = ? UNION ALL SELECT created_at FROM waves WHERE from_unit_id = ?"
+         " UNION ALL SELECT created_at FROM messages WHERE from_unit_id = ? AND kind != 'system'")
+    for u in unit_ids:
+        stamps = [r[0] for r in conn.execute(q, (u, u, u))]
+        if not stamps:
+            continue
+        handover = date.fromisoformat(_unit_row(conn, u)["handover_date"])
+        days.append(max(0, (_local_date(min(stamps)) - handover).days))
+        active += any(t > since for t in stamps)
+    return {"circle_pairs": len(pairs), "known_pairs": len(known),
+            "days_to_first_hello": round(sum(days) / len(days), 1) if days else None,
+            "households_reached_out": len(days), "active_circles_30d": active}
 
 @app.get("/api/dashboard")
 def dashboard(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
@@ -1361,6 +2044,10 @@ def dashboard(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_con
         "concerns_escalated": count("SELECT COUNT(*) FROM concerns WHERE escalated_at IS NOT NULL AND from_unit_id IN ({marks})"),
         "concerns_with_estate": count("SELECT COUNT(*) FROM concerns WHERE status = 'escalated' AND from_unit_id IN ({marks})"),
         "reports_open": conn.execute("SELECT COUNT(*) FROM reports WHERE status = 'open'").fetchone()[0],
+        **_community_health(conn, unit_ids),
+        "contact_requests": count("SELECT COUNT(*) FROM contact_requests WHERE from_unit_id IN ({marks})"),
+        "waves": count("SELECT COUNT(*) FROM waves WHERE from_unit_id IN ({marks})"),
+        "contact_requests_accepted": count("SELECT COUNT(*) FROM contact_requests WHERE status = 'accepted' AND from_unit_id IN ({marks})"),
         "warranty_overdue": sum(_ticket_json(conn, r)["clock"]["overdue"] for r in conn.execute(
             f"SELECT * FROM warranty_tickets WHERE unit_id IN ({marks})", unit_ids).fetchall()),
     }

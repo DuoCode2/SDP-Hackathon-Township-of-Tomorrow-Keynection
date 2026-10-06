@@ -32,7 +32,7 @@ def test_apartment_gets_left_right_above_below():
 
 
 def test_apartment_top_floor_corner_has_no_above_or_right():
-    assert _circle("A-15-4") == {"A-15-3": "left", "A-14-4": "below"}
+    assert _circle("A-16-4") == {"A-16-3": "left", "A-15-4": "below"}
 
 
 def test_terrace_and_apartment_never_mix():

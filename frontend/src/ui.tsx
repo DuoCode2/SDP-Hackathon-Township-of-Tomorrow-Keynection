@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { CircleAlert, CircleCheck } from 'lucide-react'
+import { Art, DoorAvatar, type ArtKind } from './components/Art'
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <div className={`card ${className}`}>{children}</div>
@@ -11,26 +12,11 @@ export function Badge({ tone = 'neutral', children }: { tone?: Tone; children: R
   return <span className={`badge badge-${tone}`}>{children}</span>
 }
 
+/** Each household is shown by its own illustrated front door. */
 export function Avatar({ name, size = 36 }: { name: string; size?: number }) {
-  const initials = name
-    .split(/\s+/)
-    .map((p) => p[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
-  const hue = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)
   return (
-    <span
-      className="avatar"
-      style={{
-        width: size,
-        height: size,
-        background: `linear-gradient(135deg, hsl(${hue} 85% 95%), hsl(${(hue + 40) % 360} 80% 88%))`,
-        color: `hsl(${hue} 55% 30%)`,
-        boxShadow: `inset 0 0 0 1px hsl(${hue} 60% 75% / 0.7)`,
-      }}
-    >
-      {initials}
+    <span className="avatar" style={{ width: size, height: size }}>
+      <DoorAvatar name={name} size={size} />
     </span>
   )
 }
@@ -81,10 +67,10 @@ export function Metric({ value, label, tone }: { value: ReactNode; label: string
   )
 }
 
-export function Empty({ icon, title, children }: { icon: ReactNode; title: string; children?: ReactNode }) {
+export function Empty({ icon, art, title, children }: { icon?: ReactNode; art?: ArtKind; title: string; children?: ReactNode }) {
   return (
     <div className="empty">
-      <div className="empty-icon">{icon}</div>
+      {art ? <Art kind={art} /> : <div className="empty-icon">{icon}</div>}
       <strong>{title}</strong>
       {children && <p>{children}</p>}
     </div>
@@ -157,7 +143,7 @@ export function Ring({ value, label }: { value: number | null; label: string }) 
   )
 }
 
-export function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
+export function Sheet({ open, onClose, children, wide = false }: { open: boolean; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -168,7 +154,7 @@ export function Sheet({ open, onClose, children }: { open: boolean; onClose: () 
   // Rendered at the top of the app so it covers the navigation and isn't trapped inside the animated screen.
   return createPortal(
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-modal onClick={(e) => e.stopPropagation()}>
+      <div className={`sheet ${wide ? 'wide' : ''}`} role="dialog" aria-modal onClick={(e) => e.stopPropagation()}>
         <div className="sheet-grip" />
         {children}
       </div>
@@ -199,17 +185,36 @@ export function shortRange(start: string, end: string): string {
 type Toast = { id: number; tone: 'ok' | 'error'; text: string }
 const ToastContext = createContext<(text: string, tone?: Toast['tone']) => void>(() => {})
 
+type Celebration = { id: number; emoji: string; label: string }
+const CelebrateContext = createContext<(emoji: string, label: string) => void>(() => {})
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
+  const [party, setParty] = useState<Celebration | null>(null)
   const next = useRef(0)
   const push = useCallback((text: string, tone: Toast['tone'] = 'ok') => {
     const id = ++next.current
     setToasts((t) => [...t, { id, tone, text }])
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200)
   }, [])
+  const celebrate = useCallback((emoji: string, label: string) => {
+    const id = ++next.current
+    setParty({ id, emoji, label })
+    setTimeout(() => setParty((p) => (p?.id === id ? null : p)), 1700)
+  }, [])
   return (
     <ToastContext.Provider value={push}>
+    <CelebrateContext.Provider value={celebrate}>
       {children}
+      {party && (
+        <div key={party.id} className="celebrate" aria-live="polite">
+          <div className="celebrate-burst" aria-hidden>
+            {Array.from({ length: 10 }, (_, i) => <i key={i} style={{ ['--i' as string]: i }} />)}
+          </div>
+          <div className="celebrate-emoji" aria-hidden>{party.emoji}</div>
+          <div className="celebrate-label">{party.label}</div>
+        </div>
+      )}
       <div className="toasts" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast toast-${t.tone}`}>
@@ -218,11 +223,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           </div>
         ))}
       </div>
+    </CelebrateContext.Provider>
     </ToastContext.Provider>
   )
 }
 
 export const useToast = () => useContext(ToastContext)
+/** A short, happy moment after reaching out to a neighbour. */
+export const useCelebrate = () => useContext(CelebrateContext)
 
 /** A rubber-stamp mark ("cop"), used where a record has been sealed, verified or closed. */
 export function Stamp({ children, tone = 'brand', tilt = -4 }: { children: ReactNode; tone?: 'brand' | 'amber' | 'red' | 'blue' | 'ink'; tilt?: number }) {
@@ -230,5 +238,21 @@ export function Stamp({ children, tone = 'brand', tilt = -4 }: { children: React
     <span className={`stamp stamp-${tone}`} style={{ transform: `rotate(${tilt}deg)` }}>
       {children}
     </span>
+  )
+}
+
+/** Numbered steps for guided flows. */
+export function Steps({ steps, current, onJump }: { steps: string[]; current: number; onJump?: (i: number) => void }) {
+  return (
+    <ol className="steps">
+      {steps.map((label, i) => (
+        <li key={label} className={i === current ? 'on' : i < current ? 'done' : ''}>
+          <button disabled={!onJump || i > current} onClick={() => onJump?.(i)}>
+            <span>{i + 1}</span>
+            {label}
+          </button>
+        </li>
+      ))}
+    </ol>
   )
 }

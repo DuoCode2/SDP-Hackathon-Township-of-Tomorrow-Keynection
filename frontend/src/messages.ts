@@ -17,6 +17,9 @@ export const RELATION_LABEL: Record<Relation, string> = {
   'across-right': 'across the road',
   above: 'upstairs',
   below: 'downstairs',
+  'above-2': 'two floors up',
+  'below-2': 'two floors down',
+  contact: 'connected by request',
 }
 
 export function introTemplate(lang: Lang, name: string, label: string, renovation?: Renovation): string {

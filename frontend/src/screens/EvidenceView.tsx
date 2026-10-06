@@ -72,7 +72,7 @@ export default function EvidenceView({ me, version, onChange }: Props) {
 
       {data && tasks.length === 0 && data.incidents.length === 0 && tickets.length === 0 && (
         <Card>
-          <Empty icon={<Camera size={24} />} title="Nothing to photograph yet">
+          <Empty art="camera" icon={<Camera size={24} />} title="Nothing to photograph yet">
             When a neighbour in your circle registers renovation, you'll be asked for a 5-minute photo of the shared wall or
             ceiling before work starts.
           </Empty>

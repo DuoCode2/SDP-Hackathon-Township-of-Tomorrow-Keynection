@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ArrowUpRight, Ban, Camera, Clock4, EyeOff, Gavel, KeyRound, Languages, Scale, ServerCog, Smartphone, UsersRound } from 'lucide-react'
+import { ArrowUpRight, Ban, Building, Camera, Clock4, EyeOff, Gavel, KeyRound, Languages, Lock, Scale, ServerCog, Smartphone, UsersRound } from 'lucide-react'
 import type { TabId } from '../guide'
 import { ScreenTitle, Stamp } from '../ui'
 
@@ -11,9 +11,16 @@ const RISKS: Risk[] = [
   {
     icon: <EyeOff size={18} />, title: 'Privacy & PDPA', risk: 'Neighbours, contractors or staff seeing personal data they should not.',
     measures: [
+      { text: 'No resident directory: outside your circle you see unit numbers, never names', built: true },
       { text: 'Phone numbers stay hidden until both households agree to exchange them', built: true },
       { text: 'Photos are re-encoded: GPS, camera model and capture time removed', built: true },
       { text: 'Contractors see only their pass, dates and house rules; no names, phones or photos', built: true },
+      { text: 'Profiles are one line only, visible to your circle and contacts, with a reminder not to share schedules or travel dates', built: true },
+      { text: 'Voice notes can only be played by the two people in the chat, and are deleted after 30 days, checked every hour (a reported one is kept for the estate team until reviewed, never longer than 90 days)', built: true },
+      { text: '"Download my data" gives each household everything Jiran5 holds about it as a file; other residents appear by unit only', built: true },
+      { text: 'Bios and helper names can’t contain phone numbers, emails or links, so numbers are still exchanged only when both agree', built: true },
+      { text: 'The data download and reported-voice playback switch off outside demo mode until sign-in exists', built: true },
+      { text: 'SDP sees neighbour-relationship numbers only as counts, never who talked to whom or what was said', built: true },
       { text: 'PDPA notice and consent at sign-up; data kept only for the defect liability period plus one year', built: false },
     ],
     see: { tab: 'chats', label: 'Chats' },
@@ -24,6 +31,10 @@ const RISKS: Risk[] = [
       { text: 'Tone check stops obvious insults before they are sent and suggests a calmer quick reply', built: true },
       { text: 'Report a message to the SDP estate team; the sender is warned privately, the reporter stays anonymous', built: true },
       { text: 'Silent block, and a daily message limit per neighbour', built: true },
+      { text: 'Homes beyond your circle need a contact request with a reason; 3 a day, no repeat after a decline', built: true },
+      { text: 'No township-wide group chat: estate notices come from a read-only official account', built: true },
+      { text: '👋 Waves are limited to one per neighbour per day and can be switched off', built: true },
+      { text: 'Quiet mode stops new messages, waves and requests; renovation notices and concerns still arrive', built: true },
       { text: 'Concerns go to the neighbour first, privately, before anyone else is involved', built: true },
     ],
     see: { tab: 'chats', label: 'Chats' },
@@ -66,16 +77,38 @@ const RISKS: Risk[] = [
     see: { tab: 'works', label: 'Works' },
   },
   {
+    icon: <Lock size={18} />, title: 'Burglary and personal safety', risk: 'An app that shows who is renovating or away tells strangers which houses are empty.',
+    measures: [
+      { text: 'Who is renovating, and when, is visible only to the homes the notice reached', built: true },
+      { text: 'Only verified owners and tenants can join (SDP handover records or the management office)', built: false },
+      { text: 'Contractor passes reveal nothing about other homes in the phase', built: true },
+    ],
+    see: { tab: 'circle', label: 'Circle' },
+  },
+  {
+    icon: <Building size={18} />, title: 'Apartments: leaks and noise across floors', risk: 'A bathroom leak or hacking noise reaches homes that are not next door.',
+    measures: [
+      { text: 'The notice range follows the type of work: wet work reaches two floors down, hacking two floors up and down', built: true },
+      { text: 'The renovating owner cannot remove anyone from the notice', built: true },
+      { text: 'Homes two floors away are told and can photograph their ceiling, without seeing each other’s names', built: true },
+      { text: 'Inter-floor leak handling follows the strata rules and the JMB/MC process', built: false },
+    ],
+    see: { tab: 'circle', label: 'Circle' },
+  },
+  {
     icon: <Smartphone size={18} />, title: 'Residents who are not online', risk: 'Older residents or tenants without smartphones are left out.',
     measures: [
       { text: 'Notices are delivered on WhatsApp, which most residents already use', built: true },
-      { text: 'A family member can act on an owner’s behalf, with the owner’s consent', built: false },
+      { text: 'Up to two family helpers can act for a household, added by the owner with consent; every action they take is recorded under the helper’s name', built: true },
+      { text: 'Voice messages for residents who find typing hard', built: true },
       { text: 'The estate office can register a renovation and print the notice for neighbours', built: false },
     ],
   },
   {
     icon: <Languages size={18} />, title: 'Language barriers', risk: 'Neighbours who do not share a language misread each other.',
     measures: [
+      { text: 'The resident screens switch between English, Bahasa Melayu and Chinese from the top bar; records stay in English, with a note in the reader’s language saying why', built: true },
+      { text: 'Hovering a quick reply shows exactly what the neighbour will receive in their language', built: true },
       { text: 'Introductions and notices in English, Bahasa Melayu and Chinese', built: true },
       { text: 'Quick replies arrive translated into the reader’s language, no internet translation needed', built: true },
       { text: 'Tamil templates', built: false },
@@ -95,7 +128,9 @@ const RISKS: Risk[] = [
     measures: [
       { text: 'Works with partial circles: each household is useful on its own', built: true },
       { text: 'Starts at handover, when SDP already meets every owner', built: false },
+      { text: 'Irregular layouts (corner, end lots, semi-D, shoplots) are set per phase and can be corrected by the estate office', built: false },
       { text: 'Reply rate and pre-work photo coverage are tracked on the command view', built: true },
+      { text: 'The command view tracks how many next-door pairs know each other and how long it takes from keys to a first hello', built: true },
     ],
     see: { tab: 'sdp', label: 'SDP command view' },
   },
@@ -103,8 +138,11 @@ const RISKS: Risk[] = [
     icon: <ServerCog size={18} />, title: 'Security of the system', risk: 'Abuse of demo shortcuts, or someone acting as another household.',
     measures: [
       { text: 'Every action checks who is allowed to do it (only owners close tickets, only recipients report)', built: true },
+      { text: 'A family helper only works for the household that added them; a removed helper is refused straight away', built: true },
+      { text: 'A helper’s name can’t look like SDP, the estate office or the police', built: true },
       { text: 'Demo-only shortcuts switch off with one setting (JIRAN_DEMO_MODE=0)', built: true },
       { text: 'Sign-in with a WhatsApp one-time code, encryption at rest and an access audit log', built: false },
+      { text: 'Outside demo mode the phase listing carries no names at all', built: true },
     ],
   },
 ]

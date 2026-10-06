@@ -1,14 +1,11 @@
 import { useState } from 'react'
-import { BellRing, Building2, Check, CircleCheck, MessageSquareWarning, Send } from 'lucide-react'
+import { BellRing, Building2, Check, CircleCheck, HandHeart, MessageSquareWarning, Send } from 'lucide-react'
 import { api, type Concern } from '../api'
+import { byWho, tEn, useT } from '../i18n'
 import { formatDate, formatTime, Stamp, useToast } from '../ui'
 
-const STATUS: Record<Concern['status'], { label: string; tone: 'amber' | 'blue' | 'brand' | 'red' | 'ink' }> = {
-  open: { label: 'Waiting for reply', tone: 'amber' },
-  acknowledged: { label: 'Owner responded', tone: 'blue' },
-  resolved: { label: 'Sorted by neighbours', tone: 'brand' },
-  escalated: { label: 'With SDP estate team', tone: 'red' },
-  closed_by_estate: { label: 'Closed by estate team', tone: 'ink' },
+const TONE: Record<Concern['status'], 'amber' | 'blue' | 'brand' | 'red' | 'ink'> = {
+  open: 'amber', acknowledged: 'blue', resolved: 'brand', escalated: 'red', closed_by_estate: 'ink',
 }
 
 /** One concern and its ladder: neighbour first, then the renovating owner, then (only if needed) SDP's estate team. */
@@ -18,6 +15,8 @@ export default function ConcernCard({ concern: c, viewer, estate = false, onChan
   estate?: boolean
   onChanged: () => void
 }) {
+  const local = useT()
+  const t = estate ? tEn : local // the estate desk is a records screen: English
   const toast = useToast()
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -39,26 +38,26 @@ export default function ConcernCard({ concern: c, viewer, estate = false, onChan
   }
 
   const steps = [
-    { label: 'Raised', at: c.created_at, done: true },
-    { label: 'Owner replied', at: c.acknowledged_at, done: !!c.acknowledged_at || c.status === 'resolved' },
+    { label: t('cc.raised'), at: c.created_at, done: true },
+    { label: t('cc.replied'), at: c.acknowledged_at, done: !!c.acknowledged_at || c.status === 'resolved' },
     c.escalated_at
-      ? { label: 'SDP estate team', at: c.escalated_at, done: true, alert: true }
-      : { label: 'Sorted', at: c.resolved_at, done: c.status === 'resolved' },
-    ...(c.escalated_at ? [{ label: 'Closed', at: c.closed_at, done: c.status === 'closed_by_estate' }] : []),
+      ? { label: t('cc.estate'), at: c.escalated_at, done: true, alert: true }
+      : { label: t('cc.sorted'), at: c.resolved_at, done: c.status === 'resolved' },
+    ...(c.escalated_at ? [{ label: t('cc.closed'), at: c.closed_at, done: c.status === 'closed_by_estate' }] : []),
   ]
-  const s = STATUS[c.status]
 
   return (
     <div className={`concern concern-${c.status}`}>
       <div className="concern-head">
         <MessageSquareWarning size={16} />
         <div className="grow">
-          <div className="concern-kicker">Concern · {c.from_name} ({c.from_label}) → {c.to_name} ({c.to_label})</div>
-          <div className="concern-title">{c.category_label}</div>
+          <div className="concern-kicker">{t('cc.kicker', { from: `${c.from_name} (${c.from_label})`, to: `${c.to_name} (${c.to_label})` })}</div>
+          <div className="concern-title">{t(`cat.${c.category}`)}</div>
         </div>
-        <Stamp tone={s.tone} tilt={-3}>{s.label}</Stamp>
+        <Stamp tone={TONE[c.status]} tilt={-3}>{t(`cc.${c.status}`)}</Stamp>
       </div>
       {c.note && <p className="concern-note">“{c.note}”</p>}
+      {c.acted_by && <div className="concern-meta"><HandHeart size={12} /> {t('cc.by', { who: byWho(t, c.acted_by) })}</div>}
       <ol className="ladder">
         {steps.map((st, i) => (
           <li key={i} className={`${st.done ? 'done' : ''} ${'alert' in st && st.alert ? 'alert' : ''}`}>
@@ -69,20 +68,20 @@ export default function ConcernCard({ concern: c, viewer, estate = false, onChan
         ))}
       </ol>
       {c.response_note && <div className="concern-reply"><b>{c.to_name}:</b> {c.response_note}</div>}
-      {c.estate_note && <div className="concern-reply estate"><b>Estate team:</b> {c.estate_note}</div>}
-      {c.reminders > 0 && <div className="concern-meta"><BellRing size={12} /> Estate team sent {c.reminders} reminder(s) to {c.to_label}</div>}
+      {c.estate_note && <div className="concern-reply estate"><b>{t('cc.estateSays')}</b> {c.estate_note}</div>}
+      {c.reminders > 0 && <div className="concern-meta"><BellRing size={12} /> {t('cc.reminders', { n: c.reminders, label: c.to_label })}</div>}
 
       {!estate && isOwner && (c.status === 'open' || c.status === 'acknowledged') && (
         <div className="concern-actions">
-          <input className="concern-input" maxLength={300} placeholder="Reply to your neighbour (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+          <input className="concern-input" maxLength={300} placeholder={t('cc.replyPlaceholder')} value={note} onChange={(e) => setNote(e.target.value)} />
           <div className="btn-row">
             {c.status === 'open' && (
-              <button className="btn btn-sm" disabled={busy} onClick={() => act(() => api.concernStep(c.id, 'acknowledge', viewer!, note), 'Reply sent')}>
-                <Send size={13} /> Reply & look into it
+              <button className="btn btn-sm" disabled={busy} onClick={() => act(() => api.concernStep(c.id, 'acknowledge', viewer!, note), t('cc.toastReply'))}>
+                <Send size={13} /> {t('cc.reply')}
               </button>
             )}
-            <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => act(() => api.concernStep(c.id, 'resolve', viewer!, note), 'Marked as sorted')}>
-              <CircleCheck size={13} /> It's sorted
+            <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => act(() => api.concernStep(c.id, 'resolve', viewer!, note), t('cc.toastSorted'))}>
+              <CircleCheck size={13} /> {t('cc.sortedBtn')}
             </button>
           </div>
         </div>
@@ -91,25 +90,25 @@ export default function ConcernCard({ concern: c, viewer, estate = false, onChan
       {!estate && isRaiser && ['open', 'acknowledged', 'resolved'].includes(c.status) && (
         <div className="concern-actions">
           <div className="concern-hint">
-            {c.status === 'resolved' ? 'Still happening? You can still involve the estate team.' : 'Not sorted? Hand it to SDP’s estate team. Everything above goes with it.'}
-            <span className="mono"> In a pilot: available after 24 h without a reply.</span>
+            {t(c.status === 'resolved' ? 'cc.stillHappening' : 'cc.notSorted')}
+            <span className="mono"> {t('cc.pilot')}</span>
           </div>
           <button className="btn btn-sm btn-danger" disabled={busy}
-            onClick={() => act(() => api.concernStep(c.id, 'escalate', viewer!), 'Sent to the SDP estate team')}>
-            <Building2 size={13} /> Escalate to SDP estate team
+            onClick={() => act(() => api.concernStep(c.id, 'escalate', viewer!), t('cc.toastEscalated'))}>
+            <Building2 size={13} /> {t('cc.escalate')}
           </button>
         </div>
       )}
 
       {estate && c.status === 'escalated' && (
         <div className="concern-actions">
-          <input className="concern-input" maxLength={300} placeholder="Note for both households (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+          <input className="concern-input" maxLength={300} placeholder={t('cc.estateNote')} value={note} onChange={(e) => setNote(e.target.value)} />
           <div className="btn-row">
-            <button className="btn btn-sm" disabled={busy} onClick={() => act(() => api.estateAction(c.id, 'remind', note), `Reminder sent to ${c.to_label}`)}>
-              <BellRing size={13} /> Remind owner of house rules
+            <button className="btn btn-sm" disabled={busy} onClick={() => act(() => api.estateAction(c.id, 'remind', note), t('cc.toastReminded', { label: c.to_label }))}>
+              <BellRing size={13} /> {t('cc.remind')}
             </button>
-            <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => act(() => api.estateAction(c.id, 'resolve', note), 'Concern closed')}>
-              <CircleCheck size={13} /> Close concern
+            <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => act(() => api.estateAction(c.id, 'resolve', note), t('cc.toastClosed'))}>
+              <CircleCheck size={13} /> {t('cc.close')}
             </button>
           </div>
         </div>

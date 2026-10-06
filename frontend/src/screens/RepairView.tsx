@@ -3,6 +3,7 @@ import { ChevronLeft, CircleCheck, CircleX, HelpCircle, ThumbsDown, ThumbsUp } f
 import { api, type UnitInfo, type WarrantyTicket } from '../api'
 import Compare from '../components/Compare'
 import WarrantyClock from '../components/WarrantyClock'
+import { useHelper } from '../helper'
 import { Badge, Card, formatDate, useToast } from '../ui'
 
 export const TICKET_BADGE: Record<WarrantyTicket['status'], ReactNode> = {
@@ -94,6 +95,7 @@ export default function RepairView({ me, ticket, onBack, onChanged }: {
 
 function OwnerDecision({ me, ticket, onChanged }: { me: UnitInfo; ticket: WarrantyTicket; onChanged: (t: WarrantyTicket) => void }) {
   const toast = useToast()
+  const helper = useHelper(me.id)
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -104,7 +106,7 @@ function OwnerDecision({ me, ticket, onChanged }: { me: UnitInfo; ticket: Warran
     }
     setSaving(true)
     try {
-      const updated = await api.respondToRepair(ticket.id, me.id, decision, note)
+      const updated = await api.respondToRepair(ticket.id, me.id, decision, note, helper?.id)
       toast(decision === 'accept' ? 'Repair accepted: ticket closed' : 'Sent back to SDP with your note')
       onChanged(updated)
     } catch (e) {

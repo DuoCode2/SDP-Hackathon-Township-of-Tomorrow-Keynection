@@ -1,19 +1,21 @@
 import type { Relation, UnitInfo } from '../api'
 
 // The phase drawn the way SDP's own plans are: house footprints, party walls and floor slabs.
-// The circle is literally "who you share a wall, a slab or a road with".
+// Ring 1 (your circle) is filled, ring 2 (your lorong or block) is outlined, everything else is plain.
+// Names appear only for homes you know; the rest show their unit number.
 
 type Box = { x: number; y: number; w: number; h: number }
 type Edge = { x1: number; y1: number; x2: number; y2: number }
 
 const X0 = 60, W = 100, D = 86
 const ROW_Y: Record<string, number> = { north: 52, south: 232 }
-const AX0 = 150, AW = 120, AH = 84, AY0 = 62
+const AX0 = 150, AW = 120, AH = 50, AY0 = 46
+const TOP_FLOOR = 16, FLOORS = 6
 
 const box = (u: UnitInfo): Box =>
   u.kind === 'terrace'
     ? { x: X0 + u.pos * W, y: ROW_Y[u.row ?? 'south'], w: W, h: D }
-    : { x: AX0 + (u.pos - 1) * AW, y: AY0 + (15 - (u.floor ?? 15)) * AH, w: AW, h: AH }
+    : { x: AX0 + (u.pos - 1) * AW, y: AY0 + (TOP_FLOOR - (u.floor ?? TOP_FLOOR)) * AH, w: AW, h: AH }
 
 const centre = (b: Box) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 })
 
@@ -29,18 +31,28 @@ function sharedEdge(a: Box, b: Box): Edge | null {
   return null
 }
 
-export default function PlanMap({ units, me, circle, selected, onSelect, view }: {
+export default function PlanMap({ units, me, circle, ring2 = [], names, works = [], selected = null, onSelect, view, impact }: {
   units: UnitInfo[]
   me: UnitInfo
   circle: { id: string; relation: Relation }[]
-  selected: string | null
-  onSelect: (id: string) => void
+  ring2?: string[]
+  /** Names this household is allowed to see (its circle and accepted contacts). */
+  names: Record<string, string>
+  /** Renovations this household has been told about. */
+  works?: string[]
+  selected?: string | null
+  onSelect?: (id: string) => void
   view: 'terrace' | 'apartment'
+  /** Renovation preview: the homes that would be notified. */
+  impact?: string[]
 }) {
   const shown = units.filter((u) => u.kind === view)
   const circleIds = new Set(circle.map((c) => c.id))
+  const ring2Ids = new Set(ring2)
+  const impactIds = new Set(impact ?? [])
+  const worksAt = new Set(works)
   const mine = me.kind === view ? box(me) : null
-  const worksAt = new Set(units.filter((u) => u.renovating).map((u) => u.id))
+  const previewing = impact !== undefined
 
   const walls = mine
     ? shown
@@ -48,10 +60,17 @@ export default function PlanMap({ units, me, circle, selected, onSelect, view }:
         .map((u) => ({ u, edge: sharedEdge(mine, box(u)) }))
         .filter((w): w is { u: UnitInfo; edge: Edge } => w.edge !== null)
     : []
-  const links = mine ? shown.filter((u) => circleIds.has(u.id)).map((u) => ({ id: u.id, a: centre(mine), b: centre(box(u)) })) : []
+  const linked = previewing ? shown.filter((u) => impactIds.has(u.id)) : shown.filter((u) => circleIds.has(u.id))
+  const links = mine ? linked.map((u) => ({ id: u.id, a: centre(mine), b: centre(box(u)) })) : []
+
+  const cls = (u: UnitInfo) => {
+    if (u.id === me.id) return 'me'
+    if (previewing) return impactIds.has(u.id) ? 'notified' : 'muted-home'
+    return circleIds.has(u.id) ? 'circle' : ring2Ids.has(u.id) ? 'ring2' : ''
+  }
 
   return (
-    <svg className="plan" viewBox="0 0 720 400" role="group" aria-label={view === 'terrace' ? 'Plan of Jalan Demo 1' : 'Elevation of Block A'}>
+    <svg className={`plan ${previewing ? 'previewing' : ''}`} viewBox="0 0 720 400" role="group" aria-label={view === 'terrace' ? 'Plan of Jalan Demo 1' : 'Section through Block A'}>
       <defs>
         <pattern id="hatch-works" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <line x1="0" y1="0" x2="0" y2="7" stroke="#e8710a" strokeWidth="2" opacity="0.45" />
@@ -66,22 +85,22 @@ export default function PlanMap({ units, me, circle, selected, onSelect, view }:
         </linearGradient>
       </defs>
 
-      {view === 'terrace' ? <TerraceFrame /> : <BlockFrame />}
+      {view === 'terrace' ? <TerraceFrame /> : <BlockFrame stackPos={me.kind === 'apartment' ? me.pos : null} />}
 
       {shown.map((u) => {
         const b = box(u)
-        const cls = u.id === me.id ? 'me' : circleIds.has(u.id) ? 'circle' : ''
         return (
-          <g key={u.id} className={`home ${cls} ${selected === u.id ? 'selected' : ''}`} role="button" tabIndex={0}
-            aria-label={`${u.label}, ${u.resident_name}${u.renovating ? ', renovating' : ''}`}
-            onClick={() => onSelect(u.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onSelect(u.id)}>
+          <g key={u.id} className={`home ${cls(u)} ${selected === u.id ? 'selected' : ''} ${onSelect ? '' : 'static'}`}
+            role={onSelect ? 'button' : undefined} tabIndex={onSelect ? 0 : undefined}
+            aria-label={`${u.label}${names[u.id] ? `, ${names[u.id]}` : ''}${worksAt.has(u.id) ? ', renovating' : ''}`}
+            onClick={() => onSelect?.(u.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onSelect?.(u.id)}>
             <rect className="home-fill" x={b.x} y={b.y} width={b.w} height={b.h} />
-            {worksAt.has(u.id) && <rect className="home-works" x={b.x} y={b.y} width={b.w} height={b.h} />}
+            {(worksAt.has(u.id) || (previewing && u.id === me.id)) && <rect className="home-works" x={b.x} y={b.y} width={b.w} height={b.h} />}
           </g>
         )
       })}
 
-      {links.map((l) => <line key={l.id} className="plan-link" x1={l.a.x} y1={l.a.y} x2={l.b.x} y2={l.b.y} />)}
+      {links.map((l) => <line key={l.id} className={`plan-link ${previewing ? 'notify' : ''}`} x1={l.a.x} y1={l.a.y} x2={l.b.x} y2={l.b.y} />)}
 
       {/* party walls and slabs between every pair of neighbours */}
       {shown.map((u) => {
@@ -94,7 +113,7 @@ export default function PlanMap({ units, me, circle, selected, onSelect, view }:
           })
       })}
 
-      {walls.map(({ u, edge }) => {
+      {!previewing && walls.map(({ u, edge }) => {
         const atRisk = worksAt.has(u.id) || worksAt.has(me.id)
         const vertical = edge.x1 === edge.x2
         return (
@@ -113,11 +132,13 @@ export default function PlanMap({ units, me, circle, selected, onSelect, view }:
         const b = box(u)
         const c = centre(b)
         const isMe = u.id === me.id
+        const short = u.kind === 'terrace' ? u.label.replace('No. ', '') : `${u.floor}-${u.pos}`
+        const tall = b.h > 60
         return (
           <g key={u.id} className={`home-label ${isMe ? 'me' : ''}`} pointerEvents="none">
-            <text x={c.x} y={c.y - 3} className="home-no">{u.kind === 'terrace' ? u.label.replace('No. ', '') : `${u.floor}-${u.pos}`}</text>
-            <text x={c.x} y={c.y + 15} className="home-name">{isMe ? 'YOU' : u.resident_name}</text>
-            {worksAt.has(u.id) && <text x={b.x + b.w - 6} y={b.y + 13} className="home-tag">WORKS</text>}
+            <text x={c.x} y={tall ? c.y - 3 : c.y - 1} className="home-no">{short}</text>
+            <text x={c.x} y={tall ? c.y + 15 : c.y + 13} className="home-name">{isMe ? 'YOU' : names[u.id] ?? ''}</text>
+            {worksAt.has(u.id) && !previewing && <text x={b.x + b.w - 6} y={b.y + 12} className="home-tag">WORKS</text>}
           </g>
         )
       })}
@@ -150,18 +171,24 @@ function TerraceFrame() {
   )
 }
 
-function BlockFrame() {
+function BlockFrame({ stackPos }: { stackPos: number | null }) {
   const right = AX0 + 4 * AW
+  const bottom = AY0 + FLOORS * AH
   return (
     <g className="frame" pointerEvents="none">
-      <line className="party" x1={AX0 - 12} y1={AY0 - 8} x2={right + 12} y2={AY0 - 8} />
-      <text className="dim-text" x={(AX0 + right) / 2} y={AY0 - 20}>BLOCK A · EAST ELEVATION</text>
-      {[15, 14, 13].map((f, i) => (
-        <text key={f} className="level" x={AX0 - 22} y={AY0 + i * AH + AH / 2 + 4}>L{f}</text>
+      {stackPos && (
+        <>
+          <rect className="stack" x={AX0 + (stackPos - 1) * AW - 6} y={AY0 - 14} width={AW + 12} height={FLOORS * AH + 22} rx="6" />
+          <text className="stack-label" x={AX0 + (stackPos - 0.5) * AW} y={AY0 - 18}>YOUR STACK</text>
+        </>
+      )}
+      <line className="party" x1={AX0 - 12} y1={AY0 - 6} x2={right + 12} y2={AY0 - 6} />
+      {Array.from({ length: FLOORS }, (_, i) => (
+        <text key={i} className="level" x={AX0 - 22} y={AY0 + i * AH + AH / 2 + 4}>L{TOP_FLOOR - i}</text>
       ))}
-      <path className="break" d={`M${AX0 - 12} ${AY0 + 3 * AH + 16} l40 0 l8 -9 l8 18 l8 -9 l${4 * AW - 40} 0`} />
-      <text className="dim-text" x={(AX0 + right) / 2} y={AY0 + 3 * AH + 40}>LEVELS 1–12 NOT SHOWN</text>
-      <ScaleBar label="ELEVATION · 1:300" />
+      <path className="break" d={`M${AX0 - 12} ${bottom + 14} l40 0 l8 -9 l8 18 l8 -9 l${4 * AW - 40} 0`} />
+      <text className="dim-text" x={(AX0 + right) / 2} y={bottom + 36}>LEVELS 1–10 NOT SHOWN</text>
+      <ScaleBar label="SECTION · 1:300" />
     </g>
   )
 }
@@ -178,12 +205,12 @@ function NorthArrow() {
 
 function ScaleBar({ label }: { label: string }) {
   return (
-    <g className="scale" transform="translate(40 372)">
+    <g className="scale" transform="translate(40 380)">
       <rect x="0" y="0" width="30" height="5" className="on" />
       <rect x="30" y="0" width="30" height="5" />
       <rect x="60" y="0" width="30" height="5" className="on" />
-      <text x="0" y="17">0</text>
-      <text x="60" y="17">10 m</text>
+      <text x="0" y="16">0</text>
+      <text x="60" y="16">10 m</text>
       <text x="640" y="8" className="sheet-label">{label}</text>
     </g>
   )

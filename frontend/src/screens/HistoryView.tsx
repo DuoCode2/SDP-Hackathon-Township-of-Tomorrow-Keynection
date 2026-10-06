@@ -1,7 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Ban, Camera, CircleCheck, FileWarning, Fingerprint, Gavel, Hammer, KeyRound, Link2, ShieldAlert, ShieldCheck, StickyNote, ThumbsDown, Ticket, Wrench } from 'lucide-react'
+import { Ban, BellRing, Building2, Camera, CircleCheck, FileWarning, Fingerprint, Gavel, Hammer, Handshake, KeyRound, Link2, MessageSquareReply, MessageSquareWarning, ShieldAlert, ShieldCheck, StickyNote, ThumbsDown, Ticket, Wrench } from 'lucide-react'
 import { api, type HistoryEvent, type UnitInfo } from '../api'
 import { Card, CardHead, CountUp, formatDate, Metric, ScreenTitle, shortRange, Skeleton } from '../ui'
+
+const CONCERN_TEXT: Record<string, string> = {
+  noise_hours: 'noise outside the agreed hours',
+  debris: 'debris, dust or blocked drains',
+  access: 'blocked road, gate or parking',
+  damage: 'possible damage',
+  workers: "workers' behaviour",
+  other: 'another issue',
+}
 
 const DECISION_TEXT: Record<string, string> = {
   renovation: 'Agreed: caused by the renovation',
@@ -15,7 +24,7 @@ function describe(e: HistoryEvent): { icon: ReactNode; title: string; detail?: s
   const s = (k: string) => String(p[k] ?? '')
   switch (e.type) {
     case 'handover':
-      return { icon: <KeyRound size={17} />, title: 'Handover', detail: 'SDP handover inspection recorded' }
+      return { icon: <KeyRound size={17} />, title: 'Handover', detail: p.vacant_possession ? `Vacant possession ${formatDate(s('vacant_possession'))} · defect liability period starts` : 'SDP handover inspection recorded' }
     case 'renovation_registered':
       return { icon: <Hammer size={17} />, title: 'Renovation registered', detail: `${s('scope')} · ${shortRange(s('start'), s('end'))} · ${(p.neighbours_notified as string[] | undefined)?.length ?? 0} neighbours notified` }
     case 'photo_baseline':
@@ -36,8 +45,20 @@ function describe(e: HistoryEvent): { icon: ReactNode; title: string; detail?: s
       return { icon: <CircleCheck size={17} />, title: 'Repair accepted by owner', detail: p.note ? `“${s('note')}”` : 'Ticket closed' }
     case 'repair_rejected_by_owner':
       return { icon: <ThumbsDown size={17} />, title: 'Repair rejected by owner', detail: p.note ? `“${s('note')}”` : undefined }
+    case 'concern_raised':
+      return { icon: <MessageSquareWarning size={17} />, title: `Concern raised · ${CONCERN_TEXT[s('category')] ?? 'issue'}`, detail: `${s('raised_by')} → ${s('about')} · told privately first` }
+    case 'concern_acknowledged':
+      return { icon: <MessageSquareReply size={17} />, title: 'Renovating owner replied to the concern', detail: p.note ? `“${s('note')}”` : undefined }
+    case 'concern_resolved':
+      return { icon: <Handshake size={17} />, title: 'Concern sorted between neighbours', detail: p.note ? `“${s('note')}”` : undefined }
+    case 'concern_escalated':
+      return { icon: <Building2 size={17} />, title: 'Concern escalated to the SDP estate team', detail: CONCERN_TEXT[s('category')] }
+    case 'estate_reminder':
+      return { icon: <BellRing size={17} />, title: 'Estate team reminded the owner of the house rules', detail: p.note ? `“${s('note')}”` : undefined }
+    case 'concern_closed_by_estate':
+      return { icon: <CircleCheck size={17} />, title: 'Estate team closed the concern', detail: p.note ? `“${s('note')}”` : undefined }
     default:
-      return { icon: <StickyNote size={17} />, title: e.type }
+      return { icon: <StickyNote size={17} />, title: e.type.replace(/_/g, ' ') }
   }
 }
 

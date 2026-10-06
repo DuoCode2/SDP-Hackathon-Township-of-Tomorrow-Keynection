@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from . import ledger
-from .seed import PHASE, demo_units
+from .seed import BIOS, PHASE, demo_notices, demo_units, handover_date
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS phases (
@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS intros (
     message TEXT NOT NULL,
     lang TEXT NOT NULL,
     renovation TEXT,
+    sent_by TEXT,
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS intro_recipients (
@@ -112,13 +113,15 @@ CREATE TABLE IF NOT EXISTS messages (
     from_unit_id TEXT REFERENCES units(id),
     to_unit_id TEXT NOT NULL REFERENCES units(id),
     thread_with TEXT REFERENCES units(id),
-    kind TEXT NOT NULL CHECK (kind IN ('text', 'quick', 'system')),
+    kind TEXT NOT NULL CHECK (kind IN ('text', 'quick', 'system', 'voice')),
+    media_id TEXT,
     body TEXT NOT NULL,
     quick_key TEXT,
     lang TEXT NOT NULL,
     author TEXT,
     withheld INTEGER NOT NULL DEFAULT 0,
     private INTEGER NOT NULL DEFAULT 0,
+    sent_by TEXT,
     created_at TEXT NOT NULL,
     read_at TEXT
 );
@@ -134,6 +137,7 @@ CREATE TABLE IF NOT EXISTS concerns (
     response_note TEXT,
     estate_note TEXT,
     reminders INTEGER NOT NULL DEFAULT 0,
+    acted_by TEXT,
     created_at TEXT NOT NULL,
     acknowledged_at TEXT,
     resolved_at TEXT,
@@ -161,6 +165,55 @@ CREATE TABLE IF NOT EXISTS contact_consents (
     created_at TEXT NOT NULL,
     PRIMARY KEY (unit_id, other_unit_id)
 );
+CREATE TABLE IF NOT EXISTS contact_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_unit_id TEXT NOT NULL REFERENCES units(id),
+    to_unit_id TEXT NOT NULL REFERENCES units(id),
+    reason TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+    created_at TEXT NOT NULL,
+    responded_at TEXT
+);
+CREATE TABLE IF NOT EXISTS delegates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    unit_id TEXT NOT NULL REFERENCES units(id),
+    name TEXT NOT NULL,
+    relation TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    revoked_at TEXT
+);
+CREATE TABLE IF NOT EXISTS waves (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_unit_id TEXT NOT NULL REFERENCES units(id),
+    to_unit_id TEXT NOT NULL REFERENCES units(id),
+    created_at TEXT NOT NULL,
+    seen_at TEXT
+);
+CREATE TABLE IF NOT EXISTS reactions (
+    message_id INTEGER NOT NULL REFERENCES messages(id),
+    unit_id TEXT NOT NULL REFERENCES units(id),
+    emoji TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (message_id, unit_id)
+);
+CREATE TABLE IF NOT EXISTS profiles (
+    unit_id TEXT PRIMARY KEY REFERENCES units(id),
+    bio TEXT NOT NULL DEFAULT '',
+    accept_requests INTEGER NOT NULL DEFAULT 1,
+    allow_waves INTEGER NOT NULL DEFAULT 1,
+    quiet_mode INTEGER NOT NULL DEFAULT 0,
+    notices_read_at TEXT
+);
+CREATE TABLE IF NOT EXISTS notices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phase_id TEXT NOT NULL REFERENCES phases(id),
+    audience TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    author TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     unit_id TEXT NOT NULL REFERENCES units(id),
@@ -185,8 +238,8 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 3
-TABLES = ("contact_consents", "reports", "blocks", "concerns", "messages",
+SCHEMA_VERSION = 6
+TABLES = ("delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
           "warranty_tickets", "gate_logs", "passes", "incidents", "photos",
           "intro_recipients", "intros", "events", "units", "phases")
 
@@ -209,16 +262,21 @@ def init_db(conn: sqlite3.Connection) -> None:
 
 def _seed(conn: sqlite3.Connection) -> None:
     conn.execute("INSERT INTO phases (id, name, note) VALUES (?, ?, ?)", (PHASE["id"], PHASE["name"], PHASE["note"]))
+    handover = handover_date()
     for u in demo_units():
         conn.execute(
             "INSERT INTO units (id, phase_id, kind, label, resident_name, terrace_row, facing_row, block, floor, pos,"
             " lang, handover_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (u["id"], u["phase_id"], u["kind"], u["label"], u["resident_name"],
-             u.get("row"), u.get("facing_row"), u.get("block"), u.get("floor"), u["pos"], u["lang"], PHASE["handover_date"]),
+             u.get("row"), u.get("facing_row"), u.get("block"), u.get("floor"), u["pos"], u["lang"], handover),
         )
         # Every home history starts with SDP's handover record.
         append_event(conn, u["id"], "handover", {"note": "Vacant possession; SDP handover inspection recorded",
-                                                 "vacant_possession": PHASE["handover_date"]})
+                                                 "vacant_possession": handover})
+        conn.execute("INSERT INTO profiles (unit_id, bio) VALUES (?, ?)", (u["id"], BIOS.get(u["resident_name"], "")))
+    for audience, title, body in demo_notices():
+        conn.execute("INSERT INTO notices (phase_id, audience, title, body, author, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                     (PHASE["id"], audience, title, body, "SDP Estate Team", now()))
 
 
 def append_event(conn: sqlite3.Connection, unit_id: str, event_type: str, payload: dict[str, Any]) -> dict[str, Any]:

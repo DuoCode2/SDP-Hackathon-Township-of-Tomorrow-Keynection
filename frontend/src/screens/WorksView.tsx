@@ -3,9 +3,11 @@ import QRCode from 'qrcode'
 import { BadgeCheck, Ban, CalendarRange, Eye, EyeOff, FileCheck2, FileClock, Hammer, KeyRound, ListChecks, ScanLine, ShieldCheck, ShieldX, Volume2, VolumeX } from 'lucide-react'
 import { api, type GateResult, type Pass, type UnitInfo, type WorkItem, type Works, type ContractorView } from '../api'
 import { Badge, Card, CardHead, Empty, formatDate, ScreenTitle, Segmented, Sheet, shortRange, Skeleton, useToast } from '../ui'
+import RenovationWizard from './RenovationWizard'
 
 interface Props {
   me: UnitInfo
+  units: UnitInfo[]
   version: number
   onChange: () => void
 }
@@ -26,9 +28,18 @@ function noisyAllowed(item: WorkItem, at: Date): boolean {
   return hm >= (r.noisy_from ?? '09:00') && hm < (r.noisy_to ?? '17:00')
 }
 
-export default function WorksView({ me, version, onChange }: Props) {
+export default function WorksView({ me, units, version, onChange }: Props) {
   const [tab, setTab] = useState<'schedule' | 'passes'>('schedule')
   const [data, setData] = useState<Works | null>(null)
+  const [wizard, setWizard] = useState<Record<string, string> | null>(null)
+
+  // The wizard shows names only for homes this household may know (its circle and accepted contacts).
+  const openWizard = () => api.directory(me.id).then((d) => {
+    const names: Record<string, string> = { [me.id]: me.resident_name }
+    d.circle.forEach((n) => { names[n.id] = n.resident_name })
+    d.nearby.forEach((n) => { if (n.resident_name) names[n.id] = n.resident_name })
+    setWizard(names)
+  })
 
   useEffect(() => {
     let live = true
@@ -45,16 +56,20 @@ export default function WorksView({ me, version, onChange }: Props) {
     <section className="screen">
       <ScreenTitle eyebrow="Layer 2 · Agree" title="Works" subtitle="Renovation around you, quiet-hour rules, and who is allowed through the gate."
         aside={data && (
-          <div className={`live-pill ${noisy.length ? 'noisy' : 'quiet'}`}>
-            <span className="pulse" />
-            {noisy.length ? <Volume2 size={15} /> : <VolumeX size={15} />}
-            {noisy.length ? 'Noisy work allowed now' : 'Quiet hours now'}
+          <div className="head-actions">
+            <div className={`live-pill ${noisy.length ? 'noisy' : 'quiet'}`}>
+              <span className="pulse" />
+              {noisy.length ? <Volume2 size={15} /> : <VolumeX size={15} />}
+              {noisy.length ? 'Noisy work allowed now' : 'Quiet hours now'}
+            </div>
+            <button className="btn btn-primary" onClick={openWizard}><Hammer size={15} /> Register renovation</button>
           </div>
         )} />
       <div className="tabs-row">
         <Segmented value={tab} onChange={setTab} options={[{ id: 'schedule', label: 'Schedule' }, { id: 'passes', label: 'Contractor passes' }]} />
       </div>
       {!data ? <Card><Skeleton lines={4} /></Card> : tab === 'schedule' ? <Schedule data={data} all={all} noisy={noisy} /> : <Passes me={me} data={data} onChange={onChange} />}
+      {wizard && <RenovationWizard open onClose={() => setWizard(null)} me={me} units={units} names={wizard} onSent={onChange} />}
     </section>
   )
 }
@@ -78,7 +93,7 @@ function Schedule({ data, all, noisy }: { data: Works; all: Item[]; noisy: Item[
         <Card>
           <CardHead icon={<CalendarRange size={16} />} title="Next 4 weeks" sub="Sundays are shaded: no renovation work allowed" />
           {all.length === 0 ? (
-            <Empty icon={<VolumeX size={22} />} title="Nothing scheduled">When anyone in your circle registers renovation, it appears on this timeline.</Empty>
+            <Empty art="house" icon={<VolumeX size={22} />} title="Nothing scheduled">When anyone in your circle registers renovation, it appears on this timeline.</Empty>
           ) : (
             <div className="timeline-grid" style={{ ['--days' as string]: days }}>
               <div className="tl-head">
@@ -181,7 +196,7 @@ function Passes({ me, data, onChange }: { me: UnitInfo; data: Works; onChange: (
   if (data.mine.length === 0) {
     return (
       <Card>
-        <Empty icon={<KeyRound size={22} />} title="Passes come from the renovating home">
+        <Empty art="house" icon={<KeyRound size={22} />} title="Passes come from the renovating home">
           Register renovation from Circle → "I'm planning renovation". You can then issue a QR pass to your contractor; the
           guardhouse scans it and only lets workers in on allowed days and hours.
         </Empty>

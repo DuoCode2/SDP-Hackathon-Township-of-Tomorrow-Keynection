@@ -72,5 +72,27 @@ def tone_problem(text: str) -> bool:
     return bool(_HOSTILE_RE.search(text))
 
 
+# Phone numbers (Malaysian mobiles, or any long run of digits), emails and links. Used on text other residents see
+# without a chat (bio, helper names), so numbers are still exchanged only when both households agree.
+_CONTACT_RE = re.compile(
+    r"(?<!\d)(?:\+?60|0)1\d(?:[\s-]?\d){7,8}(?!\d)|\d{9,}|[\w.+-]+@[\w-]+\.[\w.]+|https?://|www\.|"
+    r"\b[\w-]+\.(?:com|my|net|org|io|me|ly|link)\b",
+    re.IGNORECASE,
+)
+
+
+def contact_details(text: str) -> bool:
+    return bool(_CONTACT_RE.search(text))
+
+
+# Names a family helper must not use, so nobody can pose as SDP, the estate office or the authorities.
+_OFFICIAL_RE = re.compile(r"\b(?:sdp|sime\s*darby|estate|official|admin(?:istrator)?|jiran5|management|jmb|polis|police|pengurusan)\b|物业|管理|官方",
+                          re.IGNORECASE)
+
+
+def official_sounding(text: str) -> bool:
+    return bool(_OFFICIAL_RE.search(text))
+
+
 def quick_text(key: str, lang: str) -> str:
     return QUICK_REPLIES[key].get(lang) or QUICK_REPLIES[key]["en"]

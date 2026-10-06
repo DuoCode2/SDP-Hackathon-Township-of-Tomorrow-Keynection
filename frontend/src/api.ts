@@ -1,4 +1,5 @@
-export type Relation = 'left' | 'right' | 'across-left' | 'across' | 'across-right' | 'above' | 'below'
+export type Relation = 'left' | 'right' | 'across-left' | 'across' | 'across-right' | 'above' | 'below' | 'above-2' | 'below-2' | 'contact'
+export type WorksType = 'wet' | 'hacking' | 'structural' | 'light'
 
 export interface UnitInfo {
   id: string
@@ -34,6 +35,54 @@ export interface Renovation {
   contractor_cidb_registered?: boolean | null
   council_permit?: 'approved' | 'applied' | 'not_needed' | null
   permit_ref?: string | null
+  works_type?: WorksType
+  management_approval?: 'approved' | 'pending' | null
+}
+
+/** A home outside your circle: its place in the phase, never its resident (unless you are connected). */
+export interface NearbyHome extends Omit<UnitInfo, 'resident_name' | 'lang' | 'handover_date'> {
+  hint: string
+  hint_key: 'same_row' | 'across_road' | 'floors_above' | 'floors_below' | 'same_floor' | 'level'
+  hint_n: number
+  contact: 'none' | 'requested' | 'incoming' | 'connected' | 'declined'
+  resident_name?: string
+}
+
+export interface Directory {
+  circle: (Neighbour & { known: boolean; bio?: string })[]
+  nearby: NearbyHome[]
+  works: string[]
+  ring2_label: string
+  township_homes: number
+}
+
+export interface ImpactItem extends Omit<UnitInfo, 'resident_name' | 'lang' | 'handover_date'> {
+  relation: Relation
+  reason: string
+  reason_key: string
+  resident_name?: string
+}
+
+export interface ContactRequest {
+  id: number
+  from: NearbyHome & { resident_name?: string }
+  to: NearbyHome & { resident_name?: string }
+  reason: string
+  reason_label: string
+  note: string
+  status: 'pending' | 'accepted' | 'declined'
+  created_at: string
+  responded_at: string | null
+  mine: boolean
+}
+
+export interface Notice {
+  id: number
+  audience: string
+  title: string
+  body: string
+  author: string
+  created_at: string
 }
 
 export interface GateEntry {
@@ -164,6 +213,7 @@ export interface Concern {
   response_note: string | null
   estate_note: string | null
   reminders: number
+  acted_by?: string | null
   created_at: string
   acknowledged_at: string | null
   resolved_at: string | null
@@ -175,7 +225,11 @@ export interface Concern {
 export interface ChatMessage {
   type: 'message'
   id: number
-  kind: 'text' | 'quick' | 'system'
+  kind: 'text' | 'quick' | 'system' | 'voice'
+  reactions: { emoji: string; unit_id: string }[]
+  duration: number | null
+  expired?: boolean
+  sent_by?: string | null
   from_unit_id: string | null
   to_unit_id: string
   author: string | null
@@ -197,9 +251,36 @@ export interface ChatIntro {
   acked_at: string | null
   created_at: string
   renovation: Renovation | null
+  sent_by?: string | null
 }
 
-export type ThreadItem = ChatMessage | ChatIntro | Concern
+export interface ChatWave {
+  type: 'wave'
+  id: number
+  from_unit_id: string
+  to_unit_id: string
+  created_at: string
+  seen_at: string | null
+}
+
+export type ThreadItem = ChatMessage | ChatIntro | Concern | ChatWave
+
+export interface Profile {
+  unit_id: string
+  bio: string
+  accept_requests: boolean
+  allow_waves: boolean
+  quiet_mode: boolean
+  lang: Lang
+  blocked: { id: string; label: string; resident_name: string }[]
+}
+
+export interface Official {
+  name: string
+  verified: boolean
+  notices: Notice[]
+  unread: number
+}
 export type ContactState = 'none' | 'requested_by_me' | 'requested_by_them' | 'mutual'
 
 export interface Conversation extends Neighbour {
@@ -219,7 +300,7 @@ export interface Thread {
   contact: ContactState
   blocked: boolean
   their_renovations: { intro_id: number; scope: string; start: string; end: string }[]
-  quick_replies: { key: string; text: string }[]
+  quick_replies: { key: string; text: string; arrives?: string }[]
   concern_categories: Record<ConcernCategory, string>
 }
 
@@ -228,7 +309,7 @@ export interface ModerationReport {
   reason: string
   status: 'open' | 'warned' | 'dismissed'
   created_at: string
-  message: { id: number; text: string; sent_at: string; from_label: string; from_name: string }
+  message: { id: number; kind?: string; text: string; duration?: number | null; voice_url?: string | null; sent_at: string; from_label: string; from_name: string }
   reporter_label: string
 }
 
@@ -351,6 +432,21 @@ export interface Dashboard {
   concerns_with_estate: number
   reports_open: number
   warranty_overdue: number
+  contact_requests: number
+  contact_requests_accepted: number
+  waves: number
+  circle_pairs: number
+  known_pairs: number
+  days_to_first_hello: number | null
+  households_reached_out: number
+  active_circles_30d: number
+}
+
+export interface Delegate {
+  id: number
+  name: string
+  relation: 'child' | 'spouse' | 'sibling' | 'caregiver' | 'other'
+  created_at: string
 }
 
 export class ApiError extends Error {
@@ -389,7 +485,7 @@ export const api = {
   units: () => request<UnitInfo[]>('/api/units?phase_id=demo'),
   card: (unitId: string) =>
     request<{ neighbours: (Neighbour & { known: boolean })[]; known_count: number }>(`/api/units/${unitId}/card`),
-  sendIntro: (body: { from_unit_id: string; message: string; lang: string; renovation?: Renovation }) =>
+  sendIntro: (body: { from_unit_id: string; message: string; lang: string; renovation?: Renovation; to_unit_ids?: string[]; delegate_id?: number }) =>
     request<{ id: number; recipients: string[] }>('/api/intros', json('POST', body)),
   inbox: (unitId: string) => request<InboxItem[]>(`/api/units/${unitId}/inbox`),
   waveBack: (introId: number, unitId: string) => request(`/api/intros/${introId}/ack`, json('POST', { unit_id: unitId })),
@@ -427,26 +523,63 @@ export const api = {
   warrantyQueue: () => request<WarrantyTicket[]>('/api/warranty?phase_id=demo'),
   submitDemoRepair: (ticketId: number, name: string, subcontractor: string) =>
     request<WarrantyTicket>(`/api/warranty/${ticketId}/repair/demo`, json('POST', { name, subcontractor })),
-  respondToRepair: (ticketId: number, unitId: string, decision: 'accept' | 'reject', note: string) =>
-    request<WarrantyTicket>(`/api/warranty/${ticketId}/owner`, json('POST', { unit_id: unitId, decision, note })),
+  respondToRepair: (ticketId: number, unitId: string, decision: 'accept' | 'reject', note: string, delegateId?: number) =>
+    request<WarrantyTicket>(`/api/warranty/${ticketId}/owner`, json('POST', { unit_id: unitId, decision, note, delegate_id: delegateId ?? null })),
 
   history: (unitId: string) =>
     request<{ events: HistoryEvent[]; chain_ok: boolean; first_bad_index: number | null }>(`/api/units/${unitId}/history`),
   dashboard: () => request<Dashboard>('/api/dashboard?phase_id=demo'),
 
+  directory: (unitId: string) => request<Directory>(`/api/units/${unitId}/directory`),
+  impact: (unitId: string, works: WorksType) => request<ImpactItem[]>(`/api/units/${unitId}/impact?works_type=${works}`),
+  requestContact: (from: string, to: string, reason: string, note: string) =>
+    request<ContactRequest>('/api/contact-requests', json('POST', { from_unit_id: from, to_unit_id: to, reason, note })),
+  contactRequests: (unitId: string) => request<{ incoming: ContactRequest[]; outgoing: ContactRequest[] }>(`/api/units/${unitId}/contact-requests`),
+  respondContact: (id: number, unitId: string, accept: boolean) =>
+    request<ContactRequest>(`/api/contact-requests/${id}/respond`, json('POST', { unit_id: unitId, accept })),
+  notices: (unitId: string) => request<Notice[]>(`/api/units/${unitId}/notices`),
+  allNotices: () => request<Notice[]>('/api/notices?phase_id=demo'),
+  postNotice: (audience: string, title: string, body: string) => request<Notice>('/api/notices?phase_id=demo', json('POST', { audience, title, body })),
+  wave: (from: string, to: string) => request('/api/waves', json('POST', { from_unit_id: from, to_unit_id: to })),
+  react: (messageId: number, unitId: string, emoji: string) =>
+    request<{ emoji: string; unit_id: string }[]>(`/api/messages/${messageId}/react`, json('POST', { unit_id: unitId, emoji })),
+  sendVoice: (from: string, to: string, blob: Blob, duration: number, delegateId?: number) => {
+    const form = new FormData()
+    if (delegateId) form.append('delegate_id', String(delegateId))
+    form.append('from_unit_id', from)
+    form.append('to_unit_id', to)
+    form.append('duration', String(Math.max(1, Math.min(60, Math.round(duration)))))
+    form.append('file', blob, 'voice')
+    return request<ChatMessage>('/api/messages/voice', { method: 'POST', body: form })
+  },
+  voiceUrl: (messageId: number, unitId: string) => `/api/messages/${messageId}/voice?unit_id=${encodeURIComponent(unitId)}`,
+  profile: (unitId: string) => request<Profile>(`/api/units/${unitId}/profile`),
+  updateProfile: (unitId: string, patch: Partial<Omit<Profile, 'unit_id' | 'blocked'>>) =>
+    request<Profile>(`/api/units/${unitId}/profile`, json('PUT', patch)),
+  official: (unitId: string) => request<Official>(`/api/units/${unitId}/official`),
+  delegates: (unitId: string) => request<Delegate[]>(`/api/units/${unitId}/delegates`),
+  addDelegate: (unitId: string, name: string, relation: Delegate['relation']) =>
+    request<Delegate>(`/api/units/${unitId}/delegates`, json('POST', { name, relation, consent: true })),
+  revokeDelegate: (id: number, unitId: string) => request(`/api/delegates/${id}/revoke`, json('POST', { unit_id: unitId })),
+  exportData: async (unitId: string) => {
+    const res = await fetch(`/api/units/${unitId}/export`)
+    if (!res.ok) throw new ApiError(res.status, 'Could not prepare your data')
+    return res.blob()
+  },
+  officialRead: (unitId: string) => request(`/api/units/${unitId}/official/read`, { method: 'POST' }),
   conversations: (unitId: string) => request<Conversation[]>(`/api/units/${unitId}/conversations`),
   thread: (unitId: string, otherId: string) => request<Thread>(`/api/units/${unitId}/conversations/${otherId}`),
   markRead: (unitId: string, otherId: string) => request(`/api/units/${unitId}/conversations/${otherId}/read`, { method: 'POST' }),
-  sendMessage: (from: string, to: string, msg: { body?: string; quick_key?: string }) =>
-    request<ChatMessage>('/api/messages', json('POST', { from_unit_id: from, to_unit_id: to, ...msg })),
+  sendMessage: (from: string, to: string, msg: { body?: string; quick_key?: string }, delegateId?: number) =>
+    request<ChatMessage>('/api/messages', json('POST', { from_unit_id: from, to_unit_id: to, ...msg, delegate_id: delegateId ?? null })),
   reportMessage: (messageId: number, unitId: string, reason: string) =>
     request(`/api/messages/${messageId}/report`, json('POST', { unit_id: unitId, reason })),
   setBlock: (unitId: string, otherId: string, blocked: boolean) =>
     request(`/api/units/${unitId}/blocks`, json('POST', { other_unit_id: otherId, blocked })),
   shareContact: (unitId: string, otherId: string) =>
     request<{ contact: ContactState }>(`/api/units/${unitId}/contact`, json('POST', { other_unit_id: otherId })),
-  raiseConcern: (from: string, introId: number, category: ConcernCategory, note: string) =>
-    request<Concern>('/api/concerns', json('POST', { from_unit_id: from, intro_id: introId, category, note })),
+  raiseConcern: (from: string, introId: number, category: ConcernCategory, note: string, delegateId?: number) =>
+    request<Concern>('/api/concerns', json('POST', { from_unit_id: from, intro_id: introId, category, note, delegate_id: delegateId ?? null })),
   concernStep: (id: number, step: 'acknowledge' | 'resolve' | 'escalate', unitId: string, note = '') =>
     request<Concern>(`/api/concerns/${id}/${step}`, json('POST', { unit_id: unitId, note })),
   estateConcerns: () => request<Concern[]>('/api/estate/concerns?phase_id=demo'),

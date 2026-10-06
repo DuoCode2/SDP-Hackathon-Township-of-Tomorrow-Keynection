@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Activity, Building2, Clock4, Flag, Handshake, House, Inbox, KeyRound, MessageCircle, MessagesSquare, RotateCcw, ShieldCheck, ShieldX, Sparkles, Wrench } from 'lucide-react'
-import { api, type Concern, type Dashboard, type ModerationReport, type WarrantyTicket } from '../api'
+import { Activity, Building2, Clock4, Flag, Handshake, HeartHandshake, House, Inbox, KeyRound, Megaphone, MessagesSquare, MicOff, RotateCcw, Send, ShieldCheck, ShieldX, Sparkles, Wrench } from 'lucide-react'
+import { api, type Concern, type Dashboard, type ModerationReport, type Notice, type WarrantyTicket } from '../api'
 import ConcernCard from '../components/ConcernCard'
 import WarrantyClock from '../components/WarrantyClock'
 import { Badge, Card, CardHead, CountUp, Empty, formatDate, Ring, ScreenTitle, Segmented, Skeleton, useToast } from '../ui'
 import { TICKET_BADGE } from './RepairView'
+import { replayWelcome } from './CircleView'
 
 const SUBCONTRACTORS = ['Jaya Plaster Sdn Bhd', 'Kemas Waterproofing', 'Bina Teguh Builders']
 
@@ -14,16 +15,18 @@ export default function DashboardView({ version, onChange }: { version: number; 
   const [queue, setQueue] = useState<WarrantyTicket[]>([])
   const [concerns, setConcerns] = useState<Concern[]>([])
   const [reports, setReports] = useState<ModerationReport[]>([])
-  const [desk, setDesk] = useState<'warranty' | 'estate' | 'safety'>('warranty')
+  const [notices, setNotices] = useState<Notice[]>([])
+  const [desk, setDesk] = useState<'warranty' | 'estate' | 'safety' | 'notices'>('warranty')
 
   useEffect(() => {
     let live = true
-    Promise.all([api.dashboard(), api.warrantyQueue(), api.estateConcerns(), api.reports()]).then(([dash, q, c, r]) => {
+    Promise.all([api.dashboard(), api.warrantyQueue(), api.estateConcerns(), api.reports(), api.allNotices()]).then(([dash, q, c, r, n]) => {
       if (!live) return
       setD(dash)
       setQueue(q)
       setConcerns(c)
       setReports(r)
+      setNotices(n)
     })
     return () => {
       live = false
@@ -34,6 +37,7 @@ export default function DashboardView({ version, onChange }: { version: number; 
     await api.resetDemo()
     try {
       Object.keys(sessionStorage).filter((k) => k.startsWith('j5pass:')).forEach((k) => sessionStorage.removeItem(k))
+      replayWelcome()
     } catch {
       /* storage blocked */
     }
@@ -53,7 +57,7 @@ export default function DashboardView({ version, onChange }: { version: number; 
         <>
           <div className="kpi-strip">
             <Kpi icon={<House size={14} />} label="Know a neighbour" value={d.households_with_a_known_neighbour} sub={`of ${d.households} homes`} />
-            <Kpi icon={<MessagesSquare size={14} />} label="Messages" value={d.messages_sent} sub={`${d.intros_sent} intros · ${d.contacts_shared} numbers shared`} />
+            <Kpi icon={<MessagesSquare size={14} />} label="Messages" value={d.messages_sent} sub={`${d.intros_sent} intros · ${d.contact_requests_accepted}/${d.contact_requests} requests accepted`} />
             <Kpi icon={<Handshake size={14} />} label="Settled by neighbours" value={d.concerns_settled_by_neighbours} sub={`of ${d.concerns_raised} concerns`} />
             <Kpi icon={<Building2 size={14} />} label="With estate team" value={d.concerns_with_estate} sub={`${d.concerns_escalated} escalated in total`} />
             <Kpi icon={<Clock4 size={14} />} label="Repairs overdue" value={d.warranty_overdue} sub={`${d.warranty_open} open · ${d.warranty_closed} closed`} />
@@ -66,13 +70,14 @@ export default function DashboardView({ version, onChange }: { version: number; 
                 { id: 'warranty', label: `Warranty · ${d.warranty_open}` },
                 { id: 'estate', label: `Estate · ${d.concerns_with_estate}` },
                 { id: 'safety', label: `Safety · ${d.reports_open}` },
+                { id: 'notices', label: 'Notices' },
               ]} />
               {desk === 'warranty' && (
                 <Card>
                   <CardHead icon={<Wrench size={16} />} tone="blue" title="Warranty queue" sub="Building-defect decisions land here with the photos attached"
                     right={<div className="head-badges"><Badge tone="blue">{d.warranty_open} open</Badge><Badge tone="brand">{d.warranty_closed} closed</Badge></div>} />
                   {queue.length === 0 ? (
-                    <Empty icon={<Inbox size={22} />} title="No tickets yet">When neighbours agree a change is a building defect, the ticket appears here automatically.</Empty>
+                    <Empty art="inbox" icon={<Inbox size={22} />} title="No tickets yet">When neighbours agree a change is a building defect, the ticket appears here automatically.</Empty>
                   ) : (
                     queue.map((t) => <QueueItem key={t.id} ticket={t} onChange={onChange} />)
                   )}
@@ -83,7 +88,7 @@ export default function DashboardView({ version, onChange }: { version: number; 
                 <Card>
                   <CardHead icon={<Building2 size={16} />} tone="red" title="Estate team: neighbour concerns" sub="Escalated concerns first. The rest are still being handled between neighbours." />
                   {concerns.length === 0 ? (
-                    <Empty icon={<Handshake size={22} />} title="No concerns">Concerns start between neighbours. Only the ones they can't settle are escalated here.</Empty>
+                    <Empty art="handshake" icon={<Handshake size={22} />} title="No concerns">Concerns start between neighbours. Only the ones they can't settle are escalated here.</Empty>
                   ) : (
                     concerns.map((c) => (
                       <div key={c.id} className="estate-item">
@@ -98,12 +103,13 @@ export default function DashboardView({ version, onChange }: { version: number; 
                 <Card>
                   <CardHead icon={<Flag size={16} />} tone="amber" title="Reported messages" sub="Review within one working day. Reporters stay anonymous; warnings go only to the sender." />
                   {reports.length === 0 ? (
-                    <Empty icon={<ShieldCheck size={22} />} title="Nothing reported">Residents can report any message sent to them from the chat.</Empty>
+                    <Empty art="shield" icon={<ShieldCheck size={22} />} title="Nothing reported">Residents can report any message sent to them from the chat.</Empty>
                   ) : (
                     reports.map((r) => <ReportItem key={r.id} report={r} onChange={onChange} />)
                   )}
                 </Card>
               )}
+              {desk === 'notices' && <NoticeDesk notices={notices} onChange={onChange} />}
             </div>
 
             <div className="col sticky">
@@ -115,6 +121,20 @@ export default function DashboardView({ version, onChange }: { version: number; 
                   <Ring value={ratio(d.warranty_closed, d.warranty_closed + d.warranty_open)} label="Closed by owner" />
                   <Ring value={ratio(d.concerns_settled_by_neighbours, d.concerns_raised)} label="Settled without SDP" />
                 </div>
+              </Card>
+
+              <Card>
+                <CardHead icon={<HeartHandshake size={16} />} title="Neighbour relationships" sub="Counts only, never who or what was said" />
+                <div className="bond">
+                  <Ring value={ratio(d.known_pairs, d.circle_pairs)} label="Next-door pairs who know each other" />
+                  <dl className="bond-facts">
+                    <div><dt>Pairs that know each other</dt><dd>{d.known_pairs} / {d.circle_pairs}</dd></div>
+                    <div><dt>Keys to first hello</dt><dd>{d.days_to_first_hello === null ? '—' : `${d.days_to_first_hello} days`}</dd></div>
+                    <div><dt>Households that reached out</dt><dd>{d.households_reached_out} / {d.households}</dd></div>
+                    <div><dt>Active circles · 30 days</dt><dd>{d.active_circles_30d}</dd></div>
+                  </dl>
+                </div>
+                <div className="mono muted">FOR HANDOVER PLANNING · NOT FOR MARKETING OR PROFILING RESIDENTS</div>
               </Card>
 
               <Card className="glow">
@@ -217,7 +237,18 @@ function ReportItem({ report: r, onChange }: { report: ModerationReport; onChang
         </div>
         <Badge tone={r.status === 'open' ? 'amber' : r.status === 'warned' ? 'red' : 'neutral'}>{r.status}</Badge>
       </div>
-      <blockquote className="report-quote">“{r.message.text}”</blockquote>
+      {r.message.kind === 'voice' ? (
+        r.message.voice_url ? (
+          <div className="report-voice">
+            <span className="mono muted">VOICE · {r.message.duration ?? '?'}S · KEPT UNTIL REVIEWED</span>
+            <audio controls preload="none" src={r.message.voice_url} />
+          </div>
+        ) : (
+          <div className="voice-gone"><MicOff size={14} /> Voice message deleted after review (30-day rule)</div>
+        )
+      ) : (
+        <blockquote className="report-quote">“{r.message.text}”</blockquote>
+      )}
       {r.status === 'open' && (
         <div className="btn-row">
           <button className="btn btn-sm" onClick={() => review('dismissed')}>Dismiss</button>
@@ -225,5 +256,48 @@ function ReportItem({ report: r, onChange }: { report: ModerationReport; onChang
         </div>
       )}
     </div>
+  )
+}
+
+const AUDIENCE: Record<string, string> = { phase: 'Whole township', terrace: 'Jalan Demo 1', 'block:A': 'Block A' }
+
+/** Ring 3: one-way notices to a street, a block or the whole township. Residents can't reply-all. */
+function NoticeDesk({ notices, onChange }: { notices: Notice[]; onChange: () => void }) {
+  const toast = useToast()
+  const [audience, setAudience] = useState('block:A')
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  async function post() {
+    try {
+      await api.postNotice(audience, title, body)
+      toast(`Notice posted to ${AUDIENCE[audience]}`)
+      setTitle('')
+      setBody('')
+      onChange()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not post', 'error')
+    }
+  }
+  return (
+    <Card>
+      <CardHead icon={<Megaphone size={16} />} tone="blue" title="Community notices" sub="One-way, to a street, a block or the whole township. No replies to everyone, so no group arguments." />
+      <div className="grid-2">
+        <label className="field">Audience
+          <select value={audience} onChange={(e) => setAudience(e.target.value)}>
+            {Object.entries(AUDIENCE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </label>
+        <label className="field">Title<input value={title} maxLength={80} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Lift servicing" /></label>
+      </div>
+      <textarea className="input" rows={3} maxLength={400} value={body} onChange={(e) => setBody(e.target.value)} placeholder="What, where, when, and what residents should do" />
+      <button className="btn btn-primary" disabled={title.trim().length < 3 || body.trim().length < 3} onClick={post}><Send size={14} /> Post notice</button>
+      {notices.map((n) => (
+        <div key={n.id} className="notice-item">
+          <div className="notice-item-top"><b>{n.title}</b><span className="mono muted">{AUDIENCE[n.audience] ?? n.audience}</span></div>
+          <p>{n.body}</p>
+          <small>{n.author} · {formatDate(n.created_at)}</small>
+        </div>
+      ))}
+    </Card>
   )
 }
