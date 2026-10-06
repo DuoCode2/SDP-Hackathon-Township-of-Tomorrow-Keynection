@@ -8,7 +8,7 @@ import sqlite3
 import uuid
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal
 
@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
-from . import db, ledger, vision
+from . import db, ledger, talk, vision
 from .neighbours import Unit, inverse_relation, neighbour_circle
 from .triage import triage_hint
 
@@ -111,7 +111,12 @@ def _to_unit(row: sqlite3.Row) -> Unit:
 def _unit_json(row: sqlite3.Row) -> dict[str, Any]:
     return {"id": row["id"], "phase_id": row["phase_id"], "kind": row["kind"], "label": row["label"],
             "resident_name": row["resident_name"], "row": row["terrace_row"], "facing_row": row["facing_row"],
-            "block": row["block"], "floor": row["floor"], "pos": row["pos"]}
+            "block": row["block"], "floor": row["floor"], "pos": row["pos"], "lang": row["lang"],
+            "handover_date": row["handover_date"]}
+
+
+def _today() -> str:
+    return datetime.now(MALAYSIA).strftime("%Y-%m-%d")
 
 
 def _circle(conn: sqlite3.Connection, unit_id: str) -> list[dict[str, Any]]:
@@ -230,6 +235,9 @@ class Renovation(BaseModel):
     weekdays_only: bool = True
     contractor: str | None = Field(None, max_length=80)
     contractor_cidb_registered: bool | None = None
+    # Local-authority (PBT) approval: extensions and structural work need one; re-tiling usually does not.
+    council_permit: Literal["approved", "applied", "not_needed"] | None = None
+    permit_ref: str | None = Field(None, max_length=40, pattern=r"^[A-Za-z0-9/ .-]*$")
 
     @model_validator(mode="after")
     def check_order(self) -> "Renovation":
@@ -315,7 +323,11 @@ def phases(conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]
 
 @app.get("/api/units")
 def units(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
-    return [_unit_json(r) for r in conn.execute("SELECT * FROM units WHERE phase_id = ? ORDER BY id", (phase_id,))]
+    today = _today()
+    renovating = {r["from_unit_id"] for r in conn.execute("SELECT from_unit_id, renovation FROM intros WHERE renovation IS NOT NULL")
+                  if json.loads(r["renovation"])["end"] >= today}
+    return [{**_unit_json(r), "renovating": r["id"] in renovating}
+            for r in conn.execute("SELECT * FROM units WHERE phase_id = ? ORDER BY id", (phase_id,))]
 
 
 @app.get("/api/units/{unit_id}/neighbours")
@@ -386,6 +398,430 @@ def neighbour_card(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
         ).fetchone() is not None
         out.append({**n, "known": they_replied or i_replied})
     return {"unit_id": unit_id, "neighbours": out, "known_count": sum(n["known"] for n in out)}
+
+
+# ---------- layer 1b: talk (messages between neighbours, concerns, safety) ----------
+
+MAX_MESSAGES_PER_DAY = 30
+MAX_OPEN_CONCERNS = 5
+ESCALATE_AFTER = timedelta(hours=24)
+ESTATE = "SDP Estate Team"
+TONE_MESSAGE = ("This may come across as hostile. Try calmer words or a quick reply: messages stay on record "
+                "and can be reported.")
+
+
+class MessageIn(BaseModel):
+    from_unit_id: str = Field(..., pattern=UNIT_ID)
+    to_unit_id: str = Field(..., pattern=UNIT_ID)
+    body: str | None = Field(None, max_length=500)
+    quick_key: str | None = Field(None, pattern=r"^[a-z_]{1,30}$")
+
+    @model_validator(mode="after")
+    def one_kind(self) -> "MessageIn":
+        if bool(self.body and self.body.strip()) == bool(self.quick_key):
+            raise ValueError("send either a message or a quick reply")
+        return self
+
+
+class ReportIn(BaseModel):
+    unit_id: str = Field(..., pattern=UNIT_ID)
+    reason: Literal["harassment", "threat", "spam", "privacy", "other"]
+
+
+class BlockIn(BaseModel):
+    other_unit_id: str = Field(..., pattern=UNIT_ID)
+    blocked: bool
+
+
+class ContactIn(BaseModel):
+    other_unit_id: str = Field(..., pattern=UNIT_ID)
+
+
+class ConcernIn(BaseModel):
+    from_unit_id: str = Field(..., pattern=UNIT_ID)
+    intro_id: int
+    category: Literal["noise_hours", "debris", "access", "damage", "workers", "other"]
+    note: str = Field("", max_length=300)
+
+
+class ConcernActionIn(BaseModel):
+    unit_id: str = Field(..., pattern=UNIT_ID)
+    note: str = Field("", max_length=300)
+
+
+class EstateActionIn(BaseModel):
+    action: Literal["remind", "resolve"]
+    note: str = Field("", max_length=300)
+
+
+class ReviewIn(BaseModel):
+    outcome: Literal["warned", "dismissed"]
+
+
+def _require_neighbours(conn: sqlite3.Connection, unit_id: str, other_id: str) -> dict[str, Any]:
+    _unit_row(conn, unit_id)
+    n = next((x for x in _circle(conn, unit_id) if x["id"] == other_id), None)
+    if n is None:
+        raise HTTPException(403, "You can only talk with the households in your circle.")
+    return n
+
+
+def _blocked(conn: sqlite3.Connection, unit_id: str, other_id: str) -> bool:
+    return conn.execute("SELECT 1 FROM blocks WHERE unit_id = ? AND blocked_unit_id = ?", (unit_id, other_id)).fetchone() is not None
+
+
+def _contact_state(conn: sqlite3.Connection, me: str, other: str) -> str:
+    q = "SELECT 1 FROM contact_consents WHERE unit_id = ? AND other_unit_id = ?"
+    mine, theirs = conn.execute(q, (me, other)).fetchone(), conn.execute(q, (other, me)).fetchone()
+    return "mutual" if mine and theirs else "requested_by_me" if mine else "requested_by_them" if theirs else "none"
+
+
+def _system_message(conn: sqlite3.Connection, to_unit: str, thread_with: str, text: str, private: bool = False) -> None:
+    conn.execute(
+        "INSERT INTO messages (from_unit_id, to_unit_id, thread_with, kind, body, lang, author, private, created_at)"
+        " VALUES (NULL, ?, ?, 'system', ?, 'en', ?, ?, ?)",
+        (to_unit, thread_with, text, ESTATE, int(private), db.now()),
+    )
+
+
+def _message_json(row: sqlite3.Row, viewer_lang: str) -> dict[str, Any]:
+    out = {"type": "message", "id": row["id"], "kind": row["kind"], "from_unit_id": row["from_unit_id"],
+           "to_unit_id": row["to_unit_id"], "author": row["author"], "text": row["body"], "lang": row["lang"],
+           "translated": False, "original": None, "created_at": row["created_at"], "read_at": row["read_at"]}
+    if row["kind"] == "quick" and row["quick_key"] in talk.QUICK_REPLIES:
+        out["text"] = talk.quick_text(row["quick_key"], viewer_lang)
+        out["translated"] = viewer_lang != row["lang"]
+        out["original"] = row["body"] if out["translated"] else None
+    return out
+
+
+def _concern_row(conn: sqlite3.Connection, concern_id: int) -> sqlite3.Row:
+    row = conn.execute("SELECT * FROM concerns WHERE id = ?", (concern_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "concern not found")
+    return row
+
+
+def _concern_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
+    raiser, owner = _unit_row(conn, row["from_unit_id"]), _unit_row(conn, row["to_unit_id"])
+    reno = _intro(conn, row["intro_id"])["renovation"]
+    return {"type": "concern", "id": row["id"], "intro_id": row["intro_id"], "scope": reno["scope"] if reno else None,
+            "from_unit_id": row["from_unit_id"], "from_label": raiser["label"], "from_name": raiser["resident_name"],
+            "to_unit_id": row["to_unit_id"], "to_label": owner["label"], "to_name": owner["resident_name"],
+            "category": row["category"], "category_label": talk.CONCERN_CATEGORIES[row["category"]], "note": row["note"],
+            "status": row["status"], "response_note": row["response_note"], "estate_note": row["estate_note"],
+            "reminders": row["reminders"], "created_at": row["created_at"], "acknowledged_at": row["acknowledged_at"],
+            "resolved_at": row["resolved_at"], "escalated_at": row["escalated_at"], "closed_at": row["closed_at"]}
+
+
+def _thread_items(conn: sqlite3.Connection, me: str, other: str, viewer_lang: str) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for r in conn.execute(
+        "SELECT i.*, r.unit_id AS to_unit_id, r.acked_at FROM intros i JOIN intro_recipients r ON r.intro_id = i.id"
+        " WHERE (i.from_unit_id = ? AND r.unit_id = ?) OR (i.from_unit_id = ? AND r.unit_id = ?)",
+        (me, other, other, me),
+    ):
+        items.append({"type": "intro", "id": r["id"], "from_unit_id": r["from_unit_id"], "to_unit_id": r["to_unit_id"],
+                      "text": r["message"], "lang": r["lang"], "acked_at": r["acked_at"], "created_at": r["created_at"],
+                      "renovation": json.loads(r["renovation"]) if r["renovation"] else None})
+    for r in conn.execute(
+        "SELECT * FROM messages WHERE (from_unit_id = ? AND to_unit_id = ?) OR (from_unit_id = ? AND to_unit_id = ?)"
+        " OR (kind = 'system' AND ((to_unit_id = ? AND thread_with = ?) OR (to_unit_id = ? AND thread_with = ?)))",
+        (me, other, other, me, me, other, other, me),
+    ):
+        if r["to_unit_id"] == me and r["withheld"]:
+            continue  # sent while I had them blocked
+        if r["private"] and r["to_unit_id"] != me:
+            continue
+        items.append(_message_json(r, viewer_lang))
+    for r in conn.execute(
+        "SELECT * FROM concerns WHERE (from_unit_id = ? AND to_unit_id = ?) OR (from_unit_id = ? AND to_unit_id = ?)",
+        (me, other, other, me),
+    ):
+        items.append(_concern_json(conn, r))
+    items.sort(key=lambda x: (x["created_at"], x["type"] != "intro", x["id"]))
+    return items
+
+
+def _renovations_from(conn: sqlite3.Connection, owner: str, recipient: str) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        "SELECT i.id, i.renovation FROM intros i JOIN intro_recipients r ON r.intro_id = i.id"
+        " WHERE i.from_unit_id = ? AND r.unit_id = ? AND i.renovation IS NOT NULL ORDER BY i.id DESC",
+        (owner, recipient),
+    ).fetchall()
+    return [{"intro_id": r["id"], **{k: json.loads(r["renovation"])[k] for k in ("scope", "start", "end")}} for r in rows]
+
+
+def _preview(item: dict[str, Any] | None) -> str | None:
+    if item is None:
+        return None
+    if item["type"] == "concern":
+        return f"Concern: {item['category_label']}"
+    if item["type"] == "intro":
+        return "Renovation notice" if item["renovation"] else item["text"]
+    return item["text"]
+
+
+@app.get("/api/units/{unit_id}/conversations")
+def conversations(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+    me = _unit_row(conn, unit_id)
+    today = _today()
+    out = []
+    for n in _circle(conn, unit_id):
+        items = _thread_items(conn, unit_id, n["id"], me["lang"])
+        last = items[-1] if items else None
+        unread = conn.execute(
+            "SELECT COUNT(*) FROM messages WHERE to_unit_id = ? AND read_at IS NULL AND withheld = 0"
+            " AND (from_unit_id = ? OR (kind = 'system' AND thread_with = ?))",
+            (unit_id, n["id"], n["id"]),
+        ).fetchone()[0]
+        out.append({**n, "last": _preview(last), "last_at": last["created_at"] if last else None, "unread": unread,
+                    "blocked": _blocked(conn, unit_id, n["id"]), "contact": _contact_state(conn, unit_id, n["id"]),
+                    "open_concerns": sum(1 for i in items if i["type"] == "concern" and i["status"] in ("open", "acknowledged", "escalated")),
+                    "renovating": any(r["end"] >= today for r in _renovations_from(conn, n["id"], unit_id))})
+    out.sort(key=lambda c: c["last_at"] or "", reverse=True)
+    return out
+
+
+@app.get("/api/units/{unit_id}/conversations/{other_id}")
+def thread(unit_id: str, other_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    n = _require_neighbours(conn, unit_id, other_id)
+    me = _unit_row(conn, unit_id)
+    return {"neighbour": n, "my_lang": me["lang"], "items": _thread_items(conn, unit_id, other_id, me["lang"]),
+            "contact": _contact_state(conn, unit_id, other_id), "blocked": _blocked(conn, unit_id, other_id),
+            "their_renovations": _renovations_from(conn, other_id, unit_id),
+            "quick_replies": [{"key": k, "text": talk.quick_text(k, me["lang"])} for k in talk.QUICK_REPLIES],
+            "concern_categories": talk.CONCERN_CATEGORIES}
+
+
+@app.post("/api/units/{unit_id}/conversations/{other_id}/read")
+def mark_read(unit_id: str, other_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, bool]:
+    _require_neighbours(conn, unit_id, other_id)
+    conn.execute(
+        "UPDATE messages SET read_at = ? WHERE to_unit_id = ? AND read_at IS NULL"
+        " AND (from_unit_id = ? OR (kind = 'system' AND thread_with = ?))",
+        (db.now(), unit_id, other_id, other_id),
+    )
+    conn.commit()
+    return {"ok": True}
+
+
+@app.post("/api/messages", status_code=201)
+def send_message(body: MessageIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    sender = _unit_row(conn, body.from_unit_id)
+    _require_neighbours(conn, body.from_unit_id, body.to_unit_id)
+    if _blocked(conn, body.from_unit_id, body.to_unit_id):
+        raise HTTPException(409, "You blocked this neighbour. Unblock them to send a message.")
+    since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
+    sent = conn.execute("SELECT COUNT(*) FROM messages WHERE from_unit_id = ? AND to_unit_id = ? AND created_at > ?",
+                        (body.from_unit_id, body.to_unit_id, since)).fetchone()[0]
+    if sent >= MAX_MESSAGES_PER_DAY:
+        raise HTTPException(429, "Daily message limit for this neighbour reached. Try again tomorrow.")
+    if body.quick_key:
+        if body.quick_key not in talk.QUICK_REPLIES:
+            raise HTTPException(404, "unknown quick reply")
+        kind, text = "quick", talk.quick_text(body.quick_key, sender["lang"])
+    else:
+        kind, text = "text", (body.body or "").strip()
+        if talk.tone_problem(text):
+            raise HTTPException(422, {"code": "tone", "message": TONE_MESSAGE})
+    # If the recipient has blocked the sender, the message is kept (for the record) but never shown to them.
+    withheld = int(_blocked(conn, body.to_unit_id, body.from_unit_id))
+    cur = conn.execute(
+        "INSERT INTO messages (from_unit_id, to_unit_id, kind, body, quick_key, lang, withheld, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (body.from_unit_id, body.to_unit_id, kind, text, body.quick_key, sender["lang"], withheld, db.now()),
+    )
+    conn.commit()
+    return _message_json(conn.execute("SELECT * FROM messages WHERE id = ?", (cur.lastrowid,)).fetchone(), sender["lang"])
+
+
+@app.post("/api/messages/{message_id}/report", status_code=201)
+def report_message(message_id: int, body: ReportIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    row = conn.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "message not found")
+    if row["kind"] == "system" or row["to_unit_id"] != body.unit_id:
+        raise HTTPException(403, "You can only report messages sent to you.")
+    existing = conn.execute("SELECT id, status FROM reports WHERE message_id = ? AND reporter_unit_id = ?",
+                            (message_id, body.unit_id)).fetchone()
+    if existing:
+        return {"id": existing["id"], "status": existing["status"]}
+    cur = conn.execute("INSERT INTO reports (message_id, reporter_unit_id, reason, created_at) VALUES (?, ?, ?, ?)",
+                       (message_id, body.unit_id, body.reason, db.now()))
+    conn.commit()
+    return {"id": cur.lastrowid, "status": "open"}
+
+
+@app.post("/api/units/{unit_id}/blocks")
+def set_block(unit_id: str, body: BlockIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, bool]:
+    _require_neighbours(conn, unit_id, body.other_unit_id)
+    if body.blocked:
+        conn.execute("INSERT OR IGNORE INTO blocks (unit_id, blocked_unit_id, created_at) VALUES (?, ?, ?)",
+                     (unit_id, body.other_unit_id, db.now()))
+    else:
+        conn.execute("DELETE FROM blocks WHERE unit_id = ? AND blocked_unit_id = ?", (unit_id, body.other_unit_id))
+    conn.commit()
+    return {"blocked": body.blocked}
+
+
+@app.post("/api/units/{unit_id}/contact")
+def share_contact(unit_id: str, body: ContactIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
+    """Phone numbers are exchanged only when both households have agreed."""
+    _require_neighbours(conn, unit_id, body.other_unit_id)
+    if _blocked(conn, unit_id, body.other_unit_id) or _blocked(conn, body.other_unit_id, unit_id):
+        raise HTTPException(409, "Contact sharing isn't available with this neighbour.")
+    before = _contact_state(conn, unit_id, body.other_unit_id)
+    conn.execute("INSERT OR IGNORE INTO contact_consents (unit_id, other_unit_id, created_at) VALUES (?, ?, ?)",
+                 (unit_id, body.other_unit_id, db.now()))
+    state = _contact_state(conn, unit_id, body.other_unit_id)
+    if state == "mutual" and before != "mutual":
+        _system_message(conn, unit_id, body.other_unit_id, "Both of you agreed: phone numbers are now shared.")
+    conn.commit()
+    return {"contact": state}
+
+
+@app.post("/api/concerns", status_code=201)
+def raise_concern(body: ConcernIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Step 1 of the ladder: tell the renovating neighbour first, privately and on record."""
+    intro = conn.execute("SELECT * FROM intros WHERE id = ?", (body.intro_id,)).fetchone()
+    if intro is None or intro["renovation"] is None:
+        raise HTTPException(404, "renovation not found")
+    if conn.execute("SELECT 1 FROM intro_recipients WHERE intro_id = ? AND unit_id = ?",
+                    (body.intro_id, body.from_unit_id)).fetchone() is None:
+        raise HTTPException(403, "Only neighbours notified of this renovation can raise a concern about it.")
+    open_count = conn.execute(
+        "SELECT COUNT(*) FROM concerns WHERE intro_id = ? AND from_unit_id = ? AND status IN ('open', 'acknowledged', 'escalated')",
+        (body.intro_id, body.from_unit_id),
+    ).fetchone()[0]
+    if open_count >= MAX_OPEN_CONCERNS:
+        raise HTTPException(429, f"You already have {MAX_OPEN_CONCERNS} open concerns about this renovation.")
+    if talk.tone_problem(body.note):
+        raise HTTPException(422, {"code": "tone", "message": TONE_MESSAGE})
+    cur = conn.execute(
+        "INSERT INTO concerns (intro_id, from_unit_id, to_unit_id, category, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (body.intro_id, body.from_unit_id, intro["from_unit_id"], body.category, body.note, db.now()),
+    )
+    payload = {"concern_id": cur.lastrowid, "category": body.category, "raised_by": body.from_unit_id, "about": intro["from_unit_id"]}
+    db.append_event(conn, body.from_unit_id, "concern_raised", payload)
+    db.append_event(conn, intro["from_unit_id"], "concern_raised", payload)
+    conn.commit()
+    return _concern_json(conn, _concern_row(conn, cur.lastrowid))
+
+
+def _concern_step(conn: sqlite3.Connection, row: sqlite3.Row, status: str, stamp: str, event: str,
+                  note_field: str | None, note: str) -> dict[str, Any]:
+    sets = f"status = ?, {stamp} = ?" + (f", {note_field} = ?" if note_field else "")
+    args = [status, db.now()] + ([note] if note_field else [])
+    conn.execute(f"UPDATE concerns SET {sets} WHERE id = ?", (*args, row["id"]))
+    payload = {"concern_id": row["id"], "category": row["category"], "note": note}
+    db.append_event(conn, row["from_unit_id"], event, payload)
+    db.append_event(conn, row["to_unit_id"], event, payload)
+    conn.commit()
+    return _concern_json(conn, _concern_row(conn, row["id"]))
+
+
+@app.post("/api/concerns/{concern_id}/acknowledge")
+def acknowledge_concern(concern_id: int, body: ConcernActionIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    row = _concern_row(conn, concern_id)
+    if body.unit_id != row["to_unit_id"]:
+        raise HTTPException(403, "Only the renovating household can respond to this concern.")
+    if row["status"] != "open":
+        raise HTTPException(409, "This concern has already been answered.")
+    return _concern_step(conn, row, "acknowledged", "acknowledged_at", "concern_acknowledged", "response_note", body.note)
+
+
+@app.post("/api/concerns/{concern_id}/resolve")
+def resolve_concern(concern_id: int, body: ConcernActionIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    row = _concern_row(conn, concern_id)
+    if body.unit_id != row["to_unit_id"]:
+        raise HTTPException(403, "Only the renovating household can mark this concern as sorted.")
+    if row["status"] not in ("open", "acknowledged"):
+        raise HTTPException(409, "This concern can't be marked as sorted now.")
+    return _concern_step(conn, row, "resolved", "resolved_at", "concern_resolved", "response_note", body.note or row["response_note"] or "")
+
+
+@app.post("/api/concerns/{concern_id}/escalate")
+def escalate_concern(concern_id: int, body: ConcernActionIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Step 3: the neighbour who raised it can hand it to SDP's estate team."""
+    row = _concern_row(conn, concern_id)
+    if body.unit_id != row["from_unit_id"]:
+        raise HTTPException(403, "Only the household that raised the concern can escalate it.")
+    if row["status"] not in ("open", "acknowledged", "resolved"):
+        raise HTTPException(409, "This concern is already with the estate team or closed.")
+    waited = datetime.now(timezone.utc) - datetime.fromisoformat(row["created_at"])
+    if row["status"] == "open" and waited < ESCALATE_AFTER and not demo_mode():
+        raise HTTPException(409, "Give your neighbour 24 hours to respond before escalating.")
+    return _concern_step(conn, row, "escalated", "escalated_at", "concern_escalated", "estate_note", body.note)
+
+
+@app.get("/api/estate/concerns")
+def estate_concerns(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+    """SDP estate team's view: escalated first, then everything still open between neighbours."""
+    rows = conn.execute(
+        "SELECT c.* FROM concerns c JOIN units u ON u.id = c.from_unit_id WHERE u.phase_id = ?"
+        " ORDER BY CASE c.status WHEN 'escalated' THEN 0 WHEN 'open' THEN 1 WHEN 'acknowledged' THEN 2 ELSE 3 END, c.id DESC",
+        (phase_id,),
+    ).fetchall()
+    per_reno: dict[int, int] = {}
+    for r in rows:
+        per_reno[r["intro_id"]] = per_reno.get(r["intro_id"], 0) + 1
+    return [{**_concern_json(conn, r), "concerns_on_renovation": per_reno[r["intro_id"]]} for r in rows]
+
+
+@app.post("/api/concerns/{concern_id}/estate")
+def estate_action(concern_id: int, body: EstateActionIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    row = _concern_row(conn, concern_id)
+    if row["status"] != "escalated":
+        raise HTTPException(409, "Only escalated concerns are handled by the estate team.")
+    label = talk.CONCERN_CATEGORIES[row["category"]].lower()
+    if body.action == "remind":
+        conn.execute("UPDATE concerns SET reminders = reminders + 1, estate_note = ? WHERE id = ?", (body.note, concern_id))
+        _system_message(conn, row["to_unit_id"], row["from_unit_id"],
+                        f"Reminder from the estate team about {label}: please keep to the house rules and the hours in your "
+                        f"renovation notice, and reply here once it's sorted." + (f" Note: {body.note}" if body.note else ""))
+        payload = {"concern_id": concern_id, "action": "reminder", "note": body.note}
+        db.append_event(conn, row["from_unit_id"], "estate_reminder", payload)
+        db.append_event(conn, row["to_unit_id"], "estate_reminder", payload)
+        conn.commit()
+        return _concern_json(conn, _concern_row(conn, concern_id))
+    _system_message(conn, row["to_unit_id"], row["from_unit_id"],
+                    f"The estate team closed the concern about {label}." + (f" {body.note}" if body.note else ""))
+    return _concern_step(conn, row, "closed_by_estate", "closed_at", "concern_closed_by_estate", "estate_note", body.note)
+
+
+@app.get("/api/moderation/reports")
+def moderation_reports(conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        "SELECT r.*, m.body, m.from_unit_id, m.to_unit_id, m.created_at AS sent_at FROM reports r"
+        " JOIN messages m ON m.id = r.message_id ORDER BY CASE r.status WHEN 'open' THEN 0 ELSE 1 END, r.id DESC"
+    ).fetchall()
+    out = []
+    for r in rows:
+        sender, reporter = _unit_row(conn, r["from_unit_id"]), _unit_row(conn, r["reporter_unit_id"])
+        out.append({"id": r["id"], "reason": r["reason"], "status": r["status"], "created_at": r["created_at"],
+                    "message": {"id": r["message_id"], "text": r["body"], "sent_at": r["sent_at"],
+                                "from_label": sender["label"], "from_name": sender["resident_name"]},
+                    "reporter_label": reporter["label"]})
+    return out
+
+
+@app.post("/api/reports/{report_id}/review")
+def review_report(report_id: int, body: ReviewIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
+    row = conn.execute("SELECT r.*, m.from_unit_id, m.to_unit_id FROM reports r JOIN messages m ON m.id = r.message_id"
+                       " WHERE r.id = ?", (report_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "report not found")
+    if row["status"] != "open":
+        raise HTTPException(409, "This report has already been reviewed.")
+    conn.execute("UPDATE reports SET status = ?, reviewed_at = ? WHERE id = ?", (body.outcome, db.now(), report_id))
+    if body.outcome == "warned":
+        # Only the sender sees the warning; the reporter's identity is never revealed.
+        _system_message(conn, row["from_unit_id"], row["to_unit_id"],
+                        "A message you sent was reviewed by the estate team. Please keep conversations respectful; "
+                        "repeated reports can pause your messaging.", private=True)
+    conn.commit()
+    return {"status": body.outcome}
 
 
 # ---------- layer 3: prove ----------
@@ -686,6 +1122,42 @@ def _open_warranty(conn: sqlite3.Connection, incident: sqlite3.Row) -> int:
     return cur.lastrowid
 
 
+HDA_DLP_MONTHS = 24  # Housing Development Act, Schedules G/H: defect liability period after vacant possession
+HDA_REPAIR_DAYS = 30  # ...and the developer repairs within 30 days of the owner's written notice
+
+
+def _add_months(d: date, months: int) -> date:
+    y, m = divmod(d.month - 1 + months, 12)
+    year, month = d.year + y, m + 1
+    for day in (d.day, 30, 29, 28):
+        try:
+            return date(year, month, day)
+        except ValueError:
+            continue
+    raise ValueError("bad date")
+
+
+def _months_between(a: date, b: date) -> int:
+    return max(0, (b.year - a.year) * 12 + b.month - a.month - (1 if b.day < a.day else 0))
+
+
+def _local_date(iso: str) -> date:
+    return datetime.fromisoformat(iso).astimezone(MALAYSIA).date()
+
+
+def _warranty_clock(unit: sqlite3.Row, row: sqlite3.Row) -> dict[str, Any]:
+    today = datetime.now(MALAYSIA).date()
+    handover = date.fromisoformat(unit["handover_date"])
+    dlp_end = _add_months(handover, HDA_DLP_MONTHS)
+    notice = _local_date(row["opened_at"])
+    due = notice + timedelta(days=HDA_REPAIR_DAYS)
+    closed = _local_date(row["closed_at"]) if row["closed_at"] else None
+    return {"handover_date": handover.isoformat(), "dlp_ends": dlp_end.isoformat(), "within_dlp": notice <= dlp_end,
+            "dlp_months_left": _months_between(today, dlp_end), "notice_date": notice.isoformat(), "repair_due": due.isoformat(),
+            "repair_days": HDA_REPAIR_DAYS, "days_elapsed": ((closed or today) - notice).days, "days_left": (due - today).days,
+            "overdue": closed is None and today > due, "closed_on_time": closed is not None and closed <= due}
+
+
 def _ticket_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     unit = _unit_row(conn, row["unit_id"])
     check = json.loads(row["repair_check"]) if row["repair_check"] else None
@@ -700,7 +1172,7 @@ def _ticket_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
             "defect_photo": photo(row["defect_photo_id"]), "baseline_photo": photo(row["baseline_photo_id"]),
             "repair_photo": photo(row["repair_photo_id"]), "repair_check": check, "images": images,
             "owner_note": row["owner_note"], "reopen_count": row["reopen_count"], "opened_at": row["opened_at"],
-            "repaired_at": row["repaired_at"], "closed_at": row["closed_at"]}
+            "repaired_at": row["repaired_at"], "closed_at": row["closed_at"], "clock": _warranty_clock(unit, row)}
 
 
 def _ticket_row(conn: sqlite3.Connection, ticket_id: int) -> sqlite3.Row:
@@ -881,6 +1353,16 @@ def dashboard(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_con
         "warranty_closed": count("SELECT COUNT(*) FROM warranty_tickets WHERE status = 'closed' AND unit_id IN ({marks})"),
         "repairs_rejected": count("SELECT COALESCE(SUM(reopen_count), 0) FROM warranty_tickets WHERE unit_id IN ({marks})"),
         "home_histories_verified": sum(ledger.verify_chain(db.unit_events(conn, u))[0] for u in unit_ids),
+        "messages_sent": count("SELECT COUNT(*) FROM messages WHERE kind != 'system' AND from_unit_id IN ({marks})"),
+        "contacts_shared": count("SELECT COUNT(*) FROM contact_consents a JOIN contact_consents b"
+                                 " ON a.unit_id = b.other_unit_id AND a.other_unit_id = b.unit_id WHERE a.unit_id IN ({marks})") // 2,
+        "concerns_raised": count("SELECT COUNT(*) FROM concerns WHERE from_unit_id IN ({marks})"),
+        "concerns_settled_by_neighbours": count("SELECT COUNT(*) FROM concerns WHERE status = 'resolved' AND from_unit_id IN ({marks})"),
+        "concerns_escalated": count("SELECT COUNT(*) FROM concerns WHERE escalated_at IS NOT NULL AND from_unit_id IN ({marks})"),
+        "concerns_with_estate": count("SELECT COUNT(*) FROM concerns WHERE status = 'escalated' AND from_unit_id IN ({marks})"),
+        "reports_open": conn.execute("SELECT COUNT(*) FROM reports WHERE status = 'open'").fetchone()[0],
+        "warranty_overdue": sum(_ticket_json(conn, r)["clock"]["overdue"] for r in conn.execute(
+            f"SELECT * FROM warranty_tickets WHERE unit_id IN ({marks})", unit_ids).fetchall()),
     }
 
 

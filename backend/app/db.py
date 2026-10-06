@@ -23,7 +23,9 @@ CREATE TABLE IF NOT EXISTS units (
     facing_row TEXT,
     block TEXT,
     floor INTEGER,
-    pos INTEGER
+    pos INTEGER,
+    lang TEXT NOT NULL DEFAULT 'en',
+    handover_date TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS intros (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,6 +107,60 @@ CREATE TABLE IF NOT EXISTS warranty_tickets (
     repaired_at TEXT,
     closed_at TEXT
 );
+CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_unit_id TEXT REFERENCES units(id),
+    to_unit_id TEXT NOT NULL REFERENCES units(id),
+    thread_with TEXT REFERENCES units(id),
+    kind TEXT NOT NULL CHECK (kind IN ('text', 'quick', 'system')),
+    body TEXT NOT NULL,
+    quick_key TEXT,
+    lang TEXT NOT NULL,
+    author TEXT,
+    withheld INTEGER NOT NULL DEFAULT 0,
+    private INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    read_at TEXT
+);
+CREATE TABLE IF NOT EXISTS concerns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    intro_id INTEGER NOT NULL REFERENCES intros(id),
+    from_unit_id TEXT NOT NULL REFERENCES units(id),
+    to_unit_id TEXT NOT NULL REFERENCES units(id),
+    category TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'open'
+        CHECK (status IN ('open', 'acknowledged', 'resolved', 'escalated', 'closed_by_estate')),
+    response_note TEXT,
+    estate_note TEXT,
+    reminders INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    acknowledged_at TEXT,
+    resolved_at TEXT,
+    escalated_at TEXT,
+    closed_at TEXT
+);
+CREATE TABLE IF NOT EXISTS blocks (
+    unit_id TEXT NOT NULL REFERENCES units(id),
+    blocked_unit_id TEXT NOT NULL REFERENCES units(id),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (unit_id, blocked_unit_id)
+);
+CREATE TABLE IF NOT EXISTS reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL REFERENCES messages(id),
+    reporter_unit_id TEXT NOT NULL REFERENCES units(id),
+    reason TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'warned', 'dismissed')),
+    created_at TEXT NOT NULL,
+    reviewed_at TEXT
+);
+CREATE TABLE IF NOT EXISTS contact_consents (
+    unit_id TEXT NOT NULL REFERENCES units(id),
+    other_unit_id TEXT NOT NULL REFERENCES units(id),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (unit_id, other_unit_id)
+);
 CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     unit_id TEXT NOT NULL REFERENCES units(id),
@@ -129,8 +185,9 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 2
-TABLES = ("warranty_tickets", "gate_logs", "passes", "incidents", "photos",
+SCHEMA_VERSION = 3
+TABLES = ("contact_consents", "reports", "blocks", "concerns", "messages",
+          "warranty_tickets", "gate_logs", "passes", "incidents", "photos",
           "intro_recipients", "intros", "events", "units", "phases")
 
 
@@ -154,13 +211,14 @@ def _seed(conn: sqlite3.Connection) -> None:
     conn.execute("INSERT INTO phases (id, name, note) VALUES (?, ?, ?)", (PHASE["id"], PHASE["name"], PHASE["note"]))
     for u in demo_units():
         conn.execute(
-            "INSERT INTO units (id, phase_id, kind, label, resident_name, terrace_row, facing_row, block, floor, pos)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO units (id, phase_id, kind, label, resident_name, terrace_row, facing_row, block, floor, pos,"
+            " lang, handover_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (u["id"], u["phase_id"], u["kind"], u["label"], u["resident_name"],
-             u.get("row"), u.get("facing_row"), u.get("block"), u.get("floor"), u["pos"]),
+             u.get("row"), u.get("facing_row"), u.get("block"), u.get("floor"), u["pos"], u["lang"], PHASE["handover_date"]),
         )
         # Every home history starts with SDP's handover record.
-        append_event(conn, u["id"], "handover", {"note": "Vacant possession; SDP handover inspection recorded"})
+        append_event(conn, u["id"], "handover", {"note": "Vacant possession; SDP handover inspection recorded",
+                                                 "vacant_possession": PHASE["handover_date"]})
 
 
 def append_event(conn: sqlite3.Connection, unit_id: str, event_type: str, payload: dict[str, Any]) -> dict[str, Any]:

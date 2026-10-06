@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Ban, Camera, CircleCheck, FileWarning, Gavel, Hammer, KeyRound, ShieldAlert, ShieldCheck, StickyNote, ThumbsDown, Ticket, Wrench } from 'lucide-react'
+import { Ban, Camera, CircleCheck, FileWarning, Fingerprint, Gavel, Hammer, KeyRound, Link2, ShieldAlert, ShieldCheck, StickyNote, ThumbsDown, Ticket, Wrench } from 'lucide-react'
 import { api, type HistoryEvent, type UnitInfo } from '../api'
-import { CountUp, formatDate, ScreenTitle, shortRange, Skeleton } from '../ui'
+import { Card, CardHead, CountUp, formatDate, Metric, ScreenTitle, shortRange, Skeleton } from '../ui'
 
 const DECISION_TEXT: Record<string, string> = {
   renovation: 'Agreed: caused by the renovation',
@@ -52,20 +52,21 @@ export default function HistoryView({ me, version }: { me: UnitInfo; version: nu
     }
   }, [me.id, version])
 
+  const latest = data?.events[data.events.length - 1]
+
   return (
     <section className="screen">
-      <ScreenTitle eyebrow="Tamper-evident record" title="Home log" subtitle={`Every record about ${me.label} is chained to the one before it with SHA-256.`} />
+      <ScreenTitle eyebrow="Tamper-evident record" title="Home log" subtitle={`Every record about ${me.label} is chained to the one before it with SHA-256.`}
+        aside={data && (
+          <div className="metrics">
+            <Metric value={<CountUp value={data.events.length} />} label="Records" />
+            <Metric value={data.chain_ok ? 'OK' : 'FAIL'} label="Integrity" tone={data.chain_ok ? 'brand' : 'amber'} />
+          </div>
+        )} />
       {!data ? (
         <Skeleton lines={5} />
       ) : (
-        <>
-          <div className={`chain-banner ${data.chain_ok ? 'ok' : 'bad'}`}>
-            {data.chain_ok ? <ShieldCheck size={30} /> : <ShieldAlert size={30} />}
-            <div>
-              <strong>{data.chain_ok ? 'CHAIN VERIFIED' : 'CHAIN BROKEN'}</strong>
-              <p>{data.chain_ok ? <><CountUp value={data.events.length} /> records intact. Editing or deleting any one breaks every link after it.</> : 'A past record was changed or removed.'}</p>
-            </div>
-          </div>
+        <div className="cols">
           <ol className="blocks">
             {[...data.events].reverse().map((e, i, arr) => {
               const d = describe(e)
@@ -92,7 +93,43 @@ export default function HistoryView({ me, version }: { me: UnitInfo; version: nu
               )
             })}
           </ol>
-        </>
+
+          <div className="col sticky">
+            <div className={`chain-banner ${data.chain_ok ? 'ok' : 'bad'}`}>
+              {data.chain_ok ? <ShieldCheck size={30} /> : <ShieldAlert size={30} />}
+              <div>
+                <strong>{data.chain_ok ? 'CHAIN VERIFIED' : 'CHAIN BROKEN'}</strong>
+                <p>{data.chain_ok ? <><CountUp value={data.events.length} /> records intact. Editing or deleting any one breaks every link after it.</> : 'A past record was changed or removed.'}</p>
+              </div>
+            </div>
+
+            <Card>
+              <CardHead icon={<Link2 size={16} />} title="The chain" sub="Oldest on the left · each block carries the previous fingerprint" />
+              <div className="chain-viz" aria-hidden>
+                {data.events.map((e, i) => (
+                  <span key={e.id} className="chain-node" style={{ ['--i' as string]: i }}>
+                    <i>{e.hash.slice(0, 2)}</i>
+                  </span>
+                ))}
+              </div>
+              {latest && (
+                <div className="hash-box">
+                  <span><Fingerprint size={12} /> Latest fingerprint</span>
+                  <code>{latest.hash}</code>
+                </div>
+              )}
+            </Card>
+
+            <Card>
+              <CardHead icon={<ShieldCheck size={16} />} title="Why it can be trusted" />
+              <ol className="how">
+                <li><b>Fingerprint.</b> Each record's SHA-256 includes the fingerprint of the record before it.</li>
+                <li><b>Tamper-evident.</b> Change one old record and every fingerprint after it stops matching.</li>
+                <li><b>Shareable.</b> The owner, SDP or a future buyer can re-check the whole history in seconds.</li>
+              </ol>
+            </Card>
+          </div>
+        </div>
       )}
     </section>
   )

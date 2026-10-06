@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { BellRing, Camera, Fingerprint, Focus, Hammer, ImagePlus, MapPinOff, ScanSearch, ShieldCheck, Sparkles, Sun, Wrench } from 'lucide-react'
+import { BellRing, Camera, FileSearch, Fingerprint, Focus, Hammer, ImagePlus, MapPinOff, ScanSearch, ShieldCheck, Sparkles, Sun, Wrench } from 'lucide-react'
 import { api, MAX_PHOTO_BYTES, type Evidence, type Incident, type Photo, type RenovationTask, type UnitInfo, type WarrantyTicket } from '../api'
-import { Badge, Card, Empty, formatDate, ScreenTitle, shortRange, Skeleton, useToast } from '../ui'
+import { Badge, Card, CardHead, Empty, formatDate, Metric, ScreenTitle, shortRange, Skeleton, useToast } from '../ui'
 import CaseView, { SUGGESTION_BADGE } from './CaseView'
 import RepairView, { TICKET_BADGE } from './RepairView'
+import WarrantyClock from '../components/WarrantyClock'
 
 interface Props {
   me: UnitInfo
@@ -40,11 +41,20 @@ export default function EvidenceView({ me, version, onChange }: Props) {
 
   const tasks = data ? [...data.renovations].sort((a, b) => Number(b.needs_photo) - Number(a.needs_photo)) : []
   const waiting = tickets.filter((t) => t.status === 'repair_submitted')
+  const others = tickets.filter((t) => t.status !== 'repair_submitted')
+  const sealed = data?.renovations.filter((t) => t.baseline).length ?? 0
 
   return (
     <section className="screen">
       <ScreenTitle eyebrow="Layers 3–4 · Prove & close" title="Evidence"
-        subtitle="Pre-work photos are fingerprinted into your home log the moment they're saved. Location and camera data are stripped." />
+        subtitle="Pre-work photos are fingerprinted into your home log the moment they're saved. Location and camera data are stripped."
+        aside={data && (
+          <div className="metrics">
+            <Metric value={sealed} label="Photos sealed" tone="brand" />
+            <Metric value={data.incidents.length} label="Cases" />
+            <Metric value={tickets.filter((t) => t.status !== 'closed').length} label="Open repairs" tone={waiting.length ? 'amber' : undefined} />
+          </div>
+        )} />
 
       {!data && <Card><Skeleton lines={4} /></Card>}
 
@@ -69,11 +79,24 @@ export default function EvidenceView({ me, version, onChange }: Props) {
         </Card>
       )}
 
-      {tasks.length > 0 && <div className="section-label">Renovation next door</div>}
-      {tasks.map((t) => <TaskCard key={t.intro_id} me={me} task={t} onChange={onChange} onCase={setOpenCase} />)}
+      {data && (tasks.length > 0 || data.incidents.length > 0 || others.length > 0) && (
+      <div className={tasks.length > 0 ? 'cols' : 'stack'}>
+      {tasks.length > 0 && (
+        <div className="col">
+          <div className="section-label">Renovation next door</div>
+          {tasks.map((t) => <TaskCard key={t.intro_id} me={me} task={t} onChange={onChange} onCase={setOpenCase} />)}
+        </div>
+      )}
 
-      {data && data.incidents.length > 0 && <div className="section-label">Cases</div>}
-      {data?.incidents.map((c) => (
+      <div className="col sticky">
+      <div className="section-label">Your records</div>
+      <Card>
+      <CardHead icon={<FileSearch size={16} />} title="Cases & repairs" sub="Every comparison and warranty ticket about your home" />
+      {data.incidents.length === 0 && others.length === 0 && (
+        <div className="small muted">Nothing yet. If a crack or stain appears, photograph the same spot and it shows up here.</div>
+      )}
+      {data.incidents.length > 0 && <div className="section-label">Cases</div>}
+      {data.incidents.map((c) => (
         <button key={c.id} className="case" onClick={() => setOpenCase(c)}>
           <img src={c.images?.overlay ?? c.followup.thumb_url} alt="" loading="lazy" decoding="async" />
           <div className="grow">
@@ -85,18 +108,23 @@ export default function EvidenceView({ me, version, onChange }: Props) {
         </button>
       ))}
 
-      {tickets.filter((t) => t.status !== 'repair_submitted').length > 0 && <div className="section-label">Warranty repairs</div>}
-      {tickets.filter((t) => t.status !== 'repair_submitted').map((t) => (
+      {others.length > 0 && <div className="section-label">Warranty repairs</div>}
+      {others.map((t) => (
         <button key={t.id} className="case" onClick={() => setOpenTicket(t)}>
           <img src={(t.repair_photo ?? t.defect_photo).thumb_url} alt="" loading="lazy" decoding="async" />
           <div className="grow">
             <div className="mono muted"><Wrench size={11} style={{ verticalAlign: -1 }} /> WARRANTY #{String(t.id).padStart(3, '0')}</div>
             <div className="card-title" style={{ fontSize: 14 }}>{t.subject}</div>
             <div className="muted small">Opened {formatDate(t.opened_at)}{t.reopen_count ? ` · rejected ${t.reopen_count}×` : ''}</div>
+            <WarrantyClock clock={t.clock} closed={t.status === 'closed'} compact />
           </div>
           {TICKET_BADGE[t.status]}
         </button>
       ))}
+      </Card>
+      </div>
+      </div>
+      )}
     </section>
   )
 }
@@ -164,14 +192,9 @@ function TaskCard({ me, task, onChange, onCase }: {
   const r = task.renovation
   return (
     <Card className={task.baseline ? '' : 'alert'}>
-      <div className="card-row">
-        <div className="grow">
-          <div className="card-title"><Hammer size={15} style={{ verticalAlign: -2, color: 'var(--amber)' }} /> {task.from_name} · {task.from_label}</div>
-          <div className="small dim">{r.scope} · {shortRange(r.start, r.end)}</div>
-        </div>
-        {task.needs_photo ? <Badge tone={task.baseline ? 'brand' : 'amber'}>{task.baseline ? 'Sealed' : 'Photo needed'}</Badge> : <Badge>Optional</Badge>}
-      </div>
-      <div style={{ fontWeight: 700, fontSize: 14 }}>{subject}</div>
+      <CardHead icon={<Hammer size={16} />} tone="amber" title={`${task.from_name} · ${task.from_label}`} sub={`${r.scope} · ${shortRange(r.start, r.end)}`}
+        right={task.needs_photo ? <Badge tone={task.baseline ? 'brand' : 'amber'}>{task.baseline ? 'Sealed' : 'Photo needed'}</Badge> : <Badge>Optional</Badge>} />
+      <div className="subject"><Camera size={14} /> {subject}</div>
 
       {busy && <div className="busy"><span className="spinner" /> {busy}…</div>}
 
@@ -195,7 +218,7 @@ function TaskCard({ me, task, onChange, onCase }: {
       {task.baseline && !busy && (
         <>
           <div className="photo-row">
-            <img className="thumb" src={task.baseline.thumb_url} alt="Pre-work photo" loading="lazy" decoding="async" />
+            <img className="thumb thumb-lg" src={task.baseline.thumb_url} alt="Pre-work photo" loading="lazy" decoding="async" />
             <div className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div className="checks">
                 <Badge tone={task.baseline.quality.checks.sharp ? 'brand' : 'red'}>Sharp</Badge>

@@ -42,6 +42,8 @@ export default function CaseView({ incident, onBack, onDecided }: {
         <p>Reported by {c.reporter_name} ({c.reporter_label}){c.renovation ? ` · renovation at ${c.renovation.from_label}` : ''}</p>
       </div>
 
+      <div className="cols">
+      <div className="col">
       {c.images ? (
         <Compare before={c.images.before} after={c.images.after} overlay={c.images.overlay} regions={regions} scan={c.status === 'open'}
           leftLabel={`Pre-work · ${formatDate(c.baseline.created_at)}`} rightLabel={`Now · ${formatDate(c.followup.created_at)}`} />
@@ -59,6 +61,9 @@ export default function CaseView({ incident, onBack, onDecided }: {
           <div className="stat"><b className="accent">OK</b><span>Aligned</span></div>
         </div>
       )}
+      </div>
+
+      <div className="col sticky">
 
       <div className={`hint hint-${c.hint.suggestion}`}>
         <div className="eyebrow" style={{ color: 'var(--violet)' }}><Sparkles size={11} /> Rule-based suggestion</div>
@@ -81,6 +86,8 @@ export default function CaseView({ incident, onBack, onDecided }: {
       ) : (
         c.hint.suggestion !== 'retake' && <DecisionForm incident={c} onDecided={onDecided} />
       )}
+      </div>
+      </div>
     </section>
   )
 }

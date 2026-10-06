@@ -11,7 +11,12 @@ export interface UnitInfo {
   block: string | null
   floor: number | null
   pos: number
+  lang: Lang
+  handover_date: string
+  renovating?: boolean
 }
+
+export type Lang = 'en' | 'ms' | 'zh'
 
 export interface Neighbour extends UnitInfo {
   relation: Relation
@@ -27,6 +32,8 @@ export interface Renovation {
   weekdays_only?: boolean
   contractor?: string | null
   contractor_cidb_registered?: boolean | null
+  council_permit?: 'approved' | 'applied' | 'not_needed' | null
+  permit_ref?: string | null
 }
 
 export interface GateEntry {
@@ -119,6 +126,110 @@ export interface WarrantyTicket {
   opened_at: string
   repaired_at: string | null
   closed_at: string | null
+  clock: WarrantyClock
+}
+
+export interface WarrantyClock {
+  handover_date: string
+  dlp_ends: string
+  within_dlp: boolean
+  dlp_months_left: number
+  notice_date: string
+  repair_due: string
+  repair_days: number
+  days_elapsed: number
+  days_left: number
+  overdue: boolean
+  closed_on_time: boolean
+}
+
+export type ConcernStatus = 'open' | 'acknowledged' | 'resolved' | 'escalated' | 'closed_by_estate'
+export type ConcernCategory = 'noise_hours' | 'debris' | 'access' | 'damage' | 'workers' | 'other'
+
+export interface Concern {
+  type: 'concern'
+  id: number
+  intro_id: number
+  scope: string | null
+  from_unit_id: string
+  from_label: string
+  from_name: string
+  to_unit_id: string
+  to_label: string
+  to_name: string
+  category: ConcernCategory
+  category_label: string
+  note: string
+  status: ConcernStatus
+  response_note: string | null
+  estate_note: string | null
+  reminders: number
+  created_at: string
+  acknowledged_at: string | null
+  resolved_at: string | null
+  escalated_at: string | null
+  closed_at: string | null
+  concerns_on_renovation?: number
+}
+
+export interface ChatMessage {
+  type: 'message'
+  id: number
+  kind: 'text' | 'quick' | 'system'
+  from_unit_id: string | null
+  to_unit_id: string
+  author: string | null
+  text: string
+  lang: Lang
+  translated: boolean
+  original: string | null
+  created_at: string
+  read_at: string | null
+}
+
+export interface ChatIntro {
+  type: 'intro'
+  id: number
+  from_unit_id: string
+  to_unit_id: string
+  text: string
+  lang: Lang
+  acked_at: string | null
+  created_at: string
+  renovation: Renovation | null
+}
+
+export type ThreadItem = ChatMessage | ChatIntro | Concern
+export type ContactState = 'none' | 'requested_by_me' | 'requested_by_them' | 'mutual'
+
+export interface Conversation extends Neighbour {
+  last: string | null
+  last_at: string | null
+  unread: number
+  blocked: boolean
+  contact: ContactState
+  open_concerns: number
+  renovating: boolean
+}
+
+export interface Thread {
+  neighbour: Neighbour
+  my_lang: Lang
+  items: ThreadItem[]
+  contact: ContactState
+  blocked: boolean
+  their_renovations: { intro_id: number; scope: string; start: string; end: string }[]
+  quick_replies: { key: string; text: string }[]
+  concern_categories: Record<ConcernCategory, string>
+}
+
+export interface ModerationReport {
+  id: number
+  reason: string
+  status: 'open' | 'warned' | 'dismissed'
+  created_at: string
+  message: { id: number; text: string; sent_at: string; from_label: string; from_name: string }
+  reporter_label: string
 }
 
 export interface InboxItem {
@@ -232,10 +343,18 @@ export interface Dashboard {
   warranty_closed: number
   repairs_rejected: number
   home_histories_verified: number
+  messages_sent: number
+  contacts_shared: number
+  concerns_raised: number
+  concerns_settled_by_neighbours: number
+  concerns_escalated: number
+  concerns_with_estate: number
+  reports_open: number
+  warranty_overdue: number
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public code?: string) {
     super(message)
   }
 }
@@ -246,8 +365,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     let message = `${res.status}`
     try {
       const body = await res.json()
-      message = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
-    } catch {
+      if (typeof body.detail === 'string') message = body.detail
+      else if (body.detail?.code) throw new ApiError(res.status, body.detail.message, body.detail.code)
+      else message = Array.isArray(body.detail) ? (body.detail[0]?.msg ?? message) : JSON.stringify(body.detail)
+    } catch (e) {
+      if (e instanceof ApiError) throw e
       /* non-JSON error body */
     }
     throw new ApiError(res.status, message)
@@ -311,5 +433,26 @@ export const api = {
   history: (unitId: string) =>
     request<{ events: HistoryEvent[]; chain_ok: boolean; first_bad_index: number | null }>(`/api/units/${unitId}/history`),
   dashboard: () => request<Dashboard>('/api/dashboard?phase_id=demo'),
+
+  conversations: (unitId: string) => request<Conversation[]>(`/api/units/${unitId}/conversations`),
+  thread: (unitId: string, otherId: string) => request<Thread>(`/api/units/${unitId}/conversations/${otherId}`),
+  markRead: (unitId: string, otherId: string) => request(`/api/units/${unitId}/conversations/${otherId}/read`, { method: 'POST' }),
+  sendMessage: (from: string, to: string, msg: { body?: string; quick_key?: string }) =>
+    request<ChatMessage>('/api/messages', json('POST', { from_unit_id: from, to_unit_id: to, ...msg })),
+  reportMessage: (messageId: number, unitId: string, reason: string) =>
+    request(`/api/messages/${messageId}/report`, json('POST', { unit_id: unitId, reason })),
+  setBlock: (unitId: string, otherId: string, blocked: boolean) =>
+    request(`/api/units/${unitId}/blocks`, json('POST', { other_unit_id: otherId, blocked })),
+  shareContact: (unitId: string, otherId: string) =>
+    request<{ contact: ContactState }>(`/api/units/${unitId}/contact`, json('POST', { other_unit_id: otherId })),
+  raiseConcern: (from: string, introId: number, category: ConcernCategory, note: string) =>
+    request<Concern>('/api/concerns', json('POST', { from_unit_id: from, intro_id: introId, category, note })),
+  concernStep: (id: number, step: 'acknowledge' | 'resolve' | 'escalate', unitId: string, note = '') =>
+    request<Concern>(`/api/concerns/${id}/${step}`, json('POST', { unit_id: unitId, note })),
+  estateConcerns: () => request<Concern[]>('/api/estate/concerns?phase_id=demo'),
+  estateAction: (id: number, action: 'remind' | 'resolve', note = '') =>
+    request<Concern>(`/api/concerns/${id}/estate`, json('POST', { action, note })),
+  reports: () => request<ModerationReport[]>('/api/moderation/reports'),
+  reviewReport: (id: number, outcome: 'warned' | 'dismissed') => request(`/api/reports/${id}/review`, json('POST', { outcome })),
   resetDemo: () => request('/api/demo/reset', { method: 'POST' }),
 }

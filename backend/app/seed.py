@@ -7,6 +7,8 @@ PHASE = {
     "id": "demo",
     "name": "Taman Demo (fictional phase)",
     "note": "Two facing terrace rows on Jalan Demo 1 and one apartment block. Made-up data for the prototype.",
+    # Vacant possession date for the whole phase; the 24-month defect liability period runs from here.
+    "handover_date": "2026-03-16",
 }
 
 _SOUTH_NAMES = ["Farid", "Siti", "Aiman", "Kumar", "Wei Jie", "Nurul"]
@@ -16,6 +18,13 @@ _APT_NAMES = [
     "Kevin", "Zainab", "Arjun", "Yong",
     "Hana", "Rajesh", "Sofia", "Chong",
 ]
+# Language each household reads messages in (quick replies are shown translated into it).
+_LANG = {
+    "Farid": "ms", "Siti": "ms", "Aiman": "en", "Kumar": "en", "Wei Jie": "zh", "Nurul": "ms",
+    "Ah Hock": "zh", "Priya": "en", "Hafiz": "ms", "Mei Ling": "zh", "Daniel": "en", "Aisyah": "ms",
+    "Rahman": "ms", "Jia Hui": "zh", "Suresh": "en", "Liyana": "ms", "Kevin": "en", "Zainab": "ms",
+    "Arjun": "en", "Yong": "zh", "Hana": "ms", "Rajesh": "en", "Sofia": "en", "Chong": "zh",
+}
 
 
 def demo_units() -> list[dict]:
@@ -39,4 +48,6 @@ def demo_units() -> list[dict]:
                 "resident_name": _APT_NAMES[i], "block": "A", "floor": floor, "pos": pos,
             })
             i += 1
+    for u in units:
+        u["lang"] = _LANG[u["resident_name"]]
     return units

@@ -45,12 +45,38 @@ export function Skeleton({ lines = 3 }: { lines?: number }) {
   )
 }
 
-export function ScreenTitle({ eyebrow, title, subtitle }: { eyebrow?: string; title: string; subtitle?: string }) {
+export function ScreenTitle({ eyebrow, title, subtitle, aside }: { eyebrow?: string; title: string; subtitle?: string; aside?: ReactNode }) {
   return (
-    <div className="screen-title">
-      {eyebrow && <div className="eyebrow">{eyebrow}</div>}
-      <h1>{title}</h1>
-      {subtitle && <p>{subtitle}</p>}
+    <div className="page-head">
+      <div className="screen-title">
+        {eyebrow && <div className="eyebrow">{eyebrow}</div>}
+        <h1>{title}</h1>
+        {subtitle && <p>{subtitle}</p>}
+      </div>
+      {aside && <div className="page-head-aside">{aside}</div>}
+    </div>
+  )
+}
+
+/** Card heading: icon tile, title, optional subline and something on the right. */
+export function CardHead({ icon, title, sub, right, tone = 'brand' }: { icon?: ReactNode; title: ReactNode; sub?: ReactNode; right?: ReactNode; tone?: 'brand' | 'amber' | 'red' | 'blue' | 'violet' }) {
+  return (
+    <div className="card-head">
+      {icon && <div className={`card-icon tone-${tone}`}>{icon}</div>}
+      <div className="grow">
+        <div className="card-title">{title}</div>
+        {sub && <div className="card-sub">{sub}</div>}
+      </div>
+      {right}
+    </div>
+  )
+}
+
+export function Metric({ value, label, tone }: { value: ReactNode; label: string; tone?: 'brand' | 'amber' }) {
+  return (
+    <div className={`metric ${tone ? `metric-${tone}` : ''}`}>
+      <b>{value}</b>
+      <span>{label}</span>
     </div>
   )
 }
@@ -139,7 +165,7 @@ export function Sheet({ open, onClose, children }: { open: boolean; onClose: () 
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
   if (!open) return null
-  // Rendered at the top of the phone frame so it covers the dock and isn't trapped inside the animated screen.
+  // Rendered at the top of the app so it covers the navigation and isn't trapped inside the animated screen.
   return createPortal(
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" role="dialog" aria-modal onClick={(e) => e.stopPropagation()}>
@@ -197,3 +223,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 }
 
 export const useToast = () => useContext(ToastContext)
+
+/** A rubber-stamp mark ("cop"), used where a record has been sealed, verified or closed. */
+export function Stamp({ children, tone = 'brand', tilt = -4 }: { children: ReactNode; tone?: 'brand' | 'amber' | 'red' | 'blue' | 'ink'; tilt?: number }) {
+  return (
+    <span className={`stamp stamp-${tone}`} style={{ transform: `rotate(${tilt}deg)` }}>
+      {children}
+    </span>
+  )
+}

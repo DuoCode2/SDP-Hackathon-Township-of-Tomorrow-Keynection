@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { ChevronLeft, CircleCheck, CircleX, HelpCircle, ThumbsDown, ThumbsUp } from 'lucide-react'
 import { api, type UnitInfo, type WarrantyTicket } from '../api'
 import Compare from '../components/Compare'
+import WarrantyClock from '../components/WarrantyClock'
 import { Badge, Card, formatDate, useToast } from '../ui'
 
 export const TICKET_BADGE: Record<WarrantyTicket['status'], ReactNode> = {
@@ -29,12 +30,23 @@ export default function RepairView({ me, ticket, onBack, onChanged }: {
         <p>{t.unit_label} · opened {formatDate(t.opened_at)}{t.subcontractor ? ` · repaired by ${t.subcontractor}` : ''}</p>
       </div>
 
+      <div className="cols">
+      <div className="col">
       <div className="triptych">
         <figure>{t.baseline_photo ? <img src={t.baseline_photo.thumb_url} alt="" /> : <div className="thumb" />}<figcaption>Pre-work</figcaption></figure>
         <figure><img src={t.defect_photo.thumb_url} alt="" /><figcaption>Damage</figcaption></figure>
         <figure>{t.repair_photo ? <img src={t.repair_photo.thumb_url} alt="" /> : <div className="thumb" style={{ width: '100%', aspectRatio: '4/3' }} />}<figcaption>Repair</figcaption></figure>
       </div>
 
+      {check && t.status === 'open' && <div className="section-label">Last attempt · rejected</div>}
+      {check && t.images && (
+        <Compare before={t.images.before} after={t.images.after} overlay={t.images.overlay} regions={check.regions}
+          scan={t.status === 'repair_submitted'} leftLabel="Pre-work" rightLabel="After repair" />
+      )}
+      </div>
+
+      <div className="col sticky">
+      <WarrantyClock clock={t.clock} closed={t.status === 'closed'} />
       {t.status === 'open' && (
         <Card>
           <div className="card-title">Waiting for SDP's repair</div>
@@ -44,12 +56,6 @@ export default function RepairView({ me, ticket, onBack, onChanged }: {
               : 'SDP\'s warranty team has the ticket with your photos. When they submit a repair photo, you decide whether it\'s done.'}
           </div>
         </Card>
-      )}
-
-      {check && t.status === 'open' && <div className="section-label">Last attempt · rejected</div>}
-      {check && t.images && (
-        <Compare before={t.images.before} after={t.images.after} overlay={t.images.overlay} regions={check.regions}
-          scan={t.status === 'repair_submitted'} leftLabel="Pre-work" rightLabel="After repair" />
       )}
 
       {check && (
@@ -80,6 +86,8 @@ export default function RepairView({ me, ticket, onBack, onChanged }: {
           {t.owner_note && <div className="small dim">“{t.owner_note}”</div>}
         </Card>
       )}
+      </div>
+      </div>
     </section>
   )
 }
