@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -14,10 +15,11 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import parse_qs
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
@@ -145,12 +147,33 @@ app.add_middleware(
 )
 
 
+SITE_COOKIE = "jiran5_site"
+SITE_COOKIE_SECONDS = 30 * 24 * 3600
+SITE_LOGIN_PATH = "/site-login"
+SITE_LOGIN_MAX_BYTES = 4096  # a one-field form; anything bigger is not a person typing a password
+
+
+def _site_password() -> str | None:
+    """Online the prototype sits behind one shared password: it has no sign-in, so without this anyone with the
+    link could reset the demo or upload files. Not set (local runs): the site is open, as before."""
+    return os.environ.get("JIRAN_SITE_PASSWORD") or None
+
+
+def _site_token(password: str) -> str:
+    """What the browser keeps after the password page: a keyed hash, never the password. A new password signs
+    everyone out."""
+    return hmac.new(password.encode(), b"jiran5-site-v1", hashlib.sha256).hexdigest()
+
+
 def _site_password_ok(request: Request) -> bool:
-    """Online the prototype sits behind one shared password (HTTP Basic, any user name): it has no sign-in, so
-    without this anyone with the link could reset the demo or upload files. Not set (local runs): always open."""
-    password = os.environ.get("JIRAN_SITE_PASSWORD")
+    password = _site_password()
     if not password or request.url.path == "/api/health":  # the host's health check needs no password
         return True
+    cookie = request.cookies.get(SITE_COOKIE, "")
+    if cookie and hmac.compare_digest(cookie.encode(), _site_token(password).encode()):
+        return True
+    # Scripts may send the password as HTTP Basic (any user name). Responses never ask for it, so browsers do not
+    # pop their own login box, which some in-app browsers cannot show at all.
     scheme, _, encoded = request.headers.get("authorization", "").partition(" ")
     if scheme.lower() != "basic":
         return False
@@ -161,11 +184,87 @@ def _site_password_ok(request: Request) -> bool:
     return secrets.compare_digest(given.encode(), password.encode())
 
 
+SITE_LOGIN_PAGE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Jiran5 · password</title>
+<style>
+  :root { --brand: #e0603e; --brand-strong: #c94c2a; --ink: #0d2240; --muted: #66758a; --bg: #f2f4f7;
+          --surface: #fff; --line: rgba(13, 34, 64, 0.15); --bad: #b42318; --bad-bg: #fef3f2; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; background: var(--bg);
+         color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans SC",
+         "Microsoft YaHei", sans-serif; }
+  main { width: 100%; max-width: 400px; background: var(--surface); border: 1px solid var(--line);
+         border-radius: 16px; padding: 28px 24px; box-shadow: 0 12px 32px -20px rgba(13, 34, 64, 0.4); }
+  .logo { font-weight: 800; font-size: 26px; letter-spacing: -0.02em; margin: 0 0 14px; }
+  .logo span { color: var(--brand); }
+  p { margin: 0 0 4px; }
+  .other { color: var(--muted); font-size: 15px; }
+  label { display: block; font-weight: 600; margin: 20px 0 6px; }
+  input { width: 100%; font: inherit; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; }
+  input:focus { outline: 3px solid rgba(224, 96, 62, 0.3); border-color: var(--brand); }
+  button { width: 100%; margin-top: 14px; font: inherit; font-weight: 700; color: #fff; background: var(--brand-strong);
+           border: 0; border-radius: 10px; padding: 12px; cursor: pointer; }
+  .error { margin-top: 16px; padding: 10px 12px; border-radius: 10px; background: var(--bad-bg); color: var(--bad); }
+  .note { margin-top: 18px; font-size: 13px; color: var(--muted); }
+</style></head>
+<body><main>
+  <div class="logo">Jiran<span>5</span></div>
+  <p>This is a private demo. Enter the password from the Jiran5 team.</p>
+  <p class="other" lang="ms">Ini demo peribadi. Masukkan kata laluan daripada pasukan Jiran5.</p>
+  <p class="other" lang="zh">这是内部演示，请输入 Jiran5 团队给你的密码。</p>
+  {error}
+  <form method="post" action="/site-login">
+    <label for="password">Password · Kata laluan · 密码</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+    <button type="submit">Enter · Masuk · 进入</button>
+  </form>
+  <p class="note">This browser stays signed in for 30 days. · Pelayar ini kekal log masuk selama 30 hari. ·
+    这个浏览器会记住 30 天。</p>
+</main></body></html>
+"""
+
+SITE_LOGIN_ERROR = ('<p class="error" role="alert">Wrong password. Please try again. · '
+                    "Kata laluan salah. Cuba lagi. · 密码不对，请再试一次。</p>")
+
+
+def _site_login_page(wrong: bool = False) -> HTMLResponse:
+    return HTMLResponse(SITE_LOGIN_PAGE.replace("{error}", SITE_LOGIN_ERROR if wrong else ""), status_code=401,
+                        headers={"Cache-Control": "no-store"})
+
+
+async def _site_login(request: Request) -> HTMLResponse | RedirectResponse:
+    """The password page's form. Right: remember this browser and go to the app. Wrong: the page again."""
+    password = _site_password() or ""
+    body = b""
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > SITE_LOGIN_MAX_BYTES:
+            return _site_login_page(wrong=True)
+    given = parse_qs(body.decode("utf-8", "replace")).get("password", [""])[0]
+    if not given or not secrets.compare_digest(given.encode(), password.encode()):
+        await asyncio.sleep(0.5)  # slows guessing a little; the password itself is long
+        return _site_login_page(wrong=True)
+    response = RedirectResponse("/", status_code=303)
+    secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"  # the host ends HTTPS
+    response.set_cookie(SITE_COOKIE, _site_token(password), max_age=SITE_COOKIE_SECONDS, httponly=True,
+                        samesite="lax", secure=secure, path="/")
+    return response
+
+
 @app.middleware("http")
 async def guard(request: Request, call_next):
-    if not _site_password_ok(request):
-        response = JSONResponse({"detail": "This demo needs the password from the Jiran5 team."}, status_code=401,
-                                headers={"WWW-Authenticate": 'Basic realm="Jiran5 demo", charset="UTF-8"'})
+    if _site_password() and request.url.path == SITE_LOGIN_PATH and request.method == "POST":
+        response = await _site_login(request)
+    elif not _site_password_ok(request):
+        if request.url.path.startswith("/api/"):
+            response = JSONResponse({"detail": "This demo needs the password from the Jiran5 team."}, status_code=401)
+        else:  # a page visit: our own password page, in all three languages
+            response = _site_login_page()
+    elif _site_password() and request.url.path == SITE_LOGIN_PATH:  # already signed in, e.g. a reload
+        response = RedirectResponse("/", status_code=303)
     else:
         length = request.headers.get("content-length")
         if length and length.isdigit() and int(length) > MAX_REQUEST_BYTES:
@@ -175,6 +274,9 @@ async def guard(request: Request, call_next):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("X-Robots-Tag", "noindex, nofollow")  # a prototype: keep it out of search results
+    if response.headers.get("content-type", "").startswith("text/html"):
+        # Ask the server every time, so a stored copy of the app never skips the password check above.
+        response.headers.setdefault("Cache-Control", "no-cache")
     return response
 
 

@@ -74,7 +74,7 @@ npm run dev
 
 打开 http://localhost:5173 。电脑上是网页版：左边是导航，右边是「导览」面板（中文/英文切换，说明这一页的功能，并列出可以一键跳转的演示路线）；窗口窄于 1240 像素时导览改成按右上角按钮滑出；窄于 900 像素（手机）时改为全屏加底部导航。服务器默认只在本机开放，同一 Wi-Fi 里的其他人连不进来。
 
-测试（181 个）：
+测试（190 个）：
 
 ```bash
 cd prototype/backend
@@ -90,14 +90,18 @@ cd prototype/backend
 
 ### 放上网（给评审一个网址）
 
-用 Railway：一个容器同时跑后端和打包好的网页（`Dockerfile`），设定在 `railway.json`。不用 Vercel：它没有能长期保存的硬盘（SQLite 和照片会消失），也不能跑语音自动删除这种背景工作。
+一个容器同时跑后端和打包好的网页（`Dockerfile`）。不用 Vercel：它没有能长期保存的硬盘（SQLite 和照片会消失），也不能跑语音自动删除这种背景工作。
 
-1. 在 Railway 建一个 project，加一个 service，再给它加一个 **Volume，挂在 `/data`**（资料库、照片、语音都放这里，重新部署不会丢）
-2. 在 service 的 Variables 设 **`JIRAN_SITE_PASSWORD`**（一定要设）：整个网站要先输入这个密码才能进（浏览器会跳出登入框，帐号随便填）。原型没有登录，不设的话任何拿到网址的人都能重置示范、上传档案
-3. 在 `prototype` 资料夹执行 `railway up`（把本机代码直接上传建置，不需要连 GitHub）。之后改了代码再执行一次就会重新部署
-4. Railway 用 `/api/health` 检查服务是否正常（这一个网址不需要密码，只回传 ok）
+**现在放在 Render 免费版**：https://jiran5.onrender.com （DuoCode 的 Render 工作区，新加坡）
 
-`JIRAN_DEMO_MODE` 在容器里默认是 `1`（评审要能重置示范）。网站对搜索引擎标了 noindex。密码不要写进代码或聊天群组，私下给评审。
+- 设定：Language 选 Docker、Branch 选 `review-fixes`、Instance Type 选 Free、Health Check Path 填 `/api/health`、Auto-Deploy 是 On Commit（推送到 `review-fixes` 就自动重新部署，约 2 分钟）
+- 环境变量 **`JIRAN_SITE_PASSWORD`**（一定要设）：打开网址会先看到我们自己的三语密码页（中、英、马来文，只有一个密码框，任何浏览器和 app 里的内建浏览器都能用）。输对后这个浏览器记住 30 天；改密码等于让所有人重新输入。原型没有登录，不设的话任何拿到网址的人都能重置示范、上传档案
+- 免费版的限制：15 分钟没人用就睡着，下一次打开要等约 1 分钟（演示前几分钟先打开一次）；没有永久硬盘，睡着或重新部署后资料回到示范初始状态（评审上传的照片会消失）；只有 0.1 CPU，照片比对比本机慢几秒
+- 想要不睡、资料保留：Render 改成付费方案（约 7 美元/月）加一个挂在 `/data` 的硬盘
+
+**也可以用 Railway**（`railway.json` 已经写好）：建 service、加一个挂在 `/data` 的 Volume、设 `JIRAN_SITE_PASSWORD`，在 `prototype` 资料夹执行 `railway up`（直接上传本机代码，不需要连 GitHub）。Railway 的试用期过了要付费方案。
+
+`/api/health` 给主机检查用，不需要密码，只回传 ok。`JIRAN_DEMO_MODE` 在容器里默认是 `1`（评审要能重置示范）。网站对搜索引擎标了 noindex。密码不要写进代码或聊天群组，私下给评审。
 
 ## 演示路线（约 7 分钟）
 
@@ -140,7 +144,7 @@ cd prototype/backend
 - **屋历**：只有 app 自己的步骤能写入（拿掉了可以任意写入的通用端点）；写入前先拿资料库写锁，加上唯一索引，同时写入也不会分叉
 - **输入限制**：讯息、装修内容、时段、备注都有长度和格式限制；结束日期和时段不能颠倒
 - **CORS** 只允许本机前端；回应加上 nosniff、禁止嵌入、noindex 等安全标头
-- **放上网时整站加密码**：设了 `JIRAN_SITE_PASSWORD` 后，所有页面、图片、接口都要先输入共用密码（比对用固定时间比较），只有给主机检查用的 `/api/health` 例外；本机不设就和原来一样（有测试验证）
+- **放上网时整站加密码**：设了 `JIRAN_SITE_PASSWORD` 后，所有页面、图片、接口都要先过我们自己的三语密码页（比对用固定时间比较，输错稍微延迟），只有给主机检查用的 `/api/health` 例外；本机不设就和原来一样。浏览器只保存密码的加密指纹（HttpOnly，网页程序读不到；HTTPS 下标 Secure），不是密码本身；改密码就全部失效。网页标了「每次都问服务器」，旧的缓存不能绕过密码；登入过期时 app 自动跳回密码页，不会停在空白画面（有测试和浏览器验证）
 - **演示与职员功能**：重置、示范照片、模拟扫码时间，以及所有 SDP 后台功能（物业、审核、公告、保修队列、提交维修、后台数据、WhatsApp 预览、加入码、柜台）在设 `JIRAN_DEMO_MODE=0` 时关闭，而且在检查请求内容之前就拒绝
 - **不依赖外网**：字体、图标、QR 生成都打包在本地，演示现场断网也能跑
 - **不卡**：照片对比约 0.2 秒；启动时预热 OpenCV；拖动滑杆、数字动画都不重新渲染整页；前端打包约 600 KB（gzip 后约 190 KB，大部分是三语字串和插画），还没做分包
@@ -197,7 +201,7 @@ backend/
   app/db.py              SQLite 资料表与写入屋历
   app/main.py            FastAPI 接口与安全设置（四层、聊天、不满、审核、保修时钟都在这里）
   scripts/make_demo_photos.py
-  tests/                 181 个测试（test_site_gate.py 网上版整站密码、健康检查不用密码、noindex；test_codes.py 屋规、门卫判定、聊天自动通知与列表预览都附代码；test_decisions.py 谁能决定什么：提出、同意、不同意、检查员；test_staff_gating.py 关掉演示模式时后台全部关闭、不能任意写屋历；test_hello_safety.py 打招呼的封锁、安静模式、语气、联系方式、次数，装修日期与批准、装修连结期限；test_triage.py 时间判断与理由代码；test_ledger.py 同时写入不分叉；test_talk.py 聊天、不满、审核、时钟、物业只看升级的不满；test_rings.py 三层邻居、通知范围、联系请求、公告；test_social.py Wave、表情、语音、个人资料、官方帐号；test_care.py 语音 30 天删除、家人代办、下载我的资料、邻里关系数据、联系方式与冒充检查、以今天计算的示范日期；test_join.py 交屋加入、纸本通知、物业代登记、简易模式隐私、WhatsApp 通知、新 phase 设定）
+  tests/                 190 个测试（test_site_gate.py 网上版三语密码页、记住 30 天、改密码全部失效、页面不被缓存绕过、健康检查不用密码、noindex；test_codes.py 屋规、门卫判定、聊天自动通知与列表预览都附代码；test_decisions.py 谁能决定什么：提出、同意、不同意、检查员；test_staff_gating.py 关掉演示模式时后台全部关闭、不能任意写屋历；test_hello_safety.py 打招呼的封锁、安静模式、语气、联系方式、次数，装修日期与批准、装修连结期限；test_triage.py 时间判断与理由代码；test_ledger.py 同时写入不分叉；test_talk.py 聊天、不满、审核、时钟、物业只看升级的不满；test_rings.py 三层邻居、通知范围、联系请求、公告；test_social.py Wave、表情、语音、个人资料、官方帐号；test_care.py 语音 30 天删除、家人代办、下载我的资料、邻里关系数据、联系方式与冒充检查、以今天计算的示范日期；test_join.py 交屋加入、纸本通知、物业代登记、简易模式隐私、WhatsApp 通知、新 phase 设定）
 frontend/src/
   App.tsx                外框：导航（跟着页面性格变）、图框、语言切换、角色卡、Both sides 分屏、代办横幅、手机版底栏
   i18n.tsx               住户页面的英文、马来文、中文字典与语言切换

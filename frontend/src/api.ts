@@ -579,6 +579,16 @@ export function onReachability(listener: (ok: boolean) => void): () => void {
   return () => { reachabilityListeners.delete(listener) }
 }
 
+// Online the whole site sits behind a shared password, and only that check answers 401. A 401 means this browser's
+// sign-in has ended (a new password, or 30 days): go to the password page rather than leave screens empty.
+// The fresh address skips any copy of the app the browser kept.
+let signingIn = false
+function signInAgain(status: number) {
+  if (status !== 401 || signingIn) return
+  signingIn = true
+  window.location.replace(`/?signin=${Date.now()}`)
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response
   try {
@@ -589,6 +599,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   // 502–504 come from the dev proxy (or a gateway) when the API itself is down.
   setReachable(!(res.status >= 502 && res.status <= 504))
+  signInAgain(res.status)
   if (!res.ok) {
     let message = `${res.status}`
     try {
@@ -696,6 +707,7 @@ export const api = {
   revokeDelegate: (id: number, unitId: string) => request(`/api/delegates/${id}/revoke`, json('POST', { unit_id: unitId })),
   exportData: async (unitId: string) => {
     const res = await fetch(`/api/units/${unitId}/export`)
+    signInAgain(res.status)
     if (!res.ok) throw new ApiError(res.status, 'Could not prepare your data')
     return res.blob()
   },
