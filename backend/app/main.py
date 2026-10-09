@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import hashlib
 import json
 import logging
@@ -144,15 +145,36 @@ app.add_middleware(
 )
 
 
+def _site_password_ok(request: Request) -> bool:
+    """Online the prototype sits behind one shared password (HTTP Basic, any user name): it has no sign-in, so
+    without this anyone with the link could reset the demo or upload files. Not set (local runs): always open."""
+    password = os.environ.get("JIRAN_SITE_PASSWORD")
+    if not password or request.url.path == "/api/health":  # the host's health check needs no password
+        return True
+    scheme, _, encoded = request.headers.get("authorization", "").partition(" ")
+    if scheme.lower() != "basic":
+        return False
+    try:
+        _, _, given = base64.b64decode(encoded, validate=True).decode("utf-8").partition(":")
+    except (ValueError, UnicodeDecodeError):
+        return False
+    return secrets.compare_digest(given.encode(), password.encode())
+
+
 @app.middleware("http")
 async def guard(request: Request, call_next):
-    length = request.headers.get("content-length")
-    if length and length.isdigit() and int(length) > MAX_REQUEST_BYTES:
-        return JSONResponse({"detail": "Request too large. Photos must be under 12 MB."}, status_code=413)
-    response = await call_next(request)
+    if not _site_password_ok(request):
+        response = JSONResponse({"detail": "This demo needs the password from the Jiran5 team."}, status_code=401,
+                                headers={"WWW-Authenticate": 'Basic realm="Jiran5 demo", charset="UTF-8"'})
+    else:
+        length = request.headers.get("content-length")
+        if length and length.isdigit() and int(length) > MAX_REQUEST_BYTES:
+            return JSONResponse({"detail": "Request too large. Photos must be under 12 MB."}, status_code=413)
+        response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("X-Robots-Tag", "noindex, nofollow")  # a prototype: keep it out of search results
     return response
 
 
