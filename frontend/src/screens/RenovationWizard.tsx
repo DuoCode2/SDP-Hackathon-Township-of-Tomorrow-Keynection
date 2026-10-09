@@ -3,9 +3,9 @@ import { Bath, Building, Drill, Lock, Paintbrush, Send, ShieldCheck } from 'luci
 import { api, type ImpactItem, type Renovation, type UnitInfo, type WorksType } from '../api'
 import { LANGS, introTemplate, type Lang } from '../messages'
 import PlanMap from '../components/PlanMap'
-import { useT } from '../i18n'
+import { noisyHours, useDates, useT } from '../i18n'
 import { useHelper } from '../helper'
-import { Sheet, shortRange, Steps, useToast } from '../ui'
+import { Sheet, Steps, useToast } from '../ui'
 
 /** A local calendar date n days from today, as YYYY-MM-DD. */
 function daysFromToday(n: number): string {
@@ -17,11 +17,12 @@ function daysFromToday(n: number): string {
 const STEPS = ['reno.steps.type', 'reno.steps.who', 'reno.steps.when', 'reno.steps.approvals', 'reno.steps.review']
 
 // Title and detail come from the dictionary (works.<id>, works.<id>.d). The scope is the owner's own words, sent as typed.
-const WORKS: { id: WorksType; icon: typeof Bath; scope: string }[] = [
-  { id: 'wet', icon: Bath, scope: 'Re-tile bathroom' },
-  { id: 'hacking', icon: Drill, scope: 'Hack and re-tile living room' },
-  { id: 'structural', icon: Building, scope: 'Extend kitchen (rear wall)' },
-  { id: 'light', icon: Paintbrush, scope: 'Repaint and fit wardrobes' },
+// The suggested description is in the owner's language (they can edit it); neighbours see it as written.
+const WORKS: { id: WorksType; icon: typeof Bath }[] = [
+  { id: 'wet', icon: Bath },
+  { id: 'hacking', icon: Drill },
+  { id: 'structural', icon: Building },
+  { id: 'light', icon: Paintbrush },
 ]
 
 /** Register a renovation. Who gets the notice is worked out from the plan, not chosen by the owner. */
@@ -36,6 +37,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   estate?: { staff: string }
 }) {
   const t = useT()
+  const dates = useDates()
   const toast = useToast()
   const helper = useHelper(me.id)
   const strata = me.kind === 'apartment'
@@ -46,18 +48,19 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   const [draft, setDraft] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [reno, setReno] = useState<Renovation>({
-    scope: WORKS.find((w) => w.id === (strata ? 'wet' : 'structural'))!.scope,
+    scope: t(`works.${strata ? 'wet' : 'structural'}.scope`),
     start: daysFromToday(7),
     end: daysFromToday(21),
     noisy_hours: '',
     noisy_from: '09:00',
     noisy_to: '17:00',
     weekdays_only: true,
-    contractor: 'ABC Renovation',
-    contractor_cidb_registered: true,
-    council_permit: strata ? 'not_needed' : 'approved',
-    permit_ref: strata ? '' : 'PBT/2026/0412',
-    management_approval: strata ? 'approved' : null,
+    // Approvals and the CIDB tick are the owner's own statements, shown to every neighbour: never pre-filled.
+    contractor: '',
+    contractor_cidb_registered: false,
+    council_permit: strata ? 'not_needed' : null,
+    permit_ref: '',
+    management_approval: null,
   })
 
   useEffect(() => {
@@ -73,8 +76,10 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   const hours = `${reno.weekdays_only ? 'weekdays' : 'Mon–Sat'} ${reno.noisy_from}–${reno.noisy_to}${reno.weekdays_only ? ', no weekends' : ''}`
   const full: Renovation = {
     ...reno, works_type: works, noisy_hours: hours,
+    contractor: reno.contractor?.trim() || null,
+    council_permit: reno.council_permit || null,  // '' = not chosen yet
     permit_ref: reno.council_permit === 'not_needed' ? null : reno.permit_ref || null,
-    management_approval: strata ? reno.management_approval : null,
+    management_approval: strata ? reno.management_approval || null : null,
   }
   const message = draft ?? introTemplate(lang, me.resident_name, me.label, full)
   const set = (k: keyof Renovation) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -83,7 +88,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   }
   const pickWorks = (w: WorksType) => {
     setWorks(w)
-    setReno((r) => ({ ...r, scope: WORKS.find((x) => x.id === w)!.scope, council_permit: w === 'structural' ? 'approved' : r.council_permit }))
+    setReno((r) => ({ ...r, scope: t(`works.${w}.scope`) }))
     setDraft(null)
   }
   const blocked = works === 'structural' && (strata ? reno.management_approval !== 'approved' : reno.council_permit !== 'approved')
@@ -178,11 +183,12 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
 
       {step === 3 && (
         <div className="wizard-body">
-          <label className="field">{t('reno.contractor')}<input value={reno.contractor ?? ''} onChange={set('contractor')} maxLength={80} /></label>
+          <label className="field">{t('reno.contractor')}<input value={reno.contractor ?? ''} onChange={set('contractor')} maxLength={80} placeholder="e.g. ABC Renovation" /></label>
           <label className="switch-row"><input type="checkbox" checked={!!reno.contractor_cidb_registered} onChange={set('contractor_cidb_registered')} /> {t('reno.cidb')}</label>
           {strata && (
             <label className="field">{t('reno.jmb')}
-              <select value={reno.management_approval ?? 'pending'} onChange={set('management_approval')}>
+              <select value={reno.management_approval ?? ''} onChange={set('management_approval')}>
+                <option value="" disabled>{t('reno.choose')}</option>
                 <option value="approved">{t('reno.jmbApproved')}</option>
                 <option value="pending">{t('reno.jmbPending')}</option>
               </select>
@@ -190,7 +196,8 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
           )}
           <div className="grid-2">
             <label className="field">{t('reno.permit')}
-              <select value={reno.council_permit ?? 'not_needed'} onChange={set('council_permit')}>
+              <select value={reno.council_permit ?? ''} onChange={set('council_permit')}>
+                <option value="" disabled>{t('reno.choose')}</option>
                 <option value="approved">{t('reno.permitApproved')}</option>
                 <option value="applied">{t('reno.permitApplied')}</option>
                 <option value="not_needed">{t('reno.permitNone')}</option>
@@ -208,13 +215,13 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
         <div className="wizard-body two">
           <dl className="notice-grid">
             <div><dt>{t('reno.work')}</dt><dd>{reno.scope}</dd></div>
-            <div><dt>{t('reno.dates')}</dt><dd>{shortRange(reno.start, reno.end)}</dd></div>
-            <div><dt>{t('reno.noisy')}</dt><dd>{hours}</dd></div>
+            <div><dt>{t('reno.dates')}</dt><dd>{dates.range(reno.start, reno.end)}</dd></div>
+            <div><dt>{t('reno.noisy')}</dt><dd>{noisyHours(t, reno)}</dd></div>
             <div><dt>{t('reno.contractor')}</dt><dd>{reno.contractor || '–'}{reno.contractor_cidb_registered ? ' · CIDB ✓' : ''}</dd></div>
             <div><dt>{t('reno.notified')}</dt><dd>{t('reno.homes', { n: zone?.length ?? '–' })}</dd></div>
             <div><dt>{t('reno.approvals')}</dt><dd>{strata
-              ? `JMB/MC · ${t(reno.management_approval === 'approved' ? 'reno.jmbApproved' : 'reno.jmbPending')}`
-              : `PBT · ${t(reno.council_permit === 'approved' ? 'reno.permitApproved' : reno.council_permit === 'applied' ? 'reno.permitApplied' : 'reno.permitNone')}`}</dd></div>
+              ? `JMB/MC · ${t(!reno.management_approval ? 'reno.notStated' : reno.management_approval === 'approved' ? 'reno.jmbApproved' : 'reno.jmbPending')}`
+              : `PBT · ${t(!reno.council_permit ? 'reno.notStated' : reno.council_permit === 'approved' ? 'reno.permitApproved' : reno.council_permit === 'applied' ? 'reno.permitApplied' : 'reno.permitNone')}`}</dd></div>
           </dl>
           <div className="composer-message">
             <label className="field">{t('intro.language')}

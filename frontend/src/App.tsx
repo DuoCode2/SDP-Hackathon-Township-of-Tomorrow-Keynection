@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Building2, Calculator, Camera, CalendarClock, CircleUserRound, Columns2, Compass, Grid3x3, HandHeart, Hexagon, Languages, LayoutDashboard, MessagesSquare, Network, ShieldHalf, Smartphone } from 'lucide-react'
-import { api, type UnitInfo } from './api'
-import { Avatar, formatDate, ToastProvider } from './ui'
+import { api, onReachability, type UnitInfo } from './api'
+import { Avatar, ToastProvider } from './ui'
 import type { GuideLang, TabId } from './guide'
-import { LangProvider, useLang, type UiLang } from './i18n'
+import { EnglishOnly, LangProvider, useDates, useLang, type UiLang } from './i18n'
 import { HelperProvider, useActing, useHelper } from './helper'
 import Guide from './components/Guide'
 import CastPicker, { roleOf } from './components/Cast'
@@ -58,6 +58,8 @@ type PaneState = { me: string; tab: TabId; peer?: string }
 
 // Two faces: people screens are warm; records (works, evidence, log, SDP) keep the blueprint look.
 const WARM: TabId[] = ['circle', 'chats', 'me']
+// SDP's side stays in English on purpose; every resident screen follows the chosen language.
+const ENGLISH_TABS: TabId[] = ['sdp', 'planner', 'impact', 'channels', 'safeguards']
 // A household that hasn't joined sees the join page on these; its home log (the property's record) stays viewable.
 const NEEDS_JOIN: TabId[] = ['circle', 'chats', 'works', 'evidence', 'me']
 const faceOf = (tab: TabId) => (WARM.includes(tab) ? 'face-warm' : 'face-blueprint')
@@ -84,6 +86,7 @@ export default function App() {
 
 function Shell() {
   const { lang: uiLang, setLang: setUiLang, t } = useLang()
+  const dates = useDates()
   const [units, setUnits] = useState<UnitInfo[]>([])
   const [panes, setPanes] = useState<PaneState[]>([{ me: 'T-12', tab: 'circle' }])
   const [active, setActive] = useState(0)
@@ -96,8 +99,10 @@ function Shell() {
   const changed = () => setVersion((v) => v + 1)
 
   useEffect(() => {
-    api.units().then((u) => { setUnits(u); setOffline(false) }).catch(() => setOffline(true))
+    api.units().then((u) => setUnits(u)).catch(() => {})
   }, [version])
+  // Any request that can't reach the server shows the banner; the next one that gets through clears it.
+  useEffect(() => onReachability((ok) => setOffline(!ok)), [])
 
   useEffect(() => {
     const mq = window.matchMedia(SPLIT_OK)
@@ -209,7 +214,7 @@ function Shell() {
             <span className="grow">
               <small>{t('side.home')}</small>
               <b>{curUnit.resident_name} · {curUnit.label}</b>
-              <em>{t('side.keys', { date: formatDate(curUnit.handover_date) })}</em>
+              <em>{t('side.keys', { date: dates.date(curUnit.handover_date) })}</em>
             </span>
           </button>
         )}
@@ -250,9 +255,10 @@ function Shell() {
 
         <main className={`content ${split ? 'split' : faceOf(cur.tab)}`}>
           {offline && (
-            <div className="card" style={{ margin: 16 }}>
-              <strong>Can't reach the server</strong>
-              <p className="muted small">Start the backend on port 8000, then reload this page.</p>
+            <div className="card offline-banner" role="alert" style={{ margin: 16 }}>
+              <strong>{t('offline.title')}</strong>
+              <p className="muted small">{t('offline.body')} <span className="mono">(Demo: is the backend running?)</span></p>
+              <button className="btn btn-sm btn-primary" onClick={changed}>{t('offline.retry')}</button>
             </div>
           )}
           {split ? (
@@ -329,19 +335,20 @@ function Pane({ index, pane, units, active, split, version, onChange, onFocus, o
           <button className="btn btn-sm" onClick={() => setActing(null)}>{t('helpers.stop')}</button>
         </div>
       )}
-      {lang !== 'en' && !WARM.includes(pane.tab) && !(me && !me.joined && NEEDS_JOIN.includes(pane.tab)) && <div className="records-note"><Languages size={14} /> {t('records.english')}</div>}
+      {lang !== 'en' && ENGLISH_TABS.includes(pane.tab) && !(me && !me.joined && NEEDS_JOIN.includes(pane.tab)) && <div className="records-note"><Languages size={14} /> {t('records.english')}</div>}
       {!me.joined && NEEDS_JOIN.includes(pane.tab) ? <JoinView me={me} onJoined={onChange} /> : <>
       {pane.tab === 'circle' && <CircleView me={me} units={units} version={version} onChange={onChange}
-        onViewAs={(id) => onUpdate({ me: id })} onOpenChat={(peer) => onUpdate({ tab: 'chats', peer })} />}
+        onViewAs={(id) => onUpdate({ me: id })} onOpenChat={(peer) => onUpdate({ tab: 'chats', peer })} onOpenEvidence={() => tab('evidence')} />}
       {pane.tab === 'chats' && <ChatsView me={me} version={version} onChange={onChange} peer={pane.peer} onPeer={(peer) => onUpdate({ peer })} />}
       {pane.tab === 'works' && <WorksView me={me} units={units} version={version} onChange={onChange} />}
       {pane.tab === 'evidence' && <EvidenceView me={me} version={version} onChange={onChange} />}
-      {pane.tab === 'log' && <HistoryView me={me} version={version} />}
-      {pane.tab === 'sdp' && <DashboardView version={version} onChange={onChange} onViewAs={(id) => onUpdate({ me: id, tab: 'circle', peer: undefined })} />}
-      {pane.tab === 'planner' && <PlannerView />}
-      {pane.tab === 'impact' && <ImpactView />}
-      {pane.tab === 'channels' && <ChannelsView me={me} version={version} />}
-      {pane.tab === 'safeguards' && <SafeguardsView onGo={tab} />}
+      {pane.tab === 'log' && <HistoryView me={me} units={units} version={version} />}
+      {/* SDP's side stays in English, including the resident components it reuses (clock, comparison, concerns). */}
+      {pane.tab === 'sdp' && <EnglishOnly><DashboardView version={version} onChange={onChange} onViewAs={(id) => onUpdate({ me: id, tab: 'circle', peer: undefined })} /></EnglishOnly>}
+      {pane.tab === 'planner' && <EnglishOnly><PlannerView /></EnglishOnly>}
+      {pane.tab === 'impact' && <EnglishOnly><ImpactView /></EnglishOnly>}
+      {pane.tab === 'channels' && <EnglishOnly><ChannelsView me={me} version={version} /></EnglishOnly>}
+      {pane.tab === 'safeguards' && <EnglishOnly><SafeguardsView onGo={tab} /></EnglishOnly>}
       {pane.tab === 'me' && <MeView me={me} version={version} onChange={onChange} onGo={tab} />}
       </>}
     </div>
@@ -374,6 +381,7 @@ function Pane({ index, pane, units, active, split, version, onChange, onFocus, o
 }
 
 function LiveClock() {
+  const dates = useDates()
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000)
@@ -381,7 +389,7 @@ function LiveClock() {
   }, [])
   return (
     <span className="clock desktop-only" title="Prototype running live">
-      <span className="pulse" /> LIVE · {now.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' })}
+      <span className="pulse" /> LIVE · {dates.time(now)}
     </span>
   )
 }

@@ -117,6 +117,16 @@ def test_phone_numbers_shared_only_when_both_agree(client):
 
 # ---------- concerns: neighbour first, then the estate team ----------
 
+def test_estate_team_sees_only_what_neighbours_escalated(client):
+    intro_id = _reno(client)
+    c = client.post("/api/concerns", json={"from_unit_id": "T-11", "intro_id": intro_id, "category": "noise_hours",
+                                           "note": "Drilling at 7.30pm yesterday"}).json()
+    assert client.get("/api/estate/concerns").json() == []  # still private between the two homes
+    client.post(f"/api/concerns/{c['id']}/escalate", json={"unit_id": "T-11"})
+    queue = client.get("/api/estate/concerns").json()
+    assert [x["id"] for x in queue] == [c["id"]] and queue[0]["concerns_on_renovation"] == 1
+
+
 def test_concern_ladder_with_home_log_records(client):
     intro_id = _reno(client)
     c = client.post("/api/concerns", json={"from_unit_id": "T-11", "intro_id": intro_id, "category": "noise_hours",

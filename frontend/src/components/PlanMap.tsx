@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react'
 import type { Relation, UnitInfo } from '../api'
+import { useT } from '../i18n'
 
 // The phase drawn the way SDP's own plans are: house footprints, party walls and floor slabs.
 // Ring 1 (your circle) is filled, ring 2 (your lorong or block) is outlined, everything else is plain.
@@ -69,7 +71,19 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
     return circleIds.has(u.id) ? 'circle' : ring2Ids.has(u.id) ? 'ring2' : ''
   }
 
+  // On a phone the plan keeps a readable size and scrolls sideways (see .plan-scroll); start with your home in view.
+  const t = useT()
+  const scroller = useRef<HTMLDivElement>(null)
+  const meX = mine ? centre(mine).x : null
+  useEffect(() => {
+    const el = scroller.current
+    if (!el || meX === null || el.scrollWidth <= el.clientWidth) return
+    el.scrollLeft = (meX / 720) * el.scrollWidth - el.clientWidth / 2
+  }, [meX, view])
+
   return (
+    <>
+    <div className="plan-scroll" ref={scroller}>
     <svg className={`plan ${previewing ? 'previewing' : ''}`} viewBox="0 0 720 400" role="group" aria-label={view === 'terrace' ? 'Plan of Jalan Demo 1' : 'Section through Block A'}>
       <defs>
         <pattern id="hatch-works" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -149,6 +163,9 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
         return <rect className="select-ring" x={b.x - 5} y={b.y - 5} width={b.w + 10} height={b.h + 10} rx="4" pointerEvents="none" />
       })()}
     </svg>
+    </div>
+    <div className="plan-hint">{t('plan.swipe')}</div>
+    </>
   )
 }
 

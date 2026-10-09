@@ -370,6 +370,14 @@ h1, h2, h3, p { margin: 0; }
 .plan-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .plan-head .card-head { flex: 1 1 220px; }
 .plan { width: 100%; height: auto; display: block; user-select: none; }
+/* The plan is drawn for ~720px. On a phone it keeps a readable size and scrolls sideways instead of shrinking
+   its labels to 5px. */
+.plan-scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.plan-hint { display: none; margin-top: 6px; font-size: 12px; color: var(--muted); text-align: center; }
+@media (max-width: 699.98px) {
+  .plan-scroll > .plan { min-width: 680px; }
+  .plan-hint { display: block; }
+}
 .plan .dim { stroke: var(--ink); stroke-width: 0.8; opacity: 0.45; }
 .plan .dim-text { font: 600 9px var(--mono); letter-spacing: 0.16em; fill: var(--muted); text-anchor: middle; }
 .plan .setback { stroke: var(--ink); stroke-width: 0.8; stroke-dasharray: 6 4; opacity: 0.32; }
@@ -666,6 +674,7 @@ span.msg-tr { text-decoration: none; }
 .wclock-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 11.5px; line-height: 1.4; color: var(--text-2); }
 .wclock-foot svg { color: var(--accent-text); flex: none; }
 .wclock-law { margin-left: auto; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; color: var(--muted); padding: 1px 6px; border: 1px solid var(--line-2); border-radius: 4px; }
+.wclock-notice { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line-2); font-size: 11.5px; line-height: 1.5; }
 
 /* ---------- works ---------- */
 .now { display: flex; align-items: center; gap: 12px; }
@@ -856,7 +865,11 @@ button.ring-row:hover { background: var(--surface-2); }
 .wizard-lead { font-size: 13.5px; line-height: 1.55; color: var(--text-2); }
 .wizard-note { display: flex; align-items: flex-start; gap: 7px; padding: 9px 11px; border-radius: 9px; font-size: 12px; line-height: 1.5; color: var(--text-2); background: var(--surface-2); border: 1px dashed var(--line-2); }
 .wizard-note svg { flex: none; margin-top: 2px; color: var(--accent-text); }
-.wizard-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line-2); }
+/* The sheet scrolls; its parts must keep their height. Left to shrink, a long step squeezed under the buttons. */
+.sheet > * { flex-shrink: 0; }
+/* Back / Next stay at the bottom of the sheet while a long step scrolls, so the next step is always one tap away. */
+.wizard-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line-2);
+  position: sticky; bottom: -28px; z-index: 2; background: var(--paper); margin-bottom: -12px; }
 .pick-list { display: flex; flex-direction: column; gap: 6px; }
 .pick { display: flex; align-items: center; gap: 10px; padding: 9px 10px; text-align: left; border-radius: 10px; border: 1px solid var(--line-2); background: #fff; transition: border-color 160ms, background 160ms; }
 .pick.on { border-color: var(--sel); background: var(--sel-bg); }
@@ -1128,6 +1141,7 @@ button.ring-row:hover { background: var(--surface-2); }
 
   .sheet-backdrop { align-items: center; justify-content: center; padding: 24px; }
   .sheet { width: min(560px, 100%); max-height: 88vh; border-radius: 16px; padding: 22px 24px 24px; animation: pop 240ms var(--ease) both; box-shadow: var(--shadow-2), 0 40px 80px -30px color-mix(in srgb, var(--ink) 50%, transparent); }
+  .wizard-foot { bottom: -24px; } /* matches this sheet's bottom padding */
   .sheet-grip { display: none; }
   .toasts { left: auto; right: 28px; bottom: 28px; width: 380px; }
 }
@@ -1288,8 +1302,6 @@ button.ring-row:hover { background: var(--surface-2); }
 @keyframes door-in { from { opacity: 0; transform: translateY(16px) scale(0.85); } to { opacity: 1; transform: none; } }
 .welcome-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
 .welcome-privacy { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
-.welcome-hide { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); cursor: pointer; }
-.welcome-hide input { width: 16px; height: 16px; accent-color: var(--accent-2); }
 
 /* ---------- interface language, family helpers, your data ---------- */
 .lang-switch { display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 3px; flex: none; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface); box-shadow: var(--shadow-1); }

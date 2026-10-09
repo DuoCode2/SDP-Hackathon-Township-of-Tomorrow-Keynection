@@ -105,7 +105,7 @@ def _warranty_ticket(client, followup="wall_after_crack") -> dict:
         "name": name, "kind": kind, "subject": "Shared wall with No. 12", "renovation_intro_id": intro}).json()
     b, f = demo("wall_before", "baseline", intro_id), demo(followup, "followup")
     case = client.post("/api/incidents", json={"reporter_unit_id": "T-11", "baseline_photo_id": b["id"], "followup_photo_id": f["id"]}).json()
-    client.post(f"/api/incidents/{case['id']}/decision", json={"decision": "warranty", "decided_by": "sdp_inspector"})
+    client.post(f"/api/incidents/{case['id']}/decision", json={"unit_id": "T-11", "decision": "warranty"})
     return client.get("/api/units/T-11/warranty").json()[0]
 
 

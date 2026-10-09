@@ -5,7 +5,8 @@ import ConcernCard from '../components/ConcernCard'
 import FrontDesk from '../components/FrontDesk'
 import WarrantyClock from '../components/WarrantyClock'
 import { Badge, Card, CardHead, CountUp, Empty, formatDate, Ring, ScreenTitle, Segmented, Skeleton, useToast } from '../ui'
-import { TICKET_BADGE } from './RepairView'
+import { ticketBadge } from './RepairView'
+import { tEn } from '../i18n'
 import { replayWelcome } from './CircleView'
 
 const SUBCONTRACTORS = ['Jaya Plaster Sdn Bhd', 'Kemas Waterproofing', 'Bina Teguh Builders']
@@ -89,7 +90,7 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
               )}
               {desk === 'estate' && (
                 <Card>
-                  <CardHead icon={<Building2 size={16} />} tone="red" title="Estate team: neighbour concerns" sub="Escalated concerns first. The rest are still being handled between neighbours." />
+                  <CardHead icon={<Building2 size={16} />} tone="red" title="Estate team: neighbour concerns" sub="Only concerns a neighbour escalated. Everything else stays between the two homes." />
                   {concerns.length === 0 ? (
                     <Empty art="handshake" icon={<Handshake size={22} />} title="No concerns">Concerns start between neighbours. Only the ones they can't settle are escalated here.</Empty>
                   ) : (
@@ -145,8 +146,8 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
                 <div className="card-row">
                   <ShieldCheck size={22} color="var(--accent)" />
                   <div className="grow">
-                    <div className="card-title" style={{ fontSize: 14 }}>Home logs verified · {d.home_histories_verified}/{d.households}</div>
-                    <div className="muted small">No record in any home has been edited or deleted.</div>
+                    <div className="card-title" style={{ fontSize: 14 }}>Home logs consistent · {d.home_histories_verified}/{d.households}</div>
+                    <div className="muted small">Every home's chain links up (server check; owner receipts come with the pilot).</div>
                   </div>
                 </div>
               </Card>
@@ -198,7 +199,7 @@ function QueueItem({ ticket, onChange }: { ticket: WarrantyTicket; onChange: () 
           <div className="card-title" style={{ fontSize: 14 }}>{ticket.subject}</div>
           {ticket.reopen_count > 0 && <div className="small" style={{ color: 'var(--red)' }}>Owner rejected: “{ticket.owner_note}”</div>}
         </div>
-        {TICKET_BADGE[ticket.status]}
+        {ticketBadge(tEn, ticket.status)}
       </div>
       <WarrantyClock clock={ticket.clock} closed={ticket.status === 'closed'} compact />
       {ticket.status === 'open' && (

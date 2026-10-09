@@ -164,7 +164,7 @@ function Helpers({ me, version, onChange }: { me: UnitInfo; version: number; onC
     setBusy(true)
     setWhy(null)
     try {
-      const d = await api.addDelegate(me.id, name.trim(), relation)
+      const d = await api.addDelegate(me.id, name.trim(), relation, consent)
       toast(t('helpers.added', { name: d.name }))
       setName('')
       setConsent(false)

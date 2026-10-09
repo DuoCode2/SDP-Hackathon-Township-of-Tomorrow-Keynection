@@ -3,7 +3,8 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
-RENO = {"scope": "Extend kitchen (rear wall)", "start": "2026-10-15", "end": "2026-10-30", "works_type": "structural"}
+RENO = {"scope": "Extend kitchen (rear wall)", "start": "2026-10-15", "end": "2026-10-30", "works_type": "structural",
+        "council_permit": "approved"}
 
 
 @pytest.fixture()

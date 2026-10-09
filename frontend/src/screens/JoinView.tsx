@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Check, Hand, House, KeyRound, Lock, ShieldCheck, Sparkles } from 'lucide-react'
 import { api, ApiError, type JoinInfo, type Lang, type UnitInfo } from '../api'
-import { refusal, useT } from '../i18n'
+import { refusal, useDates, useT } from '../i18n'
 import { Logo } from '../components/Art'
-import { Card, formatDate, Steps, useCelebrate, useToast } from '../ui'
+import { Card, Steps, useCelebrate, useToast } from '../ui'
 import { replayWelcome } from './CircleView'
 
 const LANGS: { code: Lang; name: string }[] = [{ code: 'en', name: 'English' }, { code: 'ms', name: 'Bahasa Melayu' }, { code: 'zh', name: '中文' }]
@@ -28,6 +28,7 @@ function forget(unitId: string) {
 /** A household that hasn't joined: scan the handover code, choose a name and language, agree to the privacy notice. */
 export default function JoinView({ me, onJoined }: { me: UnitInfo; onJoined: () => void }) {
   const t = useT()
+  const dates = useDates()
   const toast = useToast()
   const celebrate = useCelebrate()
   const [token, setToken] = useState<string | null>(() => storedCode(me.id))
@@ -132,7 +133,7 @@ export default function JoinView({ me, onJoined }: { me: UnitInfo; onJoined: () 
               <li><ShieldCheck size={15} /> {t('join.b2')}</li>
               <li><Check size={15} /> {t('join.b3')}</li>
             </ul>
-            <small className="muted">{t('join.expires', { date: formatDate(info.expires_at) })}</small>
+            <small className="muted">{t('join.expires', { date: dates.date(info.expires_at) })}</small>
           </div>
         )}
         {step === 1 && (

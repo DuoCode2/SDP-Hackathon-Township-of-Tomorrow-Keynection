@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -20,8 +23,11 @@ def _thread(client, me, other):
     return client.get(f"/api/units/{me}/conversations/{other}").json()
 
 
-def _voice(client, frm="T-12", to="T-11", data=b"RIFF" + b"\0" * 200, ctype="audio/wav", duration="4"):
-    return client.post("/api/messages/voice", data={"from_unit_id": frm, "to_unit_id": to, "duration": duration},
+WAV = b"RIFF" + b"\0" * 4 + b"WAVE" + b"\0" * 200  # the smallest header a real WAV file starts with
+
+
+def _voice(client, frm="T-12", to="T-11", data=WAV, ctype="audio/wav", duration="4", **form):
+    return client.post("/api/messages/voice", data={"from_unit_id": frm, "to_unit_id": to, "duration": duration, **form},
                        files={"file": ("note.wav", data, ctype)})
 
 
@@ -77,6 +83,26 @@ def test_voice_note_round_trip_and_privacy(client):
     assert convo["last"].startswith("🎤")
 
 
+def test_voice_note_must_really_be_audio(client):
+    page = b"<html><script>alert(1)</script></html>" + b" " * 100
+    assert _voice(client, data=page, ctype="audio/webm").status_code == 415
+    assert _voice(client, data=b"RIFF" + b"\0" * 200).status_code == 415  # RIFF but not WAVE
+    assert _voice(client, data=b"\x1a\x45\xdf\xa3" + b"\0" * 200, ctype="audio/webm").status_code == 201  # Chrome
+    assert _voice(client, data=b"\0\0\0\x20ftypM4A " + b"\0" * 200, ctype="audio/mp4").status_code == 201  # Safari
+
+
+def test_a_refused_voice_note_leaves_no_file_behind(client):
+    folder = Path(os.environ["JIRAN_DB_PATH"]).parent / "voice"
+    assert _voice(client, delegate_id="999").status_code == 403  # not this household's helper
+    assert not folder.exists() or list(folder.iterdir()) == []
+
+
+def test_voice_notes_count_towards_the_daily_message_limit(client):
+    for i in range(30):
+        assert client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": f"note {i}"}).status_code == 201
+    assert _voice(client).status_code == 429
+
+
 def test_voice_note_limits(client):
     assert _voice(client, ctype="image/png").status_code == 415
     assert _voice(client, duration="61").status_code == 422
@@ -101,7 +127,7 @@ def test_quiet_mode_blocks_chat_but_not_formal_notices(client):
     assert _wave(client, "T-12", "T-11").status_code == 409
     intro = client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Works next week",
                                              "renovation": {"scope": "Extend kitchen", "start": "2026-10-15", "end": "2026-10-30",
-                                                            "works_type": "structural"}})
+                                                            "works_type": "structural", "council_permit": "approved"}})
     assert "T-11" in intro.json()["recipients"]
 
 

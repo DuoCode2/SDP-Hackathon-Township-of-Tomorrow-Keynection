@@ -1,7 +1,7 @@
 import { Printer } from 'lucide-react'
 import type { PaperNotice } from '../api'
-import { tEn, tIn } from '../i18n'
-import { Sheet, shortRange } from '../ui'
+import { dateIn, noisyHours, tEn, tIn } from '../i18n'
+import { Sheet } from '../ui'
 
 /** The notice the estate office prints for a household that isn't on Jiran5: in its language, with English below. */
 export default function PaperNoticeSheet({ notice, onClose, onPrinted }: { notice: PaperNotice; onClose: () => void; onPrinted: () => void }) {
@@ -27,8 +27,8 @@ export default function PaperNoticeSheet({ notice, onClose, onPrinted }: { notic
         {r && (
           <dl className="paper-grid">
             <div><dt>{both('reno.work')}</dt><dd>{r.scope}</dd></div>
-            <div><dt>{both('reno.dates')}</dt><dd>{shortRange(r.start, r.end)}</dd></div>
-            <div><dt>{both('reno.noisy')}</dt><dd>{r.noisy_hours}</dd></div>
+            <div><dt>{both('reno.dates')}</dt><dd>{dateIn(notice.lang, r.start)} – {dateIn(notice.lang, r.end)}</dd></div>
+            <div><dt>{both('reno.noisy')}</dt><dd>{noisyHours(t, r)}{notice.lang !== 'en' && <span className="paper-en">{noisyHours(tEn, r)}</span>}</dd></div>
             <div><dt>{both('reno.contractor')}</dt><dd>{r.contractor || '–'}{r.contractor_cidb_registered ? ' · CIDB ✓' : ''}</dd></div>
             {r.council_permit && <div><dt>{both('notice.permit')}</dt><dd>{both(`permit.${r.council_permit}`)}{r.permit_ref ? ` · ${r.permit_ref}` : ''}</dd></div>}
           </dl>

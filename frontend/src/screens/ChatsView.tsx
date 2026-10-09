@@ -5,16 +5,47 @@ import {
   TriangleAlert, Volume2, X,
 } from 'lucide-react'
 import {
-  api, type ChatIntro, type ChatMessage, type ChatWave, type ConcernCategory, type Conversation, type Official, type Thread,
+  api, type ChatIntro, type ChatMessage, type ChatWave, type ConcernCategory, type Conversation, type Official, type Preview, type Thread,
   type UnitInfo,
 } from '../api'
-import { byWho, refusal, useT, type Translate } from '../i18n'
+import { byWho, noisyHours, refusal, subjectText, useDates, useT, type Translate } from '../i18n'
 import { useHelper } from '../helper'
 import { LANG_TAG } from '../components/Cast'
 import ConcernCard from '../components/ConcernCard'
-import { Avatar, Empty, formatDate, formatTime, Sheet, shortRange, Skeleton, Stamp, useCelebrate, useToast } from '../ui'
+import { Avatar, Empty, Sheet, Skeleton, Stamp, useCelebrate, useToast } from '../ui'
 
 const langName = (t: Translate, code: string) => t(`lang.${code}`)
+
+/** An automatic notice in the reader's language. Notices from before codes existed show their English record. */
+function systemText(t: Translate, m: Pick<ChatMessage, 'code' | 'values' | 'text'>): string {
+  if (!m.code) return m.text
+  const v = m.values ?? {}
+  const who = v.name ? t('who', { name: v.name, label: v.label ?? '' }) + (v.helper ? t('sys.helper', { name: byWho(t, v.helper) }) : '') : ''
+  return t(`sys.${m.code}`, {
+    ...v,
+    who: v.both ? t('sys.bothOwners') : who,
+    what: v.category ? t(`cat.${v.category}`) : '',
+    // The estate notices add an optional "Note: …"; a disagreement quotes the reason itself.
+    note: m.code.startsWith('estate_') ? (v.note ? t('sys.note', { note: v.note }) : '') : (v.note ?? ''),
+    subject: v.subject ? subjectText(t, v.subject) : '',
+    outcome: v.outcome ? t(`lg.out.${v.outcome}`) : '',
+  })
+}
+
+const ESTATE_AUTHOR = 'SDP Estate Team'
+
+/** The last item of a chat, for the chat list, in the reader's language. */
+function previewText(t: Translate, p: Preview | null): string | null {
+  if (!p) return null
+  switch (p.kind) {
+    case 'renovation': return t('pv.renovation')
+    case 'wave': return t('pv.wave')
+    case 'voice': return t('pv.voice', { n: p.duration })
+    case 'concern': return t('pv.concern', { what: t(`cat.${p.category}`) })
+    case 'system': return systemText(t, p)
+    case 'text': return p.text
+  }
+}
 const CATEGORY_ICON: Record<ConcernCategory, typeof Volume2> = {
   noise_hours: Volume2, debris: Trash2, access: Car, damage: House, workers: HardHat, other: CircleHelp,
 }
@@ -30,6 +61,7 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
   onPeer: (id?: string) => void
 }) {
   const t = useT()
+  const dates = useDates()
   const root = useRef<HTMLElement>(null)
   const [wide, setWide] = useState(false)
   const [convos, setConvos] = useState<Conversation[] | null>(null)
@@ -69,7 +101,7 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
           <span className="grow">
             <span className="chat-row-top">
               <b>{t('estate.name')} <BadgeCheck size={13} className="verified" /></b>
-              {latest && <small>{formatDate(latest.created_at)}</small>}
+              {latest && <small>{dates.date(latest.created_at)}</small>}
             </span>
             <span className="chat-row-rel">{t('estate.readonly')}</span>
             <span className="chat-row-last">{latest ? latest.title : t('estate.none')}</span>
@@ -84,10 +116,10 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
             <span className="grow">
               <span className="chat-row-top">
                 <b>{c.resident_name} <i>· {c.label}</i></b>
-                {c.last_at && <small>{formatTime(c.last_at)}</small>}
+                {c.last_at && <small>{dates.time(new Date(c.last_at))}</small>}
               </span>
               <span className="chat-row-rel">{t(`rel.${c.relation}`)}{c.relation === 'left' || c.relation === 'right' ? ` · ${t('share.wallShort')}` : c.relation === 'above' || c.relation === 'below' ? ` · ${t('share.slab')}` : ''}</span>
-              <span className="chat-row-last">{c.blocked ? t('chats.blocked') : c.last ?? t('chats.sayHello')}</span>
+              <span className="chat-row-last">{c.blocked ? t('chats.blocked') : previewText(t, c.last_preview) ?? c.last ?? t('chats.sayHello')}</span>
             </span>
             <span className="chat-row-flags">
               {c.unread > 0 && <span className="unread">{c.unread}</span>}
@@ -119,6 +151,7 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
 
 function OfficialThread({ me, data, onRead, onBack }: { me: UnitInfo; data: Official | null; onRead: () => void; onBack?: () => void }) {
   const t = useT()
+  const dates = useDates()
   useEffect(() => {
     if (data && data.unread > 0) api.officialRead(me.id).then(onRead).catch(() => {})
   }, [data, me.id, onRead])
@@ -139,7 +172,7 @@ function OfficialThread({ me, data, onRead, onBack }: { me: UnitInfo; data: Offi
           <div key={n.id} className="official-notice">
             <div className="official-notice-top">
               <Stamp tone="blue" tilt={0}>{t(n.audience === 'phase' ? 'audience.phase' : n.audience === 'terrace' ? 'audience.terrace' : 'audience.block')}</Stamp>
-              <small>{formatDate(n.created_at)} · {formatTime(n.created_at)}</small>
+              <small>{dates.date(n.created_at)} · {dates.time(new Date(n.created_at))}</small>
             </div>
             <b>{n.title}</b>
             <p>{n.body}</p>
@@ -162,6 +195,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   onBack?: () => void
 }) {
   const tr = useT()
+  const dates = useDates()
   const toast = useToast()
   const celebrate = useCelebrate()
   const helper = useHelper(me.id)
@@ -291,7 +325,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
         <div className="sys-note"><ShieldCheck size={12} /> {tr('thread.private')}</div>
         {t.items.length === 0 && <div className="sys-note">{tr('thread.empty')}</div>}
         {t.items.map((item) => {
-          const day = formatDate(item.created_at)
+          const day = dates.date(item.created_at)
           const sep = day !== lastDay ? <div className="day-sep"><span>{day}</span></div> : null
           lastDay = day
           const key = `${item.type}-${item.id}`
@@ -302,9 +336,9 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
           if (item.kind === 'system') {
             return wrap(
               <div className="sys-msg">
-                <Stamp tone="ink" tilt={0}>{item.author ?? 'System'}</Stamp>
-                <p>{item.text}</p>
-                <small>{formatTime(item.created_at)}</small>
+                <Stamp tone="ink" tilt={0}>{item.author === ESTATE_AUTHOR ? tr('author.estate') : item.author ?? 'Jiran5'}</Stamp>
+                <p>{systemText(tr, item)}</p>
+                <small>{dates.time(new Date(item.created_at))}</small>
               </div>,
             )
           }
@@ -333,7 +367,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
                       ) : <span className="msg-tr"><Sparkles size={11} /> {tr('thread.quick')}</span>
                     )}
                     {item.sent_by && <span className="msg-by">{tr('thread.sentBy', { who: byWho(tr, item.sent_by) })}</span>}
-                    <span>{formatTime(item.created_at)}</span>
+                    <span>{dates.time(new Date(item.created_at))}</span>
                   </div>
                 </div>
                 {counts.length > 0 && (
@@ -410,10 +444,11 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
 
 function WaveItem({ item, mine, name, canWaveBack, onWaveBack }: { item: ChatWave; mine: boolean; name: string; canWaveBack: boolean; onWaveBack: () => void }) {
   const t = useT()
+  const dates = useDates()
   return (
     <div className={`wave-item ${mine ? 'mine' : ''}`}>
       <span className="wave-hand" aria-hidden>👋</span>
-      <span className="grow"><b>{t(mine ? 'wave.mine' : 'wave.theirs', { name })}</b><small>{formatTime(item.created_at)}</small></span>
+      <span className="grow"><b>{t(mine ? 'wave.mine' : 'wave.theirs', { name })}</b><small>{dates.time(new Date(item.created_at))}</small></span>
       {!mine && canWaveBack && <button className="btn btn-sm" onClick={onWaveBack}>{t('wave.back')}</button>}
     </div>
   )
@@ -504,19 +539,20 @@ function useRecorder(onDone: (blob: Blob, seconds: number) => void, onError: (me
 
 function IntroCard({ item, mine, onWave }: { item: ChatIntro; mine: boolean; onWave: () => void }) {
   const t = useT()
+  const dates = useDates()
   const r = item.renovation
   return (
     <div className={`notice ${mine ? 'mine' : ''}`}>
       <div className="notice-head">
         <Stamp tone={r ? 'amber' : 'brand'} tilt={-2}>{t(r ? 'notice.reno' : 'notice.intro')}</Stamp>
-        <small>{t(mine ? 'notice.mine' : 'notice.theirs')} · {formatTime(item.created_at)}{item.sent_by ? ` · ${t('thread.sentBy', { who: byWho(t, item.sent_by) })}` : ''}</small>
+        <small>{t(mine ? 'notice.mine' : 'notice.theirs')} · {dates.time(new Date(item.created_at))}{item.sent_by ? ` · ${t('thread.sentBy', { who: byWho(t, item.sent_by) })}` : ''}</small>
       </div>
       <p>{item.text}</p>
       {r && (
         <dl className="notice-grid">
           <div><dt>{t('reno.work')}</dt><dd>{r.scope}</dd></div>
-          <div><dt>{t('reno.dates')}</dt><dd>{shortRange(r.start, r.end)}</dd></div>
-          <div><dt>{t('reno.noisy')}</dt><dd>{r.noisy_hours}</dd></div>
+          <div><dt>{t('reno.dates')}</dt><dd>{dates.range(r.start, r.end)}</dd></div>
+          <div><dt>{t('reno.noisy')}</dt><dd>{noisyHours(t, r)}</dd></div>
           <div><dt>{t('reno.contractor')}</dt><dd>{r.contractor || '–'}{r.contractor_cidb_registered ? ' · CIDB ✓' : ''}</dd></div>
           {r.management_approval && <div><dt>{t('notice.jmb')}</dt><dd>{t(r.management_approval === 'approved' ? 'notice.approved' : 'notice.waiting')}</dd></div>}
           {r.council_permit && <div className={r.management_approval ? '' : 'wide'}><dt>{t('notice.permit')}</dt><dd>{t(`permit.${r.council_permit}`)}{r.permit_ref ? ` · ${r.permit_ref}` : ''}</dd></div>}
@@ -540,6 +576,7 @@ function ConcernSheet({ open, onClose, me, t, helperId, onRaised }: {
   onRaised: () => void
 }) {
   const tr = useT()
+  const dates = useDates()
   const toast = useToast()
   const [category, setCategory] = useState<ConcernCategory>('noise_hours')
   const [note, setNote] = useState('')
@@ -578,7 +615,7 @@ function ConcernSheet({ open, onClose, me, t, helperId, onRaised }: {
       {t.their_renovations.length > 1 && (
         <label className="field">{tr('concern.about')}
           <select value={reno?.intro_id} onChange={(e) => setIntroId(Number(e.target.value))}>
-            {t.their_renovations.map((r) => <option key={r.intro_id} value={r.intro_id}>{r.scope} · {shortRange(r.start, r.end)}</option>)}
+            {t.their_renovations.map((r) => <option key={r.intro_id} value={r.intro_id}>{r.scope} · {dates.range(r.start, r.end)}</option>)}
           </select>
         </label>
       )}

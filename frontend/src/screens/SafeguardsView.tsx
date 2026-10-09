@@ -45,7 +45,9 @@ const RISKS: Risk[] = [
     icon: <Camera size={18} />, title: 'False or edited evidence', risk: 'Someone uploads an old photo, or edits a record later to win a dispute.',
     measures: [
       { text: 'Each photo is fingerprinted (SHA-256) the moment it is saved, with a server timestamp', built: true },
-      { text: 'Every record is chained to the one before it; any later edit breaks the chain visibly', built: true },
+      { text: 'Every record is chained to the one before it; a quiet edit to an old record breaks the chain', built: true },
+      { text: 'No one can add records by hand: only the app\'s own steps write to a home log', built: true },
+      { text: 'Signed receipts to the owner and a daily outside timestamp, so no one (SDP included) can rewrite a log unseen', built: false },
       { text: 'In-app camera only, so gallery photos cannot be passed off as new', built: false },
     ],
     see: { tab: 'log', label: 'Home log' },
@@ -54,10 +56,13 @@ const RISKS: Risk[] = [
     icon: <Gavel size={18} />, title: 'Wrong automated judgement', risk: 'Software blaming the wrong party for a crack or a leak.',
     measures: [
       { text: 'The comparison only marks what changed; a transparent rule suggests, people decide', built: true },
-      { text: '"Ask an SDP inspector" is always an option when owners disagree', built: true },
+      { text: 'A change photographed before work began is never put down to the renovation', built: true },
+      { text: 'Blaming the renovation is only a proposal until the renovating owner agrees; nothing is pre-selected', built: true },
+      { text: '"Ask an SDP inspector" is always an option when owners disagree; residents cannot record an inspector\'s finding', built: true },
+      { text: 'A real inspector role with SDP sign-in records the finding', built: false },
       { text: 'Photos that cannot be aligned are sent back for a retake instead of guessed', built: true },
     ],
-    see: { tab: 'evidence', label: 'Evidence' },
+    see: { tab: 'evidence', label: 'Photos & repairs' },
   },
   {
     icon: <Clock4 size={18} />, title: 'Slow or disputed repairs', risk: 'Defects drag on, which is what SDP App reviewers complain about most.',

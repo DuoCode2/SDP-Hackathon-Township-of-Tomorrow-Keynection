@@ -103,7 +103,7 @@ def test_directory_shows_units_not_names_outside_the_circle(client):
 
 
 def test_who_is_renovating_is_only_visible_to_the_impact_zone(client):
-    client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi", "renovation": {**RENO, "works_type": "structural"}})
+    client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi", "renovation": {**RENO, "works_type": "structural", "council_permit": "approved"}})
     assert "T-12" in client.get("/api/units/T-11/directory").json()["works"]
     assert "T-12" in client.get("/api/units/T-12/directory").json()["works"]
     assert "T-12" not in client.get("/api/units/T-15/directory").json()["works"]

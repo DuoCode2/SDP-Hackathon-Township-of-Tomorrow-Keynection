@@ -1,9 +1,13 @@
-"""Tamper-evident home history (屋历).
+"""Chained home history (屋历).
 
 Every record for a home is appended to that home's own hash chain:
-hash = sha256(previous hash + this record). Editing or deleting any past record
-breaks every hash after it, so the chain shows whether the history was changed.
-No blockchain needed.
+hash = sha256(previous hash + this record). Quietly editing or removing a past record
+breaks every hash after it.
+
+What it does not prove on its own: whoever can write to the database can recompute the
+whole chain, and dropping the newest record leaves a valid shorter chain. The same server
+also does the checking. Independence needs the pilot's signed receipts to the owner and a
+daily fingerprint stamped outside SDP. No blockchain needed.
 """
 
 import hashlib

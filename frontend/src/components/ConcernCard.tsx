@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { BellRing, Building2, Check, CircleCheck, HandHeart, MessageSquareWarning, Send } from 'lucide-react'
 import { api, type Concern } from '../api'
-import { byWho, tEn, useT } from '../i18n'
-import { formatDate, formatTime, Stamp, useToast } from '../ui'
+import { byWho, tEn, useDates, useT } from '../i18n'
+import { Stamp, useToast } from '../ui'
 
 const TONE: Record<Concern['status'], 'amber' | 'blue' | 'brand' | 'red' | 'ink'> = {
   open: 'amber', acknowledged: 'blue', resolved: 'brand', escalated: 'red', closed_by_estate: 'ink',
@@ -17,6 +17,7 @@ export default function ConcernCard({ concern: c, viewer, estate = false, onChan
 }) {
   const local = useT()
   const t = estate ? tEn : local // the estate desk is a records screen: English
+  const dates = useDates() // SDP's screens wrap this in English, so dates follow the same rule
   const toast = useToast()
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -51,7 +52,7 @@ export default function ConcernCard({ concern: c, viewer, estate = false, onChan
       <div className="concern-head">
         <MessageSquareWarning size={16} />
         <div className="grow">
-          <div className="concern-kicker">{t('cc.kicker', { from: `${c.from_name} (${c.from_label})`, to: `${c.to_name} (${c.to_label})` })}</div>
+          <div className="concern-kicker">{t('cc.kicker', { from: t('who', { name: c.from_name, label: c.from_label }), to: t('who', { name: c.to_name, label: c.to_label }) })}</div>
           <div className="concern-title">{t(`cat.${c.category}`)}</div>
         </div>
         <Stamp tone={TONE[c.status]} tilt={-3}>{t(`cc.${c.status}`)}</Stamp>
@@ -63,7 +64,7 @@ export default function ConcernCard({ concern: c, viewer, estate = false, onChan
           <li key={i} className={`${st.done ? 'done' : ''} ${'alert' in st && st.alert ? 'alert' : ''}`}>
             <span className="ladder-dot">{st.done ? <Check size={10} strokeWidth={3} /> : i + 1}</span>
             <b>{st.label}</b>
-            <small>{st.at ? `${formatDate(st.at)} · ${formatTime(st.at)}` : '—'}</small>
+            <small>{st.at ? `${dates.date(st.at)} · ${dates.time(new Date(st.at))}` : '—'}</small>
           </li>
         ))}
       </ol>

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Eye, Hammer, Languages, Lock, Map as MapIcon, MessagesSquare, UserPlus, Users, X } from 'lucide-react'
-import { api, type ContactRequest, type Directory, type NearbyHome, type UnitInfo } from '../api'
-import { refusal, useT, type Translate } from '../i18n'
+import { Camera, Eye, Hammer, Languages, Lock, Map as MapIcon, MessagesSquare, UserPlus, Users, X } from 'lucide-react'
+import { api, type ContactRequest, type Directory, type NearbyHome, type RenovationTask, type UnitInfo } from '../api'
+import { refusal, useDates, useT, type Translate } from '../i18n'
 import PlanMap from '../components/PlanMap'
 import { LANG_TAG, roleOf } from '../components/Cast'
-import { Avatar, Badge, Card, CardHead, formatDate, ScreenTitle, Segmented, Sheet, Skeleton, useCelebrate, useToast } from '../ui'
+import { Avatar, Badge, Card, CardHead, ScreenTitle, Segmented, Sheet, Skeleton, useCelebrate, useToast } from '../ui'
 import { Logo } from '../components/Art'
 import IntroWizard from './IntroWizard'
 
@@ -15,6 +15,25 @@ interface Props {
   onChange: () => void
   onViewAs: (unitId: string) => void
   onOpenChat: (unitId: string) => void
+  onOpenEvidence: () => void
+}
+
+/** Whole days from today (Malaysian calendar) to an ISO date. */
+function daysUntil(iso: string): number {
+  const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }))
+  today.setHours(0, 0, 0, 0)
+  const [y, m, d] = iso.split('-').map(Number)
+  return Math.round((new Date(y, m - 1, d).getTime() - today.getTime()) / 86_400_000)
+}
+
+/** Work next door that hasn't started yet and still needs this household's pre-work photo: the most
+ *  time-sensitive thing on the page, because once work begins the photo can no longer show "before". */
+function photoTasksDue(tasks: RenovationTask[]): (RenovationTask & { days: number })[] {
+  return tasks
+    .filter((x) => x.needs_photo && !x.baseline)
+    .map((x) => ({ ...x, days: daysUntil(x.renovation.start) }))
+    .filter((x) => x.days >= 0)
+    .sort((a, b) => a.days - b.days)
 }
 
 type Member = Directory['circle'][number] & { waved_today?: boolean; allow_waves?: boolean }
@@ -30,33 +49,47 @@ const shares = (t: Translate, relation: string) => t(SHARES[relation] ?? `rel.${
 const langName = (t: Translate, code: string) => t(`lang.${code}`)
 
 /** Who lives around you and who you can talk to: people first, the plan one tap away. */
-// The welcome greets you once per page load, until you tick "Don't show this again".
-const HIDE_WELCOME = 'jiran5.welcome.hidden'
-let welcomedThisLoad = false
+// The welcome greets each household once. Seen is remembered per household on this device; the Me page and a
+// demo reset bring it back. (A private window remembers nothing, so it shows once per page load there.)
+const SEEN_KEY = 'jiran5.welcome.seen'
+const seenThisLoad = new Set<string>()
 
-function welcomeHidden(): boolean {
+function seenHomes(): string[] {
   try {
-    return localStorage.getItem(HIDE_WELCOME) === '1'
+    return JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]') as string[]
   } catch {
-    return false
+    return []
+  }
+}
+
+function welcomeSeen(unitId: string): boolean {
+  return seenThisLoad.has(unitId) || seenHomes().includes(unitId)
+}
+
+function markWelcomeSeen(unitId: string) {
+  seenThisLoad.add(unitId)
+  try {
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...new Set([...seenHomes(), unitId])]))
+  } catch {
+    /* private window: remembered for this page load only */
   }
 }
 
 /** Bring the welcome back (from the Me page, or after a demo reset). */
 export function replayWelcome() {
-  welcomedThisLoad = false
+  seenThisLoad.clear()
   try {
-    localStorage.removeItem(HIDE_WELCOME)
+    localStorage.removeItem(SEEN_KEY)
   } catch {
     /* private window: nothing stored anyway */
   }
 }
 
-export default function CircleView({ me, units, version, onChange, onViewAs, onOpenChat }: Props) {
+export default function CircleView({ me, units, version, onChange, onViewAs, onOpenChat, onOpenEvidence }: Props) {
   const t = useT()
   const toast = useToast()
   const celebrate = useCelebrate()
-  const [welcome, setWelcome] = useState(() => !welcomedThisLoad && !welcomeHidden())
+  const [welcome, setWelcome] = useState(() => !welcomeSeen(me.id))
   const [dir, setDir] = useState<Directory | null>(null)
   const [reqs, setReqs] = useState<{ incoming: ContactRequest[]; outgoing: ContactRequest[] } | null>(null)
   const [mode, setMode] = useState<'people' | 'map'>('people')
@@ -65,6 +98,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
   const [profile, setProfile] = useState<Member | null>(null)
   const [introOpen, setIntroOpen] = useState(false)
   const [requestFor, setRequestFor] = useState<NearbyHome | null>(null)
+  const [photoTasks, setPhotoTasks] = useState<ReturnType<typeof photoTasksDue>>([])
 
   useEffect(() => {
     let live = true
@@ -73,6 +107,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
       setDir(d)
       setReqs(r)
     })
+    api.evidence(me.id).then((e) => live && setPhotoTasks(photoTasksDue(e.renovations))).catch(() => live && setPhotoTasks([]))
     return () => {
       live = false
     }
@@ -127,6 +162,16 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
               </button>
             ))}
           </div>
+
+          {photoTasks.map((x) => (
+            <Card key={x.intro_id} className="alert photo-due">
+              <CardHead icon={<Camera size={16} />} tone="amber"
+                title={t('photo.title', { name: x.from_name, label: x.from_label,
+                  when: x.days === 0 ? t('photo.today') : x.days === 1 ? t('photo.tomorrow') : t('photo.inDays', { n: x.days }) })}
+                sub={t('photo.sub')} />
+              <button className="btn btn-primary" onClick={onOpenEvidence}><Camera size={16} /> {t('photo.cta')}</button>
+            </Card>
+          ))}
 
           {pendingIn.length > 0 && (
             <Card className="alert">
@@ -247,12 +292,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
       )}
       {introOpen && <IntroWizard open onClose={() => setIntroOpen(false)} me={me} circle={circle} onSent={() => { celebrate('👋', t('celebrate.hello')); onChange() }} />}
       {welcome && dir && (
-        <Welcome me={me} circle={circle} onShown={() => { welcomedThisLoad = true }} onClose={(hide) => {
-          if (hide) {
-            try { localStorage.setItem(HIDE_WELCOME, '1') } catch { /* private window */ }
-          }
-          setWelcome(false)
-        }} onIntro={() => setIntroOpen(true)} />
+        <Welcome me={me} circle={circle} onClose={() => { markWelcomeSeen(me.id); setWelcome(false) }} onIntro={() => setIntroOpen(true)} />
       )}
       {requestFor && <RequestSheet home={requestFor} me={me} onClose={() => setRequestFor(null)} onSent={onChange} />}
     </section>
@@ -444,23 +484,21 @@ function RequestSheet({ home, me, onClose, onSent }: { home: NearbyHome; me: Uni
 }
 
 /** The moment you meet the homes around yours. */
-function Welcome({ me, circle, onShown, onClose, onIntro }: {
+function Welcome({ me, circle, onClose, onIntro }: {
   me: UnitInfo
   circle: Member[]
-  onShown: () => void
-  onClose: (hide: boolean) => void
+  onClose: () => void
   onIntro: () => void
 }) {
   const t = useT()
-  const [hide, setHide] = useState(false)
-  useEffect(onShown, [onShown])
+  const dates = useDates()
   return (
-    <Sheet open onClose={() => onClose(hide)} wide>
+    <Sheet open onClose={onClose} wide>
       <div className="welcome">
         <div className="welcome-logo"><Logo size={44} /></div>
         <div className="eyebrow">{t('welcome.eyebrow')}</div>
         <h1>{t('welcome.title', { name: me.resident_name })}</h1>
-        <p>{t('welcome.body', { label: me.label, date: formatDate(me.handover_date), n: circle.length })}</p>
+        <p>{t('welcome.body', { label: me.label, date: dates.date(me.handover_date), n: circle.length })}</p>
         <div className="welcome-doors">
           {circle.map((n, i) => (
             <div key={n.id} className={`welcome-door ${n.joined ? '' : 'off'}`} style={{ ['--i' as string]: i }}>
@@ -472,12 +510,9 @@ function Welcome({ me, circle, onShown, onClose, onIntro }: {
         </div>
         {circle.some((n) => !n.joined) && <small className="welcome-nj">{t('nj.welcome', { n: circle.filter((n) => !n.joined).length })}</small>}
         <div className="welcome-actions">
-          <button className="btn" onClick={() => onClose(hide)}>{t('welcome.later')}</button>
-          <button className="btn btn-primary" onClick={() => { onClose(hide); onIntro() }}>👋 {t('welcome.hello')}</button>
+          <button className="btn" onClick={onClose}>{t('welcome.later')}</button>
+          <button className="btn btn-primary" onClick={() => { onClose(); onIntro() }}>👋 {t('welcome.hello')}</button>
         </div>
-        <label className="welcome-hide">
-          <input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} /> {t('welcome.hide')}
-        </label>
         <small className="welcome-privacy"><Lock size={12} /> {t('welcome.privacy')}</small>
       </div>
     </Sheet>

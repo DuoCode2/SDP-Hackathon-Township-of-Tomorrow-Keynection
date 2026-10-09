@@ -17,7 +17,7 @@ def client(tmp_path, monkeypatch):
 
 def _voice(client, frm="T-12", to="T-11"):
     return client.post("/api/messages/voice", data={"from_unit_id": frm, "to_unit_id": to, "duration": "3"},
-                       files={"file": ("v.wav", b"RIFF" + b"\0" * 200, "audio/wav")}).json()
+                       files={"file": ("v.wav", b"RIFF" + b"\0" * 4 + b"WAVE" + b"\0" * 200, "audio/wav")}).json()
 
 
 def _backdate(client, message_id, days=31):
@@ -78,7 +78,8 @@ def test_helpers_are_limited_checked_and_revocable(client):
 def test_helper_registering_renovation_is_written_to_the_home_log(client):
     helper = client.post("/api/units/T-12/delegates", json={"name": "Nora", "relation": "spouse", "consent": True}).json()
     client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Works next week", "delegate_id": helper["id"],
-                                     "renovation": {"scope": "Extend kitchen", "start": "2026-10-15", "end": "2026-10-30", "works_type": "structural"}})
+                                     "renovation": {"scope": "Extend kitchen", "start": "2026-10-15", "end": "2026-10-30", "works_type": "structural",
+                                                    "council_permit": "approved"}})
     event = next(e for e in client.get("/api/units/T-12/history").json()["events"] if e["type"] == "renovation_registered")
     assert event["payload"]["acted_by"] == "Nora (spouse)"
 

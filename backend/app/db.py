@@ -68,9 +68,13 @@ CREATE TABLE IF NOT EXISTS incidents (
     followup_photo_id TEXT NOT NULL REFERENCES photos(id),
     comparison TEXT NOT NULL,
     hint TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'open',
+    -- open -> decided, or open -> proposed (the neighbour blames the renovation) -> decided | disputed -> decided
+    status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'proposed', 'disputed', 'decided')),
     decision TEXT,
-    decision_note TEXT,
+    decision_note TEXT,   -- from the household that reported the change
+    response_note TEXT,   -- from the renovating household
+    proposed_at TEXT,
+    decided_by TEXT CHECK (decided_by IN ('reporter', 'renovating_owner', 'both_owners')),
     decided_at TEXT,
     created_at TEXT NOT NULL
 );
@@ -91,7 +95,9 @@ CREATE TABLE IF NOT EXISTS gate_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     pass_id INTEGER REFERENCES passes(id),
     allowed INTEGER NOT NULL,
-    reason TEXT NOT NULL,
+    reason TEXT NOT NULL,       -- English, for the record
+    reason_code TEXT,           -- with reason_values (JSON): shown in the reader's language
+    reason_values TEXT,
     scanned_for TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
@@ -127,6 +133,8 @@ CREATE TABLE IF NOT EXISTS messages (
     withheld INTEGER NOT NULL DEFAULT 0,
     private INTEGER NOT NULL DEFAULT 0,
     sent_by TEXT,
+    sys_code TEXT,              -- automatic notices: code + values (JSON), so the app shows them in each reader's language
+    sys_values TEXT,
     created_at TEXT NOT NULL,
     read_at TEXT
 );
@@ -248,6 +256,8 @@ CREATE TABLE IF NOT EXISTS events (
     prev_hash TEXT NOT NULL,
     hash TEXT NOT NULL
 );
+-- Backstop for append_event's lock: a home's log can never have two records chained onto the same one.
+CREATE UNIQUE INDEX IF NOT EXISTS events_one_chain ON events (unit_id, prev_hash);
 """
 
 
@@ -263,7 +273,7 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 9
 TABLES = ("paper_notices", "join_codes", "delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
           "warranty_tickets", "gate_logs", "passes", "incidents", "photos",
           "intro_recipients", "intros", "events", "units", "phases")
@@ -311,6 +321,10 @@ def _seed(conn: sqlite3.Connection) -> None:
 
 
 def append_event(conn: sqlite3.Connection, unit_id: str, event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
+    # Take the write lock before reading the last hash. Otherwise two requests can both read the same last record
+    # and both chain onto it, forking the log. If this request already wrote something, it holds the lock already.
+    if not conn.in_transaction:
+        conn.execute("BEGIN IMMEDIATE")
     last = conn.execute("SELECT hash FROM events WHERE unit_id = ? ORDER BY id DESC LIMIT 1", (unit_id,)).fetchone()
     prev_hash = last["hash"] if last else ledger.GENESIS_HASH
     created_at = now()

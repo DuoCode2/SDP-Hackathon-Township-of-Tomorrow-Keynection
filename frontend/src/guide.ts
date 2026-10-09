@@ -129,10 +129,11 @@ export const PAGES: Record<TabId, PageGuide> = {
     },
     features: {
       zh: [
-        '开工前照片：去掉 GPS 和相机资料，用 SHA-256 指纹封存，日后不能偷改',
+        '开工前照片：去掉 GPS 和相机资料，SHA-256 指纹记进屋历',
         '跟进照片自动对齐，扫描后用红框标出新裂缝或水渍',
-        '按公开规则给建议（装修造成 / 建筑瑕疵 / 请检查员 / 没有变化 / 请重拍），由人来决定',
-        '选「Building defect」会自动开 SDP 保修单',
+        '按公开规则给建议（装修造成 / 建筑瑕疵 / 请检查员 / 没有变化 / 请重拍），由人来决定；开工前就拍到的变化不会算到装修头上',
+        '「装修造成」只是提出：装修户同意才定案，不同意就请 SDP 检查员；住户不能自称检查员',
+        '选「Building defect」会自动开 SDP 保修单（这是屋主自己的权利，不用邻居同意）',
         'SDP 修好后，系统拿维修照片跟开工前照片核对',
         '只有屋主能按 Accept 关单；按 Not fixed 驳回，保修单会重开',
         '保修单显示《房屋发展法》时钟：交屋后 24 个月保修期内，发展商要在 30 天内修好；驳回也不会重新计时',
@@ -140,8 +141,9 @@ export const PAGES: Record<TabId, PageGuide> = {
       en: [
         'Pre-work photo: GPS and camera data stripped, sealed with a SHA-256 fingerprint',
         'Follow-up photo is auto-aligned; a scan marks new cracks or stains with red boxes',
-        'Rule-based suggestion (renovation / building defect / inspector / no change / retake); people decide',
-        '"Building defect" opens an SDP warranty ticket automatically',
+        'Rule-based suggestion (renovation / building defect / inspector / no change / retake); people decide. A change photographed before work began is never put down to the renovation',
+        '"Caused by the renovation" is only a proposal until the renovating owner agrees; if they disagree, an SDP inspector checks. Residents cannot record an inspector\'s finding',
+        '"Building defect" opens an SDP warranty ticket automatically (the owner\'s own right; no neighbour sign-off needed)',
         'SDP\'s repair photo is checked against the pre-work photo',
         'Only the owner can Accept and close; "Not fixed" reopens the ticket',
         'Each ticket shows the Housing Development Act clock: within the 24-month liability period, repairs are due in 30 days; rejecting does not restart it',
@@ -154,7 +156,7 @@ export const PAGES: Record<TabId, PageGuide> = {
   },
   log: {
     layer: { zh: '屋历', en: 'Home log' },
-    title: { zh: '防篡改的屋历', en: 'Tamper-evident home log' },
+    title: { zh: '环环相扣的屋历', en: 'Chained home log' },
     what: {
       zh: '每户一条记录链：交屋、装修、通行证、照片、案件、维修、屋主确认，全都按时间串起来。',
       en: 'One chain of records per home: handover, renovation, passes, photos, cases, repairs and owner sign-off, in order.',
@@ -162,18 +164,22 @@ export const PAGES: Record<TabId, PageGuide> = {
     features: {
       zh: [
         '每一块都带自己的指纹和上一块的指纹',
-        '改动任何一笔，链就会断，最上面会从 CHAIN VERIFIED 变成警告',
+        '偷偷改动旧的一笔（又没把后面全部重算），链就会断，最上面会从 CHAIN CHECKED 变成警告',
+        '老实说明：目前由同一台服务器保存和检查；试点会给屋主每笔的签章收据，再每天把指纹盖上外部时间戳',
+        '只有 app 自己的步骤能写进屋历，没有人能手动加纪录',
         '照片记录直接显示缩图',
       ],
       en: [
         'Each block shows its own fingerprint and the previous one',
-        'Change any record and the chain breaks; the banner switches from CHAIN VERIFIED to a warning',
+        'A quiet edit to an old record (without recomputing everything after it) breaks the chain; the banner switches from CHAIN CHECKED to a warning',
+        'Said plainly: today the same server keeps and checks it; the pilot adds a signed receipt to the owner for each record and a daily outside timestamp',
+        'Only the app\'s own steps write to a home log; no one can add records by hand',
         'Photo records show a thumbnail',
       ],
     },
     why: {
-      zh: '以后卖房、保修、纠纷都能拿出一份大家都信得过的屋历。',
-      en: 'When selling, claiming warranty or settling a dispute, there is a history everyone can trust.',
+      zh: '以后保修和纠纷都有一份按时间串好、双方说法都在的纪录；试点加上外部时间戳后，才能当成大家都信得过的证据。',
+      en: 'Warranty claims and disputes get one ordered record with both sides in it; with the pilot\'s outside timestamps it becomes evidence everyone can rely on.',
     },
   },
   sdp: {
@@ -432,8 +438,8 @@ export const ROUTE: RouteStep[] = [
   {
     tab: 'log', unit: 'T-11',
     text: {
-      zh: '屋历：不满、升级、保修、维修、屋主确认全部在链上，显示 CHAIN VERIFIED',
-      en: 'Home log: concern, escalation, warranty, repair and sign-off are all chained; CHAIN VERIFIED',
+      zh: '屋历：不满、升级、保修、维修、屋主确认全部在链上，显示 CHAIN CHECKED',
+      en: 'Home log: concern, escalation, warranty, repair and sign-off are all chained; CHAIN CHECKED',
     },
   },
   {

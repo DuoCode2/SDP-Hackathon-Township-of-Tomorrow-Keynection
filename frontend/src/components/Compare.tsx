@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { MoveHorizontal } from 'lucide-react'
 import type { Region } from '../api'
+import { useT } from '../i18n'
 
 interface Props {
   before: string
@@ -16,6 +17,7 @@ interface Props {
 const HUD_COLOR = 'var(--red-bright)'
 
 export default function Compare({ before, after, overlay, regions, leftLabel, rightLabel, scan = true }: Props) {
+  const t = useT()
   const frame = useRef<HTMLDivElement>(null)
   const [highlight, setHighlight] = useState(true)
   const [scanning, setScanning] = useState(scan)
@@ -32,10 +34,10 @@ export default function Compare({ before, after, overlay, regions, leftLabel, ri
   return (
     <div className="card" style={{ padding: 12 }}>
       <div className="card-row">
-        <div className="grow mono muted">DRAG TO COMPARE</div>
+        <div className="grow mono muted">{t('cmp.drag')}</div>
         <div className="toggle">
-          <button className={highlight ? 'on' : ''} onClick={() => setHighlight(true)}>Detect</button>
-          <button className={!highlight ? 'on' : ''} onClick={() => setHighlight(false)}>Raw</button>
+          <button className={highlight ? 'on' : ''} onClick={() => setHighlight(true)}>{t('cmp.detect')}</button>
+          <button className={!highlight ? 'on' : ''} onClick={() => setHighlight(false)}>{t('cmp.raw')}</button>
         </div>
       </div>
       <div ref={frame} className="compare" style={{ ['--cut' as string]: '42%' }}>
@@ -58,7 +60,7 @@ export default function Compare({ before, after, overlay, regions, leftLabel, ri
                 }}
               >
                 <span className={`hud-label ${r.y < 0.14 ? 'below' : ''}`}>
-                  {String(i + 1).padStart(2, '0')} · {r.shape === 'line' ? 'LINE' : 'PATCH'} · {(r.area_ratio * 100).toFixed(2)}%
+                  {String(i + 1).padStart(2, '0')} · {t(r.shape === 'line' ? 'cmp.line' : 'cmp.patch')} · {(r.area_ratio * 100).toFixed(2)}%
                 </span>
               </div>
             ))}
@@ -69,7 +71,7 @@ export default function Compare({ before, after, overlay, regions, leftLabel, ri
         {scanning && (
           <>
             <div className="scan" />
-            <div className="scan-label">ALIGNING · ANALYSING</div>
+            <div className="scan-label">{t('cmp.aligning')}</div>
           </>
         )}
         <input type="range" min={0} max={100} defaultValue={42} aria-label="Drag to compare before and after"

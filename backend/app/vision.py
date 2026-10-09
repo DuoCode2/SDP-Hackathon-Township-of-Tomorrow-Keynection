@@ -15,7 +15,8 @@ from PIL import Image, ImageOps
 
 MAX_UPLOAD_BYTES = 12 * 1024 * 1024
 MAX_PIXELS = 40_000_000
-ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
+# MPO is a JPEG with extra embedded pictures (some phones save these); only its first picture is used.
+ALLOWED_FORMATS = {"JPEG", "MPO", "PNG", "WEBP"}
 FULL_SIDE = 1600
 THUMB_SIDE = 480
 WORK_WIDTH = 1000  # comparisons run at this width: fast and stable
@@ -50,7 +51,7 @@ class ProcessedPhoto:
 def ingest(raw: bytes) -> ProcessedPhoto:
     """Validate an upload and re-encode it.
 
-    Re-encoding drops every piece of metadata (EXIF, GPS location, camera serial),
+    Re-encoding drops every piece of metadata (EXIF, GPS location, camera serial, JPEG comments),
     so stored photos never leak where or with what device they were taken.
     """
     if len(raw) > MAX_UPLOAD_BYTES:
@@ -71,6 +72,9 @@ def ingest(raw: bytes) -> ProcessedPhoto:
         raise PhotoError("unsupported_format")
 
     img = ImageOps.exif_transpose(img).convert("RGB")
+    # convert() carries the source's info over, and Pillow writes a JPEG comment back out if it finds one there.
+    # Clear it so nothing the phone attached (comments, profiles, XMP) reaches the stored copies.
+    img.info.clear()
     img.thumbnail((FULL_SIDE, FULL_SIDE), Image.Resampling.LANCZOS)
     thumb = img.copy()
     thumb.thumbnail((THUMB_SIDE, THUMB_SIDE), Image.Resampling.LANCZOS)

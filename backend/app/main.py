@@ -38,13 +38,20 @@ HHMM = r"^([01]\d|2[0-3]):[0-5]\d$"
 MALAYSIA = timezone(timedelta(hours=8))
 GATE_OPEN, GATE_CLOSE = "08:00", "18:00"  # contractor entry hours; Sundays closed
 MAX_ACTIVE_PASSES = 3
-HOUSE_RULES = [
-    "Noisy work only within the hours in the renovation notice",
-    "No work on Sundays and public holidays",
-    "Debris goes into the booked skip, never the drains or open land",
-    "Protect the lift and common areas before moving materials",
-    "Workers must carry this pass and show it at the guardhouse",
+MAX_RENOVATION_DAYS = 365
+RENOVATION_TALK_DAYS = 30  # homes a renovation notice connects can keep talking this long after the work ends
+MAX_HELLOS_PER_DAY = 3
+MAX_RENOVATION_NOTICES_PER_DAY = 3
+# (code, English text): the text is the record; the code lets the app show the rule in the reader's language.
+HOUSE_RULE_LIST = [
+    ("noisy_hours_only", "Noisy work only within the hours in the renovation notice"),
+    ("no_sundays", "No work on Sundays and public holidays"),
+    ("debris", "Debris goes into the booked skip, never the drains or open land"),
+    ("protect_lift", "Protect the lift and common areas before moving materials"),
+    ("carry_pass", "Workers must carry this pass and show it at the guardhouse"),
 ]
+HOUSE_RULES = [text for _, text in HOUSE_RULE_LIST]
+HOUSE_RULE_CODES = [code for code, _ in HOUSE_RULE_LIST]
 
 
 def db_path() -> str:
@@ -60,6 +67,14 @@ def data_dir(name: str) -> Path:
 def demo_mode() -> bool:
     """Demo-only endpoints (reset, sample photos) are on for local runs and off when JIRAN_DEMO_MODE=0."""
     return os.environ.get("JIRAN_DEMO_MODE", "1") == "1"
+
+
+def staff_only() -> None:
+    """SDP back-office actions (estate, moderation, notices, warranty, dashboards). Staff sign-in comes with the
+    pilot; until then they run only in demo mode. Used as a route dependency, so it refuses before the request
+    body is even checked."""
+    if not demo_mode():
+        raise HTTPException(403, "This needs SDP staff sign-in, which comes with the pilot.")
 
 
 @asynccontextmanager
@@ -92,7 +107,35 @@ async def _voice_sweeper() -> None:
             log.exception("voice clean-up failed")
 
 
+class BodyLimit:
+    """Counts request bytes as they arrive, so a body sent without Content-Length (a chunked upload) is cut off at
+    the cap too; the guard below only sees the header. It must be the innermost middleware: the 413 is raised from
+    receive() straight into FastAPI's body parsing, which passes HTTPExceptions on. Wrapped by the guard's task
+    group instead, it would turn into a generic 400."""
+
+    def __init__(self, app: Any, limit: int) -> None:
+        self.app, self.limit = app, limit
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        seen = 0
+
+        async def counted() -> dict[str, Any]:
+            nonlocal seen
+            message = await receive()
+            if message["type"] == "http.request":
+                seen += len(message.get("body", b""))
+                if seen > self.limit:
+                    raise HTTPException(413, "Request too large. Photos must be under 12 MB.")
+            return message
+
+        await self.app(scope, counted, send)
+
+
 app = FastAPI(title="Jiran5 prototype API", version="0.2.0", lifespan=lifespan)
+app.add_middleware(BodyLimit, limit=MAX_REQUEST_BYTES)  # added first = innermost (see the class)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.environ.get("JIRAN_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
@@ -257,7 +300,9 @@ def _incident_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]
         "followup": _photo_json(_photo_row(conn, row["followup_photo_id"])),
         "comparison": comparison, "hint": json.loads(row["hint"]), "images": images,
         "status": row["status"], "decision": row["decision"], "decision_note": row["decision_note"],
-        "decided_at": row["decided_at"], "created_at": row["created_at"],
+        "response_note": row["response_note"], "proposed_at": row["proposed_at"],
+        "proposed_by": row["reporter_unit_id"] if row["proposed_at"] else None,
+        "decided_by": row["decided_by"], "decided_at": row["decided_at"], "created_at": row["created_at"],
     }
 
 
@@ -293,8 +338,14 @@ class Renovation(BaseModel):
 
     @model_validator(mode="after")
     def check_order(self) -> "Renovation":
-        if self.end < self.start:
+        try:
+            start, end = date.fromisoformat(self.start), date.fromisoformat(self.end)
+        except ValueError:
+            raise ValueError("start and end must be real calendar dates") from None
+        if end < start:
             raise ValueError("end date is before start date")
+        if (end - start).days > MAX_RENOVATION_DAYS:
+            raise ValueError(f"a renovation notice can cover at most {MAX_RENOVATION_DAYS} days; send a new one after that")
         if self.noisy_to <= self.noisy_from:
             raise ValueError("noisy hours end before they start")
         return self
@@ -314,11 +365,6 @@ class AckIn(BaseModel):
     unit_id: str = Field(..., pattern=UNIT_ID)
 
 
-class EventIn(BaseModel):
-    type: Literal["photo_baseline", "incident", "triage", "warranty_closed_by_owner", "note"]
-    payload: dict[str, Any] = {}
-
-
 class DemoPhotoIn(BaseModel):
     name: str = Field(..., pattern=r"^[a-z_]{1,40}$")
     kind: Literal["baseline", "followup"]
@@ -333,8 +379,12 @@ class IncidentIn(BaseModel):
 
 
 class DecisionIn(BaseModel):
-    decision: Literal["renovation", "warranty", "inspect", "no_action"]
-    decided_by: Literal["both_owners", "sdp_inspector"] = "both_owners"
+    unit_id: str = Field(..., pattern=UNIT_ID)
+    # "dispute" is the renovating owner's answer when the neighbour says their works caused the change.
+    decision: Literal["renovation", "warranty", "inspect", "no_action", "dispute"]
+    # Accepted only so it can be refused: an inspector's finding comes from SDP, never from a resident.
+    decided_by: Literal["both_owners", "sdp_inspector"] | None = None
+    delegate_id: int | None = None
     note: str = Field("", max_length=300)
 
 
@@ -457,6 +507,20 @@ def neighbours(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> li
 @app.post("/api/intros", status_code=201)
 def send_intro(body: IntroIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     _require_joined(conn, body.from_unit_id)
+    # A hello or notice reaches several homes at once, so it gets at least the checks a chat message gets.
+    if talk.tone_problem(body.message):
+        raise HTTPException(422, {"code": "tone", "message": TONE_MESSAGE})
+    # Numbers are swapped only when both households agree. A renovation notice is the exception: CIDB's
+    # Hak Jiran guidance says to give neighbours the contractor's contact for complaints.
+    if body.renovation is None and talk.contact_details(body.message):
+        raise HTTPException(422, {"code": "private", "message": PRIVATE_MESSAGE})
+    since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
+    kind = "NOT NULL" if body.renovation else "NULL"
+    sent = conn.execute(f"SELECT COUNT(*) FROM intros WHERE from_unit_id = ? AND created_at > ? AND renovation IS {kind}",
+                        (body.from_unit_id, since)).fetchone()[0]
+    limit = MAX_RENOVATION_NOTICES_PER_DAY if body.renovation else MAX_HELLOS_PER_DAY
+    if sent >= limit:
+        raise HTTPException(429, f"At most {limit} {'renovation notices' if body.renovation else 'hellos'} a day. Try again tomorrow.")
     sent_by = _delegate_name(conn, body.from_unit_id, body.delegate_id)
     return _register_intro(conn, body.from_unit_id, body.message, body.lang,
                            body.renovation.model_dump() if body.renovation else None, body.to_unit_ids, sent_by)
@@ -465,6 +529,11 @@ def send_intro(body: IntroIn, conn: sqlite3.Connection = Depends(get_conn)) -> d
 def _register_intro(conn: sqlite3.Connection, from_unit_id: str, message: str, lang: str, renovation: dict[str, Any] | None,
                     to_unit_ids: list[str] | None, sent_by: str | None) -> dict[str, Any]:
     me, rows, phase_units = _phase(conn, from_unit_id)
+    if renovation and renovation["works_type"] == "structural":
+        # The same rule the app shows: structural work waits for its approval (JMB/MC in strata, the council otherwise).
+        approved = (renovation.get("management_approval") if me["kind"] == "apartment" else renovation.get("council_permit")) == "approved"
+        if not approved:
+            raise HTTPException(422, "Structural work needs approval first: the council (PBT) permit, or the JMB/MC in a strata building.")
     if renovation:
         # The notice goes to everyone the work can affect; the sender cannot leave anyone out. Homes not on
         # Jiran5 are still on the list: the estate office prints their notice and records the delivery.
@@ -478,6 +547,15 @@ def _register_intro(conn: sqlite3.Connection, from_unit_id: str, message: str, l
             circle = [n for n in circle if n["id"] in to_unit_ids]
         if not circle:
             raise HTTPException(422, "Pick at least one neighbour.")
+    shown = [n["id"] for n in circle]  # who the sender is told the hello went to
+    if not renovation:
+        # Same gate as a chat message: quiet mode holds a hello back, and so does the sender's own block.
+        circle = [n for n in circle if not _profile_row(conn, n["id"])["quiet_mode"] and not _blocked(conn, from_unit_id, n["id"])]
+        if not circle:
+            raise HTTPException(409, "These neighbours have quiet mode on right now. Try again later.")
+        shown = [n["id"] for n in circle]
+        # Someone who blocked the sender never gets it, and the sender isn't told (that would reveal the block).
+        circle = [n for n in circle if not _blocked(conn, n["id"], from_unit_id)]
     cur = conn.execute(
         "INSERT INTO intros (from_unit_id, message, lang, renovation, sent_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
         (from_unit_id, message, lang, json.dumps(renovation) if renovation else None, sent_by, db.now()),
@@ -495,7 +573,7 @@ def _register_intro(conn: sqlite3.Connection, from_unit_id: str, message: str, l
                         {**renovation, "neighbours_notified": [n["id"] for n in circle],
                          **({"paper_notice_for": paper} if paper else {}), **({"acted_by": sent_by} if sent_by else {})})
     conn.commit()
-    return {"id": intro_id, "recipients": [n["id"] for n in circle], "paper_notices": paper}
+    return {"id": intro_id, "recipients": shown, "paper_notices": paper}
 
 
 @app.get("/api/units/{unit_id}/inbox")
@@ -576,6 +654,7 @@ MAX_MESSAGES_PER_DAY = 30
 MAX_OPEN_CONCERNS = 5
 ESCALATE_AFTER = timedelta(hours=24)
 ESTATE = "SDP Estate Team"
+JIRAN5 = "Jiran5"  # automatic case updates: never signed as SDP, so they can't read as SDP's view
 PRIVATE_MESSAGE = ("Please don't put phone numbers, emails or links here. "
                    "Exchange numbers in a chat when you both agree.")
 TONE_MESSAGE = ("This may come across as hostile. Try calmer words or a quick reply: messages stay on record "
@@ -636,10 +715,18 @@ def _talk_partners(conn: sqlite3.Connection, unit_id: str) -> list[dict[str, Any
     """Who this household may message: its circle, anyone a renovation notice connects it with, and
     accepted contact requests. Nobody else."""
     partners = {n["id"]: n for n in _circle(conn, unit_id) if n["joined"]}
+    today = datetime.now(MALAYSIA).date()
     for r in conn.execute(
-        "SELECT i.from_unit_id, r.unit_id, r.relation FROM intro_recipients r JOIN intros i ON i.id = r.intro_id"
+        "SELECT i.from_unit_id, i.renovation, r.unit_id, r.relation FROM intro_recipients r JOIN intros i ON i.id = r.intro_id"
         " WHERE i.renovation IS NOT NULL AND (i.from_unit_id = ? OR r.unit_id = ?)", (unit_id, unit_id),
     ):
+        # A renovation links homes beyond the circle only while it matters: until a month after the work ends.
+        try:
+            ends = date.fromisoformat(json.loads(r["renovation"]).get("end", ""))
+        except ValueError:
+            continue
+        if ends + timedelta(days=RENOVATION_TALK_DAYS) < today:
+            continue
         other, rel = (r["unit_id"], r["relation"]) if r["from_unit_id"] == unit_id else (r["from_unit_id"], inverse_relation(r["relation"]))
         if other not in partners and _unit_row(conn, other)["joined_at"] is not None:
             partners[other] = {**_unit_json(_unit_row(conn, other)), "relation": rel}
@@ -671,11 +758,14 @@ def _contact_state(conn: sqlite3.Connection, me: str, other: str) -> str:
     return "mutual" if mine and theirs else "requested_by_me" if mine else "requested_by_them" if theirs else "none"
 
 
-def _system_message(conn: sqlite3.Connection, to_unit: str, thread_with: str, text: str, private: bool = False) -> None:
+def _system_message(conn: sqlite3.Connection, to_unit: str, thread_with: str, text: str, private: bool = False,
+                    author: str = ESTATE, code: str | None = None, values: dict[str, str] | None = None) -> None:
+    """An automatic notice in a thread. text is the English record; code and values let each reader see it in
+    their own language."""
     conn.execute(
-        "INSERT INTO messages (from_unit_id, to_unit_id, thread_with, kind, body, lang, author, private, created_at)"
-        " VALUES (NULL, ?, ?, 'system', ?, 'en', ?, ?, ?)",
-        (to_unit, thread_with, text, ESTATE, int(private), db.now()),
+        "INSERT INTO messages (from_unit_id, to_unit_id, thread_with, kind, body, lang, author, private, sys_code, sys_values, created_at)"
+        " VALUES (NULL, ?, ?, 'system', ?, 'en', ?, ?, ?, ?, ?)",
+        (to_unit, thread_with, text, author, int(private), code, json.dumps(values or {}), db.now()),
     )
 
 
@@ -684,7 +774,8 @@ def _message_json(row: sqlite3.Row, viewer_lang: str, reactions: list[dict[str, 
            "to_unit_id": row["to_unit_id"], "author": row["author"], "text": row["body"], "lang": row["lang"],
            "translated": False, "original": None, "created_at": row["created_at"], "read_at": row["read_at"],
            "reactions": reactions or [], "duration": int(row["body"]) if row["kind"] == "voice" else None,
-           "expired": row["kind"] == "voice" and not row["media_id"], "sent_by": row["sent_by"]}
+           "expired": row["kind"] == "voice" and not row["media_id"], "sent_by": row["sent_by"],
+           "code": row["sys_code"], "values": json.loads(row["sys_values"] or "{}")}
     if row["kind"] == "voice":
         out["text"] = "Voice message"
     if row["kind"] == "quick" and row["quick_key"] in talk.QUICK_REPLIES:
@@ -769,6 +860,23 @@ def _preview(item: dict[str, Any] | None) -> str | None:
     return item["text"]
 
 
+def _preview_data(item: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The same preview as data, so the chat list can show it in the reader's language."""
+    if item is None:
+        return None
+    if item["type"] == "concern":
+        return {"kind": "concern", "category": item["category"]}
+    if item["type"] == "intro":
+        return {"kind": "renovation"} if item["renovation"] else {"kind": "text", "text": item["text"]}
+    if item["type"] == "wave":
+        return {"kind": "wave"}
+    if item.get("kind") == "voice":
+        return {"kind": "voice", "duration": item["duration"]}
+    if item.get("kind") == "system" and item.get("code"):
+        return {"kind": "system", "code": item["code"], "values": item["values"], "text": item["text"]}
+    return {"kind": "text", "text": item["text"]}
+
+
 @app.get("/api/units/{unit_id}/conversations")
 def conversations(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
     me = _unit_row(conn, unit_id)
@@ -784,7 +892,8 @@ def conversations(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) ->
             (unit_id, n["id"], n["id"]),
         ).fetchone()[0] + conn.execute(
             "SELECT COUNT(*) FROM waves WHERE to_unit_id = ? AND from_unit_id = ? AND seen_at IS NULL", (unit_id, n["id"])).fetchone()[0]
-        out.append({**n, "last": _preview(last), "last_at": last["created_at"] if last else None, "unread": unread,
+        out.append({**n, "last": _preview(last), "last_preview": _preview_data(last),
+                    "last_at": last["created_at"] if last else None, "unread": unread,
                     "blocked": _blocked(conn, unit_id, n["id"]), "contact": _contact_state(conn, unit_id, n["id"]),
                     "open_concerns": sum(1 for i in items if i["type"] == "concern" and i["status"] in ("open", "acknowledged", "escalated")),
                     "renovating": any(r["end"] >= today for r in _renovations_from(conn, n["id"], unit_id))})
@@ -823,11 +932,7 @@ def send_message(body: MessageIn, conn: sqlite3.Connection = Depends(get_conn)) 
     sender = _unit_row(conn, body.from_unit_id)
     _require_neighbours(conn, body.from_unit_id, body.to_unit_id)
     _check_can_reach(conn, body.from_unit_id, body.to_unit_id)
-    since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
-    sent = conn.execute("SELECT COUNT(*) FROM messages WHERE from_unit_id = ? AND to_unit_id = ? AND created_at > ?",
-                        (body.from_unit_id, body.to_unit_id, since)).fetchone()[0]
-    if sent >= MAX_MESSAGES_PER_DAY:
-        raise HTTPException(429, "Daily message limit for this neighbour reached. Try again tomorrow.")
+    _check_daily_limit(conn, body.from_unit_id, body.to_unit_id)
     if body.quick_key:
         if body.quick_key not in talk.QUICK_REPLIES:
             raise HTTPException(404, "unknown quick reply")
@@ -888,7 +993,8 @@ def share_contact(unit_id: str, body: ContactIn, conn: sqlite3.Connection = Depe
                  (unit_id, body.other_unit_id, db.now()))
     state = _contact_state(conn, unit_id, body.other_unit_id)
     if state == "mutual" and before != "mutual":
-        _system_message(conn, unit_id, body.other_unit_id, "Both of you agreed: phone numbers are now shared.")
+        _system_message(conn, unit_id, body.other_unit_id, "Both of you agreed: phone numbers are now shared.",
+                        code="contacts_shared")
     conn.commit()
     return {"contact": state}
 
@@ -970,12 +1076,13 @@ def escalate_concern(concern_id: int, body: ConcernActionIn, conn: sqlite3.Conne
     return _concern_step(conn, row, "escalated", "escalated_at", "concern_escalated", "estate_note", body.note)
 
 
-@app.get("/api/estate/concerns")
+@app.get("/api/estate/concerns", dependencies=[Depends(staff_only)])
 def estate_concerns(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
-    """SDP estate team's view: escalated first, then everything still open between neighbours."""
+    """SDP estate team's view: only concerns a neighbour escalated. Until then a concern stays between the two homes
+    (neighbour first, privately), so the estate team never sees, or counts, the ones neighbours settle themselves."""
     rows = conn.execute(
-        "SELECT c.* FROM concerns c JOIN units u ON u.id = c.from_unit_id WHERE u.phase_id = ?"
-        " ORDER BY CASE c.status WHEN 'escalated' THEN 0 WHEN 'open' THEN 1 WHEN 'acknowledged' THEN 2 ELSE 3 END, c.id DESC",
+        "SELECT c.* FROM concerns c JOIN units u ON u.id = c.from_unit_id WHERE u.phase_id = ? AND c.escalated_at IS NOT NULL"
+        " ORDER BY CASE c.status WHEN 'escalated' THEN 0 ELSE 1 END, c.id DESC",
         (phase_id,),
     ).fetchall()
     per_reno: dict[int, int] = {}
@@ -984,7 +1091,7 @@ def estate_concerns(phase_id: str = "demo", conn: sqlite3.Connection = Depends(g
     return [{**_concern_json(conn, r), "concerns_on_renovation": per_reno[r["intro_id"]]} for r in rows]
 
 
-@app.post("/api/concerns/{concern_id}/estate")
+@app.post("/api/concerns/{concern_id}/estate", dependencies=[Depends(staff_only)])
 def estate_action(concern_id: int, body: EstateActionIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     row = _concern_row(conn, concern_id)
     if row["status"] != "escalated":
@@ -994,18 +1101,20 @@ def estate_action(concern_id: int, body: EstateActionIn, conn: sqlite3.Connectio
         conn.execute("UPDATE concerns SET reminders = reminders + 1, estate_note = ? WHERE id = ?", (body.note, concern_id))
         _system_message(conn, row["to_unit_id"], row["from_unit_id"],
                         f"Reminder from the estate team about {label}: please keep to the house rules and the hours in your "
-                        f"renovation notice, and reply here once it's sorted." + (f" Note: {body.note}" if body.note else ""))
+                        f"renovation notice, and reply here once it's sorted." + (f" Note: {body.note}" if body.note else ""),
+                        code="estate_reminder", values={"category": row["category"], "note": body.note})
         payload = {"concern_id": concern_id, "action": "reminder", "note": body.note}
         db.append_event(conn, row["from_unit_id"], "estate_reminder", payload)
         db.append_event(conn, row["to_unit_id"], "estate_reminder", payload)
         conn.commit()
         return _concern_json(conn, _concern_row(conn, concern_id))
     _system_message(conn, row["to_unit_id"], row["from_unit_id"],
-                    f"The estate team closed the concern about {label}." + (f" {body.note}" if body.note else ""))
+                    f"The estate team closed the concern about {label}." + (f" {body.note}" if body.note else ""),
+                    code="estate_closed", values={"category": row["category"], "note": body.note})
     return _concern_step(conn, row, "closed_by_estate", "closed_at", "concern_closed_by_estate", "estate_note", body.note)
 
 
-@app.get("/api/moderation/reports")
+@app.get("/api/moderation/reports", dependencies=[Depends(staff_only)])
 def moderation_reports(conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
     rows = conn.execute(
         "SELECT r.*, m.body, m.kind, m.media_id, m.from_unit_id, m.to_unit_id, m.created_at AS sent_at FROM reports r"
@@ -1037,7 +1146,7 @@ def reported_voice(report_id: int, conn: sqlite3.Connection = Depends(get_conn))
     return FileResponse(data_dir("voice") / row["media_id"], media_type=media, headers={"Cache-Control": "no-store"})
 
 
-@app.post("/api/reports/{report_id}/review")
+@app.post("/api/reports/{report_id}/review", dependencies=[Depends(staff_only)])
 def review_report(report_id: int, body: ReviewIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
     row = conn.execute("SELECT r.*, m.from_unit_id, m.to_unit_id FROM reports r JOIN messages m ON m.id = r.message_id"
                        " WHERE r.id = ?", (report_id,)).fetchone()
@@ -1050,7 +1159,7 @@ def review_report(report_id: int, body: ReviewIn, conn: sqlite3.Connection = Dep
         # Only the sender sees the warning; the reporter's identity is never revealed.
         _system_message(conn, row["from_unit_id"], row["to_unit_id"],
                         "A message you sent was reviewed by the estate team. Please keep conversations respectful; "
-                        "repeated reports can pause your messaging.", private=True)
+                        "repeated reports can pause your messaging.", private=True, code="report_warned")
     conn.commit()
     return {"status": body.outcome}
 
@@ -1167,7 +1276,7 @@ def all_notices(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_c
     return [dict(r) for r in conn.execute("SELECT * FROM notices WHERE phase_id = ? ORDER BY id DESC", (phase_id,))]
 
 
-@app.post("/api/notices", status_code=201)
+@app.post("/api/notices", status_code=201, dependencies=[Depends(staff_only)])
 def post_notice(body: NoticeIn, phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     """Estate team only (no sign-in in the prototype). One-way: residents cannot reply to the whole township."""
     cur = conn.execute("INSERT INTO notices (phase_id, audience, title, body, author, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1204,6 +1313,30 @@ class ProfileIn(BaseModel):
     lang: Literal["en", "ms", "zh"] | None = None
     easy_mode: bool | None = None  # bigger text and fewer options; private to the household
     whatsapp_alerts: bool | None = None
+
+
+def _check_daily_limit(conn: sqlite3.Connection, sender: str, recipient: str) -> None:
+    """Texts, quick replies and voice notes share one daily limit per neighbour."""
+    since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
+    sent = conn.execute("SELECT COUNT(*) FROM messages WHERE from_unit_id = ? AND to_unit_id = ? AND created_at > ?",
+                        (sender, recipient, since)).fetchone()[0]
+    if sent >= MAX_MESSAGES_PER_DAY:
+        raise HTTPException(429, "Daily message limit for this neighbour reached. Try again tomorrow.")
+
+
+def _looks_like_audio(raw: bytes, ext: str) -> bool:
+    """The file must start the way that audio format does, whatever the upload claimed to be."""
+    if ext == "webm":
+        return raw[:4] == b"\x1a\x45\xdf\xa3"  # EBML (Chrome, Edge)
+    if ext == "ogg":
+        return raw[:4] == b"OggS"  # Firefox
+    if ext == "m4a":
+        return raw[4:8] == b"ftyp"  # MP4 container (Safari, iPhone)
+    if ext == "mp3":
+        return raw[:3] == b"ID3" or (raw[0] == 0xFF and raw[1] & 0xE0 == 0xE0)
+    if ext == "wav":
+        return raw[:4] == b"RIFF" and raw[8:12] == b"WAVE"
+    return False
 
 
 def _check_can_reach(conn: sqlite3.Connection, sender: str, recipient: str) -> None:
@@ -1265,6 +1398,8 @@ def send_voice(from_unit_id: str = Form(..., pattern=UNIT_ID), to_unit_id: str =
     sender = _unit_row(conn, from_unit_id)
     _require_neighbours(conn, from_unit_id, to_unit_id)
     _check_can_reach(conn, from_unit_id, to_unit_id)
+    sent_by = _delegate_name(conn, from_unit_id, delegate_id)  # every check runs before anything is written to disk
+    _check_daily_limit(conn, from_unit_id, to_unit_id)
     ext = VOICE_TYPES.get((file.content_type or "").split(";")[0].strip())
     if ext is None:
         raise HTTPException(415, "Please send an audio recording.")
@@ -1273,10 +1408,11 @@ def send_voice(from_unit_id: str = Form(..., pattern=UNIT_ID), to_unit_id: str =
         raise HTTPException(413, "Voice messages can be up to one minute.")
     if len(raw) < 64:
         raise HTTPException(400, "That recording is empty.")
+    if not _looks_like_audio(raw, ext):
+        raise HTTPException(415, "Please send an audio recording.")
     media_id = f"{uuid.uuid4().hex}.{ext}"
     (data_dir("voice") / media_id).write_bytes(raw)
     withheld = int(_blocked(conn, to_unit_id, from_unit_id))
-    sent_by = _delegate_name(conn, from_unit_id, delegate_id)
     cur = conn.execute(
         "INSERT INTO messages (from_unit_id, to_unit_id, kind, body, media_id, lang, withheld, sent_by, created_at)"
         " VALUES (?, ?, 'voice', ?, ?, ?, ?, ?, ?)",
@@ -1594,12 +1730,15 @@ def report_incident(body: IncidentIn, conn: sqlite3.Connection = Depends(get_con
         raise HTTPException(403, "Both photos must belong to the household reporting the change.")
     if baseline["kind"] != "baseline" or followup["kind"] != "followup":
         raise HTTPException(400, "Compare a pre-work photo with a follow-up photo.")
+    if followup["created_at"] < baseline["created_at"]:
+        raise HTTPException(400, "The follow-up photo must be taken after the pre-work photo.")
 
     folder = data_dir("photos")
     comp = vision.compare((folder / f"{baseline['id']}.jpg").read_bytes(), (folder / f"{followup['id']}.jpg").read_bytes())
     intro = _intro(conn, baseline["renovation_intro_id"])
     hint = triage_hint(comp.result, baseline["created_at"],
-                       intro["renovation"] if intro else None, intro["from_label"] if intro else None)
+                       intro["renovation"] if intro else None, intro["from_label"] if intro else None,
+                       followup_at=followup["created_at"])
     cur = conn.execute(
         "INSERT INTO incidents (reporter_unit_id, renovation_intro_id, baseline_photo_id, followup_photo_id,"
         " comparison, hint, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -1642,23 +1781,89 @@ def incidents_for(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) ->
     return [_incident_json(conn, r) for r in rows]
 
 
+CASE_OUTCOME = {
+    "renovation": "caused by the renovation",
+    "warranty": "reported to SDP as a possible building defect",
+    "inspect": "an SDP inspector is asked to check",
+    "no_action": "no action needed",
+}
+
+
 @app.post("/api/incidents/{incident_id}/decision")
 def decide(incident_id: int, body: DecisionIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Who may decide what. A building-defect claim, "no action" or "ask an inspector" is the homeowner's own
+    call. Blaming the renovation is a claim against the neighbour: it stays a proposal until the renovating owner
+    agrees, or they accept it themselves. Nobody on a resident's phone can record an SDP inspector's finding."""
     row = conn.execute("SELECT * FROM incidents WHERE id = ?", (incident_id,)).fetchone()
     if row is None:
         raise HTTPException(404, "incident not found")
+    if body.decided_by == "sdp_inspector":
+        raise HTTPException(403, "Only SDP's inspector can record an inspector's finding.")
+    intro = _intro(conn, row["renovation_intro_id"])
+    reporter, renovator = row["reporter_unit_id"], intro["from_unit_id"] if intro else None
+    if body.unit_id == reporter:
+        role = "reporter"
+    elif body.unit_id == renovator:
+        role = "renovating_owner"
+    else:
+        raise HTTPException(403, "Only the two households in this case can decide it.")
     if row["status"] == "decided":
         raise HTTPException(409, "This case has already been decided.")
-    conn.execute(
-        "UPDATE incidents SET status = 'decided', decision = ?, decision_note = ?, decided_at = ? WHERE id = ?",
-        (body.decision, body.note, db.now(), incident_id),
-    )
-    payload = {"incident_id": incident_id, "decision": body.decision, "decided_by": body.decided_by, "note": body.note}
-    db.append_event(conn, row["reporter_unit_id"], "triage", payload)
-    intro = _intro(conn, row["renovation_intro_id"])
-    if intro:
-        db.append_event(conn, intro["from_unit_id"], "triage", payload)
-    if body.decision == "warranty":
+    acted_by = _delegate_name(conn, body.unit_id, body.delegate_id)
+    note, decision, now = body.note.strip(), body.decision, db.now()
+    if decision == "renovation" and renovator is None:
+        raise HTTPException(400, "No renovation is linked to this case.")
+    if role == "renovating_owner" and decision in ("warranty", "no_action"):
+        raise HTTPException(403, "Only the owner of the home can decide this about their own home.")
+
+    case = f"Case #{incident_id:03d}"
+    me = _unit_row(conn, body.unit_id)
+    who = f"{me['resident_name']} ({me['label']})" + (f", by {acted_by}" if acted_by else "")
+    # The same notice as values, so each household reads it in its own language.
+    values = {"case": f"{incident_id:03d}", "name": me["resident_name"], "label": me["label"], "helper": acted_by or ""}
+    my_note = "decision_note" if role == "reporter" else "response_note"
+    if decision == "dispute":
+        if role != "renovating_owner":
+            raise HTTPException(403, "Only the renovating owner can answer that proposal.")
+        if row["status"] != "proposed":
+            raise HTTPException(409, "Nothing has been proposed for this case yet.")
+        if not note:
+            raise HTTPException(422, "Say briefly why you disagree.")
+        conn.execute("UPDATE incidents SET status = 'disputed', response_note = ? WHERE id = ?", (note, incident_id))
+        stage, payload_decision, decided_by = "disputed", "renovation", None
+        told, text = reporter, (f"{case}: {who} disagrees that the renovation caused it: “{note}”. "
+                                "You can ask an SDP inspector, or report it to SDP as a possible building defect.")
+        code, values = "case_disputed", {**values, "note": note}
+    elif decision == "renovation" and role == "reporter":
+        if row["status"] == "proposed":
+            raise HTTPException(409, f"You have already asked {intro['from_label']} to confirm.")
+        if row["status"] == "disputed":  # no back-and-forth: after a "no", an inspector settles it
+            raise HTTPException(409, f"{intro['from_label']} disagreed. Ask an SDP inspector to check instead.")
+        conn.execute("UPDATE incidents SET status = 'proposed', decision_note = ?, proposed_at = ? WHERE id = ?",
+                     (note, now, incident_id))
+        stage, payload_decision, decided_by = "proposed", "renovation", None
+        subject = _photo_row(conn, row["baseline_photo_id"])["subject"]
+        told, text = renovator, (f"{case}: {who} believes the change on “{subject}” "
+                                 "was caused by your renovation. Open Photos & repairs to agree, disagree or ask an SDP inspector.")
+        code, values = "case_proposed", {**values, "subject": subject}
+    else:
+        agreed = decision == "renovation" and role == "renovating_owner" and row["proposed_at"] is not None
+        decided_by = "both_owners" if agreed else role
+        conn.execute(f"UPDATE incidents SET status = 'decided', decision = ?, {my_note} = ?, decided_by = ?, decided_at = ?"
+                     " WHERE id = ?", (decision, note or row[my_note], decided_by, now, incident_id))
+        stage, payload_decision = "decided", decision
+        told = renovator if role == "reporter" else reporter
+        text = f"{case} decided by {'both owners' if agreed else who}: {CASE_OUTCOME[decision]}."
+        code, values = "case_decided", {**values, "both": "1" if agreed else "", "outcome": decision}
+
+    payload = {"incident_id": incident_id, "stage": stage, "decision": payload_decision, "by": role,
+               **({"decided_by": decided_by} if decided_by else {}), "note": note,
+               **({"acted_by": acted_by} if acted_by else {})}
+    db.append_event(conn, reporter, "triage", payload)
+    if renovator:
+        db.append_event(conn, renovator, "triage", payload)
+        _system_message(conn, told, body.unit_id, text, author=JIRAN5, code=code, values=values)
+    if stage == "decided" and decision == "warranty":
         _open_warranty(conn, row)
     conn.commit()
     return _incident_json(conn, conn.execute("SELECT * FROM incidents WHERE id = ?", (incident_id,)).fetchone())
@@ -1672,14 +1877,16 @@ def _token_hash(token: str) -> str:
 
 def _pass_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     entries = conn.execute(
-        "SELECT allowed, reason, scanned_for, created_at FROM gate_logs WHERE pass_id = ? ORDER BY id DESC LIMIT 8",
+        "SELECT allowed, reason, reason_code, reason_values, scanned_for, created_at FROM gate_logs"
+        " WHERE pass_id = ? ORDER BY id DESC LIMIT 8",
         (row["id"],),
     ).fetchall()
     return {"id": row["id"], "intro_id": row["intro_id"], "unit_id": row["unit_id"], "contractor_name": row["contractor_name"],
             "contractor_cidb": bool(row["contractor_cidb"]), "valid_from": row["valid_from"], "valid_to": row["valid_to"],
             "entry_hours": f"{GATE_OPEN}-{GATE_CLOSE}, Mon-Sat", "status": row["status"],
             "created_at": row["created_at"], "revoked_at": row["revoked_at"],
-            "gate_log": [{**dict(e), "allowed": bool(e["allowed"])} for e in entries]}
+            "gate_log": [{**dict(e), "allowed": bool(e["allowed"]), "reason_values": json.loads(e["reason_values"] or "{}")}
+                         for e in entries]}
 
 
 @app.get("/api/units/{unit_id}/works")
@@ -1703,7 +1910,8 @@ def works(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[st
          "relation_to_me": i["relation_to_me"], "renovation": i["renovation"]}
         for i in inbox(unit_id, conn) if i["renovation"]
     ]
-    return {"mine": mine, "nearby": nearby, "gate_hours": f"{GATE_OPEN}-{GATE_CLOSE}, Mon-Sat", "house_rules": HOUSE_RULES}
+    return {"mine": mine, "nearby": nearby, "gate_hours": f"{GATE_OPEN}-{GATE_CLOSE}, Mon-Sat",
+            "gate_open": GATE_OPEN, "gate_close": GATE_CLOSE, "house_rules": HOUSE_RULES, "house_rule_codes": HOUSE_RULE_CODES}
 
 
 @app.post("/api/intros/{intro_id}/passes", status_code=201)
@@ -1749,21 +1957,22 @@ def revoke_pass(pass_id: int, body: OwnerIn, conn: sqlite3.Connection = Depends(
     return _pass_json(conn, conn.execute("SELECT * FROM passes WHERE id = ?", (pass_id,)).fetchone())
 
 
-def _gate_decision(row: sqlite3.Row | None, at: datetime) -> tuple[bool, str]:
+def _gate_decision(row: sqlite3.Row | None, at: datetime) -> tuple[bool, str, str, dict[str, str]]:
+    """(allowed, English reason for the record, code and values for the app to show in the reader's language)."""
     if row is None:
-        return False, "Unknown pass"
+        return False, "Unknown pass", "unknown", {}
     if row["status"] != "active":
-        return False, "Pass revoked by the homeowner"
+        return False, "Pass revoked by the homeowner", "revoked", {}
     day = at.strftime("%Y-%m-%d")
     if day < row["valid_from"]:
-        return False, f"Renovation has not started (starts {row['valid_from']})"
+        return False, f"Renovation has not started (starts {row['valid_from']})", "not_started", {"start": row["valid_from"]}
     if day > row["valid_to"]:
-        return False, f"Renovation ended on {row['valid_to']}"
+        return False, f"Renovation ended on {row['valid_to']}", "ended", {"end": row["valid_to"]}
     if at.weekday() == 6:
-        return False, "No renovation entry on Sundays"
+        return False, "No renovation entry on Sundays", "sunday", {}
     if not GATE_OPEN <= at.strftime("%H:%M") < GATE_CLOSE:
-        return False, f"Outside entry hours ({GATE_OPEN}-{GATE_CLOSE})"
-    return True, "Entry allowed"
+        return False, f"Outside entry hours ({GATE_OPEN}-{GATE_CLOSE})", "outside_hours", {"open": GATE_OPEN, "close": GATE_CLOSE}
+    return True, "Entry allowed", "allowed", {}
 
 
 @app.post("/api/gate/scan")
@@ -1773,15 +1982,16 @@ def gate_scan(body: ScanIn, conn: sqlite3.Connection = Depends(get_conn)) -> dic
         raise HTTPException(403, "simulated time is only available in demo mode")
     at = datetime.strptime(body.at, "%Y-%m-%dT%H:%M") if body.at else datetime.now(MALAYSIA).replace(tzinfo=None)
     row = conn.execute("SELECT * FROM passes WHERE token_hash = ?", (_token_hash(body.token),)).fetchone()
-    allowed, reason = _gate_decision(row, at)
-    conn.execute("INSERT INTO gate_logs (pass_id, allowed, reason, scanned_for, created_at) VALUES (?, ?, ?, ?, ?)",
-                 (row["id"] if row else None, int(allowed), reason, at.strftime("%Y-%m-%dT%H:%M"), db.now()))
+    allowed, reason, code, values = _gate_decision(row, at)
+    conn.execute("INSERT INTO gate_logs (pass_id, allowed, reason, reason_code, reason_values, scanned_for, created_at)"
+                 " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                 (row["id"] if row else None, int(allowed), reason, code, json.dumps(values), at.strftime("%Y-%m-%dT%H:%M"), db.now()))
     conn.commit()
     if row is None:
-        return {"allowed": False, "reason": reason, "pass": None}
+        return {"allowed": False, "reason": reason, "reason_code": code, "reason_values": values, "pass": None}
     unit = _unit_row(conn, row["unit_id"])
     reno = json.loads(conn.execute("SELECT renovation FROM intros WHERE id = ?", (row["intro_id"],)).fetchone()[0])
-    return {"allowed": allowed, "reason": reason, "scanned_for": at.strftime("%Y-%m-%dT%H:%M"),
+    return {"allowed": allowed, "reason": reason, "reason_code": code, "reason_values": values, "scanned_for": at.strftime("%Y-%m-%dT%H:%M"),
             "pass": {"contractor_name": row["contractor_name"], "contractor_cidb": bool(row["contractor_cidb"]),
                      "unit_label": unit["label"], "scope": reno["scope"], "valid_from": row["valid_from"], "valid_to": row["valid_to"]}}
 
@@ -1914,7 +2124,7 @@ def _submit_repair(conn: sqlite3.Connection, ticket: sqlite3.Row, raw: bytes, su
     return _ticket_json(conn, _ticket_row(conn, ticket["id"]))
 
 
-@app.get("/api/warranty")
+@app.get("/api/warranty", dependencies=[Depends(staff_only)])
 def warranty_queue(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
     """SDP warranty team's queue."""
     rows = conn.execute(
@@ -1931,7 +2141,7 @@ def my_warranty(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> l
     return [_ticket_json(conn, r) for r in rows]
 
 
-@app.post("/api/warranty/{ticket_id}/repair")
+@app.post("/api/warranty/{ticket_id}/repair", dependencies=[Depends(staff_only)])
 def submit_repair(ticket_id: int, subcontractor: str = Form(..., min_length=1, max_length=80),
                   file: UploadFile = File(...), conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     return _submit_repair(conn, _ticket_row(conn, ticket_id), file.file.read(vision.MAX_UPLOAD_BYTES + 1), subcontractor)
@@ -1992,15 +2202,6 @@ def home_history(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> 
     return {"unit_id": unit_id, "events": events, "chain_ok": ok, "first_bad_index": bad_index}
 
 
-@app.post("/api/units/{unit_id}/events", status_code=201)
-def add_event(unit_id: str, body: EventIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
-    """Generic append for later layers (e.g. owner-confirmed warranty closure)."""
-    _unit_row(conn, unit_id)
-    event = db.append_event(conn, unit_id, body.type, body.payload)
-    conn.commit()
-    return event
-
-
 @app.post("/api/demo/reset")
 def reset_demo(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
     """Wipe and re-seed the fictional demo data (for rehearsals). Disabled when JIRAN_DEMO_MODE=0."""
@@ -2039,7 +2240,7 @@ def _community_health(conn: sqlite3.Connection, unit_ids: list[str]) -> dict[str
             "days_to_first_hello": round(sum(days) / len(days), 1) if days else None,
             "households_reached_out": len(days), "active_circles_30d": active}
 
-@app.get("/api/dashboard")
+@app.get("/api/dashboard", dependencies=[Depends(staff_only)])
 def dashboard(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     unit_ids = [r["id"] for r in conn.execute("SELECT id FROM units WHERE phase_id = ?", (phase_id,))]
     marks = ",".join("?" * len(unit_ids))
@@ -2270,7 +2471,7 @@ def estate_register_renovation(body: EstateRenovationIn, conn: sqlite3.Connectio
 
 # ---------- what reaches a household on WhatsApp ----------
 
-@app.get("/api/units/{unit_id}/whatsapp")
+@app.get("/api/units/{unit_id}/whatsapp", dependencies=[Depends(staff_only)])
 def whatsapp_outbox(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     """The alerts this household would get from the Jiran5 WhatsApp Business account, in its own language.
     Chat alerts never contain the message itself; quiet mode holds back chat alerts but not formal notices."""

@@ -25,6 +25,28 @@ def test_ingest_strips_all_metadata_including_camera_and_location():
     assert len(Image.open(io.BytesIO(stored)).getexif()) == 0
 
 
+def test_ingest_strips_jpeg_comments_too():
+    buf = io.BytesIO()
+    Image.new("RGB", (1200, 900), (200, 210, 220)).save(buf, "JPEG", comment=b"Taken at No. 12, 7am, Siti's phone")
+    assert Image.open(io.BytesIO(buf.getvalue())).info.get("comment")
+
+    p = vision.ingest(buf.getvalue())
+    for stored in (p.full_jpeg, p.thumb_jpeg):
+        assert b"Siti" not in stored
+        assert "comment" not in Image.open(io.BytesIO(stored)).info
+
+
+def test_ingest_accepts_multi_picture_phone_jpegs():
+    # Some phones save "MPO" files: a JPEG with extra embedded pictures. The first picture is the photo.
+    buf = io.BytesIO()
+    first, second = Image.new("RGB", (1200, 900), (200, 210, 220)), Image.new("RGB", (600, 450), (10, 10, 10))
+    first.save(buf, "MPO", save_all=True, append_images=[second])
+    assert Image.open(io.BytesIO(buf.getvalue())).format == "MPO"
+
+    p = vision.ingest(buf.getvalue())
+    assert (p.width, p.height) == (1200, 900)
+
+
 def test_ingest_rejects_non_images_and_oversized_files():
     with pytest.raises(vision.PhotoError, match="not_an_image"):
         vision.ingest(b"<script>alert(1)</script>")

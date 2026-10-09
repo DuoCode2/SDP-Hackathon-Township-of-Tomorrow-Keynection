@@ -87,9 +87,14 @@ export interface Notice {
   created_at: string
 }
 
+// Server text comes as English (the record) plus a code and values the app shows in the reader's language.
+export type GateCode = 'unknown' | 'revoked' | 'not_started' | 'ended' | 'sunday' | 'outside_hours' | 'allowed'
+
 export interface GateEntry {
   allowed: boolean
   reason: string
+  reason_code: GateCode | null
+  reason_values: Record<string, string>
   scanned_for: string
   created_at: string
 }
@@ -125,12 +130,17 @@ export interface Works {
   mine: WorkItem[]
   nearby: WorkItem[]
   gate_hours: string
+  gate_open: string
+  gate_close: string
   house_rules: string[]
+  house_rule_codes: string[]
 }
 
 export interface GateResult {
   allowed: boolean
   reason: string
+  reason_code: GateCode
+  reason_values: Record<string, string>
   scanned_for?: string
   pass: { contractor_name: string; contractor_cidb: boolean; unit_label: string; scope: string; valid_from: string; valid_to: string } | null
 }
@@ -241,6 +251,9 @@ export interface ChatMessage {
   original: string | null
   created_at: string
   read_at: string | null
+  // Automatic notices only: shown in the reader's language from these (text is the English record).
+  code: string | null
+  values: Record<string, string>
 }
 
 export interface ChatIntro {
@@ -355,8 +368,13 @@ export interface Official {
 }
 export type ContactState = 'none' | 'requested_by_me' | 'requested_by_them' | 'mutual'
 
+export type Preview =
+  | { kind: 'renovation' } | { kind: 'wave' } | { kind: 'text'; text: string } | { kind: 'voice'; duration: number }
+  | { kind: 'concern'; category: string } | { kind: 'system'; code: string; values: Record<string, string>; text: string }
+
 export interface Conversation extends Neighbour {
-  last: string | null
+  last: string | null  // English, for the record
+  last_preview: Preview | null  // the same as data, shown in the reader's language
   last_at: string | null
   unread: number
   blocked: boolean
@@ -436,6 +454,15 @@ export interface RenovationTask {
 
 export type Suggestion = 'renovation' | 'warranty' | 'inspect' | 'no_change' | 'retake'
 export type Decision = 'renovation' | 'warranty' | 'inspect' | 'no_action'
+export interface TriageCode {
+  code: string
+  shapes?: ('line' | 'patch')[]
+  label?: string
+  scope?: string
+  taken?: string
+  seen?: string
+  start?: string
+}
 
 export interface Region {
   x: number
@@ -455,11 +482,19 @@ export interface Incident {
   baseline: Photo
   followup: Photo
   comparison: { aligned: boolean; changed: boolean; change_ratio: number | null; regions: Region[] }
-  hint: { suggestion: Suggestion; headline: string; reasons: string[] }
+  // reasons: the English record; codes: the same reasons as data, so the app can show them in the reader's
+  // language (cases recorded before codes existed have none, and fall back to the English).
+  hint: { suggestion: Suggestion; headline: string; reasons: string[]; codes?: TriageCode[] }
   images: { before: string; after: string; overlay: string } | null
-  status: 'open' | 'decided'
+  // proposed: the neighbour says the renovation caused it and waits for the renovating owner;
+  // disputed: the renovating owner disagreed, so an inspector (or a warranty claim) settles it.
+  status: 'open' | 'proposed' | 'disputed' | 'decided'
   decision: Decision | null
   decision_note: string | null
+  response_note: string | null
+  proposed_at: string | null
+  proposed_by: string | null
+  decided_by: 'reporter' | 'renovating_owner' | 'both_owners' | null
   decided_at: string | null
   created_at: string
 }
@@ -529,8 +564,31 @@ export class ApiError extends Error {
   }
 }
 
+// Whether the server answered the last request. Screens show a loading skeleton until their data arrives,
+// so without this a dropped connection would look like endless loading.
+let reachable = true
+const reachabilityListeners = new Set<(ok: boolean) => void>()
+function setReachable(ok: boolean) {
+  if (ok === reachable) return
+  reachable = ok
+  reachabilityListeners.forEach((f) => f(ok))
+}
+export function onReachability(listener: (ok: boolean) => void): () => void {
+  reachabilityListeners.add(listener)
+  listener(reachable)
+  return () => { reachabilityListeners.delete(listener) }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, init)
+  let res: Response
+  try {
+    res = await fetch(path, init)
+  } catch {
+    setReachable(false)  // network down, or nothing listening
+    throw new ApiError(0, "Can't reach Jiran5 right now. Check your connection and try again.")
+  }
+  // 502–504 come from the dev proxy (or a gateway) when the API itself is down.
+  setReachable(!(res.status >= 502 && res.status <= 504))
   if (!res.ok) {
     let message = `${res.status}`
     try {
@@ -583,8 +641,9 @@ export const api = {
       '/api/incidents',
       json('POST', { reporter_unit_id: unitId, baseline_photo_id: baselineId, followup_photo_id: followupId }),
     ),
-  decide: (incidentId: number, decision: Decision, decidedBy: 'both_owners' | 'sdp_inspector', note: string) =>
-    request<Incident>(`/api/incidents/${incidentId}/decision`, json('POST', { decision, decided_by: decidedBy, note })),
+  decide: (incidentId: number, unitId: string, decision: Decision | 'dispute', note: string, delegateId?: number) =>
+    request<Incident>(`/api/incidents/${incidentId}/decision`,
+      json('POST', { unit_id: unitId, decision, note, delegate_id: delegateId ?? null })),
 
   works: (unitId: string) => request<Works>(`/api/units/${unitId}/works`),
   issuePass: (introId: number, unitId: string) =>
@@ -632,8 +691,8 @@ export const api = {
     request<Profile>(`/api/units/${unitId}/profile`, json('PUT', patch)),
   official: (unitId: string) => request<Official>(`/api/units/${unitId}/official`),
   delegates: (unitId: string) => request<Delegate[]>(`/api/units/${unitId}/delegates`),
-  addDelegate: (unitId: string, name: string, relation: Delegate['relation']) =>
-    request<Delegate>(`/api/units/${unitId}/delegates`, json('POST', { name, relation, consent: true })),
+  addDelegate: (unitId: string, name: string, relation: Delegate['relation'], consent: boolean) =>
+    request<Delegate>(`/api/units/${unitId}/delegates`, json('POST', { name, relation, consent })),
   revokeDelegate: (id: number, unitId: string) => request(`/api/delegates/${id}/revoke`, json('POST', { unit_id: unitId })),
   exportData: async (unitId: string) => {
     const res = await fetch(`/api/units/${unitId}/export`)
