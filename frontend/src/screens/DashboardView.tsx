@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Activity, Building2, Clock4, Flag, Handshake, HeartHandshake, House, Inbox, KeyRound, Megaphone, MessagesSquare, MicOff, RotateCcw, Send, ShieldCheck, ShieldX, Sparkles, UserCheck, Wrench } from 'lucide-react'
 import { api, type Concern, type Dashboard, type ModerationReport, type Notice, type WarrantyTicket } from '../api'
+import { SHOW_CONTRACTOR_PASSES } from '../features'
 import ConcernCard from '../components/ConcernCard'
 import FrontDesk from '../components/FrontDesk'
 import WarrantyClock from '../components/WarrantyClock'
@@ -64,7 +65,7 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
             <Kpi icon={<Handshake size={14} />} label="Settled by neighbours" value={d.concerns_settled_by_neighbours} sub={`of ${d.concerns_raised} concerns`} />
             <Kpi icon={<Building2 size={14} />} label="With estate team" value={d.concerns_with_estate} sub={`${d.concerns_escalated} escalated in total`} />
             <Kpi icon={<Clock4 size={14} />} label="Repairs overdue" value={d.warranty_overdue} sub={`${d.warranty_open} open · ${d.warranty_closed} closed`} />
-            <Kpi icon={<KeyRound size={14} />} label="Gate scans" value={d.gate_allowed + d.gate_denied} sub={`${d.gate_denied} refused`} />
+            {SHOW_CONTRACTOR_PASSES && <Kpi icon={<KeyRound size={14} />} label="Gate scans" value={d.gate_allowed + d.gate_denied} sub={`${d.gate_denied} refused`} />}
           </div>
 
           <div className="cols">

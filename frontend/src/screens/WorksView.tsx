@@ -5,6 +5,7 @@ import { api, type ContractorView, type GateCode, type GateResult, type Pass, ty
 import { useDates, useT, type Translate } from '../i18n'
 import { Badge, Card, CardHead, Empty, ScreenTitle, Segmented, Sheet, Skeleton, useToast } from '../ui'
 import RenovationWizard from './RenovationWizard'
+import { SHOW_CONTRACTOR_PASSES } from '../features'
 
 interface Props {
   me: UnitInfo
@@ -76,10 +77,12 @@ export default function WorksView({ me, units, version, onChange }: Props) {
             <button className="btn btn-primary" onClick={openWizard}><Hammer size={15} /> {t('wk.register')}</button>
           </div>
         )} />
-      <div className="tabs-row">
-        <Segmented value={tab} onChange={setTab} options={[{ id: 'schedule', label: t('wk.tab.schedule') }, { id: 'passes', label: t('wk.tab.passes') }]} />
-      </div>
-      {!data ? <Card><Skeleton lines={4} /></Card> : tab === 'schedule' ? <Schedule data={data} all={all} noisy={noisy} /> : <Passes me={me} data={data} onChange={onChange} />}
+      {SHOW_CONTRACTOR_PASSES && (
+        <div className="tabs-row">
+          <Segmented value={tab} onChange={setTab} options={[{ id: 'schedule', label: t('wk.tab.schedule') }, { id: 'passes', label: t('wk.tab.passes') }]} />
+        </div>
+      )}
+      {!data ? <Card><Skeleton lines={4} /></Card> : SHOW_CONTRACTOR_PASSES && tab === 'passes' ? <Passes me={me} data={data} onChange={onChange} /> : <Schedule data={data} all={all} noisy={noisy} />}
       {wizard && <RenovationWizard open onClose={() => setWizard(null)} me={me} units={units} names={wizard} onSent={onChange} />}
     </section>
   )
@@ -186,7 +189,11 @@ function Schedule({ data, all, noisy }: { data: Works; all: Item[]; noisy: Item[
 
         <Card>
           <CardHead icon={<ListChecks size={16} />} title={t('wk.rules')} sub={t('wk.gateHours', { open: data.gate_open, close: data.gate_close })} />
-          <ul className="rules">{data.house_rules.map((r, i) => <li key={r}>{data.house_rule_codes?.[i] ? t(`rule.${data.house_rule_codes[i]}`) : r}</li>)}</ul>
+          <ul className="rules">
+            {data.house_rules.map((r, i) => ({ r, code: data.house_rule_codes?.[i] }))
+              .filter(({ code }) => SHOW_CONTRACTOR_PASSES || code !== 'carry_pass')  // "this pass" means nothing without passes
+              .map(({ r, code }) => <li key={r}>{code ? t(`rule.${code}`) : r}</li>)}
+          </ul>
         </Card>
       </div>
     </div>

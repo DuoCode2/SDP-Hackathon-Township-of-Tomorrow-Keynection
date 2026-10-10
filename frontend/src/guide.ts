@@ -36,7 +36,7 @@ export const UI: Record<string, Text> = {
 
 export const PAGES: Record<TabId, PageGuide> = {
   circle: {
-    layer: { zh: '第 1 层 · 认识', en: 'Layer 1 · Know' },
+    layer: { zh: '主线 · 认识', en: 'Main story · Meet' },
     title: { zh: '你的邻居（像社交 app 一样用）', en: 'Your neighbours, like a social app' },
     what: {
       zh: '打开就看到身边有谁、可以跟谁聊。不用学：操作跟 IG、WhatsApp、Facebook 一样。',
@@ -68,7 +68,7 @@ export const PAGES: Record<TabId, PageGuide> = {
     },
   },
   chats: {
-    layer: { zh: '第 1–2 层 · 认识与沟通', en: 'Layers 1–2 · Know & talk' },
+    layer: { zh: '主线 · 沟通', en: 'Main story · Talk' },
     title: { zh: '邻居之间真正的沟通', en: 'Real conversations between neighbours' },
     what: {
       zh: '跟圈子里每一户一对一聊天。通知从 WhatsApp 来，但电话号码要双方同意才交换。',
@@ -96,37 +96,35 @@ export const PAGES: Record<TabId, PageGuide> = {
     },
   },
   works: {
-    layer: { zh: '第 2 层 · 约定', en: 'Layer 2 · Agree' },
-    title: { zh: '装修日历与承包商通行证', en: 'Works calendar and contractor passes' },
+    layer: { zh: '主线 · 装修通知', en: 'Main story · Renovation notice' },
+    title: { zh: '装修通知与时段', en: 'Renovation notices and hours' },
     what: {
-      zh: '谁在装修、什么时候吵、哪些工人可以进来，全部在这里约定清楚。',
-      en: 'Who is renovating, when it can be noisy, and which workers may come through the gate.',
+      zh: '谁在装修、什么时候会吵，都在这里看清楚。登记装修时，通知自动送到受影响的每一户，同时就是一次自我介绍。',
+      en: 'Who is renovating and when it can be noisy. Registering a renovation tells every affected home automatically, and doubles as an introduction.',
     },
     features: {
       zh: [
         '最上面实时显示「现在是不是安静时段」',
-        'Schedule：未来 4 周的装修日历和屋规',
-        'Contractor passes：装修户发 QR 通行证，只限工期内、周一至六 08:00–18:00，最多 3 张，随时可撤销',
-        '模拟门卫扫码：周日、晚上、工期结束后都会被拒绝',
-        'Contractor\'s view：承包商看不到屋主电话、邻居名字和任何照片',
+        '未来 4 周的装修日历和屋规',
+        '右上角「Register renovation」：按工程类型自动算出要通知哪几户（不能删掉任何人），图上标出每户被通知的原因',
+        '通知用对方的阅读语言送达；还没加入的住户由物业送纸本',
         '装修卡片显示地方政府（PBT）准证状态',
       ],
       en: [
         'Live "quiet hours now?" status at the top',
-        'Schedule: four-week renovation calendar and house rules',
-        'Contractor passes: QR pass valid only during the works, Mon–Sat 08:00–18:00, max 3, revocable any time',
-        'Simulated guardhouse scan: Sundays, evenings and expired passes are refused',
-        'Contractor\'s view: no owner phone, neighbour names or photos',
+        'Four-week renovation calendar and house rules',
+        'Register renovation: the type of work decides which homes are told (nobody can be removed), and the plan shows why each one is',
+        'Notices arrive in each reader’s language; homes not on the app get paper from the estate office',
         'Renovation cards show the council (PBT) permit status',
       ],
     },
     why: {
-      zh: '噪音和陌生工人是投诉大宗；SDP App 评论里也有屋主要求限制承包商权限。注意：CIDB 指南和一些物业系统已有类似做法，这层是配套，不是卖点。',
-      en: 'Noise and unknown workers drive complaints, and SDP App reviewers asked for limited contractor access. Note: CIDB guidance and some estate systems already do similar things, so this layer supports the pitch rather than leads it.',
+      zh: '交屋后大家几乎同时装修，邻居第一次「认识」你往往是听到敲墙声。先通知、先自我介绍，关系就从打招呼开始，而不是从投诉开始。（承包商通行证和门卫扫码已经做好，但其他物业系统已有，所以示范里收起来。）',
+      en: 'After handover everyone renovates at once, and a neighbour often first "meets" you through the noise. Telling them first, with an introduction, starts the relationship with a hello instead of a complaint. (Contractor passes and the guardhouse scan are built but hidden: estate systems already offer them.)',
     },
   },
   evidence: {
-    layer: { zh: '第 3–4 层 · 证据与关闭', en: 'Layers 3–4 · Prove & close' },
+    layer: { zh: '安全网 · 证据与保修', en: 'Safety net · Evidence & warranty' },
     title: { zh: '照片证据与保修', en: 'Photo evidence and warranty' },
     what: {
       zh: '邻居在隔壁开工前拍照存证；之后出现裂缝或水渍，系统帮你对比，再决定由谁负责。',
@@ -155,16 +153,16 @@ export const PAGES: Record<TabId, PageGuide> = {
       ],
     },
     why: {
-      zh: '纠纷最难回答的是「装修前本来就有吗？」。没有证据只能吵，甚至上法庭（Bukit Jelutong 案判赔约 RM480 万）。这层和屋历是我们跟别人最大的不同。',
-      en: 'The hardest question in a dispute is "was it there before the works?". Without evidence it ends in arguments or court (the Bukit Jelutong judgment was about RM4.8m). This layer and the home log are what set us apart.',
+      zh: '纠纷最难回答的是「装修前本来就有吗？」。没有证据，邻居只能吵，SDP 也难判断该不该修。开工前的照片让两边都有公平的依据，邻居关系和 SDP 的保修都不用赔进去。',
+      en: 'The hardest question in a dispute is "was it there before the works?". Without evidence, neighbours argue and SDP cannot tell whether a repair is theirs. Pre-work photos give both sides a fair basis, so neither the friendship nor SDP’s warranty is lost to the argument.',
     },
   },
   log: {
-    layer: { zh: '屋历', en: 'Home log' },
+    layer: { zh: '安全网 · 屋历', en: 'Safety net · Home log' },
     title: { zh: '环环相扣的屋历', en: 'Chained home log' },
     what: {
-      zh: '每户一条记录链：交屋、装修、通行证、照片、案件、维修、屋主确认，全都按时间串起来。',
-      en: 'One chain of records per home: handover, renovation, passes, photos, cases, repairs and owner sign-off, in order.',
+      zh: '每户一条记录链：交屋、装修、照片、案件、维修、屋主确认，全都按时间串起来。',
+      en: 'One chain of records per home: handover, renovation, photos, cases, repairs and owner sign-off, in order.',
     },
     features: {
       zh: [
@@ -456,13 +454,6 @@ export const ROUTE: RouteStep[] = [
     text: {
       zh: 'SDP 后台的物业队列：提醒 Aiman 遵守屋规 → 结案（两边的对话里都看得到）',
       en: 'SDP estate queue: remind Aiman of the house rules → close the concern (both chats show it)',
-    },
-  },
-  {
-    tab: 'works', unit: 'T-12',
-    text: {
-      zh: 'Aiman：Contractor passes → 发通行证 → 门卫扫码：周日 10:00 被拒、平日 10:00 放行',
-      en: 'Aiman: Contractor passes → issue a pass → scan: Sunday 10:00 denied, weekday 10:00 allowed',
     },
   },
   {

@@ -14,7 +14,6 @@ const RISKS: Risk[] = [
       { text: 'No resident directory: outside your circle you see unit numbers, never names', built: true },
       { text: 'Phone numbers stay hidden until both households agree to exchange them', built: true },
       { text: 'Photos are re-encoded: GPS, camera model and capture time removed', built: true },
-      { text: 'Contractors see only their pass, dates and house rules; no names, phones or photos', built: true },
       { text: 'Profiles are one line only, visible to your circle and contacts, with a reminder not to share schedules or travel dates', built: true },
       { text: 'Voice notes can only be played by the two people in the chat, and are deleted after 30 days, checked every hour (a reported one is kept for the estate team until reviewed, never longer than 90 days)', built: true },
       { text: '"Download my data" gives each household everything Keynection holds about it as a file; other residents appear by unit only', built: true },
@@ -77,9 +76,8 @@ const RISKS: Risk[] = [
   {
     icon: <KeyRound size={18} />, title: 'Contractor misuse', risk: 'Workers arriving on Sundays, late at night, or after the job has ended.',
     measures: [
-      { text: 'Passes only work on the renovation dates, Monday–Saturday 08:00–18:00', built: true },
-      { text: 'Owners can revoke a pass at any time; at most three active passes per renovation', built: true },
-      { text: 'Only a fingerprint of the QR code is stored, so a data leak cannot create working passes', built: true },
+      { text: 'Noisy work only within the hours in the renovation notice; outside them, a neighbour raises a concern that goes on record', built: true },
+      { text: 'Time-limited worker passes checked at the guardhouse (refused on Sundays and outside the works dates), revocable by the owner and showing contractors no names, phones or photos. Built on the server but switched off in this demo: estate systems already do this, so it is a pilot add-on, not our focus', built: false },
     ],
     see: { tab: 'works', label: 'Works' },
   },
@@ -88,7 +86,6 @@ const RISKS: Risk[] = [
     measures: [
       { text: 'Who is renovating, and when, is visible only to the homes the notice reached', built: true },
       { text: 'Only verified owners and tenants can join (SDP handover records or the management office)', built: false },
-      { text: 'Contractor passes reveal nothing about other homes in the phase', built: true },
     ],
     see: { tab: 'circle', label: 'Circle' },
   },

@@ -48,14 +48,14 @@ def _day(d: date) -> str:
 def demo_notices() -> list[tuple[str, str, str]]:
     """Community notices (ring 3): one-way, from the estate team. Fictional examples."""
     today = today_my()
-    first_of_next_month = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
     return [
         ("block:A", "Block A water tank cleaning",
          f"Water supply to Block A pauses on {_day(_next(5, today))}, 9am to 1pm. Please store water the night before."),
         ("terrace", "Drain clearing on Jalan Demo 1",
          f"Contractors will clear the roadside drains on {_day(_next(3, today))}. Please keep cars off the drain covers."),
-        ("phase", "Contractor passes are now QR-only",
-         f"From {first_of_next_month.day} {first_of_next_month:%b} the guardhouse only admits renovation workers with a Keynection QR pass issued by the homeowner."),
+        ("phase", "Renovation hours in Taman Demo",
+         "Noisy renovation work only Monday to Saturday, 9am to 6pm, and never on Sundays or public holidays. "
+         "Register your renovation in Keynection so your neighbours hear about it from you first."),
     ]
 
 _SOUTH_NAMES = ["Farid", "Siti", "Aiman", "Kumar", "Wei Jie", "Nurul"]

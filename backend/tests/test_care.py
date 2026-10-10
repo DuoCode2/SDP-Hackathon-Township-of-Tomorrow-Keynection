@@ -166,4 +166,7 @@ def test_demo_dates_are_worked_out_from_today(monkeypatch):
     monkeypatch.setattr(seed, "today_my", lambda: date(2027, 2, 24))  # a Wednesday
     assert seed.handover_date() == "2027-02-10"
     bodies = [body for _, _, body in seed.demo_notices()]
-    assert "Saturday 27 Feb" in bodies[0] and "Thursday 4 Mar" in bodies[1] and "From 1 Mar" in bodies[2]
+    assert "Saturday 27 Feb" in bodies[0] and "Thursday 4 Mar" in bodies[1]
+    # The third notice is a standing rule with no date in it, so it can't go stale either.
+    assert "Sundays" in bodies[2] and not any(m in bodies[2] for m in ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                                                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))

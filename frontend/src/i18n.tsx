@@ -14,7 +14,7 @@ const D: Record<string, Entry> = {
   'group.trust': ['Trust', 'Kepercayaan', '信任'],
   'nav.circle': ['Neighbours', 'Jiran', '邻居'], 'nav.circle.sub': ['Who lives around you', 'Siapa di sekeliling anda', '你身边住着谁'], 'nav.circle.short': ['Circle', 'Jiran', '邻居'],
   'nav.chats': ['Chats', 'Sembang', '聊天'], 'nav.chats.sub': ['Talk & raise concerns', 'Berbual & luahkan isu', '聊天与反映问题'], 'nav.chats.short': ['Chats', 'Sembang', '聊天'],
-  'nav.works': ['Works', 'Ubah suai', '装修'], 'nav.works.sub': ['Renovation & gate passes', 'Ubah suai & pas pagar', '装修与门禁通行证'], 'nav.works.short': ['Works', 'Kerja', '装修'],
+  'nav.works': ['Works', 'Ubah suai', '装修'], 'nav.works.sub': ['Renovation notices & hours', 'Notis & waktu ubah suai', '装修通知与时段'], 'nav.works.short': ['Works', 'Kerja', '装修'],
   // Named for what residents do there, not "evidence": the photos protect both neighbours.
   'nav.evidence': ['Photos & repairs', 'Foto & pembaikan', '照片与维修'], 'nav.evidence.sub': ['Pre-work photos, cases, repairs', 'Foto sebelum kerja, kes, pembaikan', '开工前照片、案件、维修'], 'nav.evidence.short': ['Photos', 'Foto', '照片'],
   'nav.log': ['Home log', 'Log rumah', '屋历'], 'nav.log.sub': ['Linked record', 'Rekod berantai', '环环相扣的纪录'], 'nav.log.short': ['Log', 'Log', '屋历'],
@@ -579,7 +579,7 @@ const D: Record<string, Entry> = {
 
   // ---------- works: renovation around you, house rules, contractor passes ----------
   'wk.eyebrow': ['{label} · renovation around you', '{label} · ubah suai di sekeliling anda', '{label} · 你附近的装修'],
-  'wk.subtitle': ['Who is renovating near you, when noisy work is allowed, and who may come through the gate.', 'Siapa yang mengubah suai berhampiran anda, bila kerja bising dibenarkan, dan siapa boleh masuk melalui pagar.', '附近谁在装修、什么时候可以吵、谁可以进出闸门。'],
+  'wk.subtitle': ['Who is renovating near you, and when noisy work is allowed.', 'Siapa yang mengubah suai berhampiran anda, dan bila kerja bising dibenarkan.', '附近谁在装修、什么时候可以吵。'],
   'wk.pill.noisy': ['Noisy work allowed now', 'Kerja bising dibenarkan sekarang', '现在允许吵闹施工'],
   'wk.pill.quiet': ['No noisy work now', 'Tiada kerja bising sekarang', '现在不能吵闹施工'],
   'wk.register': ['Register renovation', 'Daftar ubah suai', '登记装修'],

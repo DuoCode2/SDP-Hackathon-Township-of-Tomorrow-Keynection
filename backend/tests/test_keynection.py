@@ -55,6 +55,14 @@ def test_my_data_file_and_refusals_use_the_new_name(client):
     assert refused.status_code == 422 and "Keynection" in refused.text
 
 
+def test_demo_notices_do_not_point_to_the_hidden_contractor_passes():
+    # The passes are built but switched off in the demo (estate systems already offer them), so no notice may send
+    # residents looking for them.
+    from app import seed
+    for _, title, body in seed.demo_notices():
+        assert "pass" not in f"{title} {body}".lower()
+
+
 def test_nobody_can_pose_as_the_service():
     assert talk.official_sounding("Keynection team")
 
