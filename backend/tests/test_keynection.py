@@ -40,7 +40,8 @@ def test_alerts_carry_the_new_name():
 def test_password_page_and_whatsapp_account_use_the_new_name(client, monkeypatch):
     monkeypatch.setenv("JIRAN_SITE_PASSWORD", "local-test-only")
     page = client.get("/", headers={"Accept": "text/html"}).text
-    assert "Keynection" in page and "Jiran5" not in page
+    shown = re.sub(r"<[^>]+>", "", page)  # what people read: the logo was "Jiran<span>5</span>", split by a tag
+    assert "Keynection" in shown and "Jiran5" not in shown and "Jiran5" not in page
     monkeypatch.delenv("JIRAN_SITE_PASSWORD")
     client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Works soon", "lang": "en", "renovation": RENO})
     assert client.get("/api/units/T-11/whatsapp").json()["business_name"] == "Keynection · Taman Demo"

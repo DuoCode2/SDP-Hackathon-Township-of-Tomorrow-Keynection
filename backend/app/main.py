@@ -215,7 +215,7 @@ SITE_LOGIN_PAGE = """<!doctype html>
   .note { margin-top: 18px; font-size: 13px; color: var(--muted); }
 </style></head>
 <body><main>
-  <div class="logo">Jiran<span>5</span></div>
+  <div class="logo"><span>Key</span>nection</div>
   <p>This is a private demo. Enter the password from the Keynection team.</p>
   <p class="other" lang="ms">Ini demo peribadi. Masukkan kata laluan daripada pasukan Keynection.</p>
   <p class="other" lang="zh">这是内部演示，请输入 Keynection 团队给你的密码。</p>
