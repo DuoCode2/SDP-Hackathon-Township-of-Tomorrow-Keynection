@@ -17,13 +17,13 @@ from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import parse_qs
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
-from . import ai, db, ledger, talk, vision
+from . import ai, db, ledger, quiet, talk, vision
 from .neighbours import Unit, impact_reason, impact_zone, inverse_relation, neighbour_circle, street_or_block
 from .planner import MAX_HOMES, home_count, plan_phase
 from .seed import CONSENT_VERSION, CONSENT_VERSION_AI
@@ -460,11 +460,32 @@ SUBJECT_BY_RELATION = {
 
 # ---------- schemas ----------
 
+class TimeWindow(BaseModel):
+    start: str = Field(..., pattern=HHMM)
+    end: str = Field(..., pattern=HHMM)
+
+
+class QuietTime(TimeWindow):
+    # Kept private: the reason helps the household remember, nobody else ever sees it.
+    why: Literal["baby", "night_shift", "work_from_home", "elderly", "other"] | None = None
+
+
+class QuietTimesIn(BaseModel):
+    windows: list[QuietTime] = Field(default_factory=list, max_length=quiet.MAX_QUIET_WINDOWS + 3)
+
+    @model_validator(mode="after")
+    def fair(self) -> "QuietTimesIn":
+        problem = quiet.check_windows([w.model_dump() for w in self.windows])
+        if problem:
+            raise ValueError(problem)
+        return self
+
+
 class Renovation(BaseModel):
     scope: str = Field(..., min_length=1, max_length=120, examples=["Extend kitchen (rear wall)"])
     start: str = Field(..., pattern=DATE, examples=["2026-10-15"])
     end: str = Field(..., pattern=DATE, examples=["2026-10-30"])
-    noisy_hours: str = Field("weekdays 9am-5pm, no weekends", max_length=80)
+    noisy_hours: str = Field("weekdays 9am-5pm, no weekends", max_length=160)  # the English record, quiet breaks included
     noisy_from: str = Field("09:00", pattern=HHMM)
     noisy_to: str = Field("17:00", pattern=HHMM)
     weekdays_only: bool = True
@@ -477,6 +498,8 @@ class Renovation(BaseModel):
     # Local-authority (PBT) approval: extensions and structural work need one; re-tiling usually does not.
     council_permit: Literal["approved", "applied", "not_needed"] | None = None
     permit_ref: str | None = Field(None, max_length=40, pattern=r"^[A-Za-z0-9/ .-]*$")
+    # Times inside the noisy hours kept quiet for neighbours (planned from their quiet times, see quiet.py).
+    quiet_breaks: list[TimeWindow] = Field(default_factory=list, max_length=4)
 
     @model_validator(mode="after")
     def check_order(self) -> "Renovation":
@@ -490,6 +513,11 @@ class Renovation(BaseModel):
             raise ValueError(f"a renovation notice can cover at most {MAX_RENOVATION_DAYS} days; send a new one after that")
         if self.noisy_to <= self.noisy_from:
             raise ValueError("noisy hours end before they start")
+        breaks = sorted((b.start, b.end) for b in self.quiet_breaks)
+        if any(not self.noisy_from < a < b < self.noisy_to for a, b in breaks):
+            raise ValueError("a quiet break must sit inside the noisy hours")
+        if any(breaks[i][1] > breaks[i + 1][0] for i in range(len(breaks) - 1)):
+            raise ValueError("quiet breaks overlap")
         return self
 
 
@@ -646,6 +674,69 @@ def neighbours(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> li
     return _circle(conn, unit_id)
 
 
+def _quiet_times(conn: sqlite3.Connection, unit_id: str) -> list[dict[str, Any]]:
+    row = conn.execute("SELECT quiet_times FROM profiles WHERE unit_id = ?", (unit_id,)).fetchone()
+    return json.loads(row["quiet_times"]) if row else []
+
+
+@app.get("/api/units/{unit_id}/quiet-times")
+def get_quiet_times(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """A household's own quiet times. Private: used only to plan the noisy hours of renovations that reach it."""
+    _unit_row(conn, unit_id)
+    return {"windows": _quiet_times(conn, unit_id), "max_windows": quiet.MAX_QUIET_WINDOWS,
+            "max_minutes": quiet.MAX_QUIET_MINUTES}
+
+
+@app.put("/api/units/{unit_id}/quiet-times")
+def set_quiet_times(unit_id: str, body: QuietTimesIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    _require_joined(conn, unit_id)
+    windows = sorted((w.model_dump() for w in body.windows), key=lambda w: w["start"])
+    conn.execute("UPDATE profiles SET quiet_times = ?, quiet_times_at = ? WHERE unit_id = ?",
+                 (json.dumps(windows), db.now(), unit_id))
+    conn.commit()
+    return get_quiet_times(unit_id, conn)
+
+
+def _double_works(conn: sqlite3.Connection, unit_id: str, zone: list[str], start: date, end: date) -> dict[str, Any] | None:
+    """Homes this renovation would reach that another renovation already reaches on some of the same days, so they
+    would have works on two sides at once. Says how many and the first start date that avoids it, never whose works."""
+    others = []
+    for r in conn.execute("SELECT i.renovation, x.unit_id FROM intros i JOIN intro_recipients x ON x.intro_id = i.id"
+                          " WHERE i.renovation IS NOT NULL AND i.from_unit_id != ?", (unit_id,)):
+        if r["unit_id"] in zone:
+            reno = json.loads(r["renovation"])
+            others.append((r["unit_id"], date.fromisoformat(reno["start"]), date.fromisoformat(reno["end"])))
+    homes = {h for h, a, b in others if a <= end and start <= b}
+    if not homes:
+        return None
+    length, clear = end - start, start
+    for _ in range(len(others) + 1):  # each step moves past at least one other renovation
+        hit = [b for _, a, b in others if a <= clear + length and clear <= b]
+        if not hit:
+            break
+        clear = max(hit) + timedelta(days=1)
+    return {"homes": len(homes), "clear_from": clear.isoformat()}
+
+
+@app.get("/api/units/{unit_id}/quiet-plan")
+def quiet_plan(unit_id: str, start: str = Query(..., pattern=DATE), end: str = Query(..., pattern=DATE),
+               works_type: Literal["wet", "hacking", "structural", "light"] = "hacking",
+               noisy_from: str = Query("09:00", pattern=HHMM), noisy_to: str = Query("17:00", pattern=HHMM),
+               conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Noisy hours planned around the quiet times of every home this renovation would reach, and whether any of them
+    would have works on two sides at once. The owner sees times and counts, never whose they are or why."""
+    try:
+        first, last = date.fromisoformat(start), date.fromisoformat(end)
+    except ValueError:
+        raise HTTPException(422, "start and end must be real calendar dates") from None
+    if last < first or noisy_to <= noisy_from:
+        raise HTTPException(422, "The dates or the noisy hours are the wrong way round.")
+    me, _, phase_units = _phase(conn, unit_id)
+    zone = [n.unit_id for n in impact_zone(_to_unit(me), phase_units, works_type)]
+    plan = quiet.plan(noisy_from, noisy_to, [_quiet_times(conn, u) for u in zone])
+    return {**plan, "double_works": _double_works(conn, unit_id, zone, first, last)}
+
+
 class RenovationTextIn(BaseModel):
     unit_id: str = Field(..., pattern=UNIT_ID)
     text: str = Field(..., min_length=1, max_length=500)
@@ -736,15 +827,21 @@ def _register_intro(conn: sqlite3.Connection, from_unit_id: str, message: str, l
     )
     intro_id = cur.lastrowid
     paper = []
+    kept = {"avoided": 0, "overlap": 0}
     for n in circle:
-        conn.execute("INSERT INTO intro_recipients (intro_id, unit_id, relation) VALUES (?, ?, ?)",
-                     (intro_id, n["id"], n["relation"]))
+        # Whether the noisy hours keep clear of this home's quiet times, fixed now: what the neighbour was told
+        # stays the same if either side edits something later.
+        state = quiet.respected(renovation, _quiet_times(conn, n["id"])) if renovation else None
+        if state:
+            kept[state] += 1
+        conn.execute("INSERT INTO intro_recipients (intro_id, unit_id, relation, quiet) VALUES (?, ?, ?, ?)",
+                     (intro_id, n["id"], n["relation"], state))
         if renovation and rows[n["id"]]["joined_at"] is None:
             conn.execute("INSERT INTO paper_notices (intro_id, unit_id, created_at) VALUES (?, ?, ?)", (intro_id, n["id"], db.now()))
             paper.append(n["id"])
     if renovation:
         db.append_event(conn, from_unit_id, "renovation_registered",
-                        {**renovation, "neighbours_notified": [n["id"] for n in circle],
+                        {**renovation, "neighbours_notified": [n["id"] for n in circle], "quiet_times": kept,
                          **({"paper_notice_for": paper} if paper else {}), **({"acted_by": sent_by} if sent_by else {})})
     conn.commit()
     return {"id": intro_id, "recipients": shown, "paper_notices": paper}
@@ -977,7 +1074,11 @@ def _concern_row(conn: sqlite3.Connection, concern_id: int) -> sqlite3.Row:
 def _concern_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     raiser, owner = _unit_row(conn, row["from_unit_id"]), _unit_row(conn, row["to_unit_id"])
     reno = _intro(conn, row["intro_id"])["renovation"]
+    # Where the moment it was raised falls against the notice: a noise concern shows at once whether it was in the
+    # agreed hours, a quiet break, or outside them.
+    timing = quiet.timing(reno, datetime.fromisoformat(row["created_at"]).astimezone(MALAYSIA)) if reno else None
     return {"type": "concern", "id": row["id"], "intro_id": row["intro_id"], "scope": reno["scope"] if reno else None,
+            "timing": timing,
             "from_unit_id": row["from_unit_id"], "from_label": raiser["label"], "from_name": raiser["resident_name"],
             "to_unit_id": row["to_unit_id"], "to_label": owner["label"], "to_name": owner["resident_name"],
             "category": row["category"], "category_label": talk.CONCERN_CATEGORIES[row["category"]], "note": row["note"],
@@ -989,14 +1090,15 @@ def _concern_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
 def _thread_items(conn: sqlite3.Connection, me: str, other: str, viewer_lang: str) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for r in conn.execute(
-        "SELECT i.*, r.unit_id AS to_unit_id, r.acked_at FROM intros i JOIN intro_recipients r ON r.intro_id = i.id"
+        "SELECT i.*, r.unit_id AS to_unit_id, r.acked_at, r.quiet FROM intros i JOIN intro_recipients r ON r.intro_id = i.id"
         " WHERE (i.from_unit_id = ? AND r.unit_id = ?) OR (i.from_unit_id = ? AND r.unit_id = ?)",
         (me, other, other, me),
     ):
         reno = json.loads(r["renovation"]) if r["renovation"] else None
         item = {"type": "intro", "id": r["id"], "from_unit_id": r["from_unit_id"], "to_unit_id": r["to_unit_id"],
                 "text": r["message"], "lang": r["lang"], "acked_at": r["acked_at"], "created_at": r["created_at"], "sent_by": r["sent_by"],
-                "renovation": reno, "translated": False, "by_ai": False, "original": None, "original_scope": None}
+                "renovation": reno, "translated": False, "by_ai": False, "original": None, "original_scope": None,
+                "quiet": r["quiet"] if r["to_unit_id"] == me else None}
         mine = _intro_in(r, viewer_lang) if r["to_unit_id"] == me else None
         if mine:
             item.update(text=mine["message"], translated=True, by_ai=True, original=r["message"])
@@ -1831,7 +1933,7 @@ def export_my_data(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
                       "joined_at": me["joined_at"], "privacy_notice_agreed": me["consent_version"],
                       "whatsapp_alerts": bool(p["whatsapp_alerts"]), "easy_mode": bool(p["easy_mode"])},
         "profile": {"bio": p["bio"], "accept_requests": bool(p["accept_requests"]), "allow_waves": bool(p["allow_waves"]),
-                    "quiet_mode": bool(p["quiet_mode"])},
+                    "quiet_mode": bool(p["quiet_mode"]), "quiet_times": json.loads(p["quiet_times"])},
         "family_helpers": delegates(unit_id, conn),
         "introductions_sent": sent,
         "introductions_received": received,
@@ -2252,6 +2354,12 @@ def _local_date(iso: str) -> date:
     return datetime.fromisoformat(iso).astimezone(MALAYSIA).date()
 
 
+def _at_local(day: date, hhmm: str) -> str:
+    """A date and time in Malaysia, as a stored (UTC) timestamp."""
+    h, m = map(int, hhmm.split(":"))
+    return datetime(day.year, day.month, day.day, h, m, tzinfo=MALAYSIA).astimezone(timezone.utc).isoformat(timespec="seconds")
+
+
 def _warranty_clock(unit: sqlite3.Row, row: sqlite3.Row) -> dict[str, Any]:
     today = datetime.now(MALAYSIA).date()
     handover = date.fromisoformat(unit["handover_date"])
@@ -2485,6 +2593,9 @@ def dashboard(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_con
         "contacts_shared": count("SELECT COUNT(*) FROM contact_consents a JOIN contact_consents b"
                                  " ON a.unit_id = b.other_unit_id AND a.other_unit_id = b.unit_id WHERE a.unit_id IN ({marks})") // 2,
         "concerns_raised": count("SELECT COUNT(*) FROM concerns WHERE from_unit_id IN ({marks})"),
+        "noise_concerns": count("SELECT COUNT(*) FROM concerns WHERE category = 'noise_hours' AND from_unit_id IN ({marks})"),
+        "quiet_times_kept": count("SELECT COUNT(*) FROM intro_recipients WHERE quiet = 'avoided' AND unit_id IN ({marks})"),
+        "quiet_times_missed": count("SELECT COUNT(*) FROM intro_recipients WHERE quiet = 'overlap' AND unit_id IN ({marks})"),
         "concerns_settled_by_neighbours": count("SELECT COUNT(*) FROM concerns WHERE status = 'resolved' AND from_unit_id IN ({marks})"),
         "concerns_escalated": count("SELECT COUNT(*) FROM concerns WHERE escalated_at IS NOT NULL AND from_unit_id IN ({marks})"),
         "concerns_with_estate": count("SELECT COUNT(*) FROM concerns WHERE status = 'escalated' AND from_unit_id IN ({marks})"),
@@ -2683,23 +2794,33 @@ def whatsapp_outbox(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) 
         return {"channel": "paper", "lang": me["lang"], "messages": []}
     if not p["whatsapp_alerts"]:
         return {"channel": "app", "lang": me["lang"], "messages": []}
-    lang, quiet = me["lang"], bool(p["quiet_mode"])
+    lang, quiet_mode = me["lang"], bool(p["quiet_mode"])
     out: list[dict[str, Any]] = []
 
+    now = db.now()
+
     def add(at: str, key: str, buttons: tuple[str, ...] = (), social: bool = False, **values: Any) -> None:
-        if social and quiet:
+        if social and quiet_mode:
             return
-        out.append({"at": at, "kind": key, "text": talk.wa_text(key, lang, **{k: str(v) for k, v in values.items()}),
+        out.append({"at": at, "kind": key, "scheduled": at > now,
+                    "text": talk.wa_text(key, lang, **{k: str(v) for k, v in values.items()}),
                     "buttons": [talk.wa_button(b, lang) for b in buttons]})
 
-    for r in conn.execute("SELECT i.*, u.resident_name AS name, u.label FROM intro_recipients x JOIN intros i ON i.id = x.intro_id"
-                          " JOIN units u ON u.id = i.from_unit_id WHERE x.unit_id = ?", (unit_id,)):
+    for r in conn.execute("SELECT i.*, u.resident_name AS name, u.label, x.quiet FROM intro_recipients x"
+                          " JOIN intros i ON i.id = x.intro_id JOIN units u ON u.id = i.from_unit_id WHERE x.unit_id = ?", (unit_id,)):
         if r["renovation"]:
             reno = json.loads(r["renovation"])
             scope = (_intro_in(r, lang) or {}).get("scope") or reno["scope"]
             add(r["created_at"], "reno", ("open", "concern"), name=r["name"], label=r["label"], scope=scope,
                 start=talk.date_text(reno["start"], lang), end=talk.date_text(reno["end"], lang),
-                hours=talk.hours_text(reno, lang), contractor=reno.get("contractor") or "-")
+                hours=talk.hours_text(reno, lang), quiet=talk.quiet_note(r["quiet"], lang), contractor=reno.get("contractor") or "-")
+            # Then, on their own: a reminder to photograph before the work starts, and a check once it has ended.
+            first, last = date.fromisoformat(reno["start"]), date.fromisoformat(reno["end"])
+            if _local_date(r["created_at"]) < first:
+                add(max(_at_local(first - timedelta(days=3), "09:00"), r["created_at"]), "reno_photo", ("photo",),
+                    label=r["label"], start=talk.date_text(reno["start"], lang))
+            add(_at_local(last + timedelta(days=1), "10:00"), "reno_done", ("all_good", "changed"),
+                label=r["label"], end=talk.date_text(reno["end"], lang))
         else:
             add(r["created_at"], "hello", ("wave",), social=True, name=r["name"], label=r["label"])
     for r in conn.execute("SELECT m.*, u.resident_name AS name, u.label FROM messages m JOIN units u ON u.id = m.from_unit_id"
@@ -2730,6 +2851,10 @@ def whatsapp_outbox(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) 
     for r in conn.execute(f"SELECT * FROM notices WHERE phase_id = ? AND audience IN ({','.join('?' * len(audiences))})",
                           (me["phase_id"], *audiences)):
         add(r["created_at"], "notice", ("open",), title=r["title"], body=r["body"])
+    for r in conn.execute("SELECT * FROM intros WHERE from_unit_id = ? AND renovation IS NOT NULL", (unit_id,)):
+        reno = json.loads(r["renovation"])
+        add(_at_local(date.fromisoformat(reno["end"]) + timedelta(days=1), "10:00"), "reno_done_owner", ("open",),
+            end=talk.date_text(reno["end"], lang))
     for r in conn.execute("SELECT * FROM warranty_tickets WHERE unit_id = ? AND status = 'repair_submitted' AND repaired_at IS NOT NULL", (unit_id,)):
         add(r["repaired_at"], "repair", ("open",), subject=r["subject"])
     out.sort(key=lambda m: m["at"])

@@ -112,6 +112,41 @@ const D: Record<string, Entry> = {
   'plan.swipe': ['Swipe sideways to see the whole plan', 'Leret ke sisi untuk melihat keseluruhan pelan', '左右滑动看整张平面图'],
   'hours.weekdays': ['Weekdays {from}–{to}, no weekends', 'Hari bekerja {from}–{to}, tiada hujung minggu', '平日 {from}–{to}，周末不施工'],
   'hours.monSat': ['Mon–Sat {from}–{to}', 'Isnin–Sabtu {from}–{to}', '星期一至六 {from}–{to}'],
+  'hours.quiet': ['quiet {from}–{to}', 'senyap {from}–{to}', '{from}–{to} 不吵'],
+  'hours.sep': [', ', ', ', '，'],
+  'qt.title': ['Your quiet times', 'Waktu senyap anda', '你的安静时间'],
+  'qt.sub': ['When noisy work next door should pause. Used only to plan renovation hours: nobody sees whose they are or why.', 'Bila kerja bising di sebelah patut berhenti. Hanya untuk merancang waktu ubah suai: tiada siapa tahu milik siapa atau sebabnya.', '隔壁吵闹施工应该停下来的时间。只用来安排装修时段：没人看得到是谁、为什么。'],
+  'qt.none': ['None yet. Add one if a baby naps, someone sleeps after a night shift, or you work from home.', 'Belum ada. Tambah jika bayi tidur siang, ada yang tidur selepas syif malam, atau anda bekerja dari rumah.', '还没有。家里有宝宝午睡、有人上夜班要补眠、或在家工作，可以加一个。'],
+  'qt.add': ['Add a quiet time', 'Tambah waktu senyap', '加一个安静时间'],
+  'qt.edit': ['Change', 'Ubah', '修改'],
+  'qt.save': ['Save', 'Simpan', '保存'],
+  'qt.saved': ['Quiet times saved', 'Waktu senyap disimpan', '安静时间已保存'],
+  'qt.from': ['From', 'Dari', '从'],
+  'qt.to': ['To', 'Hingga', '到'],
+  'qt.why': ['Reason (only you see it)', 'Sebab (hanya anda nampak)', '原因（只有你看得到）'],
+  'qt.why.baby': ['Baby naps', 'Bayi tidur', '宝宝午睡'],
+  'qt.why.night_shift': ['Sleep after a night shift', 'Tidur selepas syif malam', '夜班后补眠'],
+  'qt.why.work_from_home': ['Working from home', 'Bekerja dari rumah', '在家工作'],
+  'qt.why.elderly': ['An older family member resting', 'Warga emas berehat', '长辈休息'],
+  'qt.why.other': ['Something else', 'Lain-lain', '其他'],
+  'qt.limit': ['Up to {n} quiet times, {h} hours a day in all, so neighbours can still renovate.', 'Sehingga {n} waktu senyap, jumlah {h} jam sehari, supaya jiran masih boleh mengubah suai.', '最多 {n} 段、每天合计 {h} 小时，邻居才能照常装修。'],
+  'plan.title': ['Planned around your neighbours', 'Dirancang mengikut jiran anda', '已按邻居的作息安排'],
+  'plan.avoids': ['Noisy work {hours}: keeps clear of the quiet times of {n} home(s).', 'Kerja bising {hours}: mengelak waktu senyap {n} rumah.', '吵闹时段 {hours}：避开了 {n} 户的安静时间。'],
+  'plan.notAvoided': ['{n} home(s) asked for quiet times that would leave you under {h} hours of work a day, so those are not avoided and they are told before you start.', '{n} rumah meminta waktu senyap yang menyebabkan anda kurang daripada {h} jam kerja sehari, jadi tidak dielakkan dan mereka dimaklumkan sebelum kerja bermula.', '有 {n} 户要的安静时间会让你每天施工不到 {h} 小时，所以没有避开，开工前会先告诉他们。'],
+  'plan.none': ['No home this notice reaches has set a quiet time.', 'Tiada rumah yang menerima notis ini menetapkan waktu senyap.', '收到这份通知的住户都没有设安静时间。'],
+  'plan.use': ['Use the planned hours', 'Guna waktu yang dirancang', '用安排好的时段'],
+  'plan.own': ['Keep my own hours', 'Kekalkan waktu saya', '用我自己的时段'],
+  'plan.ownNote': ['Using your own hours: neighbours whose quiet times they cross are told so in the notice.', 'Menggunakan waktu anda sendiri: jiran yang waktu senyapnya terjejas dimaklumkan dalam notis.', '用你自己的时段：会碰到安静时间的邻居，通知里会写明。'],
+  'plan.double': ['{n} home(s) this notice reaches already have works from another neighbour on some of these days: noise from two sides at once.', '{n} rumah yang menerima notis ini sudah ada kerja daripada jiran lain pada beberapa hari yang sama: bising dari dua arah serentak.', '收到这份通知的 {n} 户，这几天已经有另一边的邻居在施工：会两边同时吵。'],
+  'plan.moveTo': ['Start on {date} instead', 'Mula pada {date}', '改成 {date} 开工'],
+  'quiet.avoided': ['Noisy hours planned around your quiet time', 'Waktu bising dirancang mengelak waktu senyap anda', '吵闹时段已避开你的安静时间'],
+  'quiet.overlap': ['These hours cross your quiet time: you can ask in this chat', 'Waktu ini bertembung dengan waktu senyap anda: anda boleh bertanya dalam sembang ini', '这个时段碰到你的安静时间，可以在这个聊天里问对方'],
+  'timing.within_hours': ['Raised during the agreed noisy hours', 'Dibangkitkan dalam waktu bising yang dipersetujui', '反映时在约定的吵闹时段内'],
+  'timing.quiet_break': ['Raised during an agreed quiet break', 'Dibangkitkan semasa waktu senyap yang dipersetujui', '反映时正是约定的安静时段'],
+  'timing.outside_hours': ['Raised outside the agreed noisy hours', 'Dibangkitkan di luar waktu bising yang dipersetujui', '反映时在约定的吵闹时段以外'],
+  'timing.not_a_work_day': ['Raised on a day when no work is allowed', 'Dibangkitkan pada hari tiada kerja dibenarkan', '反映当天不允许施工'],
+  'timing.outside_dates': ['Raised outside the dates in the notice', 'Dibangkitkan di luar tarikh dalam notis', '反映时不在通知的日期内'],
+  'wk.quietBreak': ['Quiet {from}–{to}, planned around neighbours', 'Senyap {from}–{to}, dirancang untuk jiran', '{from}–{to} 不吵（为邻居安排）'],
   // connection lost
   'offline.title': ["Can't reach Keynection right now", 'Tidak dapat menghubungi Keynection sekarang', '暂时连不上 Keynection'],
   'offline.body': ['Check your connection, then try again.', 'Semak sambungan anda, kemudian cuba lagi.', '请检查网络连线，然后再试一次。'],
@@ -710,6 +745,7 @@ const TA: Record<string, string> = {
   'permit.not_needed': 'நகராண்மைக் கழக அனுமதி தேவையில்லை',
   'hours.weekdays': 'வார நாட்களில் {from}–{to}, வார இறுதியில் இல்லை',
   'hours.monSat': 'திங்கள்–சனி {from}–{to}',
+  'hours.quiet': '{from}–{to} அமைதி',
   'join.privacyTitle': 'Keynection உங்கள் தகவல்களை எப்படிப் பயன்படுத்துகிறது',
   'join.p1t': 'நாங்கள் வைத்திருப்பவை',
   'join.p1': 'நீங்கள் தேர்ந்தெடுத்த பெயர், உங்கள் வீட்டு எண், மொழி, செய்திகள், நீங்கள் பதிவேற்றும் படங்கள், உங்கள் வீட்டுப் பதிவேடு.',
@@ -745,8 +781,13 @@ export function useDates() {
 
 /** When noisy work is allowed, built from the renovation's own fields in the reader's language. (The English
  *  noisy_hours string stored with the notice stays as the record.) */
-export function noisyHours(t: Translate, r: { noisy_from?: string | null; noisy_to?: string | null; weekdays_only?: boolean | null }): string {
-  return t(r.weekdays_only === false ? 'hours.monSat' : 'hours.weekdays', { from: r.noisy_from ?? '09:00', to: r.noisy_to ?? '17:00' })
+export function noisyHours(t: Translate, r: {
+  noisy_from?: string | null; noisy_to?: string | null; weekdays_only?: boolean | null; quiet_breaks?: { start: string; end: string }[]
+}): string {
+  const hours = t(r.weekdays_only === false ? 'hours.monSat' : 'hours.weekdays', { from: r.noisy_from ?? '09:00', to: r.noisy_to ?? '17:00' })
+  // Quiet breaks planned around neighbours, e.g. "Weekdays 11:00–17:00, no weekends, quiet 13:00–15:00".
+  const sep = t('hours.sep')
+  return hours + (r.quiet_breaks ?? []).map((b) => sep + t('hours.quiet', { from: b.start, to: b.end })).join('')
 }
 
 /** A date in a given language, outside React (message templates, printed notices). */

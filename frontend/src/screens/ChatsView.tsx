@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  ArrowLeft, BadgeCheck, Ban, Building2, Car, CircleHelp, Flag, Hammer, Hand, HardHat, House, Languages, Lock, Megaphone,
+  ArrowLeft, BadgeCheck, Ban, Building2, CalendarCheck, CalendarX, Car, CircleHelp, Flag, Hammer, Hand, HardHat, House, Languages, Lock, Megaphone,
   MessageSquareWarning, Mic, MicOff, MoreHorizontal, Pause, Phone, PhoneCall, Play, SendHorizontal, ShieldCheck, Smile, Sparkles, Trash2,
   TriangleAlert, Volume2, X,
 } from 'lucide-react'
@@ -593,6 +593,11 @@ function IntroCard({ item, mine, onWave }: { item: ChatIntro; mine: boolean; onW
           {r.management_approval && <div><dt>{t('notice.jmb')}</dt><dd>{t(r.management_approval === 'approved' ? 'notice.approved' : 'notice.waiting')}</dd></div>}
           {r.council_permit && <div className={r.management_approval ? '' : 'wide'}><dt>{t('notice.permit')}</dt><dd>{t(`permit.${r.council_permit}`)}{r.permit_ref ? ` · ${r.permit_ref}` : ''}</dd></div>}
         </dl>
+      )}
+      {!mine && item.quiet && (
+        <div className={`notice-quiet ${item.quiet}`}>
+          {item.quiet === 'avoided' ? <CalendarCheck size={14} /> : <CalendarX size={14} />} {t(`quiet.${item.quiet}`)}
+        </div>
       )}
       {!mine && (item.acked_at ? (
         <div className="notice-done"><Hand size={13} /> {t('wave.backDone')}</div>

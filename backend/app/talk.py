@@ -153,14 +153,14 @@ CATEGORY_LABELS: dict[str, dict[str, str]] = {
 
 WA_TEMPLATES: dict[str, dict[str, str]] = {
     "reno": {
-        "en": "Renovation notice from {name} ({label}): {scope}, {start} to {end}. Noisy work: {hours}. Contractor: "
+        "en": "Renovation notice from {name} ({label}): {scope}, {start} to {end}. Noisy work: {hours}.{quiet} Contractor: "
               "{contractor}. Please photograph your side before work starts. If anything worries you, reply in Keynection.",
-        "ms": "Notis ubah suai daripada {name} ({label}): {scope}, {start} hingga {end}. Kerja bising: {hours}. Kontraktor: "
+        "ms": "Notis ubah suai daripada {name} ({label}): {scope}, {start} hingga {end}. Kerja bising: {hours}.{quiet} Kontraktor: "
               "{contractor}. Sila ambil foto bahagian rumah anda sebelum kerja bermula. "
               "Jika ada kebimbangan, balas dalam Keynection.",
-        "zh": "{name}（{label}）的装修通知：{scope}，{start} 至 {end}。吵闹时段：{hours}。承包商：{contractor}。"
+        "zh": "{name}（{label}）的装修通知：{scope}，{start} 至 {end}。吵闹时段：{hours}。{quiet}承包商：{contractor}。"
               "开工前请先拍下你那一边的照片。有任何担心，请在 Keynection 回复。",
-        "ta": "{name} ({label}) அனுப்பிய புதுப்பிப்பு அறிவிப்பு: {scope}, {start} முதல் {end} வரை. சத்தமான வேலை: {hours}. "
+        "ta": "{name} ({label}) அனுப்பிய புதுப்பிப்பு அறிவிப்பு: {scope}, {start} முதல் {end} வரை. சத்தமான வேலை: {hours}.{quiet} "
               "ஒப்பந்ததாரர்: {contractor}. வேலை தொடங்கும் முன் உங்கள் பக்கத்தைப் படம் எடுத்து வையுங்கள். "
               "ஏதாவது கவலை இருந்தால், Keynection-இல் பதில் அனுப்புங்கள்.",
     },
@@ -240,6 +240,32 @@ WA_TEMPLATES: dict[str, dict[str, str]] = {
         "zh": "物业办公室公告：{title}。{body}",
         "ta": "நிர்வாக அலுவலக அறிவிப்பு: {title}. {body}",
     },
+    "reno_photo": {
+        "en": "Works at {label} start on {start}. Please photograph your side now: before photos protect you if anything changes.",
+        "ms": "Kerja di {label} bermula pada {start}. Sila ambil foto bahagian anda sekarang: foto sebelum kerja melindungi anda "
+              "jika ada perubahan.",
+        "zh": "{label} 的工程 {start} 开工。请现在拍下你那一边：开工前的照片能在有变化时保护你。",
+        "ta": "{label}-இல் வேலை {start} அன்று தொடங்குகிறது. உங்கள் பக்கத்தை இப்போதே படம் எடுங்கள்: ஏதாவது மாறினால் "
+              "வேலைக்கு முந்தைய படங்கள் உங்களைப் பாதுகாக்கும்.",
+    },
+    "reno_done": {
+        "en": "The works at {label} ended on {end}. Is everything on your side as before? If something changed, compare it "
+              "with your before photo in Keynection.",
+        "ms": "Kerja di {label} tamat pada {end}. Adakah semuanya di bahagian anda seperti dahulu? Jika ada perubahan, "
+              "bandingkan dengan foto sebelum kerja dalam Keynection.",
+        "zh": "{label} 的工程已在 {end} 完工。你那一边一切都跟以前一样吗？如果有变化，可以在 Keynection 跟开工前的照片对比。",
+        "ta": "{label}-இல் வேலை {end} அன்று முடிந்தது. உங்கள் பக்கம் எல்லாம் முன்பு போலவே உள்ளதா? ஏதாவது மாறியிருந்தால், "
+              "Keynection-இல் வேலைக்கு முந்தைய படத்துடன் ஒப்பிடுங்கள்.",
+    },
+    "reno_done_owner": {
+        "en": "Your works ended on {end}. Your neighbours have been asked whether anything changed on their side; any answer "
+              "comes to you in Keynection.",
+        "ms": "Kerja anda tamat pada {end}. Jiran anda telah ditanya sama ada apa-apa berubah di bahagian mereka; sebarang "
+              "jawapan akan sampai kepada anda dalam Keynection.",
+        "zh": "你的工程已在 {end} 完工。系统已问过邻居他们那一边有没有变化；有回复会在 Keynection 通知你。",
+        "ta": "உங்கள் வேலை {end} அன்று முடிந்தது. அண்டைவீட்டாரிடம் அவர்கள் பக்கம் ஏதாவது மாறியதா என்று "
+              "கேட்கப்பட்டுள்ளது; பதில் வந்தால் Keynection-இல் உங்களுக்குத் தெரியும்.",
+    },
     "repair": {
         "en": "SDP says the repair is done ({subject}). Please check it and confirm in Keynection: only you can close the ticket.",
         "ms": "SDP memaklumkan pembaikan telah siap ({subject}). Sila semak dan sahkan dalam Keynection: "
@@ -275,6 +301,34 @@ WA_BUTTONS: dict[str, dict[str, str]] = {
         "zh": "接受",
         "ta": "ஏற்றுக்கொள்",
     },
+    "photo": {
+        "en": "Take photos",
+        "ms": "Ambil foto",
+        "zh": "去拍照",
+        "ta": "படம் எடு",
+    },
+    "all_good": {
+        "en": "All good",
+        "ms": "Semua baik",
+        "zh": "一切正常",
+        "ta": "எல்லாம் சரி",
+    },
+    "changed": {
+        "en": "Something changed",
+        "ms": "Ada perubahan",
+        "zh": "有变化",
+        "ta": "ஏதோ மாறியது",
+    },
+}
+
+# Whether a renovation notice's noisy hours keep clear of the reader's quiet times (fixed when the notice is sent).
+QUIET_NOTE: dict[str, dict[str, str]] = {
+    "avoided": {"en": " These hours avoid your quiet time.", "ms": " Waktu bising ini mengelak waktu senyap anda.",
+                "zh": "吵闹时段已避开你的安静时间。", "ta": " இந்த நேரம் உங்கள் அமைதி நேரத்தைத் தவிர்க்கிறது."},
+    "overlap": {"en": " These hours overlap your quiet time; reply in Keynection to ask.",
+                "ms": " Waktu bising ini bertembung dengan waktu senyap anda; balas dalam Keynection untuk bertanya.",
+                "zh": "吵闹时段和你的安静时间重叠，可以在 Keynection 回复询问。",
+                "ta": " இந்த நேரம் உங்கள் அமைதி நேரத்துடன் மோதுகிறது; Keynection-இல் பதில் அனுப்பிக் கேளுங்கள்."},
 }
 
 
@@ -301,10 +355,19 @@ def date_text(iso: str, lang: str) -> str:
     return f"{d.day} {_MONTHS.get(lang, _MONTHS['en'])[d.month - 1]} {d.year}"
 
 
+QUIET_BREAK = {"en": "quiet {start}–{end}", "ms": "senyap {start}–{end}", "zh": "{start}–{end} 不吵", "ta": "{start}–{end} அமைதி"}
+
+
 def hours_text(reno: dict, lang: str) -> str:
     key = "weekdays" if reno.get("weekdays_only", True) else "mon_sat"
     template = HOURS[key].get(lang) or HOURS[key]["en"]
-    return template.format(start=reno.get("noisy_from") or "09:00", end=reno.get("noisy_to") or "17:00")
+    text = template.format(start=reno.get("noisy_from") or "09:00", end=reno.get("noisy_to") or "17:00")
+    breaks = [(QUIET_BREAK.get(lang) or QUIET_BREAK["en"]).format(**b) for b in reno.get("quiet_breaks") or []]
+    return text + "".join(("，" if lang == "zh" else ", ") + b for b in breaks)
+
+
+def quiet_note(state: str | None, lang: str) -> str:
+    return (QUIET_NOTE[state].get(lang) or QUIET_NOTE[state]["en"]) if state else ""
 
 
 def wa_text(key: str, lang: str, **values: str) -> str:

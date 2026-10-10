@@ -45,6 +45,16 @@ Sime Darby Property University Hackathon 2026 · People 赛道。**Every key com
 - 本机（Windows）：开始 → 搜索「编辑账户的环境变量」（英文系统是 Edit environment variables for your account）→ 新建 `ANTHROPIC_API_KEY`，值贴金钥 → 确定，然后**重新开** `start-demo.bat`（窗口会写 AI on/off）。旧电脑第一次会自动补装 AI 套件
 - Render：Dashboard → 这个服务 → Environment → Add Environment Variable：`ANTHROPIC_API_KEY` → Save（会自动重新部署）
 
+**先算好，不用吵：吵闹时段自动避开邻居的作息**（2026年10月10日加入，不靠 AI，断网也能算）：
+- **每户设一次「安静时间」**（邻居首页最下面）：例如宝宝 13–15 点午睡、夜班后 9–11 点补眠。最多 2 段、每天合计 3 小时，原因只有自己看得到。示范里 Siti（No. 11）设了宝宝午睡，对面 Hafiz（No. 22）设了夜班补眠
+- **登记装修时自动排时段**：系统把通知范围内每户的安静时间、地方政府允许的时段（星期一到六 9–6 点）一起算，建议吵闹时段，例如「11:00–17:00，13:00–15:00 不吵」，并写明「避开了 2 户的安静时间」——不说是谁、为什么。屋主每天至少保留 4 小时能施工；排不下的那户不避开，但通知里会写明。屋主也可以选「用我自己的时段」
+- **两边同时施工**：如果收到通知的某户这几天另一边也在装修，系统提醒，并一键改到不重叠的开工日（工期不变），不透露是谁在装修
+- **通知写明结果**：邻居收到的通知（app、WhatsApp、按他的语言）写着「吵闹时段已避开你的安静时间」，或「碰到你的安静时间，可以问对方」。这个结果在发出时就定下来，之后谁改设定都不会改写
+- **时间到了自己提醒**：开工前 3 天提醒受影响的邻居拍开工前照片；完工后一天问双方有没有变化（有就去跟开工前的照片比对）。WhatsApp 示意图里标着「Scheduled」
+- **反映噪音自动对时间**：邻居提出「超时施工」时，系统自动标明当时是在约定时段内、约定的安静时段，还是时段外，不用再争论约定了什么
+- **SDP 后台**：多了「通知避开的安静时间」和「噪音不满」两个数字，试点前后对比
+- 规则在 `backend/app/quiet.py`（纯规则、可解释），测试在 `tests/test_quiet.py`
+
 | 层 | 画面 | 做什么 |
 |---|---|---|
 | 1 认识 | Neighbours（Circle） | **像社交 app 一样用**：顶部一排邻居头像（橙圈是装修中、蓝点是还没认识），邻居卡片可以「Message」或「👋 Wave」，点头像看小档案；右上角可切到「Map」。**三层邻居**：第 1 层影响圈（共用墙、楼板、面对面）显示名字、可直接聊天；第 2 层同一条 lorong 或同一栋，只显示门牌，要先发「联系请求」写原因，对方接受才能聊；第 3 层整个社区没有名册和群组，物业公告放在 Chats 的官方帐号。公寓有楼层剖面图并标出「YOUR STACK」。「自我介绍」（在 Neighbours）和「登记装修」（在 Works 右上角）都是分步骤流程；装修按工程类型自动算出通知范围（湿作业到楼下两层、打墙上下各两层），并在图上标出每户被通知的原因 |
@@ -94,7 +104,7 @@ npm run dev
 
 打开 http://localhost:5173 。电脑上是网页版：左边是导航，右边是「导览」面板（中文/英文切换，说明这一页的功能，并列出可以一键跳转的演示路线）；窗口窄于 1240 像素时导览改成按右上角按钮滑出；窄于 900 像素（手机）时改为全屏加底部导航。服务器默认只在本机开放，同一 Wi-Fi 里的其他人连不进来。
 
-测试（220 个）：
+测试（235 个）：
 
 ```bash
 cd prototype/backend
@@ -129,9 +139,9 @@ cd prototype/backend
 导览最上面就是这条路线，点一步会自动跳到对应画面和住户。只走主线：
 
 1. **交钥匙那天**：Aiman（No. 12）首页就是左右和对面 5 户邻居 → 对 Siti 按「👋 Wave」
-2. **装修通知就是自我介绍**：Works →「Register renovation」→ 在「Just say it in one sentence」打一句（例：Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 → 检查后发送（还没加入的 No. 23 由物业送纸本）
-3. **隔壁 Kumar（No. 13）读淡米尔文**：触达管道里看到他在 WhatsApp 收到的是淡米尔文装修通知，连 Aiman 写的工程说明也由 AI 翻好
-4. 按「Both sides」（左 Aiman、右 Siti）→ Siti 回 👋、按快捷回复「宝宝午睡」→ 再用马来文打一句冲的话（例：Rumah awak bising macam kilang! Tak reti hormat jiran ke?）→ AI 先给她平和的说法 → Aiman 看到英文，原文点一下就有
+2. **装修通知就是自我介绍**：Works →「Register renovation」→ 在「Just say it in one sentence」打一句（例：Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 →「When」那一步系统已按邻居作息排好（避开 Siti 宝宝午睡 13–15 点、Hafiz 夜班补眠 9–11 点，不说是谁）→ 检查后发送（还没加入的 No. 23 由物业送纸本）
+3. **隔壁 Kumar（No. 13）读淡米尔文**：触达管道里看到他在 WhatsApp 收到的是淡米尔文装修通知，连 Aiman 写的工程说明也由 AI 翻好；下面还有两条会自己发出的提醒（开工前 3 天提醒拍照、完工后一天问有没有变化）
+4. 按「Both sides」（左 Aiman、右 Siti）→ Siti 打开 Aiman 的通知，看到「吵闹时段已避开你的安静时间」，宝宝午睡不用她开口 → 回 👋 → 再用马来文打一句冲的话（例：Rumah awak bising macam kilang! Tak reti hormat jiran ke?）→ AI 先给她平和的说法 → Aiman 看到英文，原文点一下就有
 
 没开 AI 时第 2、4 步照样能走：装修通知逐步填，打的字照原文送（导览最上面会写 AI 有没有开）。
 5. **万一出事**：Siti 按 Use sample → Sample crack → 系统说明裂缝开工前就有，属于保修，不是装修造成
@@ -203,6 +213,10 @@ cd prototype/backend
 - AI 送到 Anthropic（马来西亚境外）处理：隐私声明有写，但试点要签资料处理协议，或改用 SDP 自己云端供应商上的 Claude，并做资料保护影响评估
 - 示范网上版每户每天 40 次 AI 调用的上限记在服务器记忆体里，重启就归零；正式版要放进资料库
 - 还没接翻译的：「提出不满」的备注、SDP 物业公告（照原文显示）
+- 安静时间是住户自己说的，系统没法核实；所以有上限（每户 2 段、每天 3 小时），屋主每天至少保留 4 小时，而且只是「尽量避开」
+- 地方政府允许的施工时段各地不同（MBPJ、MBSA、MPKj 等），原型统一用星期一到六 9–6 点；公共假期还不认得。试点要按乡镇所在的地方政府设定
+- 「两边同时施工」的提醒会让屋主知道附近另有工程的结束日期（不知道是哪一户）；示范接受这一点，试点可以只说「建议晚一点开工」
+- 自动提醒只显示在 WhatsApp 示意图里（WhatsApp 本来就是模拟的），正式版要接 WhatsApp Business 的模板讯息
 - AI 用 `claude-opus-5-5`，质量最好但每则聊天要等几秒；放上真金钥后要实测，太慢就把 `KEYNECTION_AI_MODEL` 换成 `claude-haiku-5-5`
 - 语音讯息 30 天后自动删除，后端每小时检查一次（启动和打开聊天时也会检查）；被检举、还没审核的会保留给物业团队，但最多 90 天
 - 家人代办在演示里是一键切换；正式版代办人要用自己的手机号码登入
@@ -237,12 +251,13 @@ backend/
   app/neighbours.py      三层邻居、按工程类型的通知范围
   app/planner.py         新 phase 设定：从布局算出每户邻里圈和通知范围（只读、有上限）
   app/talk.py            快捷回复的三语翻译、语气检查、不满类别、联系方式与冒充检查、WhatsApp 通知模板
+  app/quiet.py           安静时间：按邻居作息排吵闹时段、两边同时施工、通知是否避开、反映时间对照约定（纯规则）
   app/ai.py              Claude：一句话变成装修通知栏位、按读者语言翻译、太冲时给平和说法；没有金钥或没回应就照旧
   app/demo_photos/       程序画出来的示范照片（含好/差两种维修）
   app/db.py              SQLite 资料表与写入屋历
   app/main.py            FastAPI 接口与安全设置（四层、聊天、不满、审核、保修时钟都在这里）
   scripts/make_demo_photos.py
-  tests/                 220 个测试（test_ai.py 一句话写通知、不合规则的回答被丢掉、按读者语言翻译讯息和通知（WhatsApp、纸本也是）、太冲先劝、辱骂仍挡、AI 没回应照旧、每户每天上限、只送文字不送名字，全部用替身不连真的 AI，另外走官方套件但把网络换掉，检查送出的格式、备用选项被拒时自动改问、断网和被拒都照旧；test_keynection.py 新名字、淡米尔文的快捷回复与通知、按读者语言写日期和施工时段；test_site_gate.py 网上版三语密码页、记住 30 天、改密码全部失效、页面不被缓存绕过、健康检查不用密码、noindex；test_codes.py 屋规、门卫判定、聊天自动通知与列表预览都附代码；test_decisions.py 谁能决定什么：提出、同意、不同意、检查员；test_staff_gating.py 关掉演示模式时后台全部关闭、不能任意写屋历；test_hello_safety.py 打招呼的封锁、安静模式、语气、联系方式、次数，装修日期与批准、装修连结期限；test_triage.py 时间判断与理由代码；test_ledger.py 同时写入不分叉；test_talk.py 聊天、不满、审核、时钟、物业只看升级的不满；test_rings.py 三层邻居、通知范围、联系请求、公告；test_social.py Wave、表情、语音、个人资料、官方帐号；test_care.py 语音 30 天删除、家人代办、下载我的资料、邻里关系数据、联系方式与冒充检查、以今天计算的示范日期；test_join.py 交屋加入、纸本通知、物业代登记、简易模式隐私、WhatsApp 通知、新 phase 设定）
+  tests/                 235 个测试（test_quiet.py 按邻居作息排时段、屋主保留至少 4 小时、只在法定时段内排、安静时间保密且有上限、通知写明是否避开且发出后不改写、两边同时施工与建议开工日、自动提醒的时间、噪音反映对照约定、后台数字；test_ai.py 一句话写通知、不合规则的回答被丢掉、按读者语言翻译讯息和通知（WhatsApp、纸本也是）、太冲先劝、辱骂仍挡、AI 没回应照旧、每户每天上限、只送文字不送名字，全部用替身不连真的 AI，另外走官方套件但把网络换掉，检查送出的格式、备用选项被拒时自动改问、断网和被拒都照旧；test_keynection.py 新名字、淡米尔文的快捷回复与通知、按读者语言写日期和施工时段；test_site_gate.py 网上版三语密码页、记住 30 天、改密码全部失效、页面不被缓存绕过、健康检查不用密码、noindex；test_codes.py 屋规、门卫判定、聊天自动通知与列表预览都附代码；test_decisions.py 谁能决定什么：提出、同意、不同意、检查员；test_staff_gating.py 关掉演示模式时后台全部关闭、不能任意写屋历；test_hello_safety.py 打招呼的封锁、安静模式、语气、联系方式、次数，装修日期与批准、装修连结期限；test_triage.py 时间判断与理由代码；test_ledger.py 同时写入不分叉；test_talk.py 聊天、不满、审核、时钟、物业只看升级的不满；test_rings.py 三层邻居、通知范围、联系请求、公告；test_social.py Wave、表情、语音、个人资料、官方帐号；test_care.py 语音 30 天删除、家人代办、下载我的资料、邻里关系数据、联系方式与冒充检查、以今天计算的示范日期；test_join.py 交屋加入、纸本通知、物业代登记、简易模式隐私、WhatsApp 通知、新 phase 设定）
 frontend/src/
   App.tsx                外框：导航（跟着页面性格变）、图框、语言切换、角色卡、Both sides 分屏、代办横幅、手机版底栏
   i18n.tsx               住户页面的英文、马来文、中文字典与语言切换
@@ -257,6 +272,7 @@ frontend/src/
   screens/JoinView.tsx   交屋加入：加入码、名字与语言、隐私声明同意
   screens/PlannerView.tsx、ImpactView.tsx、ChannelsView.tsx  新 phase 设定、影响估算、触达管道
   components/FrontDesk.tsx、PaperNotice.tsx  物业柜台与列印用的纸本通知
+  components/QuietTimes.tsx  「你的安静时间」卡片（只有自己看得到）
   components/Cast.tsx    演示角色卡
   components/ConcernCard.tsx    不满卡片与升级阶梯
   components/WarrantyClock.tsx  《房屋发展法》保修时钟
@@ -271,6 +287,7 @@ frontend/src/
 - [x] 淡米尔文讯息模板（快捷回复、WhatsApp 通知、纸本通知、隐私声明、自我介绍模板）
 - [ ] 请以淡米尔语为母语的人检查淡米尔文；介面也补上淡米尔文
 - [x] AI 两项（一句话写装修通知；打的字用对方语言收到、太冲先劝），功能冻结只为这两项开例外
+- [x] 先算好，不用吵：吵闹时段按邻居作息自动排、两边同时施工提醒、自动提醒、噪音反映对照约定（功能冻结的第二个例外，2026年10月10日用户决定）
 - [ ] 放上真的 `ANTHROPIC_API_KEY` 后，用真 AI 走一次评审路线，看翻译和「太冲」判断的实际表现
 - ~~后台补上平均解决天数~~（功能冻结，不做）
 - ~~承包商和门卫各自的画面~~（通行证已收起，不做）

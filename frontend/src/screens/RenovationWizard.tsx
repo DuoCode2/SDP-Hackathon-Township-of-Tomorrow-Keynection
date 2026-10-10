@@ -1,19 +1,29 @@
 import { useEffect, useState } from 'react'
-import { Bath, Building, Drill, Lock, Paintbrush, Send, ShieldCheck, Sparkles } from 'lucide-react'
-import { api, ApiError, type ImpactItem, type Renovation, type RenovationDraft, type UnitInfo, type WorksType } from '../api'
+import { Bath, Building, CalendarClock, Drill, Lock, Paintbrush, Send, ShieldCheck, Sparkles, TriangleAlert } from 'lucide-react'
+import { api, ApiError, type ImpactItem, type QuietPlan, type Renovation, type RenovationDraft, type UnitInfo, type WorksType } from '../api'
 import { LANGS, introTemplate, type Lang } from '../messages'
 import PlanMap from '../components/PlanMap'
 import { noisyHours, useDates, useT } from '../i18n'
 import { useHelper } from '../helper'
 import { useAi } from '../features'
-import { Sheet, Steps, useToast } from '../ui'
+import { Segmented, Sheet, Steps, useToast } from '../ui'
+
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 /** A local calendar date n days from today, as YYYY-MM-DD. */
 function daysFromToday(n: number): string {
   const d = new Date()
   d.setDate(d.getDate() + n)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return ymd(d)
 }
+
+/** n days after a YYYY-MM-DD date. */
+function addDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00`)
+  d.setDate(d.getDate() + n)
+  return ymd(d)
+}
+const daysBetween = (a: string, b: string) => Math.round((new Date(`${b}T00:00:00`).getTime() - new Date(`${a}T00:00:00`).getTime()) / 86_400_000)
 
 const STEPS = ['reno.steps.type', 'reno.steps.who', 'reno.steps.when', 'reno.steps.approvals', 'reno.steps.review']
 
@@ -53,6 +63,10 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   const [reading, setReading] = useState(false)
   const [filled, setFilled] = useState<RenovationDraft | null>(null)
   const [aiNote, setAiNote] = useState<string | null>(null)
+  // Noisy hours planned around the quiet times of the homes the works reach (worked out on the server, which never
+  // says whose they are). The owner can keep their own hours instead; the notice then says whose quiet time it crosses.
+  const [plan, setPlan] = useState<QuietPlan | null>(null)
+  const [usePlan, setUsePlan] = useState(true)
   const [reno, setReno] = useState<Renovation>({
     scope: t(`works.${strata ? 'wet' : 'structural'}.scope`),
     start: daysFromToday(7),
@@ -79,9 +93,27 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
     }
   }, [open, me.id, works])
 
-  const hours = `${reno.weekdays_only ? 'weekdays' : 'Mon–Sat'} ${reno.noisy_from}–${reno.noisy_to}${reno.weekdays_only ? ', no weekends' : ''}`
+  useEffect(() => {
+    if (!open || !reno.start || !reno.end || reno.end < reno.start || (reno.noisy_to ?? '17:00') <= (reno.noisy_from ?? '09:00')) return
+    let live = true
+    const timer = window.setTimeout(() => {
+      api.quietPlan(me.id, { works_type: works, start: reno.start, end: reno.end, noisy_from: reno.noisy_from ?? '09:00', noisy_to: reno.noisy_to ?? '17:00' })
+        .then((p) => live && setPlan(p)).catch(() => live && setPlan(null))
+    }, 250)
+    return () => {
+      live = false
+      window.clearTimeout(timer)
+    }
+  }, [open, me.id, works, reno.start, reno.end, reno.noisy_from, reno.noisy_to])
+  const planned = usePlan && plan && plan.homes_with_quiet_times > 0 ? plan : null
+
+  const timed = planned ? { noisy_from: planned.noisy_from, noisy_to: planned.noisy_to, quiet_breaks: planned.quiet_breaks }
+    : { noisy_from: reno.noisy_from, noisy_to: reno.noisy_to, quiet_breaks: [] }
+  // The English record of the hours; every reader sees them built from the fields in their own language.
+  const hours = `${reno.weekdays_only ? 'weekdays' : 'Mon–Sat'} ${timed.noisy_from}–${timed.noisy_to}${reno.weekdays_only ? ', no weekends' : ''}`
+    + timed.quiet_breaks.map((b) => `, quiet ${b.start}–${b.end}`).join('')
   const full: Renovation = {
-    ...reno, works_type: works, noisy_hours: hours,
+    ...reno, ...timed, works_type: works, noisy_hours: hours,
     contractor: reno.contractor?.trim() || null,
     council_permit: reno.council_permit || null,  // '' = not chosen yet
     permit_ref: reno.council_permit === 'not_needed' ? null : reno.permit_ref || null,
@@ -242,6 +274,27 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
             <label className="field">{t('reno.noisyTo')}<input type="time" value={reno.noisy_to} onChange={set('noisy_to')} /></label>
           </div>
           <label className="switch-row"><input type="checkbox" checked={!!reno.weekdays_only} onChange={set('weekdays_only')} /> {t('reno.weekends')}</label>
+          {plan && plan.homes_with_quiet_times > 0 && (
+            <div className="qplan-card">
+              <div className="qplan-head"><CalendarClock size={15} /> <b>{t('plan.title')}</b></div>
+              <p>{t('plan.avoids', { hours: noisyHours(t, { ...reno, ...plan }), n: plan.avoided })}</p>
+              {plan.not_avoided > 0 && <p className="warn">{t('plan.notAvoided', { n: plan.not_avoided, h: 4 })}</p>}
+              <Segmented value={usePlan ? 'plan' : 'own'} onChange={(v) => { setUsePlan(v === 'plan'); setDraft(null) }}
+                options={[{ id: 'plan', label: t('plan.use') }, { id: 'own', label: t('plan.own') }]} />
+              {!usePlan && <small>{t('plan.ownNote')}</small>}
+            </div>
+          )}
+          {plan?.double_works && (
+            <div className="tone-check">
+              <TriangleAlert size={15} />
+              <div>{t('plan.double', { n: plan.double_works.homes })}</div>
+              <button className="btn btn-sm" onClick={() => {
+                const clear = plan.double_works!.clear_from
+                setReno({ ...reno, start: clear, end: addDays(clear, daysBetween(reno.start, reno.end)) })
+                setDraft(null)
+              }}>{t('plan.moveTo', { date: dates.date(plan.double_works.clear_from) })}</button>
+            </div>
+          )}
           <div className="wizard-note"><ShieldCheck size={13} /> {t('reno.rules')}</div>
         </div>
       )}
@@ -281,7 +334,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
           <dl className="notice-grid">
             <div><dt>{t('reno.work')}</dt><dd>{reno.scope}</dd></div>
             <div><dt>{t('reno.dates')}</dt><dd>{dates.range(reno.start, reno.end)}</dd></div>
-            <div><dt>{t('reno.noisy')}</dt><dd>{noisyHours(t, reno)}</dd></div>
+            <div><dt>{t('reno.noisy')}</dt><dd>{noisyHours(t, full)}</dd></div>
             <div><dt>{t('reno.contractor')}</dt><dd>{reno.contractor || '–'}{reno.contractor_cidb_registered ? ' · CIDB ✓' : ''}</dd></div>
             <div><dt>{t('reno.notified')}</dt><dd>{t('reno.homes', { n: zone?.length ?? '–' })}</dd></div>
             <div><dt>{t('reno.approvals')}</dt><dd>{strata

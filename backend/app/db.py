@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from . import ledger
-from .seed import BIOS, CONSENT_VERSION, EASY_MODE, NOT_JOINED, PHASE, SEED_HELPERS, demo_notices, demo_units, handover_date
+from .seed import BIOS, CONSENT_VERSION, EASY_MODE, NOT_JOINED, PHASE, QUIET_TIMES, SEED_HELPERS, demo_notices, demo_units, handover_date
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS phases (
@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS intro_recipients (
     unit_id TEXT NOT NULL REFERENCES units(id),
     relation TEXT NOT NULL,
     acked_at TEXT,
+    quiet TEXT,                 -- renovation notices: 'avoided' or 'overlap' for this home's quiet times when sent
     PRIMARY KEY (intro_id, unit_id)
 );
 CREATE TABLE IF NOT EXISTS photos (
@@ -220,7 +221,9 @@ CREATE TABLE IF NOT EXISTS profiles (
     quiet_mode INTEGER NOT NULL DEFAULT 0,
     notices_read_at TEXT,
     easy_mode INTEGER NOT NULL DEFAULT 0,
-    whatsapp_alerts INTEGER NOT NULL DEFAULT 1
+    whatsapp_alerts INTEGER NOT NULL DEFAULT 1,
+    quiet_times TEXT NOT NULL DEFAULT '[]',  -- JSON [{start, end, why}]: private, used only to plan renovation hours
+    quiet_times_at TEXT
 );
 CREATE TABLE IF NOT EXISTS join_codes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -275,7 +278,7 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 TABLES = ("paper_notices", "join_codes", "delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
           "warranty_tickets", "gate_logs", "passes", "incidents", "photos",
           "intro_recipients", "intros", "events", "units", "phases")
@@ -312,8 +315,9 @@ def _seed(conn: sqlite3.Connection) -> None:
         # Every home history starts with SDP's handover record.
         append_event(conn, u["id"], "handover", {"note": "Vacant possession; SDP handover inspection recorded",
                                                  "vacant_possession": handover})
-        conn.execute("INSERT INTO profiles (unit_id, bio, easy_mode) VALUES (?, ?, ?)",
-                     (u["id"], BIOS.get(u["resident_name"], "") if joined else "", int(u["id"] in EASY_MODE)))
+        conn.execute("INSERT INTO profiles (unit_id, bio, easy_mode, quiet_times) VALUES (?, ?, ?, ?)",
+                     (u["id"], BIOS.get(u["resident_name"], "") if joined else "", int(u["id"] in EASY_MODE),
+                      json.dumps(QUIET_TIMES.get(u["resident_name"], []) if joined else [])))
     for unit_id, name, relation in SEED_HELPERS:
         cur = conn.execute("INSERT INTO delegates (unit_id, name, relation, created_at) VALUES (?, ?, ?, ?)", (unit_id, name, relation, now()))
         append_event(conn, unit_id, "delegate_added", {"delegate_id": cur.lastrowid, "name": name, "relation": relation})

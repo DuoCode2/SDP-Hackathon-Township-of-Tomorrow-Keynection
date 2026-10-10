@@ -1093,6 +1093,26 @@ button.ring-row:hover { background: var(--surface-2); }
 .guide-ai { display: flex; align-items: flex-start; gap: 6px; margin: 0; padding: 7px 9px; border-radius: 8px; font-size: 12px; line-height: 1.45; background: var(--well-2); color: var(--text-2); }
 .guide-ai svg { flex: none; margin-top: 2px; }
 .guide-ai.on { background: var(--violet-bg); color: var(--violet); }
+
+/* quiet times: renovation hours planned around the neighbours */
+.qplan-card { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--ok-bg); border: 1px solid var(--ok-line); font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.qplan-head { display: flex; align-items: center; justify-content: flex-start; gap: 7px; color: var(--ok-text); }
+.qplan-head b { color: var(--text); }
+.qplan-card p { margin: 0; }
+.qplan-card .warn { color: var(--works-text); }
+.qplan-card small { color: var(--muted); }
+.notice-quiet { display: flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 6px 9px; border-radius: 8px; }
+.notice-quiet.avoided { background: var(--ok-bg); color: var(--ok-text); }
+.notice-quiet.overlap { background: var(--works-bg); color: var(--works-text); }
+.concern-timing { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+.concern-timing.ok { color: var(--muted); }
+.concern-timing.off { color: var(--red); font-weight: 600; }
+.quiet-line { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; color: var(--ok-text); }
+.quiet-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.quiet-chip { padding: 4px 10px; border-radius: 999px; background: var(--ok-bg); border: 1px solid var(--ok-line); color: var(--ok-text); font-size: 12.5px; font-weight: 600; }
+.quiet-edit { display: flex; flex-direction: column; gap: 8px; }
+.quiet-row { display: grid; grid-template-columns: 1fr 1fr 1.6fr auto; gap: 8px; align-items: end; }
+@media (max-width: 560px) { .quiet-row { grid-template-columns: 1fr 1fr auto; } .quiet-row .field:nth-child(3) { grid-column: 1 / -1; grid-row: 2; } }
 .guide-scope { display: grid; gap: 8px; justify-items: start; margin: 14px 0 10px; padding: 12px 14px; border-radius: 10px; border: 1px dashed var(--line-2); background: var(--surface); }
 .guide-scope .guide-hint { margin: 0; }
 .route { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -1557,6 +1577,10 @@ button.ring-row:hover { background: var(--surface-2); }
 .wa-bubble { padding: 7px 9px 5px; border-radius: 0 10px 10px 10px; background: #fff; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08); }
 .wa-bubble p { font-size: 12.5px; line-height: 1.45; color: #1d2430; }
 .wa-bubble small { display: flex; justify-content: flex-end; align-items: center; gap: 3px; font-size: 9.5px; color: #8a96a3; }
+/* an alert Keynection will send by itself later: shown faded, with its time */
+.wa-msg.scheduled .wa-bubble { background: rgba(255, 255, 255, 0.6); border: 1px dashed rgba(29, 36, 48, 0.25); box-shadow: none; }
+.wa-msg.scheduled .wa-bubble small { color: #5b6672; }
+.wa-msg.scheduled .wa-buttons { opacity: 0.6; }
 .wa-buttons { display: grid; gap: 3px; }
 .wa-buttons span { padding: 6px; border-radius: 8px; background: #fff; text-align: center; font-size: 12px; font-weight: 600; color: #1f7ea8; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06); }
 .wa-note { display: flex; align-items: flex-start; gap: 8px; margin: auto 6px; padding: 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.9); font-size: 12.5px; line-height: 1.5; color: #3d4753; }

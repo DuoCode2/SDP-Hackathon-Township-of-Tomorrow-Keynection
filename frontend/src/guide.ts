@@ -63,6 +63,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         '右上角切到「Map」：建筑蓝图平面图，公寓有楼层剖面图和「YOUR STACK」',
         '没有住户名册、没有大群组；物业公告移到 Chats 里的官方帐号',
         '还没加入的邻居（No. 23）只显示门牌、不能传讯息；装修通知由物业办公室印纸本送过去',
+        '「你的安静时间」：设一次（例如宝宝 13–15 点午睡），以后邻居装修就会自动避开；只有你自己看得到',
       ],
       en: [
         'A row of faces at the top (like IG stories): orange ring + 🔨 is renovating, blue dot is not met yet, green ring is known; tap for a mini profile',
@@ -72,6 +73,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Switch to "Map" for the blueprint plan; apartments get a floor section with "YOUR STACK"',
         'No resident directory, no group chat; estate notices live in an official account in Chats',
         'A neighbour who hasn’t joined (No. 23) shows as a unit number and can’t be messaged; the estate office delivers their renovation notices on paper',
+        '"Your quiet times": set once (say a baby’s nap 1–3pm) and every renovation nearby is planned around it; only you can see it',
       ],
     },
     why: {
@@ -122,6 +124,9 @@ export const PAGES: Record<TabId, PageGuide> = {
         '未来 4 周的装修日历和屋规',
         '右上角「Register renovation」：按工程类型自动算出要通知哪几户（不能删掉任何人），图上标出每户被通知的原因',
         '「一句话说清楚」：用任何语言说要做什么，AI 判断工程类型（决定通知谁）、日期、吵闹时段和承包商，屋主逐步检查再发；批准和 CIDB 仍由屋主自己确认',
+        '吵闹时段按邻居的安静时间自动排好（宝宝午睡、夜班补眠），不说是谁、为什么；屋主每天至少保留 4 小时能施工，也可以用自己的时段，被碰到的邻居会在通知里看到',
+        '如果收到通知的某户这几天另一边也在施工，系统会提醒并建议改到哪天开工',
+        '时间到了自己提醒：开工前 3 天提醒邻居拍照，完工后一天问双方有没有变化；邻居反映噪音时，系统自动标明当时是在约定时段内、安静时段，还是时段外',
         '通知用对方的阅读语言送达（屋主写的话由 AI 翻好）；还没加入的住户由物业送纸本，同样是他的语言',
         '装修卡片显示地方政府（PBT）准证状态',
       ],
@@ -130,6 +135,9 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Four-week renovation calendar and house rules',
         'Register renovation: the type of work decides which homes are told (nobody can be removed), and the plan shows why each one is',
         '"Just say it in one sentence": describe the work in any language and AI fills in the type of work (which decides who is told), dates, noisy hours and contractor for the owner to check; approvals and the CIDB tick stay the owner’s',
+        'Noisy hours are planned around the neighbours’ quiet times (a baby’s nap, sleep after a night shift) without saying whose or why; the owner keeps at least 4 hours a day, or can keep their own hours and the neighbours affected are told in the notice',
+        'If a home the notice reaches already has works on its other side on those days, the owner is warned and offered a start date that avoids it',
+        'Reminders go out by themselves: photograph three days before works start, and a check the day after they end; a noise concern records whether it came during the agreed hours, a quiet break or outside them',
         'Notices arrive in each reader’s language (the owner’s own words translated by AI); homes not on the app get paper from the estate office, in their language too',
         'Renovation cards show the council (PBT) permit status',
       ],
@@ -395,22 +403,22 @@ export const JUDGE_ROUTE: RouteStep[] = [
   {
     tab: 'works', unit: 'T-12',
     text: {
-      zh: '装修通知就是自我介绍：Works →「Register renovation」→ 在「一句话说清楚」打「Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5」（中文、马来文也行）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 → 检查后发送（还没加入的 No. 23 由物业送纸本）',
-      en: 'The renovation notice is the introduction: Works → Register renovation → in "Just say it in one sentence" type "Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5" (Malay or Chinese work too) → Fill it in for me → AI picks the type of work and the plan marks who is told → check and send (No. 23, not on the app yet, gets it on paper)',
+      zh: '装修通知就是自我介绍：Works →「Register renovation」→ 在「一句话说清楚」打「Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5」（中文、马来文也行）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 →「时间」那一步系统已按邻居作息排好：避开 Siti 宝宝午睡（13–15 点）和对面 Hafiz 夜班后补眠（9–11 点），但不说是谁 → 检查后发送（还没加入的 No. 23 由物业送纸本）',
+      en: 'The renovation notice is the introduction: Works → Register renovation → in "Just say it in one sentence" type "Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5" (Malay or Chinese work too) → Fill it in for me → AI picks the type of work and the plan marks who is told → at "When" the hours are already planned around the neighbours: clear of Siti’s baby nap (1–3pm) and Hafiz’s sleep after night shifts (9–11am), without saying whose → check and send (No. 23, not on the app yet, gets it on paper)',
     },
   },
   {
     tab: 'channels', unit: 'T-13',
     text: {
-      zh: '隔壁 Kumar（No. 13）读淡米尔文：触达管道里看到他在 WhatsApp 收到的是淡米尔文装修通知，连 Aiman 写的工程说明也由 AI 翻好',
-      en: 'Kumar next door (No. 13) reads Tamil: Channels shows Aiman’s notice reaching him on WhatsApp in Tamil, down to the work Aiman described, translated by AI',
+      zh: '隔壁 Kumar（No. 13）读淡米尔文：触达管道里看到他在 WhatsApp 收到的是淡米尔文装修通知，连 Aiman 写的工程说明也由 AI 翻好；下面还排好两条会自己发出的提醒：开工前 3 天提醒拍照、完工后一天问有没有变化',
+      en: 'Kumar next door (No. 13) reads Tamil: Channels shows Aiman’s notice reaching him on WhatsApp in Tamil, down to the work Aiman described, translated by AI; below it, two reminders that go out by themselves: photograph three days before the works, and a check the day after they end',
     },
   },
   {
     tab: 'chats', unit: 'T-11',
     text: {
-      zh: '按顶栏「Both sides」（左 Aiman、右 Siti）→ Siti 回 👋、按快捷回复「宝宝午睡」→ 再用马来文打一句冲的话（例：「Rumah awak bising macam kilang! Tak reti hormat jiran ke?」）→ AI 先给她一个平和的说法 → 发出后 Aiman 看到的是英文，原文点一下就有',
-      en: 'Turn on "Both sides" (Aiman left, Siti right) → Siti waves back and taps the baby-nap quick reply → then types something sharp in Malay ("Rumah awak bising macam kilang! Tak reti hormat jiran ke?") → AI offers her a calmer wording → Aiman reads it in English, the original one tap away',
+      zh: '按顶栏「Both sides」（左 Aiman、右 Siti）→ Siti 打开 Aiman 的通知，看到「吵闹时段已避开你的安静时间」，宝宝午睡不用她开口 → 回 👋 → 再用马来文打一句冲的话（例：「Rumah awak bising macam kilang! Tak reti hormat jiran ke?」）→ AI 先给她平和的说法 → Aiman 看到的是英文，原文点一下就有',
+      en: 'Turn on "Both sides" (Aiman left, Siti right) → Siti opens Aiman’s notice: "Noisy hours planned around your quiet time", so she never had to ask about the baby’s nap → she waves back → then types something sharp in Malay ("Rumah awak bising macam kilang! Tak reti hormat jiran ke?") → AI offers her a calmer wording → Aiman reads it in English, the original one tap away',
     },
   },
   {

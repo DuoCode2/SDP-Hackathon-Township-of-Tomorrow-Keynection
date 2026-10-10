@@ -138,6 +138,8 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
                     <div><dt>Keys to first hello</dt><dd>{d.days_to_first_hello === null ? '—' : `${d.days_to_first_hello} days`}</dd></div>
                     <div><dt>Households that reached out</dt><dd>{d.households_reached_out} / {d.households}</dd></div>
                     <div><dt>Active circles · 30 days</dt><dd>{d.active_circles_30d}</dd></div>
+                    <div><dt>Quiet times kept by renovation notices</dt><dd>{d.quiet_times_kept} / {d.quiet_times_kept + d.quiet_times_missed}</dd></div>
+                    <div><dt>Noise concerns</dt><dd>{d.noise_concerns}</dd></div>
                   </dl>
                 </div>
                 <div className="mono muted">FOR HANDOVER PLANNING · NOT FOR MARKETING OR PROFILING RESIDENTS</div>

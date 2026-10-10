@@ -96,6 +96,13 @@ BIOS = {
     "Ah Hock": "Retired. Voice messages are easiest for me; my daughter helps with the app.",
 }
 
+# Times a household needs quiet, used only to plan the noisy hours of renovations that reach it. Nobody else sees
+# them, or why: Siti next door to Aiman has a baby who naps after lunch, Hafiz across the road sleeps after night shifts.
+QUIET_TIMES = {
+    "Siti": [{"start": "13:00", "end": "15:00", "why": "baby"}],
+    "Hafiz": [{"start": "09:00", "end": "11:00", "why": "night_shift"}],
+}
+
 
 def demo_units() -> list[dict]:
     units = []

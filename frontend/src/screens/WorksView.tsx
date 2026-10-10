@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
-import { BadgeCheck, Ban, CalendarRange, Eye, EyeOff, FileCheck2, FileClock, Hammer, KeyRound, ListChecks, ScanLine, ShieldCheck, ShieldX, Volume2, VolumeX } from 'lucide-react'
+import { BadgeCheck, Ban, CalendarClock, CalendarRange, Eye, EyeOff, FileCheck2, FileClock, Hammer, KeyRound, ListChecks, ScanLine, ShieldCheck, ShieldX, Volume2, VolumeX } from 'lucide-react'
 import { api, type ContractorView, type GateCode, type GateResult, type Pass, type UnitInfo, type WorkItem, type Works } from '../api'
 import { useDates, useT, type Translate } from '../i18n'
 import { Badge, Card, CardHead, Empty, ScreenTitle, Segmented, Sheet, Skeleton, useToast } from '../ui'
@@ -28,6 +28,7 @@ function noisyAllowed(item: WorkItem, at: Date): boolean {
   const wd = at.getDay()
   if (wd === 0 || (r.weekdays_only !== false && wd === 6)) return false
   const hm = at.toTimeString().slice(0, 5)
+  if ((r.quiet_breaks ?? []).some((b) => hm >= b.start && hm < b.end)) return false  // a quiet break planned for neighbours
   return hm >= (r.noisy_from ?? '09:00') && hm < (r.noisy_to ?? '17:00')
 }
 
@@ -150,6 +151,9 @@ function Schedule({ data, all, noisy }: { data: Works; all: Item[]; noisy: Item[
               <div className="stat"><b>{w.renovation.noisy_to ?? '17:00'}</b><span>{t('wk.noiseUntil')}</span></div>
               <div className="stat"><b>{t(w.renovation.weekdays_only === false ? 'wk.sat' : 'wk.noWeekend')}</b><span>{t('wk.weekend')}</span></div>
             </div>
+            {(w.renovation.quiet_breaks ?? []).map((b) => (
+              <div key={b.start} className="quiet-line"><CalendarClock size={13} /> {t('wk.quietBreak', { from: b.start, to: b.end })}</div>
+            ))}
             {w.renovation.council_permit && (
               <div className={`permit permit-${w.renovation.council_permit}`}>
                 {w.renovation.council_permit === 'applied' ? <FileClock size={14} /> : <FileCheck2 size={14} />}

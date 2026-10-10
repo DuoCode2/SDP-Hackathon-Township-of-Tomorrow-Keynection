@@ -41,7 +41,41 @@ export interface Renovation {
   permit_ref?: string | null
   works_type?: WorksType
   management_approval?: 'approved' | 'pending' | null
+  /** Times inside the noisy hours kept quiet for neighbours, planned from their quiet times. */
+  quiet_breaks?: TimeWindow[]
 }
+
+export interface TimeWindow {
+  start: string
+  end: string
+}
+
+export type QuietReason = 'baby' | 'night_shift' | 'work_from_home' | 'elderly' | 'other'
+
+/** A household's own quiet times: private, used only to plan renovation hours around it. */
+export interface QuietTimes {
+  windows: (TimeWindow & { why?: QuietReason | null })[]
+  max_windows: number
+  max_minutes: number
+}
+
+/** Noisy hours planned around the quiet times of the homes a renovation reaches: times and counts, never whose. */
+export interface QuietPlan {
+  noisy_from: string
+  noisy_to: string
+  quiet_breaks: TimeWindow[]
+  noisy_minutes: number
+  homes_with_quiet_times: number
+  avoided: number
+  not_avoided: number
+  /** Homes that would have works on two sides at once, and the first start date that avoids it. */
+  double_works: { homes: number; clear_from: string } | null
+}
+
+/** Whether a notice's noisy hours keep clear of the reader's quiet times, fixed when it was sent. */
+export type QuietState = 'avoided' | 'overlap' | null
+/** Where the moment a concern was raised falls against the notice. */
+export type Timing = 'within_hours' | 'quiet_break' | 'outside_hours' | 'not_a_work_day' | 'outside_dates'
 
 /** A home outside your circle: its place in the phase, never its resident (unless you are connected). */
 export interface NearbyHome extends Omit<UnitInfo, 'resident_name' | 'lang' | 'handover_date'> {
@@ -214,6 +248,7 @@ export interface Concern {
   id: number
   intro_id: number
   scope: string | null
+  timing: Timing | null
   from_unit_id: string
   from_label: string
   from_name: string
@@ -276,6 +311,7 @@ export interface ChatIntro {
   by_ai: boolean
   original: string | null
   original_scope: string | null
+  quiet: QuietState
 }
 
 export interface ChatWave {
@@ -345,7 +381,8 @@ export interface WhatsAppOutbox {
   channel: 'whatsapp' | 'app' | 'paper'
   lang: Lang
   business_name?: string
-  messages: { at: string; kind: string; text: string; buttons: string[] }[]
+  /** scheduled: an alert Keynection will send by itself at that time (a photo reminder, a check after the works). */
+  messages: { at: string; kind: string; scheduled: boolean; text: string; buttons: string[] }[]
 }
 
 export interface PhaseLayout {
@@ -547,6 +584,9 @@ export interface Dashboard {
   messages_sent: number
   contacts_shared: number
   concerns_raised: number
+  noise_concerns: number
+  quiet_times_kept: number
+  quiet_times_missed: number
   concerns_settled_by_neighbours: number
   concerns_escalated: number
   concerns_with_estate: number
@@ -750,6 +790,11 @@ export const api = {
   thread: (unitId: string, otherId: string) => request<Thread>(`/api/units/${unitId}/conversations/${otherId}`),
   markRead: (unitId: string, otherId: string) => request(`/api/units/${unitId}/conversations/${otherId}/read`, { method: 'POST' }),
   aiStatus: () => request<AiStatus>('/api/ai'),
+  quietTimes: (unitId: string) => request<QuietTimes>(`/api/units/${unitId}/quiet-times`),
+  setQuietTimes: (unitId: string, windows: QuietTimes['windows']) =>
+    request<QuietTimes>(`/api/units/${unitId}/quiet-times`, json('PUT', { windows })),
+  quietPlan: (unitId: string, r: { works_type: WorksType; start: string; end: string; noisy_from: string; noisy_to: string }) =>
+    request<QuietPlan>(`/api/units/${unitId}/quiet-plan?${new URLSearchParams(r)}`),
   renovationDraft: (unitId: string, text: string) =>
     request<RenovationDraft>('/api/ai/renovation-draft', json('POST', { unit_id: unitId, text })),
   sendMessage: (from: string, to: string, msg: { body?: string; quick_key?: string; keep_tone?: boolean }, delegateId?: number) =>

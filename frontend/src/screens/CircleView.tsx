@@ -7,6 +7,7 @@ import { LANG_TAG, roleOf } from '../components/Cast'
 import { Avatar, Badge, Card, CardHead, ScreenTitle, Segmented, Sheet, Skeleton, useCelebrate, useToast } from '../ui'
 import { Logo } from '../components/Art'
 import IntroWizard from './IntroWizard'
+import QuietTimesCard from '../components/QuietTimes'
 import { useShowAll } from '../features'
 
 interface Props {
@@ -237,6 +238,8 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
               </article>
             ))}
           </div>
+
+          <QuietTimesCard unitId={me.id} />
 
           {showAll && <>
           <div className="section-label ring2-label">{t('section.ring2', { place: dir.ring2_label })}</div>

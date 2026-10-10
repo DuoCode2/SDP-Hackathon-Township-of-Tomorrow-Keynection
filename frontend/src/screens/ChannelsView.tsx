@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BadgeCheck, Bell, CheckCheck, ChevronLeft, FileWarning, House, Megaphone, Network, Printer, Smartphone } from 'lucide-react'
+import { BadgeCheck, Bell, CheckCheck, ChevronLeft, Clock3, FileWarning, House, Megaphone, Network, Printer, Smartphone } from 'lucide-react'
 import { api, type Conversation, type Official, type UnitInfo, type WhatsAppOutbox } from '../api'
 import { Avatar, formatDate, formatTime, ScreenTitle, Skeleton } from '../ui'
 
@@ -82,11 +82,13 @@ export default function ChannelsView({ me, version }: { me: UnitInfo; version: n
                 <div className="wa-note">No alerts yet.</div>
               ) : (
                 wa.messages.map((m, i) => (
-                  <div key={i} className="wa-msg">
+                  <div key={i} className={`wa-msg ${m.scheduled ? 'scheduled' : ''}`}>
                     {(i === 0 || formatDate(wa.messages[i - 1].at) !== formatDate(m.at)) && <div className="wa-day">{formatDate(m.at)}</div>}
                     <div className="wa-bubble">
                       <p>{m.text}</p>
-                      <small>{formatTime(m.at)} <CheckCheck size={12} /></small>
+                      <small>
+                        {m.scheduled ? <><Clock3 size={11} /> Scheduled · goes out by itself at {formatTime(m.at)}</> : <>{formatTime(m.at)} <CheckCheck size={12} /></>}
+                      </small>
                     </div>
                     {m.buttons.length > 0 && <div className="wa-buttons">{m.buttons.map((b) => <span key={b}>{b}</span>)}</div>}
                   </div>
@@ -94,7 +96,7 @@ export default function ChannelsView({ me, version }: { me: UnitInfo; version: n
               )}
             </div>
           </div>
-          <figcaption><b>On WhatsApp</b> Short alerts from pre-approved templates, in the reader's language. They never contain what neighbours wrote; tapping opens Keynection. Quiet mode holds back chat alerts, never formal notices. Illustration.</figcaption>
+          <figcaption><b>On WhatsApp</b> Short alerts from pre-approved templates, in the reader's language. They never contain what neighbours wrote; tapping opens Keynection. Quiet mode holds back chat alerts, never formal notices. Alerts marked Scheduled go out by themselves: a reminder to photograph three days before works start, and a check the day after they end. Illustration.</figcaption>
         </figure>
       </div>
     </section>

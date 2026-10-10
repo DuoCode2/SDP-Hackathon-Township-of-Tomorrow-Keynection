@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BellRing, Building2, Check, CircleCheck, HandHeart, MessageSquareWarning, Send } from 'lucide-react'
+import { BellRing, Building2, Check, CircleCheck, Clock3, HandHeart, MessageSquareWarning, Send } from 'lucide-react'
 import { api, type Concern } from '../api'
 import { byWho, tEn, useDates, useT } from '../i18n'
 import { Stamp, useToast } from '../ui'
@@ -58,6 +58,10 @@ export default function ConcernCard({ concern: c, viewer, estate = false, onChan
         <Stamp tone={TONE[c.status]} tilt={-3}>{t(`cc.${c.status}`)}</Stamp>
       </div>
       {c.note && <p className="concern-note">“{c.note}”</p>}
+      {/* A noise concern says at once where the moment fell against what was agreed in the notice. */}
+      {c.category === 'noise_hours' && c.timing && (
+        <div className={`concern-timing ${c.timing === 'within_hours' ? 'ok' : 'off'}`}><Clock3 size={12} /> {t(`timing.${c.timing}`)}</div>
+      )}
       {c.acted_by && <div className="concern-meta"><HandHeart size={12} /> {t('cc.by', { who: byWho(t, c.acted_by) })}</div>}
       <ol className="ladder">
         {steps.map((st, i) => (
