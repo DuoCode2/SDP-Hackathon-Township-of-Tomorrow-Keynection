@@ -400,6 +400,35 @@ const D: Record<string, Entry> = {
   'join.p3': ['Voice messages: 30 days. Records: the defect liability period plus one year. The home log stays with the unit.', 'Mesej suara: 30 hari. Rekod: tempoh liabiliti kecacatan ditambah satu tahun. Log rumah kekal bersama unit.', '语音：30 天。纪录：保修期再加一年。屋历跟着这间房子。'],
   'join.p4t': ['Your rights', 'Hak anda', '你的权利'],
   'join.p4': ['Download your data any time, correct it, or ask the estate office to close your account.', 'Muat turun data anda bila-bila masa, betulkannya, atau minta pejabat estet menutup akaun anda.', '随时下载、更正你的资料，或请物业办公室关闭帐户。'],
+  'si.title': ['Welcome to Keynection', 'Selamat datang ke Keynection', '欢迎来到 Keynection'],
+  'si.lead': ['Every key comes with five neighbours. Your phone is your key: no password.', 'Setiap kunci datang dengan lima jiran. Telefon anda ialah kunci anda: tiada kata laluan.', '每一把钥匙都附送五户邻居。你的手机就是钥匙，不用密码。'],
+  'si.key': ['Sign in with my digital key', 'Log masuk dengan kunci digital saya', '用我的数字钥匙登入'],
+  'si.keyHint': ['Uses your phone’s fingerprint, face or screen lock.', 'Menggunakan cap jari, wajah atau kunci skrin telefon anda.', '用手机的指纹、刷脸或萤幕锁。'],
+  'si.new': ['New home? Use the code in your welcome pack', 'Rumah baharu? Guna kod dalam pek selamat datang', '刚拿钥匙？用欢迎礼包里的加入码'],
+  'si.codeTitle': ['Changed phones, or staff signing in for the first time?', 'Tukar telefon, atau kakitangan log masuk kali pertama?', '换了手机，或是职员第一次登入？'],
+  'si.codeHint': ['Enter the one-time code from the estate office.', 'Masukkan kod sekali guna daripada pejabat estet.', '输入物业办公室给你的一次性码。'],
+  'si.codeBtn': ['Use this code', 'Guna kod ini', '用这个码'],
+  'si.noKey': ['No key on this phone yet? Ask the estate office for a new code: they will check your ID.', 'Tiada kunci di telefon ini? Minta kod baharu di pejabat estet: mereka akan menyemak IC anda.', '这支手机还没有钥匙？请到物业办公室领新的码，他们会核对身份。'],
+  'si.unsupported': ['This browser can’t hold a digital key. Please open Keynection in Chrome or Safari on your phone.', 'Pelayar ini tidak boleh menyimpan kunci digital. Sila buka Keynection dalam Chrome atau Safari di telefon anda.', '这个浏览器无法保存数字钥匙，请用手机的 Chrome 或 Safari 打开 Keynection。'],
+  'si.failed': ['That didn’t work. Please try again.', 'Tidak berjaya. Sila cuba lagi.', '没成功，请再试一次。'],
+  'si.err.code_used': ['This code isn’t valid any more. Ask the estate office for a new one.', 'Kod ini tidak sah lagi. Minta kod baharu di pejabat estet.', '这个码已经失效了，请向物业办公室要一个新的。'],
+  'si.err.too_slow': ['That took too long. Please try again.', 'Itu mengambil masa terlalu lama. Sila cuba lagi.', '等太久了，请再试一次。'],
+  'si.err.key_unknown': ['This key isn’t known here. If you changed phones, ask the estate office for a new code.', 'Kunci ini tidak dikenali. Jika anda menukar telefon, minta kod baharu di pejabat estet.', '这把钥匙不认得。如果你换了手机，请向物业办公室要一个新的码。'],
+  'si.err.key_retry': ['This key could not be checked. Please try again.', 'Kunci ini tidak dapat disemak. Sila cuba lagi.', '这把钥匙核对不了，请再试一次。'],
+  'si.pilot': ['Pilot', 'Perintis', '试点'],
+  'key.title': ['Make your digital key', 'Buat kunci digital anda', '建立你的数字钥匙'],
+  'key.lead': ['Next time you open Keynection, this phone lets you in with your fingerprint, face or screen lock. No password to remember, and nobody else can sign in as your home.', 'Lain kali anda buka Keynection, telefon ini membenarkan anda masuk dengan cap jari, wajah atau kunci skrin. Tiada kata laluan untuk diingat, dan tiada orang lain boleh log masuk sebagai rumah anda.', '下次打开 Keynection，这支手机用指纹、刷脸或萤幕锁就能进来。不用记密码，别人也无法冒充你家登入。'],
+  'key.make': ['Make my key', 'Buat kunci saya', '建立我的钥匙'],
+  'key.done': ['Your digital key is ready', 'Kunci digital anda sudah sedia', '你的数字钥匙已建立'],
+  'key.later': ['Not now', 'Bukan sekarang', '先不用'],
+  'key.laterNote': ['Without a key, signing in again on another day needs a new code from the estate office.', 'Tanpa kunci, log masuk semula pada hari lain memerlukan kod baharu daripada pejabat estet.', '没有钥匙的话，改天要再登入就得去物业办公室领新的码。'],
+  'key.cancelled': ['No key was made. You can try again.', 'Tiada kunci dibuat. Anda boleh cuba lagi.', '没有建立钥匙，可以再试一次。'],
+  'keys.title': ['Your digital keys', 'Kunci digital anda', '你的数字钥匙'],
+  'keys.count': ['{n} key(s): each phone you added can sign in as your home.', '{n} kunci: setiap telefon yang anda tambah boleh log masuk sebagai rumah anda.', '{n} 把钥匙：每一支加过钥匙的手机都能以你家的身份登入。'],
+  'keys.add': ['Add a key on this phone', 'Tambah kunci di telefon ini', '在这支手机加一把钥匙'],
+  'keys.added': ['Key added', 'Kunci ditambah', '钥匙已加上'],
+  'keys.lost': ['Lost a phone? Tell the estate office: a new code retires every old key.', 'Hilang telefon? Beritahu pejabat estet: kod baharu membatalkan semua kunci lama.', '手机丢了？告诉物业办公室：新的码会让旧钥匙全部作废。'],
+  'keys.signout': ['Sign out', 'Log keluar', '登出'],
   'join.p5t': ['AI translation', 'Terjemahan AI', 'AI 翻译'],
   'join.p5': ['So neighbours can read you in their own language, what you type to them is translated by an AI service (Claude, by Anthropic, processed outside Malaysia). Only the words you write are sent. Your neighbour can always see your own words, and a calmer wording is only ever a suggestion.', 'Supaya jiran boleh membacanya dalam bahasa mereka sendiri, apa yang anda taip kepada mereka diterjemah oleh perkhidmatan AI (Claude, oleh Anthropic, diproses di luar Malaysia). Hanya perkataan yang anda tulis dihantar. Jiran anda sentiasa boleh melihat kata-kata asal anda, dan ayat yang lebih tenang hanyalah cadangan.', '为了让邻居用自己的语言读你写的话，你打给他们的字会由 AI 服务（Anthropic 的 Claude，在马来西亚境外处理）翻译。只送出你写的文字。邻居随时看得到你的原文；比较平和的说法永远只是建议。'],
   'join.consent': ['I have read this privacy notice ({version}) and agree to it.', 'Saya telah membaca notis privasi ini ({version}) dan bersetuju.', '我已阅读这份隐私声明（{version}）并同意。'],
@@ -848,6 +877,15 @@ function initial(): UiLang {
     return v === 'ms' || v === 'zh' ? v : 'en'
   } catch {
     return 'en'
+  }
+}
+
+/** Pilot: until someone on this phone picks a language, the app speaks the one the household chose at joining. */
+export function langChosen(): boolean {
+  try {
+    return localStorage.getItem(STORE) !== null
+  } catch {
+    return false
   }
 }
 

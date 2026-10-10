@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react'
-import { Building2, Calculator, Camera, CalendarClock, CircleUserRound, Columns2, Compass, Grid3x3, HandHeart, Hexagon, Languages, LayoutDashboard, MessagesSquare, Network, ShieldHalf, Smartphone } from 'lucide-react'
-import { api, onReachability, type UnitInfo } from './api'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Building2, Calculator, Camera, CalendarClock, CircleUserRound, Columns2, Compass, Grid3x3, HandHeart, Hexagon, Languages, LayoutDashboard, LogOut, MessagesSquare, Network, ShieldHalf, Smartphone } from 'lucide-react'
+import { api, onReachability, type AuthMe, type UnitInfo } from './api'
 import { Avatar, ToastProvider } from './ui'
 import type { GuideLang, TabId } from './guide'
-import { EnglishOnly, LangProvider, useDates, useLang, type UiLang } from './i18n'
+import { EnglishOnly, LangProvider, langChosen, useDates, useLang, type UiLang } from './i18n'
 import { HelperProvider, useActing, useHelper } from './helper'
 import Guide from './components/Guide'
 import CastPicker, { roleOf } from './components/Cast'
 import { Logo } from './components/Art'
-import { FOCUS_TABS, ShowAllProvider } from './features'
+import { FOCUS_TABS, PilotProvider, ShowAllProvider, usePilot, type Pilot } from './features'
 import CircleView from './screens/CircleView'
 import ChatsView from './screens/ChatsView'
 import WorksView from './screens/WorksView'
@@ -21,6 +21,7 @@ import JoinView from './screens/JoinView'
 import PlannerView from './screens/PlannerView'
 import ImpactView from './screens/ImpactView'
 import ChannelsView from './screens/ChannelsView'
+import SignInView from './screens/SignInView'
 
 // Labels come from the dictionary: nav.<id>, nav.<id>.sub, nav.<id>.short.
 const NAV = [
@@ -61,6 +62,8 @@ type PaneState = { me: string; tab: TabId; peer?: string }
 const WARM: TabId[] = ['circle', 'chats', 'me']
 // SDP's side stays in English on purpose; every resident screen follows the chosen language.
 const ENGLISH_TABS: TabId[] = ['sdp', 'planner', 'impact', 'channels', 'safeguards']
+// Pilot mode: a signed-in household sees its own screens only; SDP's screens belong to the staff shell.
+const RESIDENT_TABS: TabId[] = ['circle', 'chats', 'works', 'evidence', 'log', 'me']
 // A household that hasn't joined sees the join page on these; its home log (the property's record) stays viewable.
 const NEEDS_JOIN: TabId[] = ['circle', 'chats', 'works', 'evidence', 'me']
 const faceOf = (tab: TabId) => (WARM.includes(tab) ? 'face-warm' : 'face-blueprint')
@@ -88,25 +91,61 @@ export default function App() {
     <LangProvider>
       <HelperProvider>
         <ToastProvider>
-          <Shell />
+          <Gate />
         </ToastProvider>
       </HelperProvider>
     </LangProvider>
   )
 }
 
-function Shell() {
+/** Demo mode: the shell as it always was. Pilot mode: sign in first; the server decides who is asking. */
+function Gate() {
+  const [me, setMe] = useState<AuthMe | null>(null)
+  const [down, setDown] = useState(false)
+  // A welcome-pack QR (?join=…) or an estate-office code (?code=…): read once, then taken out of the address bar so
+  // the one-time code doesn't stay in the browser history or get shared by accident.
+  const [link, setLink] = useState<{ join?: string; code?: string }>(() => {
+    const q = new URLSearchParams(window.location.search)
+    return { join: q.get('join') ?? undefined, code: q.get('code') ?? undefined }
+  })
+  useEffect(() => {
+    if (link.join || link.code) window.history.replaceState(null, '', window.location.pathname)
+  }, [link])
+  const refresh = useCallback(() => {
+    api.authMe().then((m) => { setMe(m); setDown(false) }).catch(() => setDown(true))
+  }, [])
+  useEffect(() => { refresh() }, [refresh])
+  const signOut = useCallback(() => { api.signout().catch(() => {}).finally(refresh) }, [refresh])
+  const pilot = useMemo<Pilot | null>(() => (me?.mode === 'pilot' && me.signed_in ? { me, refresh, signOut } : null), [me, refresh, signOut])
+
+  if (!me) {
+    return down ? (
+      <div className="boot">
+        <div className="card offline-banner" role="alert">
+          <strong>Can't reach Keynection right now.</strong>
+          <button className="btn btn-sm btn-primary" onClick={refresh}>Try again</button>
+        </div>
+      </div>
+    ) : <div className="boot" aria-busy="true" />
+  }
+  if (me.mode === 'demo') return <Shell />
+  if (!pilot) return <SignInView initialJoin={link.join} initialCode={link.code} onSignedIn={() => { setLink({}); refresh() }} />
+  return <PilotProvider value={pilot}>{me.kind === 'staff' ? <StaffShell /> : <Shell pinned={me.unit_id ?? undefined} />}</PilotProvider>
+}
+
+function Shell({ pinned }: { pinned?: string }) {
   const { lang: uiLang, setLang: setUiLang, t } = useLang()
   const dates = useDates()
   const [units, setUnits] = useState<UnitInfo[]>([])
-  const [panes, setPanes] = useState<PaneState[]>([{ me: 'T-12', tab: 'circle' }])
+  const [panes, setPanes] = useState<PaneState[]>([{ me: pinned ?? 'T-12', tab: 'circle' }])
   const [active, setActive] = useState(0)
   const [offline, setOffline] = useState(false)
-  const [guideOpen, setGuideOpen] = useState(() => window.matchMedia(WIDE).matches)
+  const [guideOpen, setGuideOpen] = useState(() => !pinned && window.matchMedia(WIDE).matches)
   const [lang, setLang] = useState<GuideLang>(storedLang)
   const [canSplit, setCanSplit] = useState(() => window.matchMedia(SPLIT_OK).matches)
   const [showAll, setShowAll] = useState(storedShowAll)
-  const visible = (id: TabId) => showAll || FOCUS_TABS.includes(id)
+  // Pilot: the signed-in household's own screens, all of them. Demo: the main story, or every feature.
+  const visible = (id: TabId) => (pinned ? RESIDENT_TABS.includes(id) : showAll || FOCUS_TABS.includes(id))
   // Numbered in the order shown, so the main story reads 01–06 and the sheet count matches what is on screen.
   const shownNav = ALL.filter((i) => visible(i.id)).map((i, n) => ({ ...i, no: String(n + 1).padStart(2, '0') }))
   // Bumped after every write so every open pane reloads its data.
@@ -116,6 +155,11 @@ function Shell() {
   useEffect(() => {
     api.units().then((u) => setUnits(u)).catch(() => {})
   }, [version])
+  // Pilot, first visit on this phone: the app speaks the language the household chose when it joined.
+  useEffect(() => {
+    const mine = pinned ? units.find((u) => u.id === pinned) : undefined
+    if (mine && !langChosen() && (mine.lang === 'ms' || mine.lang === 'zh')) setUiLang(mine.lang)
+  }, [units, pinned, setUiLang])
   // Any request that can't reach the server shows the banner; the next one that gets through clears it.
   useEffect(() => onReachability((ok) => setOffline(!ok)), [])
 
@@ -136,15 +180,20 @@ function Shell() {
   }
   // Back to the main story: a pane left on a screen that is now hidden returns to the neighbours.
   useEffect(() => {
-    if (!showAll) setPanes((ps) => ps.map((p) => (FOCUS_TABS.includes(p.tab) ? p : { ...p, tab: 'circle', peer: undefined })))
-  }, [showAll])
+    if (!showAll && !pinned) setPanes((ps) => ps.map((p) => (FOCUS_TABS.includes(p.tab) ? p : { ...p, tab: 'circle', peer: undefined })))
+  }, [showAll, pinned])
 
   const split = panes.length === 2 && canSplit
   const shown = split ? panes : [panes[Math.min(active, panes.length - 1)]]
   const focus = split ? active : Math.min(active, panes.length - 1)
   const cur = panes[focus]
 
-  const update = (i: number, patch: Partial<PaneState>) => setPanes((ps) => ps.map((p, j) => (j === i ? { ...p, ...patch } : p)))
+  // Pilot: the household is fixed by its sign-in, so nothing switches it to another home.
+  const update = (i: number, patch: Partial<PaneState>) => {
+    const next = { ...patch }
+    if (pinned) delete next.me
+    setPanes((ps) => ps.map((p, j) => (j === i ? { ...p, ...next } : p)))
+  }
   const setTab = (tab: TabId) => update(focus, { tab, peer: undefined })
   const setMe = (me: string) => update(focus, { me, peer: undefined })
 
@@ -230,11 +279,11 @@ function Shell() {
           </nav>
         ))}
         <dl className="title-block" aria-label="Drawing title block">
-          <div className="tb-wide"><dt>Project</dt><dd><Building2 size={12} /> Taman Demo · Phase 1</dd></div>
+          <div className="tb-wide"><dt>Project</dt><dd><Building2 size={12} /> {pinned ? 'Keynection pilot' : 'Taman Demo · Phase 1'}</dd></div>
           <div><dt>Sheet</dt><dd>{page.no} / {String(shownNav.length).padStart(2, '0')}</dd></div>
           <div><dt>Rev</dt><dd>0.5</dd></div>
-          <div className="tb-wide"><dt>Viewing as</dt><dd>{curUnit ? `${curUnit.resident_name} · ${curUnit.label}` : '–'}</dd></div>
-          <div className="tb-wide"><dt>Data</dt><dd>Fictional · runs offline</dd></div>
+          <div className="tb-wide"><dt>{pinned ? 'Signed in as' : 'Viewing as'}</dt><dd>{curUnit ? `${curUnit.resident_name} · ${curUnit.label}` : '–'}</dd></div>
+          <div className="tb-wide"><dt>Data</dt><dd>{pinned ? 'Pilot · real households' : 'Fictional · runs offline'}</dd></div>
         </dl>
         {curUnit && (
           <button className="side-home" onClick={() => visible('me') && setTab('me')}>
@@ -248,7 +297,7 @@ function Shell() {
         )}
       </aside>
 
-      <ShowAllProvider value={showAll}>
+      <ShowAllProvider value={pinned ? true : showAll}>
       <div className="main">
         <header className="topbar">
           <div className="brand mobile-only">
@@ -268,17 +317,20 @@ function Shell() {
                 <button key={l.code} className={uiLang === l.code ? 'on' : ''} aria-pressed={uiLang === l.code} onClick={() => pickUiLang(l.code)} title={l.name}>{l.tag}</button>
               ))}
             </div>
-            {!split && <CastPicker units={units} me={cur.me} onPick={setMe} />}
-            {canSplit && (
+            {pinned && <span className="pilot-tag">{t('si.pilot')}</span>}
+            {!split && !pinned && <CastPicker units={units} me={cur.me} onPick={setMe} />}
+            {canSplit && !pinned && (
               <button className={`split-btn ${split ? 'on' : ''}`} onClick={toggleSplit} aria-pressed={split}
                 title="See both sides of the shared wall at once">
                 <Columns2 size={16} /> <span className="desktop-only">{t('top.bothSides')}</span>
               </button>
             )}
-            <button className={`guide-btn ${guideOpen ? 'on' : ''}`} onClick={() => setGuideOpen((o) => !o)} aria-pressed={guideOpen}>
-              <Compass size={16} />
-              <span className="desktop-only">{lang === 'zh' ? '导览' : 'Guide'}</span>
-            </button>
+            {!pinned && (
+              <button className={`guide-btn ${guideOpen ? 'on' : ''}`} onClick={() => setGuideOpen((o) => !o)} aria-pressed={guideOpen}>
+                <Compass size={16} />
+                <span className="desktop-only">{lang === 'zh' ? '导览' : 'Guide'}</span>
+              </button>
+            )}
           </div>
         </header>
 
@@ -286,7 +338,7 @@ function Shell() {
           {offline && (
             <div className="card offline-banner" role="alert" style={{ margin: 16 }}>
               <strong>{t('offline.title')}</strong>
-              <p className="muted small">{t('offline.body')} <span className="mono">(Demo: is the backend running?)</span></p>
+              <p className="muted small">{t('offline.body')} {!pinned && <span className="mono">(Demo: is the backend running?)</span>}</p>
               <button className="btn btn-sm btn-primary" onClick={changed}>{t('offline.retry')}</button>
             </div>
           )}
@@ -312,8 +364,94 @@ function Shell() {
       </div>
       </ShowAllProvider>
 
-      <Guide tab={cur.tab} me={cur.me} lang={lang} open={guideOpen} onLang={pickLang} onClose={() => setGuideOpen(false)} onGo={go}
-        showAll={showAll} onShowAll={pickShowAll} />
+      {!pinned && <Guide tab={cur.tab} me={cur.me} lang={lang} open={guideOpen} onLang={pickLang} onClose={() => setGuideOpen(false)} onGo={go}
+        showAll={showAll} onShowAll={pickShowAll} />}
+      <div id="sheet-root" />
+    </div>
+  )
+}
+
+// Pilot mode, signed in as estate-office or SDP staff: SDP's screens only, never a household's.
+const STAFF_NAV = [
+  { id: 'sdp', icon: LayoutDashboard },
+  { id: 'planner', icon: Grid3x3 },
+  { id: 'impact', icon: Calculator },
+] as const
+
+function StaffShell() {
+  const pilot = usePilot()!
+  const { t } = useLang()
+  const [tab, setTab] = useState<(typeof STAFF_NAV)[number]['id']>('sdp')
+  const [version, setVersion] = useState(0)
+  const changed = () => setVersion((v) => v + 1)
+  const no = (id: string) => String(STAFF_NAV.findIndex((i) => i.id === id) + 1).padStart(2, '0')
+  return (
+    <div className="app face-blueprint">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark"><Logo size={24} /></div>
+          <div>
+            <div className="brand-name">Keynection</div>
+            <div className="brand-sub">ESTATE OFFICE · SDP</div>
+          </div>
+        </div>
+        <nav className="nav-group" aria-label={t('group.sdp')}>
+          <div className="nav-title">{t('group.sdp')}</div>
+          {STAFF_NAV.map((i) => {
+            const Icon = i.icon
+            const on = tab === i.id
+            return (
+              <button key={i.id} className={on ? 'active' : ''} onClick={() => setTab(i.id)} aria-current={on ? 'page' : undefined}>
+                <span className="nav-no">{no(i.id)}</span>
+                <Icon size={17} strokeWidth={on ? 2.3 : 1.9} className="nav-lead" />
+                <span className="nav-text"><b>{t(`nav.${i.id}`)}</b><small>{t(`nav.${i.id}.sub`)}</small></span>
+                <Icon size={16} strokeWidth={on ? 2.3 : 1.8} className="nav-icon" />
+              </button>
+            )
+          })}
+        </nav>
+        <dl className="title-block" aria-label="Drawing title block">
+          <div className="tb-wide"><dt>Project</dt><dd><Building2 size={12} /> Keynection pilot</dd></div>
+          <div className="tb-wide"><dt>Signed in as</dt><dd>{pilot.me.name} · {pilot.me.role === 'sdp' ? 'SDP' : 'Estate office'}</dd></div>
+          <div className="tb-wide"><dt>Keys</dt><dd>{pilot.me.passkeys ?? 0} on record</dd></div>
+        </dl>
+      </aside>
+      <div className="main">
+        <header className="topbar">
+          <div className="brand mobile-only">
+            <div className="brand-mark"><Logo size={24} /></div>
+            <div className="brand-name">Keynection</div>
+          </div>
+          <div className="crumb desktop-only">
+            <span className="crumb-sheet">Sheet {no(tab)}</span>
+            <span className="crumb-sep">—</span>
+            <b>{t(`nav.${tab}`)}</b>
+          </div>
+          <div className="topbar-right">
+            <span className="pilot-tag">{t('si.pilot')} · {pilot.me.name}</span>
+            <button className="btn btn-sm" onClick={pilot.signOut}><LogOut size={14} /> Sign out</button>
+          </div>
+        </header>
+        <main className="content face-blueprint">
+          <div className="content-inner">
+            <EnglishOnly>
+              {tab === 'sdp' && <DashboardView version={version} onChange={changed} />}
+              {tab === 'planner' && <PlannerView />}
+              {tab === 'impact' && <ImpactView />}
+            </EnglishOnly>
+          </div>
+        </main>
+        <nav className="dock">
+          {STAFF_NAV.map((i) => {
+            const Icon = i.icon
+            return (
+              <button key={i.id} className={tab === i.id ? 'active' : ''} onClick={() => setTab(i.id)}>
+                <Icon size={19} strokeWidth={tab === i.id ? 2.4 : 1.9} /> {t(`nav.${i.id}.short`)}
+              </button>
+            )
+          })}
+        </nav>
+      </div>
       <div id="sheet-root" />
     </div>
   )

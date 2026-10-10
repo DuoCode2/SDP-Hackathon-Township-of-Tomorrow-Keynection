@@ -1,5 +1,5 @@
-"""SDP back-office actions need staff sign-in, which arrives with the pilot. Until then they only run in demo
-mode: with JIRAN_DEMO_MODE=0 nobody can post as the estate team, clear reports, submit repairs or read the queues."""
+"""SDP back-office actions need a staff sign-in in pilot mode (JIRAN_DEMO_MODE=0): signed out, nobody can post as
+the estate team, clear reports, submit repairs or read the queues. In demo mode anyone can try them."""
 import io
 
 import pytest
@@ -39,12 +39,12 @@ STAFF_CALLS = [
 @pytest.mark.parametrize("method,url,kwargs", STAFF_CALLS, ids=[c[1] for c in STAFF_CALLS])
 def test_staff_actions_are_closed_outside_demo_mode(client, monkeypatch, method, url, kwargs):
     monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
-    assert getattr(client, method)(url, **kwargs).status_code == 403
+    assert getattr(client, method)(url, **kwargs).status_code == 401  # signed out: please sign in
 
 
 def test_closed_even_before_the_request_is_checked(client, monkeypatch):
     monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
-    assert client.post("/api/notices", json={}).status_code == 403  # not 422: no hints about the expected fields
+    assert client.post("/api/notices", json={}).status_code == 401  # not 422: no hints about the expected fields
 
 
 def test_staff_actions_still_work_in_demo_mode(client):

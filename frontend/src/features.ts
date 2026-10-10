@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { api, type AiStatus } from './api'
+import { api, type AiStatus, type AuthMe } from './api'
 import type { TabId } from './guide'
 
 // Contractor QR passes and the guardhouse scan are built (and covered by the server's tests) but switched off in the
@@ -17,6 +17,19 @@ const ShowAllContext = createContext(false)
 export const ShowAllProvider = ShowAllContext.Provider
 /** True when the presenter has switched on every feature; false shows the main story only. */
 export const useShowAll = () => useContext(ShowAllContext)
+
+// Pilot mode (a real phase, real sign-in) or the demo. In pilot mode the signed-in household or staff member is fixed:
+// there is no cast switcher, and the server checks every request against the session.
+export interface Pilot {
+  me: AuthMe
+  /** Ask the server again who is signed in (after adding a key, say). */
+  refresh: () => void
+  signOut: () => void
+}
+const PilotContext = createContext<Pilot | null>(null)
+export const PilotProvider = PilotContext.Provider
+/** The pilot session, or null in the demo. */
+export const usePilot = () => useContext(PilotContext)
 
 // Claude translates typed words and writes the renovation notice from one sentence, when the server has a key.
 // Without one (or offline) the same screens work as before, so the app only needs to know which to say.

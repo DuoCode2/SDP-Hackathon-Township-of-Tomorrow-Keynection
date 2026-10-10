@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Check, Hand, House, KeyRound, Lock, ShieldCheck, Sparkles } from 'lucide-react'
+import { ArrowLeft, Check, Hand, House, KeyRound, Lock, ShieldCheck, Sparkles } from 'lucide-react'
 import { api, ApiError, type JoinInfo, type Lang, type UnitInfo } from '../api'
-import { refusal, tIn, useDates, useT } from '../i18n'
+import { refusal, tIn, useDates, useLang, useT } from '../i18n'
 import { LANGS } from '../messages'
 import { useAi } from '../features'
 import { Logo } from '../components/Art'
+import DigitalKeyStep from '../components/DigitalKey'
 import { Card, Steps, useCelebrate, useToast } from '../ui'
 import { replayWelcome } from './CircleView'
 
@@ -26,14 +27,25 @@ function forget(unitId: string) {
   }
 }
 
-/** A household that hasn't joined: scan the handover code, choose a name and language, agree to the privacy notice. */
-export default function JoinView({ me, onJoined }: { me: UnitInfo; onJoined: () => void }) {
+/** A household that hasn't joined: scan the handover code, choose a name and language, agree to the privacy notice.
+ * In the demo the household is the one being viewed; in pilot mode nobody is signed in yet, so the home comes from the
+ * code itself, and joining signs this phone in and offers to make it the home's digital key. */
+export default function JoinView({ me, onJoined, pilot = false, initialToken, onBack }: {
+  me?: UnitInfo
+  onJoined: () => void
+  pilot?: boolean
+  /** A code from the welcome pack's QR link. */
+  initialToken?: string
+  onBack?: () => void
+}) {
   const t = useT()
+  const { setLang: setUiLang } = useLang()
   const dates = useDates()
   const toast = useToast()
   const celebrate = useCelebrate()
   const ai = useAi()
-  const [token, setToken] = useState<string | null>(() => storedCode(me.id))
+  const [token, setToken] = useState<string | null>(() => initialToken ?? (me ? storedCode(me.id) : null))
+  const [keyStep, setKeyStep] = useState(false)
   const [typed, setTyped] = useState('')
   const [info, setInfo] = useState<JoinInfo | null>(null)
   const [expired, setExpired] = useState(false)
@@ -59,14 +71,15 @@ export default function JoinView({ me, onJoined }: { me: UnitInfo; onJoined: () 
       if (!live) return
       setExpired(true)
       setToken(null)
-      forget(me.id)
+      if (me) forget(me.id)
     })
     return () => {
       live = false
     }
-  }, [token, me.id])
+  }, [token, me])
 
   async function demoCode() {
+    if (!me) return
     try {
       const r = await api.issueJoinCode(me.id)
       try { sessionStorage.setItem(joinKey(me.id), r.token) } catch { /* private window */ }
@@ -82,26 +95,32 @@ export default function JoinView({ me, onJoined }: { me: UnitInfo; onJoined: () 
     setWhy(null)
     try {
       const u = await api.join({ token, display_name: name.trim(), lang, consent, whatsapp_alerts: wa, easy_mode: easy })
-      forget(me.id)
+      if (me) forget(me.id)
       replayWelcome()  // the first thing a new member sees is the homes around theirs
       celebrate('🏡', t('join.done', { name: u.resident_name }))
-      onJoined()
+      if (pilot) {
+        if (lang === 'en' || lang === 'ms' || lang === 'zh') setUiLang(lang)  // from here on, the language they chose
+        setKeyStep(true)  // signed in by the code: now make this phone the home's key
+      }
+      else onJoined()
     } catch (e) {
       if (refusal(e)) { setWhy(refusal(e)); setStep(1) }
-      else if (e instanceof ApiError && e.status === 404) { setExpired(true); setToken(null); setInfo(null); forget(me.id) }
+      else if (e instanceof ApiError && e.status === 404) { setExpired(true); setToken(null); setInfo(null); if (me) forget(me.id) }
       else toast(e instanceof Error ? e.message : 'Could not join', 'error')
     } finally {
       setBusy(false)
     }
   }
 
+  if (keyStep) return <DigitalKeyStep onDone={onJoined} />
+
   if (!info) {
     return (
       <section className="screen join">
         <div className="join-hero">
           <div className="welcome-logo"><Logo size={44} /></div>
-          <div className="eyebrow">{t('join.eyebrow', { phase: 'Taman Demo' })}</div>
-          <h1>{t('join.title', { label: me.label })}</h1>
+          <div className="eyebrow">{pilot ? t('si.pilot') : t('join.eyebrow', { phase: 'Taman Demo' })}</div>
+          <h1>{me ? t('join.title', { label: me.label }) : t('si.title')}</h1>
           <p>{t('join.lead')}</p>
         </div>
         <Card className="join-card">
@@ -110,8 +129,9 @@ export default function JoinView({ me, onJoined }: { me: UnitInfo; onJoined: () 
             <input value={typed} onChange={(e) => setTyped(e.target.value.trim())} maxLength={64} autoComplete="off" spellCheck={false} />
           </label>
           <div className="btn-row">
+            {onBack && <button className="btn" onClick={onBack}><ArrowLeft size={15} /> {t('btn.back')}</button>}
             <button className="btn btn-primary" disabled={typed.length < 20} onClick={() => setToken(typed)}><KeyRound size={15} /> {t('join.use')}</button>
-            <button className="btn" onClick={demoCode}><Sparkles size={15} /> {t('join.demo')}</button>
+            {!pilot && me && <button className="btn" onClick={demoCode}><Sparkles size={15} /> {t('join.demo')}</button>}
           </div>
         </Card>
       </section>

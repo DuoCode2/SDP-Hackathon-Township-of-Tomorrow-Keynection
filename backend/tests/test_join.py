@@ -99,8 +99,11 @@ def test_joining_moves_unprinted_paper_notices_into_the_app(client):
     assert "T-12" in {c["id"] for c in client.get("/api/units/T-23/conversations").json()}
 
 
-def test_staff_tools_are_off_outside_demo_mode(client, monkeypatch):
+def test_staff_tools_need_staff_sign_in_outside_demo_mode(client, monkeypatch, sign_in):
     monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+    assert client.post("/api/units/T-23/join-code").status_code == 401
+    assert client.get("/api/estate/frontdesk").status_code == 401
+    sign_in(client, "T-12")  # a household can't issue codes or open the front desk
     assert client.post("/api/units/T-23/join-code").status_code == 403
     assert client.get("/api/estate/frontdesk").status_code == 403
 

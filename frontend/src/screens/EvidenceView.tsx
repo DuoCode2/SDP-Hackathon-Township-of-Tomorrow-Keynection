@@ -6,6 +6,7 @@ import { Badge, Card, CardHead, Empty, Metric, ScreenTitle, Skeleton, useToast }
 import CaseView, { caseBadge, caseRole } from './CaseView'
 import RepairView, { ticketBadge } from './RepairView'
 import WarrantyClock from '../components/WarrantyClock'
+import { usePilot } from '../features'
 
 interface Props {
   me: UnitInfo
@@ -176,6 +177,8 @@ function TaskCard({ me, task, onChange, onCase }: {
     return false
   }
 
+  const pilot = usePilot()  // the pilot takes real photos only: the drawn samples are for the demo
+
   async function saveBaseline(source: File | 'sample') {
     if (source !== 'sample' && tooBig(source)) return
     const photo = await run(t('task.busyPrint'), () =>
@@ -225,7 +228,7 @@ function TaskCard({ me, task, onChange, onCase }: {
             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) saveBaseline(f) }} />
           <div className="btn-row">
             <button className="btn btn-primary" onClick={() => baselineInput.current?.click()}><Camera size={16} /> {t('task.take')}</button>
-            <button className="btn" onClick={() => saveBaseline('sample')}><Sparkles size={16} /> {t('task.sample')}</button>
+            {!pilot && <button className="btn" onClick={() => saveBaseline('sample')}><Sparkles size={16} /> {t('task.sample')}</button>}
           </div>
         </>
       )}
@@ -249,9 +252,9 @@ function TaskCard({ me, task, onChange, onCase }: {
             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) reportChange(f, task.baseline!) }} />
           <div className="btn-row">
             <button className="btn" onClick={() => followupInput.current?.click()}><ImagePlus size={16} /> {t('task.followup')}</button>
-            <button className="btn" onClick={() => reportChange('sample-change', task.baseline!)}><Sparkles size={16} /> {t(ceiling ? 'task.sampleStain' : 'task.sampleCrack')}</button>
+            {!pilot && <button className="btn" onClick={() => reportChange('sample-change', task.baseline!)}><Sparkles size={16} /> {t(ceiling ? 'task.sampleStain' : 'task.sampleCrack')}</button>}
           </div>
-          {!ceiling && <button className="link" onClick={() => reportChange('sample-same', task.baseline!)}>{t('task.sampleSame')}</button>}
+          {!ceiling && !pilot && <button className="link" onClick={() => reportChange('sample-same', task.baseline!)}>{t('task.sampleSame')}</button>}
         </>
       )}
     </Card>

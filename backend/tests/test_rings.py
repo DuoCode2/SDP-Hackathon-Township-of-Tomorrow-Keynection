@@ -152,6 +152,8 @@ def test_notices_reach_the_right_audience(client):
     assert all(n["title"] != "Lift servicing" for n in client.get("/api/units/T-12/notices").json())
 
 
-def test_no_resident_names_in_the_phase_listing_outside_demo_mode(client, monkeypatch):
+def test_no_resident_names_in_the_phase_listing_outside_demo_mode(client, monkeypatch, sign_in):
     monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
-    assert all("resident_name" not in u for u in client.get("/api/units").json())
+    sign_in(client, "T-12")
+    others = [u for u in client.get("/api/units").json() if u["id"] != "T-12"]  # your own name greets you
+    assert others and all("resident_name" not in u for u in others)

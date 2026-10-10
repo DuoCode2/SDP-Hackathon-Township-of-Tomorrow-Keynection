@@ -8,7 +8,7 @@ import { Avatar, Badge, Card, CardHead, ScreenTitle, Segmented, Sheet, Skeleton,
 import { Logo } from '../components/Art'
 import IntroWizard from './IntroWizard'
 import QuietTimesCard from '../components/QuietTimes'
-import { useShowAll } from '../features'
+import { usePilot, useShowAll } from '../features'
 
 interface Props {
   me: UnitInfo
@@ -316,6 +316,7 @@ function ProfileSheet({ n, works, onClose, onMessage, onWave, onViewAs }: {
   onViewAs: () => void
 }) {
   const t = useT()
+  const pilot = usePilot()
   if (!n.joined) {
     return (
       <Sheet open onClose={onClose}>
@@ -325,7 +326,7 @@ function ProfileSheet({ n, works, onClose, onMessage, onWave, onViewAs }: {
           <div className="profile-sub">{shares(t, n.relation)} · {t('nj.status')}</div>
         </div>
         <div className="wizard-note"><Lock size={13} /> {t('nj.note')}</div>
-        <button className="link-btn demo-link" onClick={onViewAs}><Eye size={13} /> {t('panel.viewAs')}</button>
+        {!pilot && <button className="link-btn demo-link" onClick={onViewAs}><Eye size={13} /> {t('panel.viewAs')}</button>}
       </Sheet>
     )
   }
@@ -347,7 +348,7 @@ function ProfileSheet({ n, works, onClose, onMessage, onWave, onViewAs }: {
         <button className="btn" disabled={n.waved_today || n.allow_waves === false} onClick={onWave}>👋 {t(n.waved_today ? 'profile.wavedToday' : 'btn.wave')}</button>
       </div>
       <div className="wizard-note"><Lock size={13} /> {t('profile.privacy')}</div>
-      <button className="link-btn demo-link" onClick={onViewAs}><Eye size={13} /> {t('profile.viewAs', { name: n.resident_name })}</button>
+      {!pilot && <button className="link-btn demo-link" onClick={onViewAs}><Eye size={13} /> {t('profile.viewAs', { name: n.resident_name })}</button>}
     </Sheet>
   )
 }
@@ -366,6 +367,7 @@ function HomePanel({ id, me, units, dir, reqs, works, onClose, onMessage, onView
   onRespond: (r: ContactRequest, accept: boolean) => void
 }) {
   const t = useT()
+  const pilot = usePilot()
   const unit = units.find((u) => u.id === id)
   const member = dir.circle.find((n) => n.id === id)
   const near = dir.nearby.find((n) => n.id === id)

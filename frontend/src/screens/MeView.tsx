@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
-  ArrowUpRight, BellOff, Ban, Check, Download, EyeOff, Hand, HandHeart, Hexagon, Languages, Lock, MessageCircle, ShieldHalf, Type, UserPlus, UserRound,
+  ArrowUpRight, BellOff, Ban, Check, Download, EyeOff, Fingerprint, Hand, HandHeart, Hexagon, KeyRound, Languages, Lock, LogOut, MessageCircle,
+  ShieldHalf, Type, UserPlus, UserRound,
 } from 'lucide-react'
 import { api, type Delegate, type Lang, type Profile, type UnitInfo } from '../api'
 import { LANGS } from '../messages'
@@ -10,12 +11,15 @@ import { useActing } from '../helper'
 import { roleOf } from '../components/Cast'
 import { Avatar, Card, CardHead, ScreenTitle, Skeleton, useToast } from '../ui'
 import { replayWelcome } from './CircleView'
+import { usePilot } from '../features'
+import { cancelled, keysSupported, makeKey, problem } from '../passkey'
 
 const RELATIONS: Delegate['relation'][] = ['child', 'spouse', 'sibling', 'caregiver', 'other']
 
 /** Profile and privacy: how neighbours see you, how reachable you are, who helps you, and your data. */
 export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; version: number; onChange: () => void; onGo: (tab: TabId) => void }) {
   const t = useT()
+  const pilot = usePilot()
   const toast = useToast()
   const [p, setP] = useState<Profile | null>(null)
   const [bio, setBio] = useState('')
@@ -68,7 +72,7 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
               <span className="story-ring big known"><Avatar name={me.resident_name} size={76} /></span>
               <div className="grow">
                 <h2>{me.resident_name}</h2>
-                <div className="profile-sub">{me.label} · {t('demo.role', { role: roleOf(me.id, t) })}</div>
+                <div className="profile-sub">{me.label}{pilot ? '' : ` · ${t('demo.role', { role: roleOf(me.id, t) })}`}</div>
                 <div className="profile-bio">{p.bio ? `“${p.bio}”` : t('me.noBio')}</div>
               </div>
             </div>
@@ -105,6 +109,7 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
         </div>
 
         <div className="col sticky">
+          {pilot && <DigitalKeys />}
           <Card>
             <CardHead icon={<EyeOff size={16} />} title={t('me.see')} />
             <div className="share-grid">
@@ -130,13 +135,46 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
           <Card>
             <CardHead icon={<Languages size={16} />} title={t('me.shortcuts')} />
             <button className="shortcut" onClick={() => onGo('log')}><Hexagon size={15} /> {t('me.myLog')} <ArrowUpRight size={14} /></button>
-            <button className="shortcut" onClick={() => onGo('safeguards')}><ShieldHalf size={15} /> {t('me.safe')} <ArrowUpRight size={14} /></button>
+            {!pilot && <button className="shortcut" onClick={() => onGo('safeguards')}><ShieldHalf size={15} /> {t('me.safe')} <ArrowUpRight size={14} /></button>}
             <button className="shortcut muted-shortcut" onClick={() => { replayWelcome(); onGo('circle') }}>{t('me.welcomeAgain')} <ArrowUpRight size={14} /></button>
-            <button className="shortcut muted-shortcut" onClick={() => onGo('sdp')}>{t('me.sdp')} <ArrowUpRight size={14} /></button>
+            {!pilot && <button className="shortcut muted-shortcut" onClick={() => onGo('sdp')}>{t('me.sdp')} <ArrowUpRight size={14} /></button>}
           </Card>
         </div>
       </div>
     </section>
+  )
+}
+
+/** Pilot mode: the phones that can sign in as this home, add one more, or sign out. */
+function DigitalKeys() {
+  const t = useT()
+  const toast = useToast()
+  const pilot = usePilot()
+  const [busy, setBusy] = useState(false)
+  if (!pilot) return null
+
+  async function add() {
+    setBusy(true)
+    try {
+      await makeKey()
+      toast(t('keys.added'))
+      pilot!.refresh()
+    } catch (e) {
+      if (!cancelled(e)) toast(problem(e, t), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHead icon={<KeyRound size={16} />} title={t('keys.title')} sub={t('keys.count', { n: pilot.me.passkeys ?? 0 })} />
+      <div className="btn-row">
+        <button className="btn btn-sm" disabled={busy || !keysSupported()} onClick={add}><Fingerprint size={14} /> {t('keys.add')}</button>
+        <button className="btn btn-sm" onClick={pilot.signOut}><LogOut size={14} /> {t('keys.signout')}</button>
+      </div>
+      <small className="muted">{t('keys.lost')}</small>
+    </Card>
   )
 }
 

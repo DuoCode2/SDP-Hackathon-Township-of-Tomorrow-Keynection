@@ -233,6 +233,49 @@ CREATE TABLE IF NOT EXISTS join_codes (
     expires_at TEXT NOT NULL,
     used_at TEXT
 );
+-- Sign-in (pilot mode). A subject is 'unit:<id>' (a household) or 'staff:<id>'. Codes and session tokens are stored
+-- as hashes only; a passkey's private key never leaves the person's phone.
+CREATE TABLE IF NOT EXISTS staff (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('estate', 'sdp')),
+    created_at TEXT NOT NULL,
+    revoked_at TEXT
+);
+CREATE TABLE IF NOT EXISTS access_codes (   -- one-time: a staff member's first sign-in, or a household's after a lost phone
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    purpose TEXT NOT NULL CHECK (purpose IN ('staff', 'reentry')),
+    subject TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT
+);
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,
+    subject TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS passkeys (
+    credential_id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL,
+    public_key BLOB NOT NULL,
+    sign_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    last_used_at TEXT
+);
+CREATE TABLE IF NOT EXISTS webauthn_handles (  -- the random user id a phone stores with its passkey
+    subject TEXT PRIMARY KEY,
+    handle TEXT NOT NULL UNIQUE
+);
+CREATE TABLE IF NOT EXISTS auth_challenges (
+    id TEXT PRIMARY KEY,
+    challenge TEXT NOT NULL,
+    purpose TEXT NOT NULL CHECK (purpose IN ('register', 'signin')),
+    subject TEXT,
+    expires_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS paper_notices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     intro_id INTEGER NOT NULL REFERENCES intros(id),
@@ -278,8 +321,8 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 11
-TABLES = ("paper_notices", "join_codes", "delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
+SCHEMA_VERSION = 12
+TABLES = ("auth_challenges", "webauthn_handles", "passkeys", "sessions", "access_codes", "staff", "paper_notices", "join_codes", "delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
           "warranty_tickets", "gate_logs", "passes", "incidents", "photos",
           "intro_recipients", "intros", "events", "units", "phases")
 

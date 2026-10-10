@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
-import { ClipboardPen, Eye, KeyRound, Printer, QrCode, Send, UserCheck } from 'lucide-react'
+import { ClipboardPen, Eye, KeyRound, Printer, QrCode, Send, Smartphone, UserCheck, UserPlus } from 'lucide-react'
 import { api, type FrontDesk as Desk, type PaperNotice, type UnitInfo } from '../api'
 import { EnglishOnly } from '../i18n'
+import { usePilot } from '../features'
 import { joinKey } from '../screens/JoinView'
 import RenovationWizard from '../screens/RenovationWizard'
 import { Badge, Card, CardHead, Empty, formatDate, Sheet, shortRange, Skeleton, useToast } from '../ui'
@@ -27,12 +28,18 @@ const PAPER_BADGE: Record<PaperNotice['status'], { tone: 'amber' | 'blue' | 'bra
 /** The estate office counter: join codes at handover, paper notices, and help for owners who aren't online. */
 export default function FrontDesk({ version, onChange, onViewAs }: { version: number; onChange: () => void; onViewAs?: (unitId: string) => void }) {
   const toast = useToast()
+  const pilot = usePilot()
   const [desk, setDesk] = useState<Desk | null>(null)
   const [units, setUnits] = useState<UnitInfo[]>([])
-  const [staff, setStaff] = useState(storedStaff)
-  const [code, setCode] = useState<{ unit: string; label: string; token: string; expires: string; qr: string } | null>(null)
+  const [typedStaff, setStaff] = useState(storedStaff)
+  // Pilot: records are signed with the signed-in staff member's own name (the server checks it).
+  const staff = pilot?.me.name ?? typedStaff
+  const [code, setCode] = useState<{ kind: 'join' | 'reentry' | 'staff'; unit: string; label: string; token: string; expires: string; qr: string } | null>(null)
   const [printing, setPrinting] = useState<PaperNotice | null>(null)
-  const [owner, setOwner] = useState('T-20')
+  const [owner, setOwner] = useState(pilot ? '' : 'T-20')
+  const [lost, setLost] = useState('')
+  const [colleague, setColleague] = useState('')
+  const [role, setRole] = useState<'estate' | 'sdp'>('estate')
   const [signed, setSigned] = useState(false)
   const [wizard, setWizard] = useState(false)
 
@@ -54,15 +61,40 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
   }
   const staffOk = staff.trim().length >= 2
 
+  // A QR the phone's camera opens straight away: Keynection's address with the one-time code, nothing else.
+  const qrFor = (param: 'join' | 'code', token: string) =>
+    QRCode.toDataURL(`${window.location.origin}/?${param}=${token}`, { margin: 1, width: 280, errorCorrectionLevel: 'M', color: { dark: '#0b1220', light: '#ffffff' } })
+
   async function issue(unit: string, label: string) {
     try {
       const r = await api.issueJoinCode(unit)
-      // The QR carries only the code; the join page asks for nothing until the owner opens it.
-      const qr = await QRCode.toDataURL(`J5JOIN:${r.token}`, { margin: 1, width: 280, errorCorrectionLevel: 'M', color: { dark: '#0b1220', light: '#ffffff' } })
-      setCode({ unit, label, token: r.token, expires: r.expires_at, qr })
+      setCode({ kind: 'join', unit, label, token: r.token, expires: r.expires_at, qr: await qrFor('join', r.token) })
       onChange()
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Could not issue a code', 'error')
+    }
+  }
+
+  // A household lost its phone: after checking ID, a one-time code that retires every old key of that home.
+  async function reentry() {
+    const unit = units.find((u) => u.id === lost)
+    if (!unit) return
+    try {
+      const r = await api.reentryCode(unit.id)
+      setCode({ kind: 'reentry', unit: unit.id, label: unit.label, token: r.token, expires: r.expires_at, qr: await qrFor('code', r.token) })
+      setLost('')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not issue a code', 'error')
+    }
+  }
+
+  async function addColleague() {
+    try {
+      const r = await api.addStaff(colleague.trim(), role)
+      setCode({ kind: 'staff', unit: '', label: colleague.trim(), token: r.token, expires: r.expires_at, qr: await qrFor('code', r.token) })
+      setColleague('')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not add a colleague', 'error')
     }
   }
 
@@ -85,16 +117,18 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
 
   if (!desk) return <Card><Skeleton lines={5} /></Card>
   const owners = units.filter((u) => u.joined)
-  const ownerUnit = units.find((u) => u.id === owner)
+  const ownerUnit = units.find((u) => u.id === (owner || owners[0]?.id))
   const names = Object.fromEntries(units.map((u) => [u.id, u.resident_name]))
 
   return (
     <>
       <Card>
         <CardHead icon={<UserCheck size={16} />} tone="blue" title="Front desk" sub={`${desk.joined} of ${desk.households} households have joined. Staff actions are recorded under your name.`} />
-        <label className="field">Staff on duty
-          <input value={staff} maxLength={40} onChange={(e) => saveStaff(e.target.value)} />
-        </label>
+        {pilot ? <div className="small">Signed in as <b>{staff}</b>: actions here are recorded under this name.</div> : (
+          <label className="field">Staff on duty
+            <input value={typedStaff} maxLength={40} onChange={(e) => saveStaff(e.target.value)} />
+          </label>
+        )}
       </Card>
 
       <Card>
@@ -133,7 +167,7 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
         <CardHead icon={<ClipboardPen size={16} />} title="Register a renovation for an owner" sub="For owners who prefer paper. Same rules as the app: everyone affected is told, and your name goes on record." />
         <div className="grid-2">
           <label className="field">Owner
-            <select value={owner} onChange={(e) => setOwner(e.target.value)}>
+            <select value={ownerUnit?.id ?? ''} onChange={(e) => setOwner(e.target.value)}>
               {owners.map((u) => <option key={u.id} value={u.id}>{u.label} · {u.resident_name}</option>)}
             </select>
           </label>
@@ -143,12 +177,46 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
         <div className="small muted">Households that haven't joined must join first: Keynection needs their consent before it holds their renovation.</div>
       </Card>
 
+      {pilot && (
+        <Card>
+          <CardHead icon={<Smartphone size={16} />} title="Lost phone · re-entry code" sub="Check the owner's ID first. The code works once, for a week, and retires every old key of that home." />
+          <div className="grid-2">
+            <label className="field">Household
+              <select value={lost} onChange={(e) => setLost(e.target.value)}>
+                <option value="">Choose…</option>
+                {owners.map((u) => <option key={u.id} value={u.id}>{u.label}{u.resident_name ? ` · ${u.resident_name}` : ''}</option>)}
+              </select>
+            </label>
+            <button className="btn btn-sm btn-primary desk-signed" disabled={!lost} onClick={reentry}><KeyRound size={14} /> Issue re-entry code</button>
+          </div>
+        </Card>
+      )}
+      {pilot && (
+        <Card>
+          <CardHead icon={<UserPlus size={16} />} title="Add a colleague" sub="They get a one-time code for their first sign-in, then make their own digital key." />
+          <div className="grid-2">
+            <label className="field">Name<input value={colleague} maxLength={40} onChange={(e) => setColleague(e.target.value)} /></label>
+            <label className="field">Role
+              <select value={role} onChange={(e) => setRole(e.target.value as 'estate' | 'sdp')}>
+                <option value="estate">Estate office</option>
+                <option value="sdp">SDP</option>
+              </select>
+            </label>
+          </div>
+          <button className="btn btn-sm btn-primary" disabled={colleague.trim().length < 2} onClick={addColleague}><UserPlus size={14} /> Add and show their code</button>
+        </Card>
+      )}
+
       {code && (
         <Sheet open onClose={() => setCode(null)}>
-          <div className="eyebrow">Join code · {code.label}</div>
-          <div className="pass-qr"><img src={code.qr} alt={`Join code for ${code.label}`} /></div>
-          <div className="small muted">Shown once: print it into the welcome pack. Valid once, until {formatDate(code.expires)}.</div>
-          <button className="btn btn-primary btn-block" onClick={openAsResident}><Eye size={15} /> Open the join page as {code.label} (demo)</button>
+          <div className="eyebrow">{code.kind === 'join' ? 'Join code' : code.kind === 'reentry' ? 'Re-entry code' : 'First sign-in code'} · {code.label}</div>
+          <div className="pass-qr"><img src={code.qr} alt={`One-time code for ${code.label}`} /></div>
+          <div className="small muted">
+            {code.kind === 'join' ? 'Shown once: print it into the welcome pack. ' : 'Shown once: let them scan it with their phone camera now. '}
+            Valid once, until {formatDate(code.expires)}.
+          </div>
+          {pilot && <div className="mono small code-text">{code.token}</div>}
+          {!pilot && code.kind === 'join' && <button className="btn btn-primary btn-block" onClick={openAsResident}><Eye size={15} /> Open the join page as {code.label} (demo)</button>}
         </Sheet>
       )}
       {printing && <PaperNoticeSheet notice={printing} onClose={() => setPrinting(null)}

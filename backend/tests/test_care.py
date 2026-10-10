@@ -132,10 +132,14 @@ def test_reported_voice_is_not_kept_forever(client):
     assert client.get("/api/moderation/reports").json()[0]["message"]["voice_url"] is None
 
 
-def test_bulk_export_and_reported_audio_need_sign_in_outside_demo_mode(client, monkeypatch):
+def test_bulk_export_and_reported_audio_need_sign_in_outside_demo_mode(client, monkeypatch, sign_in):
     msg = _voice(client)
     rep = client.post(f"/api/messages/{msg['id']}/report", json={"unit_id": "T-11", "reason": "harassment"}).json()
     monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+    assert client.get("/api/units/T-12/export").status_code == 401
+    assert client.get(f"/api/moderation/reports/{rep['id']}/voice").status_code == 401
+    sign_in(client, "T-11")  # a household downloads its own data, nobody else's, and can't play reported audio
+    assert client.get("/api/units/T-11/export").status_code == 200
     assert client.get("/api/units/T-12/export").status_code == 403
     assert client.get(f"/api/moderation/reports/{rep['id']}/voice").status_code == 403
 

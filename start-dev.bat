@@ -8,7 +8,8 @@ if not exist "backend\.venv\Scripts\python.exe" (
   pause
   exit /b 1
 )
-"backend\.venv\Scripts\python.exe" -c "import anthropic" 2>nul || "backend\.venv\Scripts\python.exe" -m pip install -q -r "backend\requirements.txt"
+"backend\.venv\Scripts\python.exe" -c "import anthropic, webauthn" 2>nul || "backend\.venv\Scripts\python.exe" -m pip install -q -r "backend\requirements.txt"
+if not exist "frontend\node_modules\@simplewebauthn\browser" call npm --prefix frontend install --no-fund --no-audit
 
 start "Keynection API :8000" cmd /k ""backend\.venv\Scripts\python.exe" -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload --reload-dir backend\app"
 start "Keynection web :5173" cmd /k "npm --prefix frontend run dev"

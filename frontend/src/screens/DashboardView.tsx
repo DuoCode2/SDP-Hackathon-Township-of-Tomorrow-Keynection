@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Activity, Building2, Clock4, Flag, Handshake, HeartHandshake, House, Inbox, KeyRound, Megaphone, MessagesSquare, MicOff, RotateCcw, Send, ShieldCheck, ShieldX, Sparkles, UserCheck, Wrench } from 'lucide-react'
+import { Activity, Building2, Camera, Clock4, Flag, Handshake, HeartHandshake, House, Inbox, KeyRound, Megaphone, MessagesSquare, MicOff, RotateCcw, Send, ShieldCheck, ShieldX, Sparkles, UserCheck, Wrench } from 'lucide-react'
 import { api, type Concern, type Dashboard, type ModerationReport, type Notice, type WarrantyTicket } from '../api'
-import { SHOW_CONTRACTOR_PASSES } from '../features'
+import { SHOW_CONTRACTOR_PASSES, usePilot } from '../features'
 import ConcernCard from '../components/ConcernCard'
 import FrontDesk from '../components/FrontDesk'
 import WarrantyClock from '../components/WarrantyClock'
@@ -14,6 +14,7 @@ const SUBCONTRACTORS = ['Jaya Plaster Sdn Bhd', 'Kemas Waterproofing', 'Bina Teg
 
 export default function DashboardView({ version, onChange, onViewAs }: { version: number; onChange: () => void; onViewAs?: (unitId: string) => void }) {
   const toast = useToast()
+  const pilot = usePilot()
   const [d, setD] = useState<Dashboard | null>(null)
   const [queue, setQueue] = useState<WarrantyTicket[]>([])
   const [concerns, setConcerns] = useState<Concern[]>([])
@@ -155,7 +156,7 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
                 </div>
               </Card>
 
-              <button className="link" onClick={reset}><RotateCcw size={12} style={{ verticalAlign: -2 }} /> Reset demo data (for rehearsals)</button>
+              {!pilot && <button className="link" onClick={reset}><RotateCcw size={12} style={{ verticalAlign: -2 }} /> Reset demo data (for rehearsals)</button>}
             </div>
           </div>
         </>
@@ -176,8 +177,23 @@ function Kpi({ icon, label, value, sub }: { icon: ReactNode; label: string; valu
 
 function QueueItem({ ticket, onChange }: { ticket: WarrantyTicket; onChange: () => void }) {
   const toast = useToast()
-  const [sub, setSub] = useState(SUBCONTRACTORS[0])
+  const pilot = usePilot()
+  const [sub, setSub] = useState(pilot ? '' : SUBCONTRACTORS[0])
   const [busy, setBusy] = useState(false)
+
+  // Pilot: the subcontractor's own photo of the finished repair, checked against the pre-work photo.
+  async function upload(file: File) {
+    setBusy(true)
+    try {
+      const t = await api.submitRepair(ticket.id, sub.trim(), file)
+      toast(t.repair_check?.verdict === 'restored' ? 'Repair submitted · matches pre-work photo' : 'Repair submitted · marks still detected')
+      onChange()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not submit', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
   const ceiling = ticket.subject.toLowerCase().startsWith('ceiling')
 
   async function submit(quality: 'good' | 'poor') {
@@ -207,13 +223,28 @@ function QueueItem({ ticket, onChange }: { ticket: WarrantyTicket; onChange: () 
       <WarrantyClock clock={ticket.clock} closed={ticket.status === 'closed'} compact />
       {ticket.status === 'open' && (
         <>
-          <label className="field">Subcontractor (Procore)
-            <select value={sub} onChange={(e) => setSub(e.target.value)}>{SUBCONTRACTORS.map((s) => <option key={s}>{s}</option>)}</select>
-          </label>
-          <div className="btn-row">
-            <button className="btn btn-sm" onClick={() => submit('poor')} disabled={busy}><Sparkles size={13} /> Sample: poor patch</button>
-            <button className="btn btn-sm" onClick={() => submit('good')} disabled={busy}><Sparkles size={13} /> Sample: proper repair</button>
-          </div>
+          {pilot ? (
+            <>
+              <label className="field">Subcontractor
+                <input value={sub} maxLength={80} onChange={(e) => setSub(e.target.value)} placeholder="Company that did the repair" />
+              </label>
+              <label className={`btn btn-sm btn-primary file-btn ${!sub.trim() || busy ? 'disabled' : ''}`}>
+                <Camera size={13} /> Upload the repair photo
+                <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" disabled={!sub.trim() || busy}
+                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) upload(f) }} />
+              </label>
+            </>
+          ) : (
+            <>
+              <label className="field">Subcontractor (Procore)
+                <select value={sub} onChange={(e) => setSub(e.target.value)}>{SUBCONTRACTORS.map((s) => <option key={s}>{s}</option>)}</select>
+              </label>
+              <div className="btn-row">
+                <button className="btn btn-sm" onClick={() => submit('poor')} disabled={busy}><Sparkles size={13} /> Sample: poor patch</button>
+                <button className="btn btn-sm" onClick={() => submit('good')} disabled={busy}><Sparkles size={13} /> Sample: proper repair</button>
+              </div>
+            </>
+          )}
           <div className="mono muted">SDP CAN SUBMIT A REPAIR · ONLY THE OWNER CAN CLOSE IT</div>
         </>
       )}

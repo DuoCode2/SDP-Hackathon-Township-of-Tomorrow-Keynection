@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import contextvars
 import hashlib
 import hmac
 import json
@@ -15,15 +16,15 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
-from . import ai, db, ledger, quiet, talk, vision
+from . import ai, auth, db, ledger, quiet, talk, vision
 from .neighbours import Unit, impact_reason, impact_zone, inverse_relation, neighbour_circle, street_or_block
 from .planner import MAX_HOMES, home_count, plan_phase
 from .seed import CONSENT_VERSION, CONSENT_VERSION_AI
@@ -74,12 +75,16 @@ def demo_mode() -> bool:
     return os.environ.get("JIRAN_DEMO_MODE", "1") == "1"
 
 
+# Who is asking, once the sign-in guard below has checked the session (pilot mode). None in demo mode.
+_current_actor: contextvars.ContextVar["auth.Actor | None"] = contextvars.ContextVar("actor", default=None)
+
+
 def staff_only() -> None:
-    """SDP back-office actions (estate, moderation, notices, warranty, dashboards). Staff sign-in comes with the
-    pilot; until then they run only in demo mode. Used as a route dependency, so it refuses before the request
-    body is even checked."""
-    if not demo_mode():
-        raise HTTPException(403, "This needs SDP staff sign-in, which comes with the pilot.")
+    """SDP back-office actions (estate, moderation, notices, warranty, dashboards). In demo mode anyone can try
+    them; in pilot mode only a signed-in staff member (the guard checks the session before the request body)."""
+    actor = _current_actor.get()
+    if not demo_mode() and not (actor and actor.is_staff):
+        raise HTTPException(403, "This is for the estate office and SDP staff.")
 
 
 @asynccontextmanager
@@ -144,6 +149,13 @@ class BodyLimit:
 
 
 app = FastAPI(title="Keynection prototype API", version="0.2.0", lifespan=lifespan)
+
+
+async def _sign_in_guard(request: Request) -> None:
+    await _check_access(request)  # defined with the sign-in endpoints below
+
+
+app.router.dependencies.append(Depends(_sign_in_guard))  # every route declared after this line is guarded
 app.add_middleware(BodyLimit, limit=MAX_REQUEST_BYTES)  # added first = innermost (see the class)
 app.add_middleware(
     CORSMiddleware,
@@ -599,10 +611,13 @@ def phases(conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]
 
 @app.get("/api/units")
 def units(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
-    """The phase layout. Names are included only in demo mode (for the demo cast); a real deployment never
-    exposes a resident directory. Who is renovating is not here either: see /directory."""
+    """The phase layout. Names are included in demo mode (for the demo cast); in a pilot only for the household's
+    own home and for the estate office, which already holds the handover list. A real deployment never exposes a
+    resident directory. Who is renovating is not here either: see /directory."""
+    actor = _current_actor.get()
     rows = conn.execute("SELECT * FROM units WHERE phase_id = ? ORDER BY id", (phase_id,)).fetchall()
-    return [_unit_json(r) if demo_mode() else _unit_public(r) for r in rows]
+    named = lambda r: demo_mode() or (actor is not None and (actor.is_staff or actor.unit_id == r["id"]))  # noqa: E731
+    return [_unit_json(r) if named(r) else _unit_public(r) for r in rows]
 
 
 def _works_visible_to(conn: sqlite3.Connection, unit_id: str) -> set[str]:
@@ -1828,8 +1843,9 @@ def _expire_voice(conn: sqlite3.Connection) -> int:
 
 
 def _require_sign_in_or_demo() -> None:
-    if not demo_mode():
-        raise HTTPException(403, "This needs sign-in, which comes with the pilot.")
+    """Belt and braces for the most sensitive endpoints: in pilot mode the guard must have found a session."""
+    if not demo_mode() and _current_actor.get() is None:
+        raise HTTPException(401, {"code": "signin", "message": "Please sign in with your digital key."})
 
 
 def _check_shared_text(text: str) -> None:
@@ -2017,6 +2033,8 @@ def use_demo_photo(unit_id: str, body: DemoPhotoIn, conn: sqlite3.Connection = D
 def photo_file(photo_id: str, size: Literal["full", "thumb"] = "full",
                conn: sqlite3.Connection = Depends(get_conn)) -> FileResponse:
     row = _photo_row(conn, photo_id)
+    if not _may_see_photo(conn, row):
+        raise HTTPException(404, "photo not found")  # not 403: don't confirm that someone else's photo exists
     name = f"{row['id']}_thumb.jpg" if size == "thumb" else f"{row['id']}.jpg"
     return FileResponse(data_dir("photos") / name, media_type="image/jpeg",
                         headers={"Cache-Control": "private, max-age=31536000, immutable"})
@@ -2062,7 +2080,9 @@ def report_incident(body: IncidentIn, conn: sqlite3.Connection = Depends(get_con
 @app.get("/api/incidents/{incident_id}/image")
 def incident_image(incident_id: int, kind: Literal["before", "after", "overlay"],
                    conn: sqlite3.Connection = Depends(get_conn)) -> FileResponse:
-    if conn.execute("SELECT 1 FROM incidents WHERE id = ?", (incident_id,)).fetchone() is None:
+    incident = conn.execute("SELECT i.reporter_unit_id, n.from_unit_id AS owner FROM incidents i"
+                            " LEFT JOIN intros n ON n.id = i.renovation_intro_id WHERE i.id = ?", (incident_id,)).fetchone()
+    if incident is None or not _may_see(incident["reporter_unit_id"], incident["owner"]):
         raise HTTPException(404, "incident not found")
     path = data_dir("compare") / f"{incident_id}_{kind}.jpg"
     if not path.exists():
@@ -2490,6 +2510,8 @@ def owner_response(ticket_id: int, body: OwnerResponseIn, conn: sqlite3.Connecti
 def warranty_image(ticket_id: int, kind: Literal["before", "after", "overlay"],
                    conn: sqlite3.Connection = Depends(get_conn)) -> FileResponse:
     ticket = _ticket_row(conn, ticket_id)
+    if not _may_see(ticket["unit_id"]):
+        raise HTTPException(404, "warranty ticket not found")
     if not ticket["repair_photo_id"]:
         raise HTTPException(404, "no repair photo yet")
     path = data_dir("compare") / f"w{ticket_id}_{ticket['repair_photo_id'][:12]}_{kind}.jpg"
@@ -2663,7 +2685,7 @@ def join_lookup(body: JoinLookupIn, conn: sqlite3.Connection = Depends(get_conn)
 
 
 @app.post("/api/join")
-def join(body: JoinIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+def join(body: JoinIn, request: Request, response: Response, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     code = _join_code(conn, body.token)
     if not body.consent:
         raise HTTPException(422, "Keynection can only set up your household once you agree to the privacy notice.")
@@ -2680,7 +2702,240 @@ def join(body: JoinIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str
     # No name in the permanent log: only what was agreed.
     db.append_event(conn, unit_id, "joined", {"privacy_notice": _consent_version(), "whatsapp_alerts": body.whatsapp_alerts})
     conn.commit()
+    if not demo_mode():  # the one-time code proved who they are: sign this phone in, then it makes its digital key
+        _set_session(request, response, auth.new_session(conn, auth.unit_subject(unit_id)))
     return _unit_json(_unit_row(conn, unit_id))
+
+
+# ---------- sign-in (pilot mode): every key comes with a digital key ----------
+
+# Which endpoints need what, in pilot mode. Anything not listed acts for one household: the unit it names (in the
+# path, the query or the body) must be the signed-in household's own.
+PUBLIC_ENDPOINTS = {"health", "ai_status", "join_lookup", "join", "auth_me", "auth_signin_options", "auth_signin",
+                    "auth_signout", "auth_redeem_code", "gate_scan", "contractor_view"}
+DEMO_ENDPOINTS = {"reset_demo", "demo_photos", "use_demo_photo", "submit_demo_repair"}
+SIGNED_IN_ENDPOINTS = {"units", "phases", "photo_file", "incident_image", "warranty_image", "auth_passkey_options",
+                       "auth_add_passkey"}  # anyone signed in; the photo endpoints check whose photo it is
+STAFF_ENDPOINTS = {"estate_concerns", "estate_action", "moderation_reports", "reported_voice", "review_report",
+                   "all_notices", "post_notice", "warranty_queue", "submit_repair", "dashboard", "issue_join_code",
+                   "front_desk", "paper_printed", "paper_delivered", "estate_register_renovation", "whatsapp_outbox",
+                   "planner_preview", "issue_reentry_code", "add_staff_member"}
+ACTOR_FIELDS = ("unit_id", "from_unit_id", "reporter_unit_id")  # the household doing something, wherever it is named
+
+
+async def _json_body(request: Request) -> dict[str, Any]:
+    if "application/json" not in request.headers.get("content-type", ""):
+        return {}
+    try:
+        data = json.loads(await request.body() or b"{}")
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+async def _claimed_units(request: Request) -> list[str]:
+    """Every household this request says is acting: path, query, JSON body or form."""
+    claimed = [request.path_params.get("unit_id"), request.query_params.get("unit_id")]
+    body = await _json_body(request)
+    claimed += [body.get(f) for f in ACTOR_FIELDS]
+    content = request.headers.get("content-type", "")
+    if "multipart/form-data" in content or "x-www-form-urlencoded" in content:
+        form = await request.form()
+        claimed += [form.get(f) for f in ACTOR_FIELDS]
+    return [c for c in claimed if c is not None]
+
+
+async def _check_access(request: Request) -> None:
+    """The sign-in guard, run before every endpoint. Demo mode: open, as the demo's cast switcher needs. Pilot mode:
+    the server decides who is asking, from the session cookie, and refuses anything that person may not do."""
+    if demo_mode():
+        return
+    name = getattr(request.scope.get("endpoint"), "__name__", "")
+    if name in PUBLIC_ENDPOINTS:
+        return
+    if name in DEMO_ENDPOINTS:
+        raise HTTPException(403, "This is part of the demo only.")
+    conn = db.connect(db_path())
+    try:
+        actor = auth.actor_for(conn, request.cookies.get(auth.SESSION_COOKIE))
+    finally:
+        conn.close()
+    if actor is None:
+        raise HTTPException(401, {"code": "signin", "message": "Please sign in with your digital key."})
+    _current_actor.set(actor)
+    if name in SIGNED_IN_ENDPOINTS:
+        return
+    if name in STAFF_ENDPOINTS:
+        if not actor.is_staff:
+            raise HTTPException(403, "This is for the estate office and SDP staff.")
+        signed = (await _json_body(request)).get("staff_name")
+        if isinstance(signed, str) and signed.strip().casefold() != actor.name.strip().casefold():
+            raise HTTPException(403, "Records are signed with your own name.")
+        return
+    if actor.is_staff:
+        raise HTTPException(403, "Staff can't act for a household.")
+    if any(unit != actor.unit_id for unit in await _claimed_units(request)):
+        raise HTTPException(403, "You can only act for your own home.")
+
+
+def _may_see(*units: str | None) -> bool:
+    """Demo mode, staff, or one of these households."""
+    actor = _current_actor.get()
+    return actor is None or actor.is_staff or actor.unit_id in units
+
+
+def _may_see_photo(conn: sqlite3.Connection, photo: sqlite3.Row) -> bool:
+    """A photo inside someone's home: theirs, the other side of a case it is part of, or its warranty ticket."""
+    if _may_see(photo["unit_id"]):
+        return True
+    parties = conn.execute("SELECT i.reporter_unit_id, n.from_unit_id FROM incidents i LEFT JOIN intros n ON n.id = i.renovation_intro_id"
+                           " WHERE i.baseline_photo_id = ? OR i.followup_photo_id = ?", (photo["id"], photo["id"])).fetchall()
+    return any(_may_see(r[0], r[1]) for r in parties)
+
+
+def _set_session(request: Request, response: Response, token: str) -> None:
+    secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"  # the host ends HTTPS
+    response.set_cookie(auth.SESSION_COOKIE, token, max_age=auth.SESSION_DAYS * 86400, httponly=True, samesite="lax",
+                        secure=secure, path="/")
+
+
+def _relying_party(request: Request) -> tuple[str, list[str]]:
+    """The site a passkey belongs to and the page origins allowed to use it. Online, set KEYNECTION_ORIGIN (for
+    example https://keynection.example.com) so it never depends on what a request says about its host."""
+    configured = [o.strip().rstrip("/") for o in os.environ.get("KEYNECTION_ORIGIN", "").split(",") if o.strip()]
+    if configured:
+        return urlparse(configured[0]).hostname or "", configured
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    origin = f"{proto}://{request.headers.get('host', request.url.netloc)}"
+    return urlparse(origin).hostname or "", [origin]
+
+
+def _pilot_only() -> None:
+    if demo_mode():
+        raise HTTPException(409, "Sign-in is part of pilot mode (JIRAN_DEMO_MODE=0); the demo switches households instead.")
+
+
+def _me_json(conn: sqlite3.Connection, actor: auth.Actor | None) -> dict[str, Any]:
+    if actor is None:
+        return {"mode": "demo" if demo_mode() else "pilot", "signed_in": False}
+    return {"mode": "pilot", "signed_in": True, "kind": "staff" if actor.is_staff else "household",
+            "unit_id": actor.unit_id, "name": actor.name, "role": actor.role, "passkeys": auth.passkey_count(conn, actor.subject)}
+
+
+class CredentialIn(BaseModel):
+    challenge_id: str = Field(..., min_length=10, max_length=64)
+    credential: dict[str, Any]
+
+
+class CodeIn(BaseModel):
+    token: str = Field(..., min_length=20, max_length=64)
+
+
+class StaffMemberIn(BaseModel):
+    name: str = Field(..., min_length=2, max_length=40)
+    role: Literal["estate", "sdp"] = "estate"
+
+
+@app.get("/api/auth/me")
+def auth_me(request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Demo or pilot mode, and in pilot mode who this phone is signed in as."""
+    actor = None if demo_mode() else auth.actor_for(conn, request.cookies.get(auth.SESSION_COOKIE))
+    return _me_json(conn, actor)
+
+
+@app.post("/api/auth/signin/options")
+def auth_signin_options(request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    _pilot_only()
+    rp_id, _ = _relying_party(request)
+    return auth.signin_options(conn, rp_id)
+
+
+@app.post("/api/auth/signin")
+def auth_signin(body: CredentialIn, request: Request, response: Response, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    _pilot_only()
+    rp_id, origins = _relying_party(request)
+    try:
+        subject = auth.finish_signin(conn, body.challenge_id, body.credential, rp_id, origins)
+    except auth.SignInError as e:
+        raise HTTPException(401, {"code": e.reason, "message": str(e)}) from None
+    token = auth.new_session(conn, subject)
+    actor = auth.actor_for(conn, token)
+    if actor is None:  # the home closed its account, or the staff member left
+        auth.end_session(conn, token)
+        raise HTTPException(401, {"code": "signin", "message": "This key no longer opens Keynection."})
+    _set_session(request, response, token)
+    return _me_json(conn, actor)
+
+
+@app.post("/api/auth/signout")
+def auth_signout(request: Request, response: Response, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, bool]:
+    auth.end_session(conn, request.cookies.get(auth.SESSION_COOKIE))
+    response.delete_cookie(auth.SESSION_COOKIE, path="/")
+    return {"ok": True}
+
+
+@app.post("/api/auth/code")
+def auth_redeem_code(body: CodeIn, request: Request, response: Response, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """A one-time code from the estate office: a staff member's first sign-in, or a household's after a lost phone.
+    A re-entry retires every old key and session of that home first, in case the lost phone is in someone's hands."""
+    _pilot_only()
+    try:
+        purpose, subject = auth.use_code(conn, body.token)
+    except auth.SignInError as e:
+        raise HTTPException(404, {"code": e.reason, "message": str(e)}) from None
+    if purpose == "reentry":
+        auth.retire_all(conn, subject)
+        db.append_event(conn, subject[5:], "signed_in_again", {"old_keys_retired": True})
+        conn.commit()
+    token = auth.new_session(conn, subject)
+    _set_session(request, response, token)
+    return _me_json(conn, auth.actor_for(conn, token))
+
+
+@app.post("/api/auth/passkeys/options")
+def auth_passkey_options(request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Start making a digital key on this phone for the signed-in household or staff member."""
+    _pilot_only()
+    actor = _current_actor.get()
+    rp_id, _ = _relying_party(request)
+    label = f"{actor.name} · {_unit_row(conn, actor.unit_id)['label']}" if actor.unit_id else f"{actor.name} · staff"
+    return auth.registration_options(conn, actor, rp_id, label)
+
+
+@app.post("/api/auth/passkeys")
+def auth_add_passkey(body: CredentialIn, request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    _pilot_only()
+    actor = _current_actor.get()
+    rp_id, origins = _relying_party(request)
+    try:
+        count = auth.finish_registration(conn, actor, body.challenge_id, body.credential, rp_id, origins)
+    except auth.SignInError as e:
+        raise HTTPException(422, {"code": e.reason, "message": str(e)}) from None
+    if actor.unit_id:
+        db.append_event(conn, actor.unit_id, "digital_key_added", {"keys": count})
+        conn.commit()
+    return {"ok": True, "passkeys": count}
+
+
+@app.post("/api/units/{unit_id}/reentry-code", status_code=201)
+def issue_reentry_code(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """A household lost its phone: after checking ID, the estate office gives a one-time code. Using it retires
+    the old keys, so a lost phone can't be used to read the household's chats."""
+    _pilot_only()
+    _require_joined(conn, unit_id, "This household hasn't joined yet: give them a join code instead.")
+    token, expires = auth.issue_code(conn, "reentry", auth.unit_subject(unit_id))
+    db.append_event(conn, unit_id, "reentry_code_issued", {"by": _current_actor.get().name, "expires_at": expires})
+    conn.commit()
+    return {"token": token, "expires_at": expires}
+
+
+@app.post("/api/staff", status_code=201)
+def add_staff_member(body: StaffMemberIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """A signed-in staff member adds a colleague, who gets a one-time code for their first sign-in."""
+    _pilot_only()
+    _check_name(body.name.strip())
+    staff_id, token, expires = auth.add_staff(conn, body.name.strip(), body.role)
+    return {"staff_id": staff_id, "token": token, "expires_at": expires}
 
 
 # ---------- estate front desk: handover codes, paper notices, help for residents who are not online ----------

@@ -11,3 +11,5 @@ pytest==9.1.1
 httpx==0.28.1
 # Claude, for translation and notice writing. Optional at run time: without a key (or this package) the app works as before.
 anthropic==1.13.0
+# Passkey sign-in for pilot mode (WebAuthn).
+webauthn==3.0.1

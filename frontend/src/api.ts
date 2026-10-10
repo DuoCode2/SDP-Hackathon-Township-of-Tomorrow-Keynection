@@ -1,3 +1,7 @@
+import type {
+  AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON,
+} from '@simplewebauthn/browser'
+
 export type Relation = 'left' | 'right' | 'across-left' | 'across' | 'across-right' | 'above' | 'below' | 'above-2' | 'below-2' | 'contact'
 export type WorksType = 'wet' | 'hacking' | 'structural' | 'light'
 
@@ -615,6 +619,24 @@ export class ApiError extends Error {
   }
 }
 
+/** Demo or pilot mode, and in pilot mode who this phone is signed in as. */
+export interface AuthMe {
+  mode: 'demo' | 'pilot'
+  signed_in: boolean
+  kind?: 'household' | 'staff'
+  unit_id?: string | null
+  name?: string
+  role?: 'estate' | 'sdp' | null
+  /** How many digital keys (passkeys) this household or staff member has. */
+  passkeys?: number
+}
+
+/** A WebAuthn ceremony the server started: the browser answers `options`, then sends back `challenge_id`. */
+export interface KeyCeremony<T> {
+  challenge_id: string
+  options: T
+}
+
 /** Whether Claude is on for translation and notice writing on this server. */
 export interface AiStatus {
   on: boolean
@@ -657,8 +679,9 @@ export function onReachability(listener: (ok: boolean) => void): () => void {
 // sign-in has ended (a new password, or 30 days): go to the password page rather than leave screens empty.
 // The fresh address skips any copy of the app the browser kept.
 let signingIn = false
-function signInAgain(status: number) {
-  if (status !== 401 || signingIn) return
+function signInAgain(status: number, path = '') {
+  // A sign-in step that fails (a key or code refused) is answered on the sign-in screen itself, not by reloading.
+  if (status !== 401 || signingIn || ['/api/auth/signin', '/api/auth/code', '/api/auth/passkeys'].some((p) => path.startsWith(p))) return
   signingIn = true
   window.location.replace(`/?signin=${Date.now()}`)
 }
@@ -673,7 +696,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   // 502–504 come from the dev proxy (or a gateway) when the API itself is down.
   setReachable(!(res.status >= 502 && res.status <= 504))
-  signInAgain(res.status)
+  signInAgain(res.status, path)
   if (!res.ok) {
     let message = `${res.status}`
     try {
@@ -739,6 +762,13 @@ export const api = {
 
   myWarranty: (unitId: string) => request<WarrantyTicket[]>(`/api/units/${unitId}/warranty`),
   warrantyQueue: () => request<WarrantyTicket[]>('/api/warranty?phase_id=demo'),
+  /** SDP's subcontractor photographs the finished repair (pilot); the owner still decides whether it is done. */
+  submitRepair: (ticketId: number, subcontractor: string, file: File) => {
+    const form = new FormData()
+    form.append('subcontractor', subcontractor)
+    form.append('file', file)
+    return request<WarrantyTicket>(`/api/warranty/${ticketId}/repair`, { method: 'POST', body: form })
+  },
   submitDemoRepair: (ticketId: number, name: string, subcontractor: string) =>
     request<WarrantyTicket>(`/api/warranty/${ticketId}/repair/demo`, json('POST', { name, subcontractor })),
   respondToRepair: (ticketId: number, unitId: string, decision: 'accept' | 'reject', note: string, delegateId?: number) =>
@@ -790,6 +820,18 @@ export const api = {
   thread: (unitId: string, otherId: string) => request<Thread>(`/api/units/${unitId}/conversations/${otherId}`),
   markRead: (unitId: string, otherId: string) => request(`/api/units/${unitId}/conversations/${otherId}/read`, { method: 'POST' }),
   aiStatus: () => request<AiStatus>('/api/ai'),
+  authMe: () => request<AuthMe>('/api/auth/me'),
+  signinOptions: () => request<KeyCeremony<PublicKeyCredentialRequestOptionsJSON>>('/api/auth/signin/options', { method: 'POST' }),
+  signin: (challengeId: string, credential: AuthenticationResponseJSON) =>
+    request<AuthMe>('/api/auth/signin', json('POST', { challenge_id: challengeId, credential })),
+  signout: () => request<{ ok: boolean }>('/api/auth/signout', { method: 'POST' }),
+  redeemCode: (token: string) => request<AuthMe>('/api/auth/code', json('POST', { token })),
+  passkeyOptions: () => request<KeyCeremony<PublicKeyCredentialCreationOptionsJSON>>('/api/auth/passkeys/options', { method: 'POST' }),
+  addPasskey: (challengeId: string, credential: RegistrationResponseJSON) =>
+    request<{ ok: boolean; passkeys: number }>('/api/auth/passkeys', json('POST', { challenge_id: challengeId, credential })),
+  reentryCode: (unitId: string) => request<{ token: string; expires_at: string }>(`/api/units/${unitId}/reentry-code`, { method: 'POST' }),
+  addStaff: (name: string, role: 'estate' | 'sdp') =>
+    request<{ staff_id: number; token: string; expires_at: string }>('/api/staff', json('POST', { name, role })),
   quietTimes: (unitId: string) => request<QuietTimes>(`/api/units/${unitId}/quiet-times`),
   setQuietTimes: (unitId: string, windows: QuietTimes['windows']) =>
     request<QuietTimes>(`/api/units/${unitId}/quiet-times`, json('PUT', { windows })),

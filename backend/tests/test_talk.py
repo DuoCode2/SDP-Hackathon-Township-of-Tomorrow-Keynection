@@ -156,10 +156,11 @@ def test_only_notified_neighbours_can_raise_concerns(client):
     assert r.status_code == 403
 
 
-def test_escalation_waits_24h_outside_demo_mode(client, monkeypatch):
+def test_escalation_waits_24h_outside_demo_mode(client, monkeypatch, sign_in):
     intro_id = _reno(client)
     cid = client.post("/api/concerns", json={"from_unit_id": "T-11", "intro_id": intro_id, "category": "access"}).json()["id"]
     monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+    sign_in(client, "T-11")
     assert client.post(f"/api/concerns/{cid}/escalate", json={"unit_id": "T-11"}).status_code == 409
 
 
