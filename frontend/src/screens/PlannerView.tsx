@@ -44,7 +44,7 @@ export default function PlannerView() {
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = `jiran5-phase-circles-${plan.homes}-homes.csv`
+    a.download = `keynection-phase-circles-${plan.homes}-homes.csv`
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -55,7 +55,7 @@ export default function PlannerView() {
   return (
     <section className="screen">
       <ScreenTitle eyebrow="SDP · New phase" title="Phase setup"
-        subtitle="Describe the layout from the site plan. Jiran5 works out every household's circle and who each kind of renovation must notify, with the same rules the app uses. Nothing is saved." />
+        subtitle="Describe the layout from the site plan. Keynection works out every household's circle and who each kind of renovation must notify, with the same rules the app uses. Nothing is saved." />
       <div className="cols">
         <div className="col">
           <Card>

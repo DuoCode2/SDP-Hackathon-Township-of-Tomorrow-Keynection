@@ -29,7 +29,7 @@ from .planner import MAX_HOMES, home_count, plan_phase
 from .seed import CONSENT_VERSION
 from .triage import triage_hint
 
-log = logging.getLogger("jiran5")
+log = logging.getLogger("keynection")
 
 DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "app.db"
 DEMO_PHOTO_DIR = Path(__file__).resolve().parent / "demo_photos"
@@ -38,6 +38,8 @@ UNIT_ID = r"^[A-Z]-\d{1,3}(-\d{1,2})?$"
 PHOTO_ID = re.compile(r"^[0-9a-f]{32}$")
 DATE = r"^\d{4}-\d{2}-\d{2}$"
 HHMM = r"^([01]\d|2[0-3]):[0-5]\d$"
+# Languages a household can read its messages in (talk.LANGS). The screens themselves stay in en, ms and zh.
+ReadLang = Literal["en", "ms", "zh", "ta"]
 MALAYSIA = timezone(timedelta(hours=8))
 GATE_OPEN, GATE_CLOSE = "08:00", "18:00"  # contractor entry hours; Sundays closed
 MAX_ACTIVE_PASSES = 3
@@ -137,7 +139,7 @@ class BodyLimit:
         await self.app(scope, counted, send)
 
 
-app = FastAPI(title="Jiran5 prototype API", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="Keynection prototype API", version="0.2.0", lifespan=lifespan)
 app.add_middleware(BodyLimit, limit=MAX_REQUEST_BYTES)  # added first = innermost (see the class)
 app.add_middleware(
     CORSMiddleware,
@@ -147,6 +149,8 @@ app.add_middleware(
 )
 
 
+# The cookie and the hash context keep the project's first name (Jiran5): renaming them would sign everyone out
+# and change nothing anyone sees.
 SITE_COOKIE = "jiran5_site"
 SITE_COOKIE_SECONDS = 30 * 24 * 3600
 SITE_LOGIN_PATH = "/site-login"
@@ -188,7 +192,7 @@ SITE_LOGIN_PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Jiran5 · password</title>
+<title>Keynection · password</title>
 <style>
   :root { --brand: #e0603e; --brand-strong: #c94c2a; --ink: #0d2240; --muted: #66758a; --bg: #f2f4f7;
           --surface: #fff; --line: rgba(13, 34, 64, 0.15); --bad: #b42318; --bad-bg: #fef3f2; }
@@ -212,9 +216,9 @@ SITE_LOGIN_PAGE = """<!doctype html>
 </style></head>
 <body><main>
   <div class="logo">Jiran<span>5</span></div>
-  <p>This is a private demo. Enter the password from the Jiran5 team.</p>
-  <p class="other" lang="ms">Ini demo peribadi. Masukkan kata laluan daripada pasukan Jiran5.</p>
-  <p class="other" lang="zh">这是内部演示，请输入 Jiran5 团队给你的密码。</p>
+  <p>This is a private demo. Enter the password from the Keynection team.</p>
+  <p class="other" lang="ms">Ini demo peribadi. Masukkan kata laluan daripada pasukan Keynection.</p>
+  <p class="other" lang="zh">这是内部演示，请输入 Keynection 团队给你的密码。</p>
   {error}
   <form method="post" action="/site-login">
     <label for="password">Password · Kata laluan · 密码</label>
@@ -260,7 +264,7 @@ async def guard(request: Request, call_next):
         response = await _site_login(request)
     elif not _site_password_ok(request):
         if request.url.path.startswith("/api/"):
-            response = JSONResponse({"detail": "This demo needs the password from the Jiran5 team."}, status_code=401)
+            response = JSONResponse({"detail": "This demo needs the password from the Keynection team."}, status_code=401)
         else:  # a page visit: our own password page, in all three languages
             response = _site_login_page()
     elif _site_password() and request.url.path == SITE_LOGIN_PATH:  # already signed in, e.g. a reload
@@ -311,11 +315,11 @@ def _unit_json(row: sqlite3.Row) -> dict[str, Any]:
 
 def _require_joined(conn: sqlite3.Connection, unit_id: str, message: str | None = None) -> sqlite3.Row:
     """A household takes part only after it joins and agrees to the privacy notice. Until then nobody can
-    message it, and it can't act in Jiran5 (the estate office delivers formal notices to it on paper)."""
+    message it, and it can't act in Keynection (the estate office delivers formal notices to it on paper)."""
     row = _unit_row(conn, unit_id)
     if row["joined_at"] is None:
         raise HTTPException(409, {"code": "not_joined", "message": message or
-                                  f"{row['label']} isn't on Jiran5 yet. The estate office delivers formal notices to them on paper."})
+                                  f"{row['label']} isn't on Keynection yet. The estate office delivers formal notices to them on paper."})
     return row
 
 
@@ -478,7 +482,7 @@ class Renovation(BaseModel):
 class IntroIn(BaseModel):
     from_unit_id: str = Field(..., pattern=UNIT_ID)
     message: str = Field(..., min_length=1, max_length=1000)
-    lang: Literal["en", "ms", "zh", "ta"] = "en"
+    lang: ReadLang = "en"
     renovation: Renovation | None = None
     # A hello can go to part of the circle; a renovation notice always goes to the whole impact zone.
     to_unit_ids: list[str] | None = Field(None, max_length=8)
@@ -660,14 +664,14 @@ def _register_intro(conn: sqlite3.Connection, from_unit_id: str, message: str, l
             raise HTTPException(422, "Structural work needs approval first: the council (PBT) permit, or the JMB/MC in a strata building.")
     if renovation:
         # The notice goes to everyone the work can affect; the sender cannot leave anyone out. Homes not on
-        # Jiran5 are still on the list: the estate office prints their notice and records the delivery.
+        # Keynection are still on the list: the estate office prints their notice and records the delivery.
         circle = [{"id": n.unit_id, "relation": n.relation} for n in impact_zone(_to_unit(me), phase_units, renovation["works_type"])]
     else:
         circle = [n for n in _circle(conn, from_unit_id) if n["joined"]]  # a hello only reaches people who joined
         if to_unit_ids is not None:
             allowed = {n["id"] for n in circle}
             if not set(to_unit_ids) <= allowed:
-                raise HTTPException(403, "An introduction can only go to the homes in your circle that are on Jiran5.")
+                raise HTTPException(403, "An introduction can only go to the homes in your circle that are on Keynection.")
             circle = [n for n in circle if n["id"] in to_unit_ids]
         if not circle:
             raise HTTPException(422, "Pick at least one neighbour.")
@@ -732,7 +736,7 @@ def neighbour_card(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
     out = []
     for n in circle:
         if not n["joined"]:
-            # Not on Jiran5 yet: no name (resident_name is the unit label), no language, no bio, nothing to tap.
+            # Not on Keynection yet: no name (resident_name is the unit label), no language, no bio, nothing to tap.
             out.append({**n, "lang": None, "known": False, "bio": "", "waved_today": False, "allow_waves": False})
             continue
         they_replied = conn.execute(
@@ -778,7 +782,7 @@ MAX_MESSAGES_PER_DAY = 30
 MAX_OPEN_CONCERNS = 5
 ESCALATE_AFTER = timedelta(hours=24)
 ESTATE = "SDP Estate Team"
-JIRAN5 = "Jiran5"  # automatic case updates: never signed as SDP, so they can't read as SDP's view
+SERVICE = "Keynection"  # automatic case updates: never signed as SDP, so they can't read as SDP's view
 PRIVATE_MESSAGE = ("Please don't put phone numbers, emails or links here. "
                    "Exchange numbers in a chat when you both agree.")
 TONE_MESSAGE = ("This may come across as hostile. Try calmer words or a quick reply: messages stay on record "
@@ -1434,7 +1438,7 @@ class ProfileIn(BaseModel):
     accept_requests: bool | None = None
     allow_waves: bool | None = None
     quiet_mode: bool | None = None
-    lang: Literal["en", "ms", "zh"] | None = None
+    lang: ReadLang | None = None
     easy_mode: bool | None = None  # bigger text and fewer options; private to the household
     whatsapp_alerts: bool | None = None
 
@@ -1695,7 +1699,7 @@ def delegates(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> lis
 
 @app.post("/api/units/{unit_id}/delegates", status_code=201)
 def add_delegate(unit_id: str, body: DelegateIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
-    """The owner authorises a family member to use Jiran5 for them (for residents who are not online)."""
+    """The owner authorises a family member to use Keynection for them (for residents who are not online)."""
     _require_joined(conn, unit_id)
     if not body.consent:
         raise HTTPException(422, "The owner must agree before a helper is added.")
@@ -1724,7 +1728,7 @@ def revoke_delegate(delegate_id: int, body: RevokeIn, conn: sqlite3.Connection =
 
 @app.get("/api/units/{unit_id}/export")
 def export_my_data(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> JSONResponse:
-    """PDPA right of access: everything Jiran5 holds about this household, as one file.
+    """PDPA right of access: everything Keynection holds about this household, as one file.
     Other residents appear by unit only, never by name. It bundles a whole household's records, so outside demo mode
     it stays off until residents sign in (WhatsApp one-time code in the pilot)."""
     _require_sign_in_or_demo()
@@ -1752,7 +1756,7 @@ def export_my_data(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
                          "text": f"Voice message ({r['body']}s)" if r["kind"] == "voice" else r["body"], "sent_by": r["sent_by"]})
     data = {
         "exported_at": db.now(),
-        "about": "Your data held by Jiran5 (prototype). Other residents are listed by unit, not by name.",
+        "about": "Your data held by Keynection (prototype). Other residents are listed by unit, not by name.",
         "household": {"unit": me["label"], "kind": me["kind"], "reading_language": me["lang"], "handover_date": me["handover_date"],
                       "joined_at": me["joined_at"], "privacy_notice_agreed": me["consent_version"],
                       "whatsapp_alerts": bool(p["whatsapp_alerts"]), "easy_mode": bool(p["easy_mode"])},
@@ -1780,7 +1784,7 @@ def export_my_data(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
         "home_log": db.unit_events(conn, unit_id),
     }
     conn.commit()
-    return JSONResponse(data, headers={"Content-Disposition": f'attachment; filename="jiran5-{me["label"].replace(" ", "").replace(".", "")}-my-data.json"'})
+    return JSONResponse(data, headers={"Content-Disposition": f'attachment; filename="keynection-{me["label"].replace(" ", "").replace(".", "")}-my-data.json"'})
 
 
 # ---------- layer 3: prove ----------
@@ -1986,7 +1990,7 @@ def decide(incident_id: int, body: DecisionIn, conn: sqlite3.Connection = Depend
     db.append_event(conn, reporter, "triage", payload)
     if renovator:
         db.append_event(conn, renovator, "triage", payload)
-        _system_message(conn, told, body.unit_id, text, author=JIRAN5, code=code, values=values)
+        _system_message(conn, told, body.unit_id, text, author=SERVICE, code=code, values=values)
     if stage == "decided" and decision == "warranty":
         _open_warranty(conn, row)
     conn.commit()
@@ -2432,7 +2436,7 @@ class JoinLookupIn(BaseModel):
 
 class JoinIn(JoinLookupIn):
     display_name: str = Field(..., min_length=2, max_length=30)
-    lang: Literal["en", "ms", "zh"]
+    lang: ReadLang
     consent: bool
     whatsapp_alerts: bool = True
     easy_mode: bool = False
@@ -2481,7 +2485,7 @@ def join_lookup(body: JoinLookupIn, conn: sqlite3.Connection = Depends(get_conn)
 def join(body: JoinIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     code = _join_code(conn, body.token)
     if not body.consent:
-        raise HTTPException(422, "Jiran5 can only set up your household once you agree to the privacy notice.")
+        raise HTTPException(422, "Keynection can only set up your household once you agree to the privacy notice.")
     name = body.display_name.strip()
     _check_name(name)
     unit_id = code["unit_id"]
@@ -2508,7 +2512,7 @@ class EstateRenovationIn(StaffIn):
     unit_id: str = Field(..., pattern=UNIT_ID)
     owner_signed: bool  # the owner signed the estate office's paper renovation form
     message: str = Field(..., min_length=1, max_length=1000)
-    lang: Literal["en", "ms", "zh"] = "en"
+    lang: ReadLang = "en"
     renovation: Renovation
 
 
@@ -2588,7 +2592,7 @@ def estate_register_renovation(body: EstateRenovationIn, conn: sqlite3.Connectio
     if not body.owner_signed:
         raise HTTPException(422, "The owner needs to sign the paper renovation form first.")
     _check_shared_text(body.staff_name)
-    _require_joined(conn, body.unit_id, "Help the owner join first: their consent is needed before Jiran5 holds their renovation.")
+    _require_joined(conn, body.unit_id, "Help the owner join first: their consent is needed before Keynection holds their renovation.")
     staff = f"Estate office ({body.staff_name.strip()})"
     return _register_intro(conn, body.unit_id, body.message, body.lang, body.renovation.model_dump(), None, staff)
 
@@ -2597,7 +2601,7 @@ def estate_register_renovation(body: EstateRenovationIn, conn: sqlite3.Connectio
 
 @app.get("/api/units/{unit_id}/whatsapp", dependencies=[Depends(staff_only)])
 def whatsapp_outbox(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
-    """The alerts this household would get from the Jiran5 WhatsApp Business account, in its own language.
+    """The alerts this household would get from the Keynection WhatsApp Business account, in its own language.
     Chat alerts never contain the message itself; quiet mode holds back chat alerts but not formal notices."""
     me = _unit_row(conn, unit_id)
     p = _profile_row(conn, unit_id)
@@ -2619,7 +2623,8 @@ def whatsapp_outbox(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) 
         if r["renovation"]:
             reno = json.loads(r["renovation"])
             add(r["created_at"], "reno", ("open", "concern"), name=r["name"], label=r["label"], scope=reno["scope"],
-                start=reno["start"], end=reno["end"], hours=reno.get("noisy_hours") or "-", contractor=reno.get("contractor") or "-")
+                start=talk.date_text(reno["start"], lang), end=talk.date_text(reno["end"], lang),
+                hours=talk.hours_text(reno, lang), contractor=reno.get("contractor") or "-")
         else:
             add(r["created_at"], "hello", ("wave",), social=True, name=r["name"], label=r["label"])
     for r in conn.execute("SELECT m.*, u.resident_name AS name, u.label FROM messages m JOIN units u ON u.id = m.from_unit_id"
@@ -2653,7 +2658,7 @@ def whatsapp_outbox(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) 
     for r in conn.execute("SELECT * FROM warranty_tickets WHERE unit_id = ? AND status = 'repair_submitted' AND repaired_at IS NOT NULL", (unit_id,)):
         add(r["repaired_at"], "repair", ("open",), subject=r["subject"])
     out.sort(key=lambda m: m["at"])
-    return {"channel": "whatsapp", "lang": lang, "business_name": "Jiran5 · Taman Demo", "messages": out[-25:]}
+    return {"channel": "whatsapp", "lang": lang, "business_name": "Keynection · Taman Demo", "messages": out[-25:]}
 
 
 # ---------- phase setup ----------

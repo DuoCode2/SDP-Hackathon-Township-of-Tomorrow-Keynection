@@ -3,7 +3,7 @@ import type { PaperNotice } from '../api'
 import { dateIn, noisyHours, tEn, tIn } from '../i18n'
 import { Sheet } from '../ui'
 
-/** The notice the estate office prints for a household that isn't on Jiran5: in its language, with English below. */
+/** The notice the estate office prints for a household that isn't on Keynection: in its language, with English below. */
 export default function PaperNoticeSheet({ notice, onClose, onPrinted }: { notice: PaperNotice; onClose: () => void; onPrinted: () => void }) {
   const t = tIn(notice.lang)
   const both = (key: string, vars?: Record<string, string | number>) => (

@@ -19,11 +19,16 @@ export const UI: Record<string, Text> = {
   thisPage: { zh: '这一页', en: 'This page' },
   features: { zh: '可以做什么', en: 'What you can do' },
   why: { zh: '为什么重要', en: 'Why it matters' },
-  route: { zh: '演示路线', en: 'Demo route' },
+  route: { zh: '完整演示路线（约 7 分钟）', en: 'Full demo route (about 7 minutes)' },
   routeHint: { zh: '点一步就会自动跳到对应画面和住户', en: 'Click a step to jump to that screen and household' },
+  judgeRoute: { zh: '3 分钟评审路线', en: '3-minute judge route' },
+  judgeHint: {
+    zh: '只走主线：交钥匙 → 认识左右和对面 5 户 → 装修通知就是自我介绍 → 万一出事有公平记录 → SDP 怎么检查效果',
+    en: 'The main story only: keys → meet the five homes beside and opposite → the renovation notice is the introduction → a fair record if something goes wrong → how SDP checks it works',
+  },
   about: {
-    zh: 'Jiran5：交屋当天就帮屋主认识最近的 5 户邻居，装修前约好规矩、留下照片证据，建筑瑕疵交给 SDP 修到屋主满意为止。',
-    en: 'Jiran5 introduces new owners to their five closest neighbours at handover, agrees renovation rules up front, keeps photo evidence, and hands building defects to SDP until the owner is satisfied.',
+    zh: 'Keynection：每一把钥匙都附送五户邻居。从交钥匙那天起，帮屋主认识左右和对面这 5 户；装修季是邻居变朋友还是变仇人的关键期，所以装修通知就是第一次自我介绍。万一出了裂缝漏水，公平的记录、分流和保修在背后撑着。',
+    en: 'Keynection: every key comes with five neighbours. From the day they get their keys, owners meet the five homes beside and opposite them. Renovation season decides whether neighbours become friends or enemies, so the renovation notice doubles as the first introduction. If a crack or leak appears, a fair record, triage and the warranty back it up.',
   },
   fictional: { zh: '所有住户、门牌和照片都是虚构的示范资料。', en: 'All residents, units and photos are fictional demo data.' },
   close: { zh: '收起导览', en: 'Hide guide' },
@@ -71,14 +76,14 @@ export const PAGES: Record<TabId, PageGuide> = {
     },
     features: {
       zh: [
-        '快捷回复会自动翻成对方的语言：Siti 用马来文按，Aiman 看到英文（不用上网翻译）',
+        '快捷回复会自动翻成对方的语言：Siti 用马来文按，Aiman 看到英文；隔壁 Kumar 读淡米尔文（不用上网翻译）',
         '「提出不满」：先私下告诉装修户 → 对方回复或处理 → 不行再升级给 SDP 物业团队；每一步写进两户屋历',
         '语气检查：明显的辱骂发不出去，系统建议改用平和的快捷回复',
         '检举讯息给 SDP 审核（对方不知道是谁检举），也可以静默封锁',
         '「交换电话」要双方都同意才生效',
       ],
       en: [
-        'Quick replies arrive translated: Siti taps in Malay, Aiman reads English (no online translation needed)',
+        'Quick replies arrive translated: Siti taps in Malay, Aiman reads English, Kumar next door reads Tamil (no online translation needed)',
         '"Raise a concern": tell the renovating neighbour privately → they reply or fix it → if not, escalate to SDP’s estate team; every step goes into both home logs',
         'Tone check: obvious insults are not sent; a calmer quick reply is suggested',
         'Report a message for SDP review (the sender never learns who reported), or block silently',
@@ -207,7 +212,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Numbers: share of concerns settled between neighbours, reply rate, pre-work photo coverage, owner-closed repairs',
         'Neighbour relationships: share of next-door pairs who know each other, days from keys to a first hello, circles active in 30 days (counts only, never who or what)',
         'Moderation can play a reported voice message (reported voice is kept until reviewed; all other voice is deleted after 30 days)',
-        'Front desk: one-time join codes (QR) at handover, printed notices for households not on Jiran5 with delivery recorded, and renovations registered for owners who prefer paper (the staff name goes on record)',
+        'Front desk: one-time join codes (QR) at handover, printed notices for households not on Keynection with delivery recorded, and renovations registered for owners who prefer paper (the staff name goes on record)',
         '"Reset demo data" at the bottom clears everything before a rehearsal',
       ],
     },
@@ -230,7 +235,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         '开关：接受联系请求、接受 👋 Wave、安静模式（邻居不能发讯息，但装修通知和不满仍会送达）',
         '已封锁名单，可以解除封锁',
         '家人代办：屋主可以授权最多 2 位家人（例如替长辈操作），他们做的每件事都会以他们的名字记录；按「以 Adam 的身份使用」即可示范',
-        '下载我的资料（PDPA）：一个档案包含 Jiran5 保存的所有关于这户的资料，其他住户只显示门牌',
+        '下载我的资料（PDPA）：一个档案包含 Keynection 保存的所有关于这户的资料，其他住户只显示门牌',
         '介面语言：顶栏 EN / BM / 中 切换住户页面的语言',
         '简易模式：字和按钮更大、选项更少（只有自己看得到这个设定）；WhatsApp 通知开关（通知里不会有讯息内容）',
         '捷径：我的屋历',
@@ -241,7 +246,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Switches: accept contact requests, accept 👋 waves, quiet mode (no chats, but renovation notices and concerns still arrive)',
         'Blocked neighbours, with unblock',
         'Family helpers: the owner can add up to two family members (for example to help an elderly parent); everything they do is recorded under their name. Tap "Use the app as Adam" to demo it',
-        'Download my data (PDPA): one file with everything Jiran5 holds about the household; other residents appear by unit only',
+        'Download my data (PDPA): one file with everything Keynection holds about the household; other residents appear by unit only',
         'Interface language: EN / BM / 中 in the top bar switches the resident screens',
         'Easy mode: bigger text and buttons, fewer options (private to the household); WhatsApp alerts on or off (alerts never include message content)',
         'Shortcut to your home log',
@@ -257,7 +262,7 @@ export const PAGES: Record<TabId, PageGuide> = {
     title: { zh: '新 phase 设定', en: 'Phase setup' },
     what: {
       zh: 'SDP 输入平面图的基本布局（几条 lorong、每排几间、几栋公寓、几层、每层几户），系统用跟 app 一模一样的规则算出每一户的邻里圈和每种装修要通知谁。不会存任何资料。',
-      en: 'SDP enters the basic layout from the site plan (lorongs, houses per row, blocks, floors, units per floor) and Jiran5 works out every circle and notice list with the same rules as the app. Nothing is saved.',
+      en: 'SDP enters the basic layout from the site plan (lorongs, houses per row, blocks, floors, units per floor) and Keynection works out every circle and notice list with the same rules as the app. Nothing is saved.',
     },
     features: {
       zh: [
@@ -276,55 +281,55 @@ export const PAGES: Record<TabId, PageGuide> = {
       ],
     },
     why: {
-      zh: '证明 Jiran5 可以很快复制到 SDP 的其他 township：一个上千户的 phase 不到一秒就设定好，物业只需要检查不规则的地段。',
-      en: 'Shows Jiran5 can be copied to SDP’s other townships quickly: a phase of a thousand homes is set up in under a second, and the estate office only checks irregular plots.',
+      zh: '证明 Keynection 可以很快复制到 SDP 的其他 township：一个上千户的 phase 不到一秒就设定好，物业只需要检查不规则的地段。',
+      en: 'Shows Keynection can be copied to SDP’s other townships quickly: a phase of a thousand homes is set up in under a second, and the estate office only checks irregular plots.',
     },
   },
   impact: {
     layer: { zh: 'SDP 后台', en: 'SDP view' },
     title: { zh: '影响估算', en: 'Impact model' },
     what: {
-      zh: '估算一个 phase 交屋后两年，Jiran5 可能帮 SDP 省下多少物业工时和成本。左边每个数字都是假设，可以直接改，右边马上重算，每个结果都写出公式。',
-      en: 'Estimates how much estate staff time and money Jiran5 could save in a phase’s first two years. Every number on the left is an assumption you can change; results recalculate instantly and show their formulas.',
+      zh: '最上面是主要指标「邻里连结」：用统计局 2020 年人口普查的真实数字当起点（雪兰莪 13.2% 的人一个月内没跟邻居面对面说过话，全国 6.5%），试点用同一题检查。下面才是 SDP 可能省下的成本，每个数字都标明是假设，可以直接改。',
+      en: 'The main measure, neighbour connection, comes first and starts from real census data (Selangor: 13.2% had no face-to-face contact with a neighbour in a month; Malaysia 6.5%). The pilot checks it with the same question. Below it, what SDP could save, every number marked as an assumption you can change.',
     },
     features: {
       zh: [
-        '假设：装修比例、引起投诉的比例、每宗投诉的工时、邻居自行解决的比例、争议理赔、人力成本、WhatsApp 讯息费',
-        '户数会自动带入「新 phase 设定」最近算的结果',
-        '结果：省下的工时、扣掉 WhatsApp 费用后的净节省、今天 vs 有 Jiran5 的工时对比',
-        '页首清楚写明：这是示意模型，不是预测；试点时用 SDP 自己的数字替换，后台会量出真实比例',
+        '选乡镇所在的州（雪兰莪、吉隆坡、森美兰、柔佛、全国），自动带入普查数字',
+        '试点目标：把「一个月没跟邻居说过话」减少多少；算出多少户开始跟邻居有往来',
+        '成本部分先算 SDP 一定要付的：保修期内「装修造成还是建筑缺陷」的争议；再算邻居投诉（只适用于 SDP 物业团队有处理投诉的社区）',
+        '户数会自动带入「新 phase 设定」最近算的结果；页首写明只有普查数字是实测资料',
       ],
       en: [
-        'Assumptions: renovation share, complaint share, staff hours per complaint, share settled by neighbours, disputed claims, staff cost, WhatsApp fees',
-        'The number of homes comes from the latest Phase setup run',
-        'Results: staff hours saved, net saving after WhatsApp costs, and hours today versus with Jiran5',
-        'Clearly labelled as an illustrative model, not a forecast; the pilot replaces each assumption with SDP’s own data, measured on the command view',
+        'Pick the township’s state (Selangor, Kuala Lumpur, Negeri Sembilan, Johor or all of Malaysia) to load its census figures',
+        'Pilot target: how much to cut "no contact with a neighbour"; shows how many households come into contact',
+        'Costs start with what SDP certainly pays: disputes over "renovation or building defect" during the warranty; then neighbour complaints, only where SDP’s estate team handles them',
+        'Homes come from the latest Phase setup run; the banner says only the census figures are measured data',
       ],
     },
     why: {
-      zh: '商业价值（10%）和影响力（25%）需要数字，但不能编造。把假设摊开让 SDP 自己调，比一个漂亮的数字更可信。',
-      en: 'Commercial value (10%) and impact (25%) need numbers, but they must not be invented. Showing the assumptions and letting SDP change them is more credible than one impressive figure.',
+      zh: '评审一定会问「数字从哪里来」。主要指标用政府普查的真实数据和同一个问题，试点结果可以直接跟全国比较；其他数字摊开让 SDP 自己调，不编造。',
+      en: 'Judges will ask where the numbers come from. The main measure uses real government census data and the same question, so pilot results compare directly with the national figures; everything else is laid open for SDP to adjust, nothing invented.',
     },
   },
   channels: {
     layer: { zh: 'SDP 后台', en: 'SDP view' },
     title: { zh: '触达管道', en: 'Channels' },
     what: {
-      zh: '两支手机：左边是 Jiran5 放在 SDP App 里的样子（同一个登入），右边是这一户在 WhatsApp 收到的通知（用他的语言）。',
-      en: 'Two phones: Jiran5 as a module inside the SDP App (same sign-in), and the WhatsApp alerts this household receives, in its own language.',
+      zh: '两支手机：左边是 Keynection 放在 SDP App 里的样子（同一个登入），右边是这一户在 WhatsApp 收到的通知（用他的语言）。',
+      en: 'Two phones: Keynection as a module inside the SDP App (same sign-in), and the WhatsApp alerts this household receives, in its own language.',
     },
     features: {
       zh: [
-        'SDP App 里的「Neighbours · Jiran5」入口，显示未读数和最近的聊天（版面是示意，不是 SDP 真正的 app）',
+        'SDP App 里的「Neighbours · Keynection」入口，显示未读数和最近的聊天（版面是示意，不是 SDP 真正的 app）',
         'WhatsApp 通知按真实资料产生：装修通知（完整内容）、新讯息提醒（不含讯息内容）、问题进度、物业公告、维修确认',
         '安静模式只挡聊天提醒，正式通知照样送达；还没加入的住户改用纸本，关掉 WhatsApp 的只在 app 里看',
-        '换顶栏的住户，就能看到不同人、不同语言收到的通知',
+        '换顶栏的住户，就能看到不同人、不同语言收到的通知：隔壁 Kumar（No. 13）收到的是淡米尔文',
       ],
       en: [
-        'A "Neighbours · Jiran5" entry inside the SDP App with unread counts and recent chats (illustrative layout, not SDP’s actual app)',
+        'A "Neighbours · Keynection" entry inside the SDP App with unread counts and recent chats (illustrative layout, not SDP’s actual app)',
         'WhatsApp alerts built from real data: full renovation notices, new-message alerts without the content, concern updates, estate notices, repair checks',
-        'Quiet mode holds back chat alerts only; households not on Jiran5 get paper instead, and those with alerts off see everything in the app',
-        'Switch household in the top bar to see what someone else receives, in their language',
+        'Quiet mode holds back chat alerts only; households not on Keynection get paper instead, and those with alerts off see everything in the app',
+        'Switch household in the top bar to see what someone else receives, in their language: Kumar next door (No. 13) gets Tamil',
       ],
     },
     why: {
@@ -363,6 +368,52 @@ export interface RouteStep {
   unit?: string
   text: Text
 }
+
+// The main story in about three minutes, for judges: connection first, the safety net last.
+export const JUDGE_ROUTE: RouteStep[] = [
+  {
+    tab: 'circle', unit: 'T-12',
+    text: {
+      zh: '交钥匙那天：Aiman（No. 12）刚交屋，首页就是左右和对面这 5 户邻居（共用墙、对面）→ 对 Siti 按「👋 Wave」',
+      en: 'Key day: Aiman (No. 12) has just moved in, and his home screen is the five homes beside and opposite him (shared walls, across the road) → 👋 Wave at Siti',
+    },
+  },
+  {
+    tab: 'works', unit: 'T-12',
+    text: {
+      zh: '装修通知就是自我介绍：Works →「Register renovation」→ 图上标出谁会收到 → 发送（还没加入的 No. 23 由物业送纸本）',
+      en: 'The renovation notice is the introduction: Works → Register renovation → the plan marks who is told → send (No. 23, not on the app yet, gets it on paper)',
+    },
+  },
+  {
+    tab: 'channels', unit: 'T-13',
+    text: {
+      zh: '隔壁 Kumar（No. 13）读淡米尔文：触达管道里看到他在 WhatsApp 收到的是淡米尔文装修通知',
+      en: 'Kumar next door (No. 13) reads Tamil: Channels shows Aiman’s notice reaching him on WhatsApp in Tamil',
+    },
+  },
+  {
+    tab: 'chats', unit: 'T-11',
+    text: {
+      zh: '按顶栏「Both sides」（左 Aiman、右 Siti）→ Siti 回 👋、按快捷回复「宝宝午睡」→ Aiman 看到英文：先认识，再约好时间',
+      en: 'Turn on "Both sides" (Aiman left, Siti right) → Siti waves back and taps the baby-nap quick reply → Aiman reads it in English: meet first, then agree the hours',
+    },
+  },
+  {
+    tab: 'evidence', unit: 'T-11',
+    text: {
+      zh: '万一出事：Siti 按 Use sample 封存开工前照片 → Sample crack → 系统说明裂缝开工前就有，属于保修，不是装修造成',
+      en: 'If something goes wrong: Siti seals a pre-work photo (Use sample) → Sample crack → the crack was there before the works, so it goes to the warranty, not to Aiman',
+    },
+  },
+  {
+    tab: 'impact',
+    text: {
+      zh: 'SDP 怎么检查效果：影响估算用 2020 年普查同一题（雪兰莪 13.2% 一个月没跟邻居说过话），试点前后一比就知道；后台还会算隔壁互相认识的比例',
+      en: 'How SDP checks it works: the Impact model uses the 2020 census question (Selangor: 13.2% had no neighbour contact in a month), asked before and after the pilot; the command view also counts next-door pairs who know each other',
+    },
+  },
+]
 
 export const ROUTE: RouteStep[] = [
   {
@@ -446,7 +497,7 @@ export const ROUTE: RouteStep[] = [
     tab: 'sdp',
     text: {
       zh: '（加入与纸本，可选）SDP 后台 → Front desk：Aiman 的装修通知里 No. 23 还没加入 → 按 Print 看纸本通知 → Delivered；再为 No. 23 按 Issue code → 用演示按钮打开加入页 → 选名字、语言、同意隐私声明',
-      en: '(Joining and paper, optional) Command view → Front desk: No. 23 isn’t on Jiran5, so Aiman’s notice is on paper → Print → Delivered; then Issue code for No. 23 → open the join page (demo) → name, language, privacy consent',
+      en: '(Joining and paper, optional) Command view → Front desk: No. 23 isn’t on Keynection, so Aiman’s notice is on paper → Print → Delivered; then Issue code for No. 23 → open the join page (demo) → name, language, privacy consent',
     },
   },
   {

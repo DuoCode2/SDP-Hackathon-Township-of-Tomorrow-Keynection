@@ -3,6 +3,7 @@ import {
   ArrowUpRight, BellOff, Ban, Check, Download, EyeOff, Hand, HandHeart, Hexagon, Languages, Lock, MessageCircle, ShieldHalf, Type, UserPlus, UserRound,
 } from 'lucide-react'
 import { api, type Delegate, type Lang, type Profile, type UnitInfo } from '../api'
+import { LANGS } from '../messages'
 import type { TabId } from '../guide'
 import { refusal, useT } from '../i18n'
 import { useActing } from '../helper'
@@ -10,7 +11,6 @@ import { roleOf } from '../components/Cast'
 import { Avatar, Card, CardHead, ScreenTitle, Skeleton, useToast } from '../ui'
 import { replayWelcome } from './CircleView'
 
-const LANGS: { code: Lang; name: string }[] = [{ code: 'en', name: 'English' }, { code: 'ms', name: 'Bahasa Melayu' }, { code: 'zh', name: '中文' }]
 const RELATIONS: Delegate['relation'][] = ['child', 'spouse', 'sibling', 'caregiver', 'other']
 
 /** Profile and privacy: how neighbours see you, how reachable you are, who helps you, and your data. */
@@ -140,7 +140,7 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
   )
 }
 
-/** Family helpers: up to two people who may use Jiran5 for this household, each action recorded under their name. */
+/** Family helpers: up to two people who may use Keynection for this household, each action recorded under their name. */
 function Helpers({ me, version, onChange }: { me: UnitInfo; version: number; onChange: () => void }) {
   const t = useT()
   const toast = useToast()
@@ -226,7 +226,7 @@ function Helpers({ me, version, onChange }: { me: UnitInfo; version: number; onC
   )
 }
 
-/** PDPA: see everything Jiran5 holds about this household, as a file. */
+/** PDPA: see everything Keynection holds about this household, as a file. */
 function YourData({ me }: { me: UnitInfo }) {
   const t = useT()
   const toast = useToast()
@@ -239,7 +239,7 @@ function YourData({ me }: { me: UnitInfo }) {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `jiran5-my-data-${me.id}.json`
+      a.download = `keynection-my-data-${me.id}.json`
       document.body.appendChild(a)
       a.click()
       a.remove()

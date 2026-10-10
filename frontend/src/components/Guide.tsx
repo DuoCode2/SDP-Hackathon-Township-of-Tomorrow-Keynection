@@ -1,5 +1,5 @@
 import { Compass, Lightbulb, X } from 'lucide-react'
-import { PAGES, ROUTE, UI, type GuideLang, type TabId } from '../guide'
+import { JUDGE_ROUTE, PAGES, ROUTE, UI, type GuideLang, type RouteStep, type TabId } from '../guide'
 
 interface Props {
   tab: TabId
@@ -11,9 +11,25 @@ interface Props {
   onGo: (tab: TabId, unit?: string) => void
 }
 
-// Explains the current screen and walks through the demo route. A side column on wide screens, a drawer otherwise.
+// Explains the current screen and walks through the demo routes (the 3-minute judge route first, then the full one).
+// A side column on wide screens, a drawer otherwise.
 export default function Guide({ tab, me, lang, open, onLang, onClose, onGo }: Props) {
   const page = PAGES[tab]
+  const steps = (route: RouteStep[], judge = false) => (
+    <ol className={`route ${judge ? 'route-judge' : ''}`}>
+      {route.map((s, i) => {
+        const here = s.tab === tab && (!s.unit || s.unit === me)
+        return (
+          <li key={i}>
+            <button className={here ? 'here' : ''} onClick={() => onGo(s.tab, s.unit)}>
+              <span className="route-n">{i + 1}</span>
+              <span>{s.text[lang]}</span>
+            </button>
+          </li>
+        )
+      })}
+    </ol>
+  )
   return (
     <>
       {open && <div className="guide-scrim" onClick={onClose} />}
@@ -29,6 +45,10 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo }: Pr
 
         <div className="guide-body" lang={lang === 'zh' ? 'zh-Hans' : 'en'}>
           <p className="guide-about">{UI.about[lang]}</p>
+
+          <div className="section-label">{UI.judgeRoute[lang]}</div>
+          <p className="guide-hint">{UI.judgeHint[lang]}</p>
+          {steps(JUDGE_ROUTE, true)}
 
           <div className="section-label">{UI.thisPage[lang]}</div>
           <div className="guide-card">
@@ -47,19 +67,7 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo }: Pr
 
           <div className="section-label">{UI.route[lang]}</div>
           <p className="guide-hint">{UI.routeHint[lang]}</p>
-          <ol className="route">
-            {ROUTE.map((s, i) => {
-              const here = s.tab === tab && (!s.unit || s.unit === me)
-              return (
-                <li key={i}>
-                  <button className={here ? 'here' : ''} onClick={() => onGo(s.tab, s.unit)}>
-                    <span className="route-n">{i + 1}</span>
-                    <span>{s.text[lang]}</span>
-                  </button>
-                </li>
-              )
-            })}
-          </ol>
+          {steps(ROUTE)}
           <p className="guide-hint">{UI.fictional[lang]}</p>
         </div>
       </aside>

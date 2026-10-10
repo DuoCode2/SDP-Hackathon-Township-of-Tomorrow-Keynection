@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Check, Hand, House, KeyRound, Lock, ShieldCheck, Sparkles } from 'lucide-react'
 import { api, ApiError, type JoinInfo, type Lang, type UnitInfo } from '../api'
-import { refusal, useDates, useT } from '../i18n'
+import { refusal, tIn, useDates, useT } from '../i18n'
+import { LANGS } from '../messages'
 import { Logo } from '../components/Art'
 import { Card, Steps, useCelebrate, useToast } from '../ui'
 import { replayWelcome } from './CircleView'
 
-const LANGS: { code: Lang; name: string }[] = [{ code: 'en', name: 'English' }, { code: 'ms', name: 'Bahasa Melayu' }, { code: 'zh', name: '中文' }]
 
 // The demo keeps an issued code in this browser tab only, the way a resident would scan it from the welcome pack.
 export const joinKey = (unitId: string) => `j5join:${unitId}`
@@ -117,6 +117,7 @@ export default function JoinView({ me, onJoined }: { me: UnitInfo; onJoined: () 
   }
 
   const steps = [t('join.steps.home'), t('join.steps.you'), t('join.steps.privacy')]
+  const tp = tIn(lang)
   return (
     <section className="screen join">
       <div className="join-hero compact">
@@ -152,16 +153,17 @@ export default function JoinView({ me, onJoined }: { me: UnitInfo; onJoined: () 
           </div>
         )}
         {step === 2 && (
-          <div className="join-step">
-            <b className="join-ptitle"><Lock size={15} /> {t('join.privacyTitle')}</b>
+          // What the household agrees to is shown in the language it just chose to read (Tamil included).
+          <div className="join-step" lang={lang}>
+            <b className="join-ptitle"><Lock size={15} /> {tp('join.privacyTitle')}</b>
             <dl className="join-privacy">
-              <div><dt>{t('join.p1t')}</dt><dd>{t('join.p1')}</dd></div>
-              <div><dt>{t('join.p2t')}</dt><dd>{t('join.p2')}</dd></div>
-              <div><dt>{t('join.p3t')}</dt><dd>{t('join.p3')}</dd></div>
-              <div><dt>{t('join.p4t')}</dt><dd>{t('join.p4')}</dd></div>
+              <div><dt>{tp('join.p1t')}</dt><dd>{tp('join.p1')}</dd></div>
+              <div><dt>{tp('join.p2t')}</dt><dd>{tp('join.p2')}</dd></div>
+              <div><dt>{tp('join.p3t')}</dt><dd>{tp('join.p3')}</dd></div>
+              <div><dt>{tp('join.p4t')}</dt><dd>{tp('join.p4')}</dd></div>
             </dl>
-            <label className="switch-row consent"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /><span>{t('join.consent', { version: info.consent_version })}</span></label>
-            <label className="switch-row consent"><input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} /><span>{t('join.wa')}</span></label>
+            <label className="switch-row consent"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /><span>{tp('join.consent', { version: info.consent_version })}</span></label>
+            <label className="switch-row consent"><input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} /><span>{tp('join.wa')}</span></label>
           </div>
         )}
         <div className="wizard-foot">

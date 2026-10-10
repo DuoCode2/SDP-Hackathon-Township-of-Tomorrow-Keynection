@@ -336,7 +336,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
           if (item.kind === 'system') {
             return wrap(
               <div className="sys-msg">
-                <Stamp tone="ink" tilt={0}>{item.author === ESTATE_AUTHOR ? tr('author.estate') : item.author ?? 'Jiran5'}</Stamp>
+                <Stamp tone="ink" tilt={0}>{item.author === ESTATE_AUTHOR ? tr('author.estate') : item.author ?? 'Keynection'}</Stamp>
                 <p>{systemText(tr, item)}</p>
                 <small>{dates.time(new Date(item.created_at))}</small>
               </div>,

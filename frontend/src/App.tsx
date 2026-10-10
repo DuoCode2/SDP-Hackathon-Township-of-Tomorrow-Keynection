@@ -191,8 +191,8 @@ function Shell() {
         <div className="brand">
           <div className="brand-mark"><Logo size={24} /></div>
           <div>
-            <div className="brand-name">Jiran5</div>
-            <div className="brand-sub">NEIGHBOURS · ON RECORD</div>
+            <div className="brand-name">Keynection</div>
+            <div className="brand-sub">EVERY KEY · FIVE NEIGHBOURS</div>
           </div>
         </div>
         {NAV.map((g) => (
@@ -224,7 +224,7 @@ function Shell() {
         <header className="topbar">
           <div className="brand mobile-only">
             <div className="brand-mark"><Logo size={24} /></div>
-            <div className="brand-name">Jiran5</div>
+            <div className="brand-name">Keynection</div>
           </div>
           <div className="crumb desktop-only">
             <span className="crumb-sheet">Sheet {page.no}</span>

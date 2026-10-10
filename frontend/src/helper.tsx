@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { Delegate } from './api'
 
-// A family helper using Jiran5 for a household (for example, a daughter helping her mother).
+// A family helper using Keynection for a household (for example, a daughter helping her mother).
 // In a real pilot the helper signs in on their own phone; the demo switches with one tap from the Me page.
 
 export interface Acting {

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import { ApiError } from './api'
+import { ApiError, type Lang } from './api'
 
 // Interface language for the resident screens: English, Bahasa Melayu, 中文. That includes Evidence (photos, cases,
 // repairs), where residents make decisions. Works, the home log and SDP's screens are still English. Whatever the
@@ -50,6 +50,7 @@ const D: Record<string, Entry> = {
   'hint.floors_above': ['{n} floors above', '{n} tingkat di atas', '楼上 {n} 层'], 'hint.floors_below': ['{n} floors below', '{n} tingkat di bawah', '楼下 {n} 层'],
   'hint.same_floor': ['Same floor', 'Tingkat sama', '同一层'], 'hint.level': ['Level {n}', 'Tingkat {n}', '{n} 楼'],
   'lang.en': ['English', 'Bahasa Inggeris', '英文'], 'lang.ms': ['Bahasa Melayu', 'Bahasa Melayu', '马来文'], 'lang.zh': ['Chinese', 'Bahasa Cina', '中文'],
+  'lang.ta': ['Tamil', 'Bahasa Tamil', '淡米尔文'],
   'place.block': ['Block {b}', 'Blok {b}', '{b} 栋'],
 
   // common buttons
@@ -112,7 +113,7 @@ const D: Record<string, Entry> = {
   'hours.weekdays': ['Weekdays {from}–{to}, no weekends', 'Hari bekerja {from}–{to}, tiada hujung minggu', '平日 {from}–{to}，周末不施工'],
   'hours.monSat': ['Mon–Sat {from}–{to}', 'Isnin–Sabtu {from}–{to}', '星期一至六 {from}–{to}'],
   // connection lost
-  'offline.title': ["Can't reach Jiran5 right now", 'Tidak dapat menghubungi Jiran5 sekarang', '暂时连不上 Jiran5'],
+  'offline.title': ["Can't reach Keynection right now", 'Tidak dapat menghubungi Keynection sekarang', '暂时连不上 Keynection'],
   'offline.body': ['Check your connection, then try again.', 'Semak sambungan anda, kemudian cuba lagi.', '请检查网络连线，然后再试一次。'],
   'offline.retry': ['Try again', 'Cuba lagi', '再试一次'],
   // pre-work photo reminder on the home screen
@@ -141,11 +142,11 @@ const D: Record<string, Entry> = {
   'intro.editable': ['Message · you can edit it', 'Mesej · boleh disunting', '讯息 · 可以修改'],
   'intro.shared': ['Shared', 'Dikongsi', '会分享'], 'intro.sharedBody': ['Your first name, your unit and the language you read', 'Nama pertama, unit dan bahasa bacaan anda', '你的名字、门牌和阅读语言'],
   'intro.notShared': ['Not shared', 'Tidak dikongsi', '不会分享'], 'intro.notSharedBody': ['Your surname, phone number and email. Numbers are exchanged only if you both agree later', 'Nama keluarga, nombor telefon dan e-mel. Nombor hanya ditukar jika anda berdua bersetuju kemudian', '你的姓氏、电话和电邮。之后双方同意才会交换号码'],
-  'intro.theyCan': ['They can', 'Mereka boleh', '对方可以'], 'intro.theyCanBody': ['Wave back, reply in Jiran5, or ignore it. Nothing is posted to a group. They get a WhatsApp alert from Jiran5, never from your number', 'Membalas lambaian, membalas dalam Jiran5, atau mengabaikannya. Tiada apa disiarkan ke kumpulan. Mereka menerima makluman WhatsApp daripada Jiran5, bukan daripada nombor anda', '回招呼、在 Jiran5 回复或忽略，不会发到群组。对方会收到 Jiran5 发的 WhatsApp 提醒，不会看到你的号码'],
+  'intro.theyCan': ['They can', 'Mereka boleh', '对方可以'], 'intro.theyCanBody': ['Wave back, reply in Keynection, or ignore it. Nothing is posted to a group. They get a WhatsApp alert from Keynection, never from your number', 'Membalas lambaian, membalas dalam Keynection, atau mengabaikannya. Tiada apa disiarkan ke kumpulan. Mereka menerima makluman WhatsApp daripada Keynection, bukan daripada nombor anda', '回招呼、在 Keynection 回复或忽略，不会发到群组。对方会收到 Keynection 发的 WhatsApp 提醒，不会看到你的号码'],
   'intro.consent': ['I agree to share my first name and unit with the {n} neighbour(s) I picked.', 'Saya setuju berkongsi nama pertama dan unit saya dengan {n} jiran yang saya pilih.', '我同意把名字和门牌分享给我选的 {n} 位邻居。'],
   'intro.selected': ['{n} of {m} selected', '{n} daripada {m} dipilih', '已选 {n}/{m}'],
   'intro.send': ['Send hello', 'Hantar salam', '发送招呼'],
-  'intro.sent': ['Sent to {n} neighbour(s). Jiran5 lets them know on WhatsApp', 'Dihantar kepada {n} jiran. Jiran5 memaklumkan mereka melalui WhatsApp', '已发给 {n} 位邻居，Jiran5 会用 WhatsApp 通知他们'],
+  'intro.sent': ['Sent to {n} neighbour(s). Keynection lets them know on WhatsApp', 'Dihantar kepada {n} jiran. Keynection memaklumkan mereka melalui WhatsApp', '已发给 {n} 位邻居，Keynection 会用 WhatsApp 通知他们'],
 
   // register renovation
   'reno.steps.type': ['Type of work', 'Jenis kerja', '工程类型'], 'reno.steps.who': ['Who is told', 'Siapa dimaklumkan', '通知谁'], 'reno.steps.when': ['When', 'Bila', '时间'],
@@ -285,10 +286,10 @@ const D: Record<string, Entry> = {
   'me.seeNobody': ['Nobody', 'Tiada sesiapa', '没有人'], 'me.seeNobodyBody': ['Surname, phone, email, unless you both agree to exchange numbers', 'Nama keluarga, telefon, e-mel, kecuali anda berdua bersetuju menukar nombor', '姓氏、电话、电邮（除非双方同意交换号码）'],
   'me.blocked': ['Blocked', 'Disekat', '已封锁'], 'me.blockedSub': ['They aren’t told. Formal notices and concerns stay on record.', 'Mereka tidak diberitahu. Notis rasmi dan kebimbangan tetap direkodkan.', '对方不会知道，正式通知和问题照样留下纪录。'],
   'me.noneBlocked': ['Nobody blocked.', 'Tiada yang disekat.', '没有封锁任何人。'], 'me.unblocked': ['{name} is unblocked', '{name} dinyahsekat', '已解除封锁 {name}'],
-  'me.shortcuts': ['Shortcuts', 'Pintasan', '捷径'], 'me.myLog': ['My home log', 'Log rumah saya', '我的屋历'], 'me.safe': ['How Jiran5 keeps you safe', 'Bagaimana Jiran5 melindungi anda', 'Jiran5 怎样保护你'],
+  'me.shortcuts': ['Shortcuts', 'Pintasan', '捷径'], 'me.myLog': ['My home log', 'Log rumah saya', '我的屋历'], 'me.safe': ['How Keynection keeps you safe', 'Bagaimana Keynection melindungi anda', 'Keynection 怎样保护你'],
   'me.welcomeAgain': ['Show the welcome again', 'Tunjuk sambutan semula', '再看一次欢迎画面'], 'me.sdp': ['SDP command view (demo)', 'Paparan kawalan SDP (demo)', 'SDP 管理后台（演示）'],
   'helpers.title': ['Family helpers', 'Pembantu keluarga', '家人代办'],
-  'helpers.sub': ['Let a family member use Jiran5 for you. Everything they do is recorded under their name.', 'Benarkan ahli keluarga menggunakan Jiran5 untuk anda. Semua tindakan mereka direkodkan atas nama mereka.', '授权家人替你使用 Jiran5，他们做的每件事都会以他们的名字记录。'],
+  'helpers.sub': ['Let a family member use Keynection for you. Everything they do is recorded under their name.', 'Benarkan ahli keluarga menggunakan Keynection untuk anda. Semua tindakan mereka direkodkan atas nama mereka.', '授权家人替你使用 Keynection，他们做的每件事都会以他们的名字记录。'],
   'helpers.none': ['No helpers yet.', 'Belum ada pembantu.', '还没有代办人。'], 'helpers.max': ['Up to 2 helpers.', 'Sehingga 2 pembantu.', '最多 2 位。'],
   'helpers.name': ['Name', 'Nama', '名字'], 'helpers.relation': ['Relationship', 'Hubungan', '关系'],
   'relation.child': ['Son or daughter', 'Anak', '子女'], 'relation.spouse': ['Spouse', 'Pasangan', '配偶'], 'relation.sibling': ['Brother or sister', 'Adik-beradik', '兄弟姐妹'],
@@ -299,10 +300,10 @@ const D: Record<string, Entry> = {
   'helpers.banner': ['You’re helping {owner} as {name}. Everything you do is recorded as done by {name}.', 'Anda membantu {owner} sebagai {name}. Semua tindakan direkodkan sebagai dibuat oleh {name}.', '你正以 {name} 的身份替 {owner} 操作，所有动作都会记录为 {name} 所做。'],
   'helpers.stop': ['Stop helping', 'Berhenti membantu', '结束代办'],
   'data.title': ['Your data', 'Data anda', '你的资料'],
-  'data.sub': ['Under Malaysia’s Personal Data Protection Act you can see everything Jiran5 holds about you.', 'Di bawah Akta Perlindungan Data Peribadi Malaysia, anda boleh melihat semua data Jiran5 tentang anda.', '根据马来西亚个人资料保护法，你可以查看 Jiran5 保存的所有关于你的资料。'],
+  'data.sub': ['Under Malaysia’s Personal Data Protection Act you can see everything Keynection holds about you.', 'Di bawah Akta Perlindungan Data Peribadi Malaysia, anda boleh melihat semua data Keynection tentang anda.', '根据马来西亚个人资料保护法，你可以查看 Keynection 保存的所有关于你的资料。'],
   'data.download': ['Download my data', 'Muat turun data saya', '下载我的资料'], 'data.downloading': ['Your data file is downloading', 'Fail data anda sedang dimuat turun', '正在下载你的资料'],
   'data.note': ['Other residents appear by unit only. Voice messages are deleted after 30 days.', 'Penduduk lain dipaparkan mengikut unit sahaja. Mesej suara dipadam selepas 30 hari.', '其他住户只以门牌显示；语音讯息会在 30 天后删除。'],
-  'data.leave': ['Leaving Jiran5 removes your profile and chats; the home log stays with the unit as part of the property’s record. (Pilot)', 'Meninggalkan Jiran5 membuang profil dan sembang anda; log rumah kekal bersama unit sebagai rekod hartanah. (Perintis)', '退出 Jiran5 会删除你的资料和聊天；屋历会留在这间房子，作为房产纪录。（试点）'],
+  'data.leave': ['Leaving Keynection removes your profile and chats; the home log stays with the unit as part of the property’s record. (Pilot)', 'Meninggalkan Keynection membuang profil dan sembang anda; log rumah kekal bersama unit sebagai rekod hartanah. (Perintis)', '退出 Keynection 会删除你的资料和聊天；屋历会留在这间房子，作为房产纪录。（试点）'],
 
   // new SDP pages (nav only: the pages themselves are records screens, in English)
   'group.sdp': ['Sime Darby Property', 'Sime Darby Property', 'Sime Darby Property'],
@@ -311,22 +312,22 @@ const D: Record<string, Entry> = {
   'nav.channels': ['Channels', 'Saluran', '触达管道'], 'nav.channels.sub': ['SDP App & WhatsApp', 'Aplikasi SDP & WhatsApp', 'SDP App 与 WhatsApp'], 'nav.channels.short': ['Channels', 'Saluran', '管道'],
 
   // households that haven't joined yet
-  'nj.status': ['Not on Jiran5 yet', 'Belum menyertai Jiran5', '还没加入 Jiran5'],
+  'nj.status': ['Not on Keynection yet', 'Belum menyertai Keynection', '还没加入 Keynection'],
   'nj.note': ['They haven’t joined yet, so their name stays private. The estate office gives them formal notices on paper.', 'Mereka belum menyertai, jadi nama mereka dirahsiakan. Pejabat estet menyampaikan notis rasmi secara bercetak.', '对方还没加入，所以名字保密。物业办公室会把正式通知印出来交给他们。'],
   'nj.story': ['Not joined', 'Belum sertai', '未加入'],
-  'nj.paper': ['Not on Jiran5: the estate office delivers a paper notice', 'Belum di Jiran5: pejabat estet menghantar notis bercetak', '还没加入：由物业办公室送纸本通知'],
-  'nj.welcome': ['{n} of these homes isn’t on Jiran5 yet. The estate office gives them your notices on paper.', '{n} daripada rumah ini belum di Jiran5. Pejabat estet menyampaikan notis anda secara bercetak.', '其中 {n} 户还没加入 Jiran5，物业办公室会把你的通知印出来交给他们。'],
+  'nj.paper': ['Not on Keynection: the estate office delivers a paper notice', 'Belum di Keynection: pejabat estet menghantar notis bercetak', '还没加入：由物业办公室送纸本通知'],
+  'nj.welcome': ['{n} of these homes isn’t on Keynection yet. The estate office gives them your notices on paper.', '{n} daripada rumah ini belum di Keynection. Pejabat estet menyampaikan notis anda secara bercetak.', '其中 {n} 户还没加入 Keynection，物业办公室会把你的通知印出来交给他们。'],
   'cast.notJoined': ['Not joined yet', 'Belum menyertai', '还没加入'],
 
   // joining at handover
   'join.eyebrow': ['Welcome to {phase}', 'Selamat datang ke {phase}', '欢迎来到 {phase}'],
-  'join.title': ['{label} isn’t on Jiran5 yet', '{label} belum menyertai Jiran5', '{label} 还没加入 Jiran5'],
+  'join.title': ['{label} isn’t on Keynection yet', '{label} belum menyertai Keynection', '{label} 还没加入 Keynection'],
   'join.lead': ['Your join code is in the welcome pack from SDP’s handover team. Scan the QR code, or ask the estate office for a new one.', 'Kod penyertaan anda ada dalam pek selamat datang daripada pasukan serah kunci SDP. Imbas kod QR, atau minta kod baharu di pejabat estet.', '加入码在 SDP 交屋团队给你的欢迎礼包里。扫描 QR 码，或到物业办公室领一个新的。'],
   'join.paste': ['Join code', 'Kod penyertaan', '加入码'], 'join.use': ['Use this code', 'Guna kod ini', '使用这个码'],
   'join.demo': ['Get a code from the front desk (demo)', 'Dapatkan kod dari kaunter (demo)', '向物业柜台领码（演示）'],
   'join.steps.home': ['Your home', 'Rumah anda', '你的家'], 'join.steps.you': ['You', 'Anda', '你'], 'join.steps.privacy': ['Privacy', 'Privasi', '隐私'],
   'join.homeTitle': ['{label} · {phase}', '{label} · {phase}', '{label} · {phase}'],
-  'join.homeBody': ['{n} homes share a wall, a slab or a road with yours. Jiran5 introduces you to them, and keeps renovations and repairs fair and on record.', '{n} rumah berkongsi dinding, lantai atau jalan dengan rumah anda. Jiran5 memperkenalkan anda kepada mereka, dan memastikan ubah suai serta pembaikan adil dan direkodkan.', '有 {n} 户跟你共用墙、楼板或面对面。Jiran5 帮你认识他们，也让装修和维修公平、有纪录。'],
+  'join.homeBody': ['{n} homes share a wall, a slab or a road with yours. Keynection introduces you to them, and keeps renovations and repairs fair and on record.', '{n} rumah berkongsi dinding, lantai atau jalan dengan rumah anda. Keynection memperkenalkan anda kepada mereka, dan memastikan ubah suai serta pembaikan adil dan direkodkan.', '有 {n} 户跟你共用墙、楼板或面对面。Keynection 帮你认识他们，也让装修和维修公平、有纪录。'],
   'join.b1': ['Say hello and chat with the homes around you, in your language', 'Bertegur sapa dan berbual dengan jiran di sekeliling, dalam bahasa anda', '用你的语言，跟身边的住户打招呼、聊天'],
   'join.b2': ['Get renovation notices before work starts, and raise concerns privately', 'Terima notis ubah suai sebelum kerja bermula, dan luahkan kebimbangan secara peribadi', '开工前收到装修通知，可以私下反映问题'],
   'join.b3': ['Keep photo evidence and follow SDP repairs until you are satisfied', 'Simpan bukti foto dan ikuti pembaikan SDP sehingga anda berpuas hati', '保存照片证据，跟进 SDP 维修直到你满意'],
@@ -334,7 +335,7 @@ const D: Record<string, Entry> = {
   'join.nameHint': ['Your first name or what neighbours call you. No surname, phone number or email.', 'Nama pertama atau panggilan anda. Tanpa nama keluarga, nombor telefon atau e-mel.', '你的名字或邻居怎么称呼你。不要写姓氏、电话或电邮。'],
   'join.lang': ['Language you read', 'Bahasa bacaan anda', '你阅读的语言'],
   'join.easy': ['Easy mode: bigger text and buttons, fewer options', 'Mod mudah: teks dan butang lebih besar, pilihan lebih sedikit', '简易模式：字和按钮更大、选项更少'],
-  'join.privacyTitle': ['How Jiran5 uses your information', 'Bagaimana Jiran5 menggunakan maklumat anda', 'Jiran5 怎样使用你的资料'],
+  'join.privacyTitle': ['How Keynection uses your information', 'Bagaimana Keynection menggunakan maklumat anda', 'Keynection 怎样使用你的资料'],
   'join.p1t': ['What we keep', 'Apa yang kami simpan', '我们保存什么'],
   'join.p1': ['The name you chose, your unit, your language, your messages, photos you upload and your home log.', 'Nama pilihan anda, unit, bahasa, mesej, foto yang dimuat naik dan log rumah anda.', '你选的名字、门牌、语言、讯息、上传的照片和屋历。'],
   'join.p2t': ['Who sees what', 'Siapa nampak apa', '谁看得到什么'],
@@ -345,8 +346,8 @@ const D: Record<string, Entry> = {
   'join.p4': ['Download your data any time, correct it, or ask the estate office to close your account.', 'Muat turun data anda bila-bila masa, betulkannya, atau minta pejabat estet menutup akaun anda.', '随时下载、更正你的资料，或请物业办公室关闭帐户。'],
   'join.consent': ['I have read this privacy notice ({version}) and agree to it.', 'Saya telah membaca notis privasi ini ({version}) dan bersetuju.', '我已阅读这份隐私声明（{version}）并同意。'],
   'join.wa': ['Send me short alerts on WhatsApp (never the content of messages)', 'Hantar notifikasi ringkas melalui WhatsApp (tanpa isi mesej)', '用 WhatsApp 发简短通知给我（不会有讯息内容）'],
-  'join.finish': ['Join Jiran5', 'Sertai Jiran5', '加入 Jiran5'],
-  'join.done': ['Welcome to Jiran5, {name}!', 'Selamat datang ke Jiran5, {name}!', '{name}，欢迎加入 Jiran5！'],
+  'join.finish': ['Join Keynection', 'Sertai Keynection', '加入 Keynection'],
+  'join.done': ['Welcome to Keynection, {name}!', 'Selamat datang ke Keynection, {name}!', '{name}，欢迎加入 Keynection！'],
   'join.expired': ['This join code isn’t valid any more. Ask the estate office for a new one.', 'Kod ini tidak sah lagi. Minta kod baharu di pejabat estet.', '这个加入码已失效，请到物业办公室领新的。'],
   'join.expires': ['Code valid until {date}, once', 'Kod sah sehingga {date}, sekali sahaja', '这个码在 {date} 前有效，只能用一次'],
 
@@ -355,7 +356,7 @@ const D: Record<string, Entry> = {
   'me.easySub': ['Bigger text and buttons, fewer options. Only you see this setting.', 'Teks dan butang lebih besar, pilihan lebih sedikit. Hanya anda nampak tetapan ini.', '字和按钮更大、选项更少，只有你看得到这个设定。'],
   'me.easyOn': ['Easy mode on', 'Mod mudah dihidupkan', '已开启简易模式'], 'me.easyOff': ['Easy mode off', 'Mod mudah dimatikan', '已关闭简易模式'],
   'me.wa': ['WhatsApp alerts', 'Notifikasi WhatsApp', 'WhatsApp 通知'],
-  'me.waSub': ['Short alerts from the Jiran5 account. What neighbours write stays in Jiran5.', 'Notifikasi ringkas daripada akaun Jiran5. Apa yang ditulis jiran kekal dalam Jiran5.', '来自 Jiran5 帐号的简短通知，邻居写的内容留在 Jiran5。'],
+  'me.waSub': ['Short alerts from the Keynection account. What neighbours write stays in Keynection.', 'Notifikasi ringkas daripada akaun Keynection. Apa yang ditulis jiran kekal dalam Keynection.', '来自 Keynection 帐号的简短通知，邻居写的内容留在 Keynection。'],
 
   // paper notice (printed by the estate office)
   'paper.title': ['Renovation notice', 'Notis ubah suai', '装修通知'],
@@ -364,7 +365,7 @@ const D: Record<string, Entry> = {
   'paper.registered': ['Registered by {who}', 'Didaftarkan oleh {who}', '由 {who} 登记'],
   'paper.photo': ['Before work starts, take photos of your walls, ceiling and floor on the side facing the works. They protect you if anything changes.', 'Sebelum kerja bermula, ambil foto dinding, siling dan lantai di bahagian yang menghadap kerja. Foto ini melindungi anda jika ada perubahan.', '开工前，请拍下靠近工程那一边的墙、天花板和地板。万一有变化，这些照片能保护你。'],
   'paper.concern': ['Worried about noise, debris or damage? Tell the estate office: they will pass it on and keep a record.', 'Bimbang tentang bising, sisa binaan atau kerosakan? Beritahu pejabat estet: mereka akan menyampaikannya dan merekodkannya.', '担心噪音、垃圾或损坏？请告诉物业办公室，他们会转达并留下纪录。'],
-  'paper.join': ['You can also join Jiran5 with the code in your SDP welcome pack, to get notices on your phone.', 'Anda juga boleh menyertai Jiran5 dengan kod dalam pek selamat datang SDP untuk menerima notis di telefon.', '你也可以用 SDP 欢迎礼包里的加入码加入 Jiran5，在手机上收通知。'],
+  'paper.join': ['You can also join Keynection with the code in your SDP welcome pack, to get notices on your phone.', 'Anda juga boleh menyertai Keynection dengan kod dalam pek selamat datang SDP untuk menerima notis di telefon.', '你也可以用 SDP 欢迎礼包里的加入码加入 Keynection，在手机上收通知。'],
   'paper.delivered': ['Delivered by the estate office', 'Dihantar oleh pejabat estet', '由物业办公室送达'],
 
   // ---------- evidence, cases and repairs: every screen where a resident decides something ----------
@@ -518,7 +519,7 @@ const D: Record<string, Entry> = {
     'Semua perkara penting tentang {label} sejak serahan kunci, mengikut urutan: foto, kes, pembaikan dan keputusan, termasuk kata-kata kedua-dua pihak. Tiada apa di sini boleh diubah secara senyap kemudian. Ia membantu jika berlaku pertikaian atau tuntutan waranti.',
     '{label} 从交屋开始的重要事情，按时间顺序记下来：照片、案件、维修和决定，双方说过的话都在。记下之后不能被偷偷修改。万一有纠纷或要申请保修，就用得上。'],
   'log.ok': ['Nothing has been changed quietly', 'Tiada apa yang diubah secara senyap', '没有被偷偷修改过'],
-  'log.okSub': ['{n} records, checked by Jiran5', '{n} rekod, disemak oleh Jiran5', '共 {n} 条纪录，Jiran5 已检查'],
+  'log.okSub': ['{n} records, checked by Keynection', '{n} rekod, disemak oleh Keynection', '共 {n} 条纪录，Keynection 已检查'],
   'log.bad': ['An earlier record was changed or removed', 'Rekod terdahulu telah diubah atau dibuang', '有一条以前的纪录被改过或删掉了'],
   'log.badSub': ['Tell SDP, and keep your own copies of photos and messages.', 'Beritahu SDP, dan simpan salinan foto dan mesej anda sendiri.', '请通知 SDP，并自己保留照片和讯息的副本。'],
   'log.newestFirst': ['Newest first', 'Terkini dahulu', '最新的在最上面'],
@@ -571,7 +572,7 @@ const D: Record<string, Entry> = {
   'lg.helperAdded': ['Family helper added: {name}', 'Pembantu keluarga ditambah: {name}', '加入家人代办：{name}'],
   'lg.helperRemoved': ['Family helper removed: {name}', 'Pembantu keluarga dibuang: {name}', '移除家人代办：{name}'],
   'lg.joinCode': ['Join code issued by SDP', 'Kod penyertaan dikeluarkan oleh SDP', 'SDP 发出加入码'],
-  'lg.joined': ['Joined Jiran5 and agreed to the privacy notice', 'Menyertai Jiran5 dan bersetuju dengan notis privasi', '加入 Jiran5，并同意隐私声明'],
+  'lg.joined': ['Joined Keynection and agreed to the privacy notice', 'Menyertai Keynection dan bersetuju dengan notis privasi', '加入 Keynection，并同意隐私声明'],
   'lg.paper': ['Notice delivered on paper', 'Notis dihantar secara bercetak', '纸本通知已送达'],
   'lg.paper.d': ['to {to} · by {by}', 'kepada {to} · oleh {by}', '送给 {to} · 送件人：{by}'],
   'lg.other': ['Record', 'Rekod', '纪录'],
@@ -665,7 +666,39 @@ const D: Record<string, Entry> = {
   'cmp.line': ['Line', 'Garis', '线'], 'cmp.patch': ['Patch', 'Tompok', '斑块'], 'cmp.aligning': ['Aligning · comparing', 'Menyelaras · membanding', '对齐 · 比较中'],
 }
 
-const LOCALE: Record<UiLang, string> = { en: 'en-MY', ms: 'ms-MY', zh: 'zh-CN' }
+// Tamil for what a resident receives in their own language: the printed renovation notice, noisy-work hours and the
+// privacy notice they agree to. The screens stay in en, ms and zh; any key missing here falls back to English.
+// Written with AI help: a native speaker should review it before a pilot.
+const TA: Record<string, string> = {
+  'paper.title': 'புதுப்பிப்பு வேலை அறிவிப்பு',
+  'paper.to': '{label} குடியிருப்பாளர்களுக்கு',
+  'paper.from': 'அருகில் புதுப்பிப்பு வேலை செய்யும் {name} ({label}) அனுப்புவது',
+  'paper.registered': '{who} பதிவு செய்தது',
+  'paper.photo': 'வேலை தொடங்கும் முன், வேலை நடக்கும் பக்கத்தில் உள்ள உங்கள் சுவர், கூரை, தரை ஆகியவற்றைப் படம் எடுத்து வையுங்கள். ஏதாவது மாற்றம் ஏற்பட்டால் இவை உங்களைப் பாதுகாக்கும்.',
+  'paper.concern': 'சத்தம், கழிவு அல்லது சேதம் பற்றிக் கவலையா? நிர்வாக அலுவலகத்திடம் சொல்லுங்கள்: அவர்கள் அதைத் தெரிவித்து, பதிவு செய்து வைப்பார்கள்.',
+  'paper.join': 'உங்கள் SDP வரவேற்புத் தொகுப்பில் உள்ள குறியீட்டைக் கொண்டு Keynection-இல் சேரலாம்; அப்போது அறிவிப்புகள் உங்கள் கைபேசிக்கே வரும்.',
+  'paper.delivered': 'நிர்வாக அலுவலகம் ஒப்படைத்தது',
+  'reno.work': 'வேலை', 'reno.dates': 'தேதிகள்', 'reno.noisy': 'சத்தமான வேலை', 'reno.contractor': 'ஒப்பந்ததாரர்',
+  'notice.permit': 'அனுமதி',
+  'permit.approved': 'நகராண்மைக் கழக அனுமதி கிடைத்தது',
+  'permit.applied': 'நகராண்மைக் கழக அனுமதிக்கு விண்ணப்பிக்கப்பட்டது',
+  'permit.not_needed': 'நகராண்மைக் கழக அனுமதி தேவையில்லை',
+  'hours.weekdays': 'வார நாட்களில் {from}–{to}, வார இறுதியில் இல்லை',
+  'hours.monSat': 'திங்கள்–சனி {from}–{to}',
+  'join.privacyTitle': 'Keynection உங்கள் தகவல்களை எப்படிப் பயன்படுத்துகிறது',
+  'join.p1t': 'நாங்கள் வைத்திருப்பவை',
+  'join.p1': 'நீங்கள் தேர்ந்தெடுத்த பெயர், உங்கள் வீட்டு எண், மொழி, செய்திகள், நீங்கள் பதிவேற்றும் படங்கள், உங்கள் வீட்டுப் பதிவேடு.',
+  'join.p2t': 'யார் எதைப் பார்க்கலாம்',
+  'join.p2': 'உங்கள் அண்டை வட்டத்தினர் உங்கள் பெயரைப் பார்க்கலாம். மற்றவர்கள் உங்கள் வீட்டு எண்ணை மட்டுமே பார்ப்பார்கள். இருவரும் ஒப்புக்கொண்டால் தவிர, உங்கள் தொலைபேசி எண் ரகசியமாகவே இருக்கும்.',
+  'join.p3t': 'எவ்வளவு காலம்',
+  'join.p3': 'குரல் செய்திகள்: 30 நாட்கள். பதிவுகள்: குறைபாட்டுப் பொறுப்புக் காலத்துடன் மேலும் ஓர் ஆண்டு. வீட்டுப் பதிவேடு அந்த வீட்டுடனேயே இருக்கும்.',
+  'join.p4t': 'உங்கள் உரிமைகள்',
+  'join.p4': 'எப்போது வேண்டுமானாலும் உங்கள் தகவல்களைப் பதிவிறக்கலாம், திருத்தலாம், அல்லது உங்கள் கணக்கை மூட நிர்வாக அலுவலகத்திடம் கேட்கலாம்.',
+  'join.consent': 'இந்தத் தனியுரிமை அறிவிப்பை ({version}) படித்தேன், ஒப்புக்கொள்கிறேன்.',
+  'join.wa': 'WhatsApp-இல் சுருக்கமான அறிவிப்புகளை அனுப்புங்கள் (செய்திகளின் உள்ளடக்கம் ஒருபோதும் இருக்காது)',
+}
+
+const LOCALE: Record<Lang, string> = { en: 'en-MY', ms: 'ms-MY', zh: 'zh-CN', ta: 'ta-MY' }
 
 /** Dates in the reader's language: "7 Oct 2026", "7 Okt 2026", "2026年10月7日". */
 export function useDates() {
@@ -690,7 +723,7 @@ export function noisyHours(t: Translate, r: { noisy_from?: string | null; noisy_
 }
 
 /** A date in a given language, outside React (message templates, printed notices). */
-export function dateIn(lang: UiLang, iso: string): string {
+export function dateIn(lang: Lang, iso: string): string {
   return new Date(iso).toLocaleDateString(LOCALE[lang], { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
@@ -711,9 +744,9 @@ export type Translate = (key: string, vars?: Record<string, string | number>) =>
 
 const IDX: Record<UiLang, number> = { en: 0, ms: 1, zh: 2 }
 
-function translate(lang: UiLang, key: string, vars?: Record<string, string | number>): string {
+function translate(lang: Lang, key: string, vars?: Record<string, string | number>): string {
   const entry = D[key]
-  let text = entry ? entry[IDX[lang]] || entry[0] : key
+  let text = lang === 'ta' ? TA[key] ?? entry?.[0] ?? key : entry ? entry[IDX[lang]] || entry[0] : key
   if (vars) for (const [k, v] of Object.entries(vars)) text = text.split(`{${k}}`).join(String(v))
   return text
 }
@@ -724,7 +757,7 @@ export function refusal(e: unknown): string | null {
 }
 
 /** A translator fixed to one language, e.g. a printed notice in the recipient's language. */
-export const tIn = (lang: UiLang): Translate => (k, v) => translate(lang, k, v)
+export const tIn = (lang: Lang): Translate => (k, v) => translate(lang, k, v)
 
 /** English only: for the records screens and the SDP side, whatever the interface language. */
 export const tEn: Translate = (k, v) => translate('en', k, v)
@@ -739,6 +772,7 @@ const LangContext = createContext<{ lang: UiLang; setLang: (l: UiLang) => void; 
   lang: 'en', setLang: () => {}, t: (k, v) => translate('en', k, v),
 })
 
+// Storage keys keep the project's first name (Jiran5) so saved choices survive the rename.
 const STORE = 'jiran5.uiLang'
 function initial(): UiLang {
   try {

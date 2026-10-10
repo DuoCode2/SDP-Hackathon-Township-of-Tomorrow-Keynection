@@ -109,7 +109,7 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
       </Card>
 
       <Card>
-        <CardHead icon={<Printer size={16} />} title="Paper notices" sub="Renovation notices for households not on Jiran5. Delivery goes into both home logs." />
+        <CardHead icon={<Printer size={16} />} title="Paper notices" sub="Renovation notices for households not on Keynection. Delivery goes into both home logs." />
         {desk.paper_notices.length === 0 ? (
           <Empty art="inbox" title="Nothing to deliver">When a renovation notice includes a household that hasn't joined, it appears here to print.</Empty>
         ) : desk.paper_notices.map((n) => (
@@ -140,7 +140,7 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
           <label className="switch-row consent desk-signed"><input type="checkbox" checked={signed} onChange={(e) => setSigned(e.target.checked)} /> The owner signed the paper renovation form</label>
         </div>
         <button className="btn btn-sm btn-primary" disabled={!signed || !staffOk || !ownerUnit} onClick={() => setWizard(true)}><ClipboardPen size={14} /> Open the form</button>
-        <div className="small muted">Households that haven't joined must join first: Jiran5 needs their consent before it holds their renovation.</div>
+        <div className="small muted">Households that haven't joined must join first: Keynection needs their consent before it holds their renovation.</div>
       </Card>
 
       {code && (

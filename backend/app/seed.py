@@ -11,7 +11,7 @@ HANDOVER_DAYS_AGO = 14
 # Version of the plain-language privacy notice a household agrees to when it joins (PDPA consent).
 CONSENT_VERSION = "pilot-2026-10"
 
-# Households that have not joined Jiran5 yet. Until they do, neighbours see their unit number only, never a name,
+# Households that have not joined Keynection yet. Until they do, neighbours see their unit number only, never a name,
 # and renovation notices reach them on paper through the estate office.
 NOT_JOINED = {"T-23"}
 # Households that use easy mode (bigger text, fewer options). Private to the household itself.
@@ -55,7 +55,7 @@ def demo_notices() -> list[tuple[str, str, str]]:
         ("terrace", "Drain clearing on Jalan Demo 1",
          f"Contractors will clear the roadside drains on {_day(_next(3, today))}. Please keep cars off the drain covers."),
         ("phase", "Contractor passes are now QR-only",
-         f"From {first_of_next_month.day} {first_of_next_month:%b} the guardhouse only admits renovation workers with a Jiran5 QR pass issued by the homeowner."),
+         f"From {first_of_next_month.day} {first_of_next_month:%b} the guardhouse only admits renovation workers with a Keynection QR pass issued by the homeowner."),
     ]
 
 _SOUTH_NAMES = ["Farid", "Siti", "Aiman", "Kumar", "Wei Jie", "Nurul"]
@@ -68,9 +68,10 @@ _APT_NAMES = {
     15: ["Hana", "Rajesh", "Sofia", "Chong"],
     16: ["Nadia", "Wei Ming", "Thinesh", "Farah"],
 }
-# Language each household reads messages in (quick replies are shown translated into it).
+# Language each household reads messages in (quick replies and alerts arrive translated into it). Kumar, next door to
+# Aiman, reads Tamil, so the demo shows a renovation notice reaching him in Tamil.
 _LANG = {
-    "Farid": "ms", "Siti": "ms", "Aiman": "en", "Kumar": "en", "Wei Jie": "zh", "Nurul": "ms",
+    "Farid": "ms", "Siti": "ms", "Aiman": "en", "Kumar": "ta", "Wei Jie": "zh", "Nurul": "ms",
     "Ah Hock": "zh", "Priya": "en", "Hafiz": "ms", "Mei Ling": "zh", "Daniel": "en", "Aisyah": "ms",
     "Rahman": "ms", "Jia Hui": "zh", "Suresh": "en", "Liyana": "ms", "Kevin": "en", "Zainab": "ms",
     "Arjun": "en", "Yong": "zh", "Hana": "ms", "Rajesh": "en", "Sofia": "en", "Chong": "zh",

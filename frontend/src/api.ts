@@ -19,7 +19,9 @@ export interface UnitInfo {
   joined: boolean
 }
 
-export type Lang = 'en' | 'ms' | 'zh'
+/** The language a household reads its messages in. Tamil covers what residents receive (quick replies, alerts,
+ *  notices, the privacy notice); the screens themselves are in English, Malay and Chinese (UiLang). */
+export type Lang = 'en' | 'ms' | 'zh' | 'ta'
 
 export interface Neighbour extends UnitInfo {
   relation: Relation
@@ -595,7 +597,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     res = await fetch(path, init)
   } catch {
     setReachable(false)  // network down, or nothing listening
-    throw new ApiError(0, "Can't reach Jiran5 right now. Check your connection and try again.")
+    throw new ApiError(0, "Can't reach Keynection right now. Check your connection and try again.")
   }
   // 502–504 come from the dev proxy (or a gateway) when the API itself is down.
   setReachable(!(res.status >= 502 && res.status <= 504))

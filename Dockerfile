@@ -1,4 +1,4 @@
-# Jiran5 online: one container serves the API and the built web app on one port, like start-demo.bat.
+# Keynection online: one container serves the API and the built web app on one port, like start-demo.bat.
 # Settings come from the host: PORT (set by the host), JIRAN_SITE_PASSWORD (required online: the prototype
 # has no sign-in), and a volume mounted at /data so the demo database and photos survive restarts.
 

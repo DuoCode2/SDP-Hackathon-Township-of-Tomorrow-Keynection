@@ -6,7 +6,7 @@ import { ScreenTitle, Stamp } from '../ui'
 type Measure = { text: string; built: boolean }
 type Risk = { icon: ReactNode; title: string; risk: string; measures: Measure[]; see?: { tab: TabId; label: string } }
 
-// Every concern raised while designing Jiran5, and what the prototype (or the pilot plan) does about it.
+// Every concern raised while designing Keynection, and what the prototype (or the pilot plan) does about it.
 const RISKS: Risk[] = [
   {
     icon: <EyeOff size={18} />, title: 'Privacy & PDPA', risk: 'Neighbours, contractors or staff seeing personal data they should not.',
@@ -17,11 +17,11 @@ const RISKS: Risk[] = [
       { text: 'Contractors see only their pass, dates and house rules; no names, phones or photos', built: true },
       { text: 'Profiles are one line only, visible to your circle and contacts, with a reminder not to share schedules or travel dates', built: true },
       { text: 'Voice notes can only be played by the two people in the chat, and are deleted after 30 days, checked every hour (a reported one is kept for the estate team until reviewed, never longer than 90 days)', built: true },
-      { text: '"Download my data" gives each household everything Jiran5 holds about it as a file; other residents appear by unit only', built: true },
+      { text: '"Download my data" gives each household everything Keynection holds about it as a file; other residents appear by unit only', built: true },
       { text: 'Bios and helper names can’t contain phone numbers, emails or links, so numbers are still exchanged only when both agree', built: true },
       { text: 'The data download and reported-voice playback switch off outside demo mode until sign-in exists', built: true },
       { text: 'SDP sees neighbour-relationship numbers only as counts, never who talked to whom or what was said', built: true },
-      { text: 'Nobody is in Jiran5 without consent: a household joins with a one-time code from its handover pack and agrees to a plain-language privacy notice; until then neighbours see only its unit number', built: true },
+      { text: 'Nobody is in Keynection without consent: a household joins with a one-time code from its handover pack and agrees to a plain-language privacy notice; until then neighbours see only its unit number', built: true },
       { text: 'The name neighbours see is chosen by the owner when joining; the name on SDP’s sales record is never shown', built: true },
       { text: 'Data kept only for the defect liability period plus one year, then deleted', built: false },
     ],
@@ -118,9 +118,9 @@ const RISKS: Risk[] = [
     measures: [
       { text: 'The resident screens switch between English, Bahasa Melayu and Chinese from the top bar; records stay in English, with a note in the reader’s language saying why', built: true },
       { text: 'Hovering a quick reply shows exactly what the neighbour will receive in their language', built: true },
-      { text: 'Introductions and notices in English, Bahasa Melayu and Chinese', built: true },
+      { text: 'Introductions, quick replies, WhatsApp alerts, paper notices and the privacy notice in English, Bahasa Melayu, Chinese and Tamil', built: true },
       { text: 'Quick replies arrive translated into the reader’s language, no internet translation needed', built: true },
-      { text: 'Tamil templates', built: false },
+      { text: 'Tamil on every screen, and a native speaker’s review of the Tamil text (written with AI help)', built: false },
     ],
     see: { tab: 'chats', label: 'Chats' },
   },
@@ -139,7 +139,7 @@ const RISKS: Risk[] = [
       { text: 'Starts at handover, when SDP already meets every owner: the join code is in the welcome pack', built: true },
       { text: 'A new phase is set up from the site plan in seconds; end lots and corners are flagged automatically', built: true },
       { text: 'Irregular plots (semi-D, shoplots, odd shapes) are checked and corrected by the estate office', built: false },
-      { text: 'Alerts arrive on WhatsApp and Jiran5 sits inside the SDP App, so there is no new app to install', built: true },
+      { text: 'Alerts arrive on WhatsApp and Keynection sits inside the SDP App, so there is no new app to install', built: true },
       { text: 'Reply rate and pre-work photo coverage are tracked on the command view', built: true },
       { text: 'The command view tracks how many next-door pairs know each other and how long it takes from keys to a first hello', built: true },
     ],
@@ -165,7 +165,7 @@ export default function SafeguardsView({ onGo }: { onGo: (tab: TabId) => void })
   const total = RISKS.reduce((n, r) => n + r.measures.length, 0)
   return (
     <section className="screen">
-      <ScreenTitle eyebrow="Trust" title="Safeguards" subtitle="Every risk we found while designing Jiran5, and what the prototype already does about it."
+      <ScreenTitle eyebrow="Trust" title="Safeguards" subtitle="Every risk we found while designing Keynection, and what the prototype already does about it."
         aside={<div className="metrics"><div className="metric metric-brand"><b>{built}/{total}</b><span>Built in prototype</span></div><div className="metric"><b>{RISKS.length}</b><span>Risks covered</span></div></div>} />
       <div className="risk-grid">
         {RISKS.map((r) => (

@@ -1,12 +1,12 @@
 @echo off
-REM Jiran5 demo: double-click to run. Sets itself up on first run, then serves everything on one port.
+REM Keynection demo: double-click to run. Sets itself up on first run, then serves everything on one port.
 setlocal
 cd /d "%~dp0"
-title Jiran5 demo
+title Keynection demo
 
 echo.
 echo  ==============================
-echo   Jiran5 prototype - demo mode
+echo   Keynection prototype - demo mode
 echo  ==============================
 echo.
 

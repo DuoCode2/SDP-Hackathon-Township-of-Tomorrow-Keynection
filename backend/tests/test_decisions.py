@@ -51,10 +51,10 @@ def test_blaming_the_renovation_is_only_a_proposal_until_the_renovating_owner_ag
     assert p["status"] == "proposed" and p["decision"] is None and p["proposed_by"] == "T-11"
     assert client.get("/api/units/T-11/warranty").json() == []
 
-    # The renovating owner is told in their thread with the neighbour, by Jiran5 rather than "SDP".
+    # The renovating owner is told in their thread with the neighbour, by Keynection rather than "SDP".
     items = client.get("/api/units/T-12/conversations/T-11").json()["items"]
     notice = [i for i in items if i.get("kind") == "system" and f"#{case['id']:03d}" in i["text"]]
-    assert len(notice) == 1 and notice[0]["author"] == "Jiran5"
+    assert len(notice) == 1 and notice[0]["author"] == "Keynection"
 
     agreed = _decide(client, case["id"], "T-12", "renovation", "We'll patch it on Saturday").json()
     assert agreed["status"] == "decided" and agreed["decision"] == "renovation" and agreed["decided_by"] == "both_owners"

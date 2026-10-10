@@ -8,7 +8,7 @@ import { Avatar } from '../ui'
 // Their role and story text live in the dictionary under role.<id> and story.<id>.
 export const CAST: string[] = ['T-12', 'T-11', 'T-22', 'A-15-3', 'A-14-3', 'A-13-3']
 
-export const LANG_TAG: Record<string, string> = { en: 'EN', ms: 'BM', zh: '中' }
+export const LANG_TAG: Record<string, string> = { en: 'EN', ms: 'BM', zh: '中', ta: 'த' }
 
 export function roleOf(unitId: string, t: Translate = tEn): string {
   return t(CAST.includes(unitId) ? `role.${unitId}` : 'role.resident')

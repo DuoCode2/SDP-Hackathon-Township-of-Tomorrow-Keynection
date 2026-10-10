@@ -1,13 +1,14 @@
-import type { Relation, Renovation } from './api'
+import type { Lang, Relation, Renovation } from './api'
 import { dateIn, noisyHours, tIn } from './i18n'
 
-export type Lang = 'en' | 'ms' | 'zh'
+export type { Lang }
 
+/** The languages a household can read in, and write its introduction or renovation notice in. */
 export const LANGS: { code: Lang; name: string }[] = [
   { code: 'en', name: 'English' },
   { code: 'ms', name: 'Bahasa Melayu' },
   { code: 'zh', name: '中文' },
-  // TODO: Tamil template (the team brief asks for four languages).
+  { code: 'ta', name: 'தமிழ்' },
 ]
 
 export const RELATION_LABEL: Record<Relation, string> = {
@@ -37,6 +38,15 @@ export function introTemplate(lang: Lang, name: string, label: string, renovatio
         (r
           ? ` Kami akan mengubah suai (${r.scope}) dari ${start} hingga ${end}. Kerja bising hanya ${hours}. ` +
             `Kontraktor: ${contractor}. Mohon maaf awal-awal — hubungi saya bila-bila masa!`
+          : '')
+      )
+    case 'ta':
+      // Written with AI help: a native speaker should review it before a pilot.
+      return (
+        `வணக்கம்! நான் ${label}-இல் வசிக்கும் ${name}. நாங்கள் இப்போதுதான் குடிவந்தோம் — உங்களைச் சந்தித்ததில் மகிழ்ச்சி!` +
+        (r
+          ? ` ${start} முதல் ${end} வரை எங்கள் வீட்டில் புதுப்பிப்பு வேலை (${r.scope}) நடக்கும். சத்தமான வேலை நேரம்: ${shown}. ` +
+            `ஒப்பந்ததாரர்: ${contractor}. முன்கூட்டியே மன்னிக்கவும் — எப்போது வேண்டுமானாலும் எனக்குச் செய்தி அனுப்புங்கள்!`
           : '')
       )
     case 'zh':

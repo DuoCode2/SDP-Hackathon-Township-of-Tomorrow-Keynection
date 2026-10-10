@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Jiran5 demo for macOS/Linux: sets itself up on first run, then serves everything on http://localhost:8000
+# Keynection demo for macOS/Linux: sets itself up on first run, then serves everything on http://localhost:8000
 set -euo pipefail
 cd "$(dirname "$0")"
 
