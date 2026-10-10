@@ -168,7 +168,7 @@ h1, h2, h3, p { margin: 0; }
 
 .dock {
   position: absolute; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 5;
-  display: grid; grid-template-columns: repeat(5, 1fr); padding: 5px; border-radius: 18px;
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 5px; border-radius: 18px; /* 4 tabs (main story) or 5 */
   background: rgba(255, 255, 255, 0.86); backdrop-filter: blur(18px) saturate(170%); -webkit-backdrop-filter: blur(18px) saturate(170%);
   border: 1px solid var(--line-2); box-shadow: var(--shadow-2);
 }
@@ -1065,6 +1065,8 @@ button.ring-row:hover { background: var(--surface-2); }
 .guide-why svg { color: var(--amber); flex: none; margin-top: 3px; }
 .guide-why b { display: block; color: var(--amber); font-size: 12px; margin-bottom: 1px; }
 .guide-hint { font-size: 12px; line-height: 1.5; color: var(--muted); }
+.guide-scope { display: grid; gap: 8px; justify-items: start; margin: 14px 0 10px; padding: 12px 14px; border-radius: 10px; border: 1px dashed var(--line-2); background: var(--surface); }
+.guide-scope .guide-hint { margin: 0; }
 .route { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .route button { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 9px 10px; text-align: left; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface); font-size: 12.5px; line-height: 1.55; color: var(--text-2); transition: border-color 160ms, background 160ms, box-shadow 160ms, color 160ms; }
 .route button:hover { border-color: var(--accent-line); color: var(--text); }

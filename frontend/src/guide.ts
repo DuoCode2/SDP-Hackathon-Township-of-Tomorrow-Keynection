@@ -31,6 +31,13 @@ export const UI: Record<string, Text> = {
     en: 'Keynection: every key comes with five neighbours. From the day they get their keys, owners meet the five homes beside and opposite them. Renovation season decides whether neighbours become friends or enemies, so the renovation notice doubles as the first introduction. If a crack or leak appears, a fair record, triage and the warranty back it up.',
   },
   fictional: { zh: '所有住户、门牌和照片都是虚构的示范资料。', en: 'All residents, units and photos are fictional demo data.' },
+  showAll: { zh: '显示全部功能', en: 'Show every feature' },
+  showAllHint: {
+    zh: '现在只显示主线。评审问到长者、隐私、推广或风险时，打开这里就能示范：屋历、我、SDP 后台、新 phase 设定、风险清单，以及 5 户以外的联系请求。',
+    en: 'Only the main story is showing. When judges ask about older residents, privacy, scale or risks, switch this on to demo the home log, profile, SDP command view, phase setup, safeguards and contact requests beyond the five.',
+  },
+  focusOnly: { zh: '只看主线', en: 'Main story only' },
+  focusOnlyHint: { zh: '全部功能都打开了。示范完可以切回只看主线。', en: 'Every feature is showing. Switch back to the main story when you are done.' },
   close: { zh: '收起导览', en: 'Hide guide' },
 }
 

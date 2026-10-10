@@ -8,6 +8,7 @@ import { HelperProvider, useActing, useHelper } from './helper'
 import Guide from './components/Guide'
 import CastPicker, { roleOf } from './components/Cast'
 import { Logo } from './components/Art'
+import { FOCUS_TABS, ShowAllProvider } from './features'
 import CircleView from './screens/CircleView'
 import ChatsView from './screens/ChatsView'
 import WorksView from './screens/WorksView'
@@ -64,6 +65,16 @@ const ENGLISH_TABS: TabId[] = ['sdp', 'planner', 'impact', 'channels', 'safeguar
 const NEEDS_JOIN: TabId[] = ['circle', 'chats', 'works', 'evidence', 'me']
 const faceOf = (tab: TabId) => (WARM.includes(tab) ? 'face-warm' : 'face-blueprint')
 
+// Main story only, or every feature: remembered in this browser, main story by default.
+const SHOW_ALL = 'keynection.showAll'
+function storedShowAll(): boolean {
+  try {
+    return localStorage.getItem(SHOW_ALL) === '1'
+  } catch {
+    return false
+  }
+}
+
 function storedLang(): GuideLang {
   try {
     return localStorage.getItem('jiran5.guideLang') === 'en' ? 'en' : 'zh'
@@ -94,6 +105,10 @@ function Shell() {
   const [guideOpen, setGuideOpen] = useState(() => window.matchMedia(WIDE).matches)
   const [lang, setLang] = useState<GuideLang>(storedLang)
   const [canSplit, setCanSplit] = useState(() => window.matchMedia(SPLIT_OK).matches)
+  const [showAll, setShowAll] = useState(storedShowAll)
+  const visible = (id: TabId) => showAll || FOCUS_TABS.includes(id)
+  // Numbered in the order shown, so the main story reads 01–06 and the sheet count matches what is on screen.
+  const shownNav = ALL.filter((i) => visible(i.id)).map((i, n) => ({ ...i, no: String(n + 1).padStart(2, '0') }))
   // Bumped after every write so every open pane reloads its data.
   const [version, setVersion] = useState(0)
   const changed = () => setVersion((v) => v + 1)
@@ -110,6 +125,19 @@ function Shell() {
     mq.addEventListener('change', on)
     return () => mq.removeEventListener('change', on)
   }, [])
+
+  const pickShowAll = (on: boolean) => {
+    setShowAll(on)
+    try {
+      localStorage.setItem(SHOW_ALL, on ? '1' : '0')
+    } catch {
+      // Private window: the choice just isn't remembered.
+    }
+  }
+  // Back to the main story: a pane left on a screen that is now hidden returns to the neighbours.
+  useEffect(() => {
+    if (!showAll) setPanes((ps) => ps.map((p) => (FOCUS_TABS.includes(p.tab) ? p : { ...p, tab: 'circle', peer: undefined })))
+  }, [showAll])
 
   const split = panes.length === 2 && canSplit
   const shown = split ? panes : [panes[Math.min(active, panes.length - 1)]]
@@ -157,7 +185,7 @@ function Shell() {
     if (!window.matchMedia(WIDE).matches) setGuideOpen(false)
   }
 
-  const page = ALL.find((i) => i.id === cur.tab)!
+  const page = shownNav.find((i) => i.id === cur.tab) ?? shownNav[0]
   const curUnit = units.find((u) => u.id === cur.me)
   const [pending, setPending] = useState(0)
   useEffect(() => {
@@ -195,21 +223,21 @@ function Shell() {
             <div className="brand-sub">EVERY KEY · FIVE NEIGHBOURS</div>
           </div>
         </div>
-        {NAV.map((g) => (
+        {NAV.filter((g) => shownNav.some((i) => i.group === g.group)).map((g) => (
           <nav key={g.group} className="nav-group" aria-label={groupTitle(g.group)}>
             <div className="nav-title">{groupTitle(g.group)}</div>
-            {ALL.filter((i) => i.group === g.group).map((i) => navButton(i, false))}
+            {shownNav.filter((i) => i.group === g.group).map((i) => navButton(i, false))}
           </nav>
         ))}
         <dl className="title-block" aria-label="Drawing title block">
           <div className="tb-wide"><dt>Project</dt><dd><Building2 size={12} /> Taman Demo · Phase 1</dd></div>
-          <div><dt>Sheet</dt><dd>{page.no} / {String(ALL.length).padStart(2, '0')}</dd></div>
+          <div><dt>Sheet</dt><dd>{page.no} / {String(shownNav.length).padStart(2, '0')}</dd></div>
           <div><dt>Rev</dt><dd>0.5</dd></div>
           <div className="tb-wide"><dt>Viewing as</dt><dd>{curUnit ? `${curUnit.resident_name} · ${curUnit.label}` : '–'}</dd></div>
           <div className="tb-wide"><dt>Data</dt><dd>Fictional · runs offline</dd></div>
         </dl>
         {curUnit && (
-          <button className="side-home" onClick={() => setTab('me')}>
+          <button className="side-home" onClick={() => visible('me') && setTab('me')}>
             <Avatar name={curUnit.resident_name} size={40} />
             <span className="grow">
               <small>{t('side.home')}</small>
@@ -220,6 +248,7 @@ function Shell() {
         )}
       </aside>
 
+      <ShowAllProvider value={showAll}>
       <div className="main">
         <header className="topbar">
           <div className="brand mobile-only">
@@ -270,25 +299,27 @@ function Shell() {
                   </div>
                 ),
                 <Pane key={i} index={i} pane={p} units={units} active={focus === i} split version={version} onChange={changed}
-                  onFocus={() => setActive(i)} onUpdate={(patch) => update(i, patch)} />,
+                  onFocus={() => setActive(i)} onUpdate={(patch) => update(i, patch)} tabs={shownNav} />,
               ])}
             </div>
           ) : (
             <Pane index={focus} pane={cur} units={units} active split={false} version={version} onChange={changed}
-              onFocus={() => {}} onUpdate={(patch) => update(focus, patch)} />
+              onFocus={() => {}} onUpdate={(patch) => update(focus, patch)} tabs={shownNav} />
           )}
         </main>
 
-        <nav className="dock">{ALL.filter((i) => i.dock).map((i) => navButton(i, true))}</nav>
+        <nav className="dock">{shownNav.filter((i) => i.dock).map((i) => navButton(i, true))}</nav>
       </div>
+      </ShowAllProvider>
 
-      <Guide tab={cur.tab} me={cur.me} lang={lang} open={guideOpen} onLang={pickLang} onClose={() => setGuideOpen(false)} onGo={go} />
+      <Guide tab={cur.tab} me={cur.me} lang={lang} open={guideOpen} onLang={pickLang} onClose={() => setGuideOpen(false)} onGo={go}
+        showAll={showAll} onShowAll={pickShowAll} />
       <div id="sheet-root" />
     </div>
   )
 }
 
-function Pane({ index, pane, units, active, split, version, onChange, onFocus, onUpdate }: {
+function Pane({ index, pane, units, active, split, version, onChange, onFocus, onUpdate, tabs }: {
   index: number
   pane: PaneState
   units: UnitInfo[]
@@ -298,6 +329,7 @@ function Pane({ index, pane, units, active, split, version, onChange, onFocus, o
   onChange: () => void
   onFocus: () => void
   onUpdate: (patch: Partial<PaneState>) => void
+  tabs: NavItem[]
 }) {
   const { t, lang } = useLang()
   const me = units.find((u) => u.id === pane.me)
@@ -362,7 +394,7 @@ function Pane({ index, pane, units, active, split, version, onChange, onFocus, o
         <CastPicker units={units} me={pane.me} onPick={(id) => onUpdate({ me: id, peer: undefined })} compact />
         <span className="pane-role">{roleOf(pane.me, t)}</span>
         <div className="pane-tabs" role="tablist">
-          {ALL.map((i) => {
+          {tabs.map((i) => {
             const Icon = i.icon
             return (
               <button key={i.id} role="tab" aria-selected={pane.tab === i.id} className={pane.tab === i.id ? 'on' : ''} onClick={() => tab(i.id)} title={t(`nav.${i.id}`)}>

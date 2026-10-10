@@ -7,6 +7,7 @@ import { LANG_TAG, roleOf } from '../components/Cast'
 import { Avatar, Badge, Card, CardHead, ScreenTitle, Segmented, Sheet, Skeleton, useCelebrate, useToast } from '../ui'
 import { Logo } from '../components/Art'
 import IntroWizard from './IntroWizard'
+import { useShowAll } from '../features'
 
 interface Props {
   me: UnitInfo
@@ -87,6 +88,7 @@ export function replayWelcome() {
 
 export default function CircleView({ me, units, version, onChange, onViewAs, onOpenChat, onOpenEvidence }: Props) {
   const t = useT()
+  const showAll = useShowAll()  // contact requests beyond the five homes are an extra, shown on request
   const toast = useToast()
   const celebrate = useCelebrate()
   const [welcome, setWelcome] = useState(() => !welcomeSeen(me.id))
@@ -236,6 +238,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
             ))}
           </div>
 
+          {showAll && <>
           <div className="section-label ring2-label">{t('section.ring2', { place: dir.ring2_label })}</div>
           <p className="ring2-note"><Lock size={12} /> {t('ring2.note')}</p>
           <div className="nearby-grid">
@@ -254,6 +257,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
               </div>
             ))}
           </div>
+          </>}
         </>
       ) : (
         <div className="cols">

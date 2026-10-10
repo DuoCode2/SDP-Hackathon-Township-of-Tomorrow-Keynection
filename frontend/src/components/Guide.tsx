@@ -1,4 +1,4 @@
-import { Compass, Lightbulb, X } from 'lucide-react'
+import { Compass, Eye, Focus, Lightbulb, X } from 'lucide-react'
 import { JUDGE_ROUTE, PAGES, ROUTE, UI, type GuideLang, type RouteStep, type TabId } from '../guide'
 
 interface Props {
@@ -9,11 +9,13 @@ interface Props {
   onLang: (lang: GuideLang) => void
   onClose: () => void
   onGo: (tab: TabId, unit?: string) => void
+  showAll: boolean
+  onShowAll: (on: boolean) => void
 }
 
 // Explains the current screen and walks through the demo routes (the 3-minute judge route first, then the full one).
 // A side column on wide screens, a drawer otherwise.
-export default function Guide({ tab, me, lang, open, onLang, onClose, onGo }: Props) {
+export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, showAll, onShowAll }: Props) {
   const page = PAGES[tab]
   const steps = (route: RouteStep[], judge = false) => (
     <ol className={`route ${judge ? 'route-judge' : ''}`}>
@@ -65,9 +67,17 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo }: Pr
             </div>
           </div>
 
-          <div className="section-label">{UI.route[lang]}</div>
-          <p className="guide-hint">{UI.routeHint[lang]}</p>
-          {steps(ROUTE)}
+          {showAll && <>
+            <div className="section-label">{UI.route[lang]}</div>
+            <p className="guide-hint">{UI.routeHint[lang]}</p>
+            {steps(ROUTE)}
+          </>}
+          <div className="guide-scope">
+            <p className="guide-hint">{showAll ? UI.focusOnlyHint[lang] : UI.showAllHint[lang]}</p>
+            <button className="btn btn-sm" onClick={() => onShowAll(!showAll)}>
+              {showAll ? <><Focus size={14} /> {UI.focusOnly[lang]}</> : <><Eye size={14} /> {UI.showAll[lang]}</>}
+            </button>
+          </div>
           <p className="guide-hint">{UI.fictional[lang]}</p>
         </div>
       </aside>
