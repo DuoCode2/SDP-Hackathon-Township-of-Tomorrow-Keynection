@@ -3,6 +3,7 @@ import { Check, Hand, House, KeyRound, Lock, ShieldCheck, Sparkles } from 'lucid
 import { api, ApiError, type JoinInfo, type Lang, type UnitInfo } from '../api'
 import { refusal, tIn, useDates, useT } from '../i18n'
 import { LANGS } from '../messages'
+import { useAi } from '../features'
 import { Logo } from '../components/Art'
 import { Card, Steps, useCelebrate, useToast } from '../ui'
 import { replayWelcome } from './CircleView'
@@ -31,6 +32,7 @@ export default function JoinView({ me, onJoined }: { me: UnitInfo; onJoined: () 
   const dates = useDates()
   const toast = useToast()
   const celebrate = useCelebrate()
+  const ai = useAi()
   const [token, setToken] = useState<string | null>(() => storedCode(me.id))
   const [typed, setTyped] = useState('')
   const [info, setInfo] = useState<JoinInfo | null>(null)
@@ -161,6 +163,7 @@ export default function JoinView({ me, onJoined }: { me: UnitInfo; onJoined: () 
               <div><dt>{tp('join.p2t')}</dt><dd>{tp('join.p2')}</dd></div>
               <div><dt>{tp('join.p3t')}</dt><dd>{tp('join.p3')}</dd></div>
               <div><dt>{tp('join.p4t')}</dt><dd>{tp('join.p4')}</dd></div>
+              {ai?.on && <div><dt>{tp('join.p5t')}</dt><dd>{tp('join.p5')}</dd></div>}
             </dl>
             <label className="switch-row consent"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /><span>{tp('join.consent', { version: info.consent_version })}</span></label>
             <label className="switch-row consent"><input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} /><span>{tp('join.wa')}</span></label>

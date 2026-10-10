@@ -34,6 +34,7 @@ export default function PaperNoticeSheet({ notice, onClose, onPrinted }: { notic
           </dl>
         )}
         <blockquote className="paper-message">“{notice.message}”</blockquote>
+        {notice.translated && <p className="paper-small">{both('paper.byAi')}</p>}
         <ol className="paper-steps">
           <li>{both('paper.photo')}</li>
           <li>{both('paper.concern')}</li>

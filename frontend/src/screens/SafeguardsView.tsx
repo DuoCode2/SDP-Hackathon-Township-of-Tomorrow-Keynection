@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ArrowUpRight, Ban, Building, Camera, Clock4, EyeOff, Gavel, KeyRound, Languages, Lock, Scale, ServerCog, Smartphone, UsersRound } from 'lucide-react'
+import { ArrowUpRight, Ban, Building, Camera, Clock4, EyeOff, Gavel, KeyRound, Languages, Lock, Scale, ServerCog, Smartphone, Sparkles, UsersRound } from 'lucide-react'
 import type { TabId } from '../guide'
 import { ScreenTitle, Stamp } from '../ui'
 
@@ -29,7 +29,7 @@ const RISKS: Risk[] = [
   {
     icon: <Ban size={18} />, title: 'Harassment & neighbour conflict', risk: 'A messaging tool can make disputes louder instead of calmer.',
     measures: [
-      { text: 'Tone check stops obvious insults before they are sent and suggests a calmer quick reply', built: true },
+      { text: 'Tone check stops obvious insults before they are sent; with AI on, a message that sounds heated gets a calmer wording offered first', built: true },
       { text: 'Report a message to the SDP estate team; the sender is warned privately, the reporter stays anonymous', built: true },
       { text: 'Silent block, and a daily message limit per neighbour', built: true },
       { text: 'Homes beyond your circle need a contact request with a reason; 3 a day, no repeat after a decline', built: true },
@@ -37,6 +37,21 @@ const RISKS: Risk[] = [
       { text: '👋 Waves are limited to one per neighbour per day and can be switched off', built: true },
       { text: 'Quiet mode stops new messages, waves and requests; renovation notices and concerns still arrive', built: true },
       { text: 'Concerns go to the neighbour first, privately, before anyone else is involved', built: true },
+    ],
+    see: { tab: 'chats', label: 'Chats' },
+  },
+  {
+    icon: <Sparkles size={18} />, title: 'AI translation and suggestions', risk: 'A machine puts words in a neighbour’s mouth, gets a renovation wrong, or sends residents’ messages abroad.',
+    measures: [
+      { text: 'Only the words being written go to Claude (Anthropic), never the directory or who is writing to whom; a name or unit number goes only if the writer typed it in', built: true },
+      { text: 'Every translation is marked “Translated by AI” with the original one tap away; the home log and reports keep the original words', built: true },
+      { text: 'A calmer wording is only a suggestion: the sender chooses which words go, and insults are still refused', built: true },
+      { text: 'From one sentence, AI fills in the type of work, dates, hours and contractor; approvals and the CIDB tick stay the owner’s, and nothing is sent until the owner has checked every step', built: true },
+      { text: 'Answers that break the notice rules (an end before the start, impossible hours) are dropped and handed back to the owner', built: true },
+      { text: 'No key, no network or no answer in time: messages go as written, quick replies are still translated, the notice is filled in by hand', built: true },
+      { text: 'A daily AI allowance per home keeps the cost of a public demo small', built: true },
+      { text: 'The privacy notice names the AI service and that it processes text outside Malaysia (PDPA cross-border transfer)', built: true },
+      { text: 'Pilot: a data processing agreement, or Claude through SDP’s own cloud provider, and a native speaker checking Malay and Tamil translations', built: false },
     ],
     see: { tab: 'chats', label: 'Chats' },
   },

@@ -250,6 +250,8 @@ export interface ChatMessage {
   text: string
   lang: Lang
   translated: boolean
+  /** Translated by Claude (a typed message), not one of the pre-translated quick replies. */
+  by_ai: boolean
   original: string | null
   created_at: string
   read_at: string | null
@@ -269,6 +271,11 @@ export interface ChatIntro {
   created_at: string
   renovation: Renovation | null
   sent_by?: string | null
+  /** For a reader of another language: text and renovation.scope are Claude's translation of these. */
+  translated: boolean
+  by_ai: boolean
+  original: string | null
+  original_scope: string | null
 }
 
 export interface ChatWave {
@@ -322,6 +329,8 @@ export interface PaperNotice {
   from_name: string
   sent_by: string | null
   message: string
+  /** The message is printed in the household's language, translated by Claude. */
+  translated?: boolean
   renovation: Renovation | null
 }
 
@@ -561,9 +570,32 @@ export interface Delegate {
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public code?: string) {
+  constructor(public status: number, message: string, public code?: string, public suggestion?: string) {
     super(message)
   }
+}
+
+/** Whether Claude is on for translation and notice writing on this server. */
+export interface AiStatus {
+  on: boolean
+  model: string | null
+}
+
+/** One sentence turned into notice fields. Empty fields are left for the owner; "unsure" names what was dropped. */
+export interface RenovationDraft {
+  /** The language the owner wrote in: the notice is written in it, and each neighbour gets a translation. */
+  language: Lang
+  works_type: WorksType
+  scope: string | null
+  start: string | null
+  end: string | null
+  noisy_from: string | null
+  noisy_to: string | null
+  weekdays_only: boolean | null
+  contractor: string | null
+  why: string
+  missing: string[]
+  unsure: ('dates' | 'hours')[]
 }
 
 // Whether the server answered the last request. Screens show a loading skeleton until their data arrives,
@@ -607,7 +639,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     try {
       const body = await res.json()
       if (typeof body.detail === 'string') message = body.detail
-      else if (body.detail?.code) throw new ApiError(res.status, body.detail.message, body.detail.code)
+      else if (body.detail?.code) throw new ApiError(res.status, body.detail.message, body.detail.code, body.detail.suggestion)
       else message = Array.isArray(body.detail) ? (body.detail[0]?.msg ?? message) : JSON.stringify(body.detail)
     } catch (e) {
       if (e instanceof ApiError) throw e
@@ -717,7 +749,10 @@ export const api = {
   conversations: (unitId: string) => request<Conversation[]>(`/api/units/${unitId}/conversations`),
   thread: (unitId: string, otherId: string) => request<Thread>(`/api/units/${unitId}/conversations/${otherId}`),
   markRead: (unitId: string, otherId: string) => request(`/api/units/${unitId}/conversations/${otherId}/read`, { method: 'POST' }),
-  sendMessage: (from: string, to: string, msg: { body?: string; quick_key?: string }, delegateId?: number) =>
+  aiStatus: () => request<AiStatus>('/api/ai'),
+  renovationDraft: (unitId: string, text: string) =>
+    request<RenovationDraft>('/api/ai/renovation-draft', json('POST', { unit_id: unitId, text })),
+  sendMessage: (from: string, to: string, msg: { body?: string; quick_key?: string; keep_tone?: boolean }, delegateId?: number) =>
     request<ChatMessage>('/api/messages', json('POST', { from_unit_id: from, to_unit_id: to, ...msg, delegate_id: delegateId ?? null })),
   reportMessage: (messageId: number, unitId: string, reason: string) =>
     request(`/api/messages/${messageId}/report`, json('POST', { unit_id: unitId, reason })),

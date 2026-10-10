@@ -31,6 +31,11 @@ export const UI: Record<string, Text> = {
     en: 'Keynection: every key comes with five neighbours. From the day they get their keys, owners meet the five homes beside and opposite them. Renovation season decides whether neighbours become friends or enemies, so the renovation notice doubles as the first introduction. If a crack or leak appears, a fair record, triage and the warranty back it up.',
   },
   fictional: { zh: '所有住户、门牌和照片都是虚构的示范资料。', en: 'All residents, units and photos are fictional demo data.' },
+  aiOn: { zh: 'AI 已开启：打字自动翻译、太冲先劝、一句话写装修通知', en: 'AI on: typed words translated, heated ones calmed, the notice written from one sentence' },
+  aiOff: {
+    zh: 'AI 没开（服务器没有 ANTHROPIC_API_KEY）：路线照样能走，只是打的字照原文送、装修通知要逐步填',
+    en: 'AI off (no ANTHROPIC_API_KEY on the server): the route still works; typed words go as written and the notice is filled in step by step',
+  },
   showAll: { zh: '显示全部功能', en: 'Show every feature' },
   showAllHint: {
     zh: '现在只显示主线。评审问到长者、隐私、推广或风险时，打开这里就能示范：屋历、我、SDP 后台、新 phase 设定、风险清单，以及 5 户以外的联系请求。',
@@ -83,16 +88,18 @@ export const PAGES: Record<TabId, PageGuide> = {
     },
     features: {
       zh: [
-        '快捷回复会自动翻成对方的语言：Siti 用马来文按，Aiman 看到英文；隔壁 Kumar 读淡米尔文（不用上网翻译）',
+        '用什么语言打字都行：对方收到的是 AI（Claude）翻好的他的语言，标着「AI 翻译」，原文点一下就看到',
+        '快捷回复不用上网也会翻：Siti 用马来文按，Aiman 看到英文；隔壁 Kumar 读淡米尔文',
         '「提出不满」：先私下告诉装修户 → 对方回复或处理 → 不行再升级给 SDP 物业团队；每一步写进两户屋历',
-        '语气检查：明显的辱骂发不出去，系统建议改用平和的快捷回复',
+        '语气检查：AI 觉得太冲时，先给一个意思不变、比较平和的说法，你自己选发哪个；明显的辱骂一律发不出去',
         '检举讯息给 SDP 审核（对方不知道是谁检举），也可以静默封锁',
         '「交换电话」要双方都同意才生效',
       ],
       en: [
-        'Quick replies arrive translated: Siti taps in Malay, Aiman reads English, Kumar next door reads Tamil (no online translation needed)',
+        'Type in any language: your neighbour reads it in theirs, translated by AI (Claude), marked "Translated by AI", with the original one tap away',
+        'Quick replies are translated even offline: Siti taps in Malay, Aiman reads English, Kumar next door reads Tamil',
         '"Raise a concern": tell the renovating neighbour privately → they reply or fix it → if not, escalate to SDP’s estate team; every step goes into both home logs',
-        'Tone check: obvious insults are not sent; a calmer quick reply is suggested',
+        'Tone check: when AI thinks a message sounds heated, it offers a calmer wording with the same facts and you choose which to send; obvious insults are never sent',
         'Report a message for SDP review (the sender never learns who reported), or block silently',
         '"Exchange numbers" only takes effect when both sides agree',
       ],
@@ -114,14 +121,16 @@ export const PAGES: Record<TabId, PageGuide> = {
         '最上面实时显示「现在是不是安静时段」',
         '未来 4 周的装修日历和屋规',
         '右上角「Register renovation」：按工程类型自动算出要通知哪几户（不能删掉任何人），图上标出每户被通知的原因',
-        '通知用对方的阅读语言送达；还没加入的住户由物业送纸本',
+        '「一句话说清楚」：用任何语言说要做什么，AI 判断工程类型（决定通知谁）、日期、吵闹时段和承包商，屋主逐步检查再发；批准和 CIDB 仍由屋主自己确认',
+        '通知用对方的阅读语言送达（屋主写的话由 AI 翻好）；还没加入的住户由物业送纸本，同样是他的语言',
         '装修卡片显示地方政府（PBT）准证状态',
       ],
       en: [
         'Live "quiet hours now?" status at the top',
         'Four-week renovation calendar and house rules',
         'Register renovation: the type of work decides which homes are told (nobody can be removed), and the plan shows why each one is',
-        'Notices arrive in each reader’s language; homes not on the app get paper from the estate office',
+        '"Just say it in one sentence": describe the work in any language and AI fills in the type of work (which decides who is told), dates, noisy hours and contractor for the owner to check; approvals and the CIDB tick stay the owner’s',
+        'Notices arrive in each reader’s language (the owner’s own words translated by AI); homes not on the app get paper from the estate office, in their language too',
         'Renovation cards show the council (PBT) permit status',
       ],
     },
@@ -386,22 +395,22 @@ export const JUDGE_ROUTE: RouteStep[] = [
   {
     tab: 'works', unit: 'T-12',
     text: {
-      zh: '装修通知就是自我介绍：Works →「Register renovation」→ 图上标出谁会收到 → 发送（还没加入的 No. 23 由物业送纸本）',
-      en: 'The renovation notice is the introduction: Works → Register renovation → the plan marks who is told → send (No. 23, not on the app yet, gets it on paper)',
+      zh: '装修通知就是自我介绍：Works →「Register renovation」→ 在「一句话说清楚」打「Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5」（中文、马来文也行）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 → 检查后发送（还没加入的 No. 23 由物业送纸本）',
+      en: 'The renovation notice is the introduction: Works → Register renovation → in "Just say it in one sentence" type "Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5" (Malay or Chinese work too) → Fill it in for me → AI picks the type of work and the plan marks who is told → check and send (No. 23, not on the app yet, gets it on paper)',
     },
   },
   {
     tab: 'channels', unit: 'T-13',
     text: {
-      zh: '隔壁 Kumar（No. 13）读淡米尔文：触达管道里看到他在 WhatsApp 收到的是淡米尔文装修通知',
-      en: 'Kumar next door (No. 13) reads Tamil: Channels shows Aiman’s notice reaching him on WhatsApp in Tamil',
+      zh: '隔壁 Kumar（No. 13）读淡米尔文：触达管道里看到他在 WhatsApp 收到的是淡米尔文装修通知，连 Aiman 写的工程说明也由 AI 翻好',
+      en: 'Kumar next door (No. 13) reads Tamil: Channels shows Aiman’s notice reaching him on WhatsApp in Tamil, down to the work Aiman described, translated by AI',
     },
   },
   {
     tab: 'chats', unit: 'T-11',
     text: {
-      zh: '按顶栏「Both sides」（左 Aiman、右 Siti）→ Siti 回 👋、按快捷回复「宝宝午睡」→ Aiman 看到英文：先认识，再约好时间',
-      en: 'Turn on "Both sides" (Aiman left, Siti right) → Siti waves back and taps the baby-nap quick reply → Aiman reads it in English: meet first, then agree the hours',
+      zh: '按顶栏「Both sides」（左 Aiman、右 Siti）→ Siti 回 👋、按快捷回复「宝宝午睡」→ 再用马来文打一句冲的话（例：「Rumah awak bising macam kilang! Tak reti hormat jiran ke?」）→ AI 先给她一个平和的说法 → 发出后 Aiman 看到的是英文，原文点一下就有',
+      en: 'Turn on "Both sides" (Aiman left, Siti right) → Siti waves back and taps the baby-nap quick reply → then types something sharp in Malay ("Rumah awak bising macam kilang! Tak reti hormat jiran ke?") → AI offers her a calmer wording → Aiman reads it in English, the original one tap away',
     },
   },
   {
@@ -431,8 +440,8 @@ export const ROUTE: RouteStep[] = [
   {
     tab: 'works', unit: 'T-12',
     text: {
-      zh: 'Aiman：Works 右上角「Register renovation」→ 选 Extension → 图上标出谁会被通知 → 填完发送',
-      en: 'Aiman: Works → Register renovation → Extension → the plan marks who is told → send',
+      zh: 'Aiman：Works 右上角「Register renovation」→ 用一句话说要做什么让 AI 填（或自己选 Extension）→ 图上标出谁会被通知 → 填完发送',
+      en: 'Aiman: Works → Register renovation → say it in one sentence for AI to fill in (or pick Extension yourself) → the plan marks who is told → send',
     },
   },
   {

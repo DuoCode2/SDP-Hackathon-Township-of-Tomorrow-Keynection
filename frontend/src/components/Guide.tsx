@@ -1,5 +1,6 @@
-import { Compass, Eye, Focus, Lightbulb, X } from 'lucide-react'
+import { Compass, Eye, Focus, Lightbulb, Sparkles, X } from 'lucide-react'
 import { JUDGE_ROUTE, PAGES, ROUTE, UI, type GuideLang, type RouteStep, type TabId } from '../guide'
+import { useAi } from '../features'
 
 interface Props {
   tab: TabId
@@ -17,7 +18,8 @@ interface Props {
 // A side column on wide screens, a drawer otherwise.
 export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, showAll, onShowAll }: Props) {
   const page = PAGES[tab]
-  const steps = (route: RouteStep[], judge = false) => (
+  const ai = useAi()
+  const steps =(route: RouteStep[], judge = false) => (
     <ol className={`route ${judge ? 'route-judge' : ''}`}>
       {route.map((s, i) => {
         const here = s.tab === tab && (!s.unit || s.unit === me)
@@ -50,6 +52,11 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, show
 
           <div className="section-label">{UI.judgeRoute[lang]}</div>
           <p className="guide-hint">{UI.judgeHint[lang]}</p>
+          {ai && (
+            <p className={`guide-ai ${ai.on ? 'on' : ''}`}>
+              <Sparkles size={13} /> {ai.on ? `${UI.aiOn[lang]} (${ai.model})` : UI.aiOff[lang]}
+            </p>
+          )}
           {steps(JUDGE_ROUTE, true)}
 
           <div className="section-label">{UI.thisPage[lang]}</div>

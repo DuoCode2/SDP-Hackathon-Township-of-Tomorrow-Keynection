@@ -23,10 +23,10 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
-from . import db, ledger, talk, vision
+from . import ai, db, ledger, talk, vision
 from .neighbours import Unit, impact_reason, impact_zone, inverse_relation, neighbour_circle, street_or_block
 from .planner import MAX_HOMES, home_count, plan_phase
-from .seed import CONSENT_VERSION
+from .seed import CONSENT_VERSION, CONSENT_VERSION_AI
 from .triage import triage_hint
 
 log = logging.getLogger("keynection")
@@ -89,6 +89,10 @@ async def lifespan(_: FastAPI):
     _expire_voice(conn)
     conn.close()
     vision.warm_up()  # pay OpenCV's start-up cost now, not during the first demo comparison
+    if ai.enabled():
+        log.info("AI translation and notice writing on (%s)", ai.model_name())
+    else:
+        log.info("AI off: set ANTHROPIC_API_KEY to turn on translation and notice writing; everything else works as before")
     sweeper = asyncio.create_task(_voice_sweeper())
     yield
     sweeper.cancel()
@@ -323,6 +327,11 @@ def _require_joined(conn: sqlite3.Connection, unit_id: str, message: str | None 
     return row
 
 
+def _consent_version() -> str:
+    """The privacy notice shown at joining: with AI on it says what is translated, and where."""
+    return CONSENT_VERSION_AI if ai.enabled() else CONSENT_VERSION
+
+
 def _today() -> str:
     return datetime.now(MALAYSIA).strftime("%Y-%m-%d")
 
@@ -355,6 +364,11 @@ def _intro(conn: sqlite3.Connection, intro_id: int | None) -> dict[str, Any] | N
         return None
     return {"id": row["id"], "from_unit_id": row["from_unit_id"], "from_label": row["from_label"],
             "from_name": row["from_name"], "renovation": json.loads(row["renovation"]) if row["renovation"] else None}
+
+
+def _intro_in(row: sqlite3.Row, lang: str) -> dict[str, str | None] | None:
+    """Claude's translation of a hello or notice for a reader of lang, if there is one: {"message", "scope"}."""
+    return json.loads(row["translations"] or "{}").get(lang)
 
 
 def _photo_json(row: sqlite3.Row) -> dict[str, Any]:
@@ -632,6 +646,32 @@ def neighbours(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> li
     return _circle(conn, unit_id)
 
 
+class RenovationTextIn(BaseModel):
+    unit_id: str = Field(..., pattern=UNIT_ID)
+    text: str = Field(..., min_length=1, max_length=500)
+
+
+@app.get("/api/ai")
+def ai_status() -> dict[str, Any]:
+    """Whether Claude is on for translation and notice writing, so the app can say so, and fall back when it isn't."""
+    return ai.status()
+
+
+@app.post("/api/ai/renovation-draft")
+def renovation_draft(body: RenovationTextIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """The owner says what they are doing in one sentence, in any language; Claude fills in the notice for them to
+    check. Nothing is sent from here: the owner still goes through the steps and presses send."""
+    me = _unit_row(conn, body.unit_id)
+    if not ai.enabled():
+        raise HTTPException(503, {"code": "ai_off", "message": "AI isn't switched on here. Fill in the steps below."})
+    if not ai.spend(body.unit_id):
+        raise HTTPException(429, "That's all the AI help for today. Fill in the steps below.")
+    draft = ai.draft_renovation(body.text.strip(), me["kind"], date.fromisoformat(_today()), MAX_RENOVATION_DAYS)
+    if draft is None:
+        raise HTTPException(503, {"code": "ai_busy", "message": "The AI didn't answer in time. Try again, or fill in the steps below."})
+    return draft
+
+
 @app.post("/api/intros", status_code=201)
 def send_intro(body: IntroIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     _require_joined(conn, body.from_unit_id)
@@ -684,9 +724,15 @@ def _register_intro(conn: sqlite3.Connection, from_unit_id: str, message: str, l
         shown = [n["id"] for n in circle]
         # Someone who blocked the sender never gets it, and the sender isn't told (that would reveal the block).
         circle = [n for n in circle if not _blocked(conn, n["id"], from_unit_id)]
+    # Each neighbour reads it in their own language (paper notices too). Asked before anything is written, so no
+    # lock is held while Claude answers; with no answer the notice goes as written.
+    readers = {rows[n["id"]]["lang"] for n in circle} - {lang}
+    translations = ai.translate_notice(from_unit_id, message, renovation["scope"] if renovation else None, readers) \
+        if readers and ai.enabled() else {}
     cur = conn.execute(
-        "INSERT INTO intros (from_unit_id, message, lang, renovation, sent_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-        (from_unit_id, message, lang, json.dumps(renovation) if renovation else None, sent_by, db.now()),
+        "INSERT INTO intros (from_unit_id, message, lang, renovation, sent_by, translations, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (from_unit_id, message, lang, json.dumps(renovation) if renovation else None, sent_by,
+         json.dumps(translations, ensure_ascii=False) if translations else None, db.now()),
     )
     intro_id = cur.lastrowid
     paper = []
@@ -787,6 +833,7 @@ PRIVATE_MESSAGE = ("Please don't put phone numbers, emails or links here. "
                    "Exchange numbers in a chat when you both agree.")
 TONE_MESSAGE = ("This may come across as hostile. Try calmer words or a quick reply: messages stay on record "
                 "and can be reported.")
+CALMER_MESSAGE = "This may sound sharper than you mean. Here is a calmer way to say the same thing."
 
 
 class MessageIn(BaseModel):
@@ -795,6 +842,8 @@ class MessageIn(BaseModel):
     body: str | None = Field(None, max_length=500)
     quick_key: str | None = Field(None, pattern=r"^[a-z_]{1,30}$")
     delegate_id: int | None = None
+    # Send these words even though a calmer wording was offered: the suggestion is advice. Insults are still refused.
+    keep_tone: bool = False
 
     @model_validator(mode="after")
     def one_kind(self) -> "MessageIn":
@@ -897,10 +946,11 @@ def _system_message(conn: sqlite3.Connection, to_unit: str, thread_with: str, te
     )
 
 
-def _message_json(row: sqlite3.Row, viewer_lang: str, reactions: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def _message_json(row: sqlite3.Row, viewer_lang: str, reactions: list[dict[str, Any]] | None = None,
+                  viewer: str | None = None) -> dict[str, Any]:
     out = {"type": "message", "id": row["id"], "kind": row["kind"], "from_unit_id": row["from_unit_id"],
            "to_unit_id": row["to_unit_id"], "author": row["author"], "text": row["body"], "lang": row["lang"],
-           "translated": False, "original": None, "created_at": row["created_at"], "read_at": row["read_at"],
+           "translated": False, "by_ai": False, "original": None, "created_at": row["created_at"], "read_at": row["read_at"],
            "reactions": reactions or [], "duration": int(row["body"]) if row["kind"] == "voice" else None,
            "expired": row["kind"] == "voice" and not row["media_id"], "sent_by": row["sent_by"],
            "code": row["sys_code"], "values": json.loads(row["sys_values"] or "{}")}
@@ -910,6 +960,10 @@ def _message_json(row: sqlite3.Row, viewer_lang: str, reactions: list[dict[str, 
         out["text"] = talk.quick_text(row["quick_key"], viewer_lang)
         out["translated"] = viewer_lang != row["lang"]
         out["original"] = row["body"] if out["translated"] else None
+    # A typed message reaches its reader in Claude's translation; the sender sees their own words.
+    translated = json.loads(row["translations"] or "{}").get(viewer_lang) if row["kind"] == "text" and viewer == row["to_unit_id"] else None
+    if translated:
+        out.update(text=translated, translated=True, by_ai=True, original=row["body"])
     return out
 
 
@@ -939,9 +993,16 @@ def _thread_items(conn: sqlite3.Connection, me: str, other: str, viewer_lang: st
         " WHERE (i.from_unit_id = ? AND r.unit_id = ?) OR (i.from_unit_id = ? AND r.unit_id = ?)",
         (me, other, other, me),
     ):
-        items.append({"type": "intro", "id": r["id"], "from_unit_id": r["from_unit_id"], "to_unit_id": r["to_unit_id"],
-                      "text": r["message"], "lang": r["lang"], "acked_at": r["acked_at"], "created_at": r["created_at"], "sent_by": r["sent_by"],
-                      "renovation": json.loads(r["renovation"]) if r["renovation"] else None})
+        reno = json.loads(r["renovation"]) if r["renovation"] else None
+        item = {"type": "intro", "id": r["id"], "from_unit_id": r["from_unit_id"], "to_unit_id": r["to_unit_id"],
+                "text": r["message"], "lang": r["lang"], "acked_at": r["acked_at"], "created_at": r["created_at"], "sent_by": r["sent_by"],
+                "renovation": reno, "translated": False, "by_ai": False, "original": None, "original_scope": None}
+        mine = _intro_in(r, viewer_lang) if r["to_unit_id"] == me else None
+        if mine:
+            item.update(text=mine["message"], translated=True, by_ai=True, original=r["message"])
+            if reno and mine["scope"]:
+                item.update(renovation={**reno, "scope": mine["scope"]}, original_scope=reno["scope"])
+        items.append(item)
     for r in conn.execute(
         "SELECT * FROM messages WHERE (from_unit_id = ? AND to_unit_id = ?) OR (from_unit_id = ? AND to_unit_id = ?)"
         " OR (kind = 'system' AND ((to_unit_id = ? AND thread_with = ?) OR (to_unit_id = ? AND thread_with = ?)))",
@@ -951,7 +1012,7 @@ def _thread_items(conn: sqlite3.Connection, me: str, other: str, viewer_lang: st
             continue  # sent while I had them blocked
         if r["private"] and r["to_unit_id"] != me:
             continue
-        items.append(_message_json(r, viewer_lang, _reactions(conn, r["id"])))
+        items.append(_message_json(r, viewer_lang, _reactions(conn, r["id"]), viewer=me))
     for r in conn.execute("SELECT * FROM waves WHERE (from_unit_id = ? AND to_unit_id = ?) OR (from_unit_id = ? AND to_unit_id = ?)",
                           (me, other, other, me)):
         items.append({"type": "wave", "id": r["id"], "from_unit_id": r["from_unit_id"], "to_unit_id": r["to_unit_id"],
@@ -1061,21 +1122,30 @@ def send_message(body: MessageIn, conn: sqlite3.Connection = Depends(get_conn)) 
     _require_neighbours(conn, body.from_unit_id, body.to_unit_id)
     _check_can_reach(conn, body.from_unit_id, body.to_unit_id)
     _check_daily_limit(conn, body.from_unit_id, body.to_unit_id)
+    translations = None
     if body.quick_key:
         if body.quick_key not in talk.QUICK_REPLIES:
             raise HTTPException(404, "unknown quick reply")
         kind, text = "quick", talk.quick_text(body.quick_key, sender["lang"])
     else:
         kind, text = "text", (body.body or "").strip()
-        if talk.tone_problem(text):
-            raise HTTPException(422, {"code": "tone", "message": TONE_MESSAGE})
+        reader_lang = _unit_row(conn, body.to_unit_id)["lang"]
+        # One look by Claude: the reader's translation, and a calmer wording if it sounds heated.
+        check = ai.check_message(body.from_unit_id, text, reader_lang) if ai.enabled() else None
+        calmer = {"suggestion": check.calmer} if check and check.heated and check.calmer else {}
+        if talk.tone_problem(text):  # insults are never sent, whatever Claude says
+            raise HTTPException(422, {"code": "tone", "message": TONE_MESSAGE, **calmer})
+        if calmer and not body.keep_tone:
+            raise HTTPException(422, {"code": "calmer", "message": CALMER_MESSAGE, **calmer})
+        if check and check.translation.strip() and check.translation.strip() != text:
+            translations = json.dumps({reader_lang: check.translation.strip()[:1500]}, ensure_ascii=False)
     # If the recipient has blocked the sender, the message is kept (for the record) but never shown to them.
     withheld = int(_blocked(conn, body.to_unit_id, body.from_unit_id))
     sent_by = _delegate_name(conn, body.from_unit_id, body.delegate_id)
     cur = conn.execute(
-        "INSERT INTO messages (from_unit_id, to_unit_id, kind, body, quick_key, lang, withheld, sent_by, created_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (body.from_unit_id, body.to_unit_id, kind, text, body.quick_key, sender["lang"], withheld, sent_by, db.now()),
+        "INSERT INTO messages (from_unit_id, to_unit_id, kind, body, quick_key, lang, withheld, sent_by, translations, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (body.from_unit_id, body.to_unit_id, kind, text, body.quick_key, sender["lang"], withheld, sent_by, translations, db.now()),
     )
     conn.commit()
     return _message_json(conn.execute("SELECT * FROM messages WHERE id = ?", (cur.lastrowid,)).fetchone(), sender["lang"])
@@ -2477,7 +2547,7 @@ def join_lookup(body: JoinLookupIn, conn: sqlite3.Connection = Depends(get_conn)
     me, _, phase_units = _phase(conn, code["unit_id"])
     phase = conn.execute("SELECT name FROM phases WHERE id = ?", (me["phase_id"],)).fetchone()
     return {"unit_id": me["id"], "label": me["label"], "kind": me["kind"], "phase": phase["name"] if phase else "",
-            "suggested_name": me["record_name"] or "", "lang": me["lang"], "consent_version": CONSENT_VERSION,
+            "suggested_name": me["record_name"] or "", "lang": me["lang"], "consent_version": _consent_version(),
             "circle_size": len(neighbour_circle(_to_unit(me), phase_units)), "expires_at": code["expires_at"]}
 
 
@@ -2490,14 +2560,14 @@ def join(body: JoinIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str
     _check_name(name)
     unit_id = code["unit_id"]
     conn.execute("UPDATE units SET resident_name = ?, lang = ?, joined_at = ?, consent_version = ? WHERE id = ?",
-                 (name, body.lang, db.now(), CONSENT_VERSION, unit_id))
+                 (name, body.lang, db.now(), _consent_version(), unit_id))
     conn.execute("UPDATE profiles SET whatsapp_alerts = ?, easy_mode = ? WHERE unit_id = ?",
                  (int(body.whatsapp_alerts), int(body.easy_mode), unit_id))
     conn.execute("UPDATE join_codes SET used_at = ? WHERE id = ?", (db.now(), code["id"]))
     # Notices not printed yet now arrive in the app instead.
     conn.execute("UPDATE paper_notices SET status = 'superseded' WHERE unit_id = ? AND status = 'to_print'", (unit_id,))
     # No name in the permanent log: only what was agreed.
-    db.append_event(conn, unit_id, "joined", {"privacy_notice": CONSENT_VERSION, "whatsapp_alerts": body.whatsapp_alerts})
+    db.append_event(conn, unit_id, "joined", {"privacy_notice": _consent_version(), "whatsapp_alerts": body.whatsapp_alerts})
     conn.commit()
     return _unit_json(_unit_row(conn, unit_id))
 
@@ -2520,11 +2590,15 @@ def _paper_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     unit = _unit_row(conn, row["unit_id"])
     intro = conn.execute("SELECT i.*, u.label AS from_label, u.resident_name AS from_name FROM intros i"
                          " JOIN units u ON u.id = i.from_unit_id WHERE i.id = ?", (row["intro_id"],)).fetchone()
+    reno = json.loads(intro["renovation"]) if intro["renovation"] else None
+    printed = _intro_in(intro, unit["lang"])  # printed in the household's own language when there is a translation
+    if reno and printed and printed["scope"]:
+        reno = {**reno, "scope": printed["scope"]}
     return {"id": row["id"], "status": row["status"], "created_at": row["created_at"], "printed_at": row["printed_at"],
             "delivered_at": row["delivered_at"], "delivered_by": row["delivered_by"],
             "unit_id": unit["id"], "unit_label": unit["label"], "lang": unit["lang"],
             "intro_id": intro["id"], "from_label": intro["from_label"], "from_name": intro["from_name"], "sent_by": intro["sent_by"],
-            "message": intro["message"], "renovation": json.loads(intro["renovation"]) if intro["renovation"] else None}
+            "message": printed["message"] if printed else intro["message"], "translated": bool(printed), "renovation": reno}
 
 
 @app.get("/api/estate/frontdesk")
@@ -2622,7 +2696,8 @@ def whatsapp_outbox(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) 
                           " JOIN units u ON u.id = i.from_unit_id WHERE x.unit_id = ?", (unit_id,)):
         if r["renovation"]:
             reno = json.loads(r["renovation"])
-            add(r["created_at"], "reno", ("open", "concern"), name=r["name"], label=r["label"], scope=reno["scope"],
+            scope = (_intro_in(r, lang) or {}).get("scope") or reno["scope"]
+            add(r["created_at"], "reno", ("open", "concern"), name=r["name"], label=r["label"], scope=scope,
                 start=talk.date_text(reno["start"], lang), end=talk.date_text(reno["end"], lang),
                 hours=talk.hours_text(reno, lang), contractor=reno.get("contractor") or "-")
         else:

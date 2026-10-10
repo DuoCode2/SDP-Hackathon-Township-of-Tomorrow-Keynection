@@ -5,11 +5,12 @@ import {
   TriangleAlert, Volume2, X,
 } from 'lucide-react'
 import {
-  api, type ChatIntro, type ChatMessage, type ChatWave, type ConcernCategory, type Conversation, type Official, type Preview, type Thread,
-  type UnitInfo,
+  api, ApiError, type ChatIntro, type ChatMessage, type ChatWave, type ConcernCategory, type Conversation, type Official, type Preview,
+  type Thread, type UnitInfo,
 } from '../api'
 import { byWho, noisyHours, refusal, subjectText, useDates, useT, type Translate } from '../i18n'
 import { useHelper } from '../helper'
+import { useAi } from '../features'
 import { LANG_TAG } from '../components/Cast'
 import ConcernCard from '../components/ConcernCard'
 import { Avatar, Empty, Sheet, Skeleton, Stamp, useCelebrate, useToast } from '../ui'
@@ -199,9 +200,12 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   const toast = useToast()
   const celebrate = useCelebrate()
   const helper = useHelper(me.id)
+  const ai = useAi()
   const [t, setT] = useState<Thread | null>(null)
   const [text, setText] = useState('')
   const [tone, setTone] = useState<string | null>(null)
+  // AI's calmer wording for what was just typed. hard: an insult, which is never sent as it was.
+  const [calmer, setCalmer] = useState<{ said: string; suggestion: string; hard: boolean } | null>(null)
   const [sending, setSending] = useState(false)
   const [concernOpen, setConcernOpen] = useState(false)
   const [reporting, setReporting] = useState<ChatMessage | null>(null)
@@ -240,15 +244,18 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   const n = t.neighbour
   const wavedToday = t.items.some((i) => i.type === 'wave' && i.from_unit_id === me.id && Date.now() - new Date(i.created_at).getTime() < DAY)
 
-  async function send(msg: { body?: string; quick_key?: string }) {
+  async function send(msg: { body?: string; quick_key?: string; keep_tone?: boolean }) {
     setSending(true)
     setTone(null)
+    setCalmer(null)
     try {
       await api.sendMessage(me.id, other, msg, helper?.id)
       if (msg.body) setText('')
       onChange()
     } catch (e) {
-      if (refusal(e)) setTone(refusal(e))
+      if (e instanceof ApiError && e.suggestion && (e.code === 'calmer' || e.code === 'tone')) {
+        setCalmer({ said: msg.body ?? '', suggestion: e.suggestion, hard: e.code === 'tone' })
+      } else if (refusal(e)) setTone(refusal(e))
       else toast(e instanceof Error ? e.message : 'Could not send', 'error')
     } finally {
       setSending(false)
@@ -359,10 +366,13 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
                     <p>{original && item.original ? item.original : item.text}</p>
                   )}
                   <div className="msg-meta">
-                    {item.kind === 'quick' && (
+                    {(item.kind === 'quick' || item.by_ai) && (
                       item.translated ? (
-                        <button className="msg-tr" onClick={() => setShowOriginal((s) => { const x = new Set(s); if (x.has(item.id)) x.delete(item.id); else x.add(item.id); return x })}>
-                          <Languages size={11} /> {tr(original ? 'thread.original' : 'thread.translated', { lang: langName(tr, item.lang) })}
+                        <button className={`msg-tr ${item.by_ai ? 'by-ai' : ''}`} onClick={() => setShowOriginal((s) => { const x = new Set(s); if (x.has(item.id)) x.delete(item.id); else x.add(item.id); return x })}>
+                          {item.by_ai ? <Sparkles size={11} /> : <Languages size={11} />}{' '}
+                          {item.by_ai
+                            ? tr(original ? 'thread.originalAi' : 'thread.byAi')
+                            : tr(original ? 'thread.original' : 'thread.translated', { lang: langName(tr, item.lang) })}
                         </button>
                       ) : <span className="msg-tr"><Sparkles size={11} /> {tr('thread.quick')}</span>
                     )}
@@ -404,6 +414,22 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
               <button className="icon-btn" onClick={() => setTone(null)} aria-label="Dismiss">×</button>
             </div>
           )}
+          {calmer && (
+            <div className="calmer">
+              <div className="calmer-head">
+                <Sparkles size={15} />
+                <b>{tr(calmer.hard ? 'tone.title' : 'calmer.title')}</b>
+                <button className="icon-btn" onClick={() => setCalmer(null)} aria-label="Dismiss">×</button>
+              </div>
+              {calmer.hard && <p>{tr('tone.body')}</p>}
+              <small>{tr(calmer.hard ? 'tone.suggest' : 'calmer.body')}</small>
+              <blockquote>{calmer.suggestion}</blockquote>
+              <div className="btn-row">
+                <button className="btn btn-sm btn-primary" disabled={sending} onClick={() => send({ body: calmer.suggestion })}>{tr('calmer.use')}</button>
+                {!calmer.hard && <button className="btn btn-sm" disabled={sending} onClick={() => send({ body: calmer.said, keep_tone: true })}>{tr('calmer.keep')}</button>}
+              </div>
+            </div>
+          )}
           <div className="quick-row">
             {t.quick_replies.map((q) => (
               <button key={q.key} className="quick" disabled={sending} onClick={() => send({ quick_key: q.key })} title={q.arrives ? tr('thread.arrives', { name: n.resident_name, text: q.arrives }) : langName(tr, n.lang)}>{q.text}</button>
@@ -423,7 +449,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
                 <button className="btn btn-sm concern-btn" onClick={() => setConcernOpen(true)}><MessageSquareWarning size={14} /> {tr('thread.concern')}</button>
               )}
               <textarea className="compose-input" rows={1} maxLength={500} placeholder={tr('thread.placeholder', { name: n.resident_name })} value={text}
-                onChange={(e) => { setText(e.target.value); setTone(null) }}
+                onChange={(e) => { setText(e.target.value); setTone(null); setCalmer(null) }}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && text.trim()) { e.preventDefault(); send({ body: text }) } }} />
               {text.trim() ? (
                 <button className="send-btn" disabled={sending} onClick={() => send({ body: text })} aria-label="Send"><SendHorizontal size={17} /></button>
@@ -432,7 +458,11 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
               )}
             </div>
           )}
-          <div className="compose-foot"><Languages size={11} /> {tr('thread.foot', { lang: langName(tr, n.lang) })}</div>
+          <div className={`compose-foot ${ai?.on ? 'by-ai' : ''}`}>
+            {ai?.on ? <Sparkles size={11} /> : <Languages size={11} />}{' '}
+            {sending && ai?.on && text.trim() ? tr('thread.translating')
+              : tr(ai?.on ? 'thread.footAi' : 'thread.foot', { lang: langName(tr, n.lang), name: n.resident_name })}
+          </div>
         </div>
       )}
 
@@ -540,6 +570,7 @@ function useRecorder(onDone: (blob: Blob, seconds: number) => void, onError: (me
 function IntroCard({ item, mine, onWave }: { item: ChatIntro; mine: boolean; onWave: () => void }) {
   const t = useT()
   const dates = useDates()
+  const [original, setOriginal] = useState(false)
   const r = item.renovation
   return (
     <div className={`notice ${mine ? 'mine' : ''}`}>
@@ -547,10 +578,15 @@ function IntroCard({ item, mine, onWave }: { item: ChatIntro; mine: boolean; onW
         <Stamp tone={r ? 'amber' : 'brand'} tilt={-2}>{t(r ? 'notice.reno' : 'notice.intro')}</Stamp>
         <small>{t(mine ? 'notice.mine' : 'notice.theirs')} · {dates.time(new Date(item.created_at))}{item.sent_by ? ` · ${t('thread.sentBy', { who: byWho(t, item.sent_by) })}` : ''}</small>
       </div>
-      <p>{item.text}</p>
+      <p>{original && item.original ? item.original : item.text}</p>
+      {item.translated && (
+        <button className="msg-tr by-ai notice-tr" onClick={() => setOriginal((o) => !o)}>
+          <Sparkles size={11} /> {t(original ? 'thread.originalAi' : 'thread.byAi')}
+        </button>
+      )}
       {r && (
         <dl className="notice-grid">
-          <div><dt>{t('reno.work')}</dt><dd>{r.scope}</dd></div>
+          <div><dt>{t('reno.work')}</dt><dd>{original && item.original_scope ? item.original_scope : r.scope}</dd></div>
           <div><dt>{t('reno.dates')}</dt><dd>{dates.range(r.start, r.end)}</dd></div>
           <div><dt>{t('reno.noisy')}</dt><dd>{noisyHours(t, r)}</dd></div>
           <div><dt>{t('reno.contractor')}</dt><dd>{r.contractor || '–'}{r.contractor_cidb_registered ? ' · CIDB ✓' : ''}</dd></div>

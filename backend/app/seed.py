@@ -8,8 +8,10 @@ from datetime import date, datetime, timedelta, timezone
 
 MALAYSIA = timezone(timedelta(hours=8))
 HANDOVER_DAYS_AGO = 14
-# Version of the plain-language privacy notice a household agrees to when it joins (PDPA consent).
+# Version of the plain-language privacy notice a household agrees to when it joins (PDPA consent). Where AI is on,
+# the notice has one more paragraph (what residents type is translated by Claude, outside Malaysia): its own version.
 CONSENT_VERSION = "pilot-2026-10"
+CONSENT_VERSION_AI = "pilot-2026-10-ai"
 
 # Households that have not joined Keynection yet. Until they do, neighbours see their unit number only, never a name,
 # and renovation notices reach them on paper through the estate office.

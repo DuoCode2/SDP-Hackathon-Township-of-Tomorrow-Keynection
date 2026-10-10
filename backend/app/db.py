@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS intros (
     lang TEXT NOT NULL,
     renovation TEXT,
     sent_by TEXT,
+    translations TEXT,          -- JSON {lang: {message, scope}}: Claude's translation for each reader's language
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS intro_recipients (
@@ -135,6 +136,7 @@ CREATE TABLE IF NOT EXISTS messages (
     sent_by TEXT,
     sys_code TEXT,              -- automatic notices: code + values (JSON), so the app shows them in each reader's language
     sys_values TEXT,
+    translations TEXT,          -- JSON {lang: text}: Claude's translation for the reader; body stays as written
     created_at TEXT NOT NULL,
     read_at TEXT
 );
@@ -273,7 +275,7 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 TABLES = ("paper_notices", "join_codes", "delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
           "warranty_tickets", "gate_logs", "passes", "incidents", "photos",
           "intro_recipients", "intros", "events", "units", "phases")

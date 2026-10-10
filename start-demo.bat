@@ -20,6 +20,11 @@ if not exist "backend\.venv\Scripts\python.exe" (
 ) else (
   echo  [1/3] Python packages ready
 )
+REM Set up before the AI features came: add the one new package.
+"backend\.venv\Scripts\python.exe" -c "import anthropic" 2>nul || (
+  echo        Adding the AI package ^(once^)...
+  "backend\.venv\Scripts\python.exe" -m pip install -q -r "backend\requirements.txt" || goto :fail
+)
 
 if not exist "frontend\node_modules" (
   echo  [2/3] First run: installing web packages...
@@ -33,6 +38,7 @@ call npm --prefix frontend run build --silent || goto :fail
 
 echo.
 echo  Running at http://localhost:8000
+if defined ANTHROPIC_API_KEY (echo  AI translation and notice writing: on) else (echo  AI translation and notice writing: off - set ANTHROPIC_API_KEY to turn it on)
 echo  Keep this window open during the demo. Close it to stop.
 echo.
 if not defined JIRAN_NO_BROWSER start "" /b cmd /c "ping -n 5 127.0.0.1 >nul & start http://localhost:8000"

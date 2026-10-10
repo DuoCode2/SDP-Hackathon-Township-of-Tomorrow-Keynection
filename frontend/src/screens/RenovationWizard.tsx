@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Bath, Building, Drill, Lock, Paintbrush, Send, ShieldCheck } from 'lucide-react'
-import { api, type ImpactItem, type Renovation, type UnitInfo, type WorksType } from '../api'
+import { Bath, Building, Drill, Lock, Paintbrush, Send, ShieldCheck, Sparkles } from 'lucide-react'
+import { api, ApiError, type ImpactItem, type Renovation, type RenovationDraft, type UnitInfo, type WorksType } from '../api'
 import { LANGS, introTemplate, type Lang } from '../messages'
 import PlanMap from '../components/PlanMap'
 import { noisyHours, useDates, useT } from '../i18n'
 import { useHelper } from '../helper'
+import { useAi } from '../features'
 import { Sheet, Steps, useToast } from '../ui'
 
 /** A local calendar date n days from today, as YYYY-MM-DD. */
@@ -47,6 +48,11 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   const [lang, setLang] = useState<Lang>(me.lang)
   const [draft, setDraft] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
+  const ai = useAi()
+  const [said, setSaid] = useState('')
+  const [reading, setReading] = useState(false)
+  const [filled, setFilled] = useState<RenovationDraft | null>(null)
+  const [aiNote, setAiNote] = useState<string | null>(null)
   const [reno, setReno] = useState<Renovation>({
     scope: t(`works.${strata ? 'wet' : 'structural'}.scope`),
     start: daysFromToday(7),
@@ -93,6 +99,34 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   }
   const blocked = works === 'structural' && (strata ? reno.management_approval !== 'approved' : reno.council_permit !== 'approved')
 
+  /** The owner's one sentence fills in the steps; whatever AI left empty keeps what was there. Nothing is sent. */
+  async function fillIn() {
+    setReading(true)
+    setAiNote(null)
+    setFilled(null)
+    try {
+      const d = await api.renovationDraft(me.id, said.trim())
+      setWorks(d.works_type)
+      setReno((r) => {
+        const start = d.start ?? r.start
+        const end = d.end ?? r.end
+        return {
+          ...r, scope: d.scope ?? t(`works.${d.works_type}.scope`), start, end: end < start ? start : end,
+          noisy_from: d.noisy_from ?? r.noisy_from, noisy_to: d.noisy_to ?? r.noisy_to,
+          weekdays_only: d.weekdays_only ?? r.weekdays_only, contractor: d.contractor ?? r.contractor,
+        }
+      })
+      setLang(d.language)  // the notice is written in the language the owner used; each neighbour gets their own
+      setDraft(null)
+      setFilled(d)
+    } catch (e) {
+      const code = e instanceof ApiError ? e.code : undefined
+      setAiNote(code === 'ai_off' ? t('ai.off') : code === 'ai_busy' || !(e instanceof Error) ? t('ai.busy') : e.message)
+    } finally {
+      setReading(false)
+    }
+  }
+
   async function send() {
     setSending(true)
     try {
@@ -112,6 +146,9 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   function close() {
     setStep(0)
     setDraft(null)
+    setSaid('')
+    setFilled(null)
+    setAiNote(null)
     onClose()
   }
 
@@ -127,6 +164,34 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
 
       {step === 0 && (
         <div className="wizard-body">
+          {ai?.on && (
+            <div className="ai-box">
+              <div className="ai-box-head"><Sparkles size={15} /> <b>{t('ai.reno.title')}</b></div>
+              <small className="muted">{t('ai.reno.hint')}</small>
+              <div className="ai-box-row">
+                <textarea rows={2} maxLength={500} value={said} onChange={(e) => setSaid(e.target.value)} placeholder={t('ai.reno.placeholder')}
+                  aria-label={t('ai.reno.title')} />
+                <button className="btn btn-primary" disabled={!said.trim() || reading} onClick={fillIn}>
+                  <Sparkles size={14} /> {reading ? t('ai.reno.working') : t('ai.reno.fill')}
+                </button>
+              </div>
+              {aiNote && <div className="ai-note">{aiNote}</div>}
+              {filled && (
+                <div className="ai-filled">
+                  <b><Sparkles size={13} /> {t('ai.reno.done')}</b>
+                  {filled.why && <p>{filled.why}</p>}
+                  {filled.unsure.map((u) => <p key={u} className="warn">{t(`ai.unsure.${u}`)}</p>)}
+                  {filled.missing.length > 0 && (
+                    <>
+                      <p>{t('ai.reno.missing')}</p>
+                      <ul>{filled.missing.map((m) => <li key={m}>{m}</li>)}</ul>
+                    </>
+                  )}
+                  <small><ShieldCheck size={12} /> {t('ai.reno.yours')}</small>
+                </div>
+              )}
+            </div>
+          )}
           <div className="works-grid">
             {WORKS.map((w) => {
               const Icon = w.icon
