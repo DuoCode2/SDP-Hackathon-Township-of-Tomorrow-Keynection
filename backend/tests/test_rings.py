@@ -146,7 +146,7 @@ def test_contact_request_note_gets_the_tone_check(client):
 def test_notices_reach_the_right_audience(client):
     terrace = {n["audience"] for n in client.get("/api/units/T-12/notices").json()}
     block = {n["audience"] for n in client.get("/api/units/A-14-3/notices").json()}
-    assert terrace == {"phase", "terrace"} and block == {"phase", "block:A"}
+    assert terrace == {"phase", "street:Jalan Demo 1"} and block == {"phase", "block:A"}
     client.post("/api/notices", json={"audience": "block:A", "title": "Lift servicing", "body": "Lift B is off on Monday morning."})
     assert client.get("/api/units/A-14-3/notices").json()[0]["title"] == "Lift servicing"
     assert all(n["title"] != "Lift servicing" for n in client.get("/api/units/T-12/notices").json())

@@ -1,11 +1,13 @@
 import { Printer } from 'lucide-react'
 import type { PaperNotice } from '../api'
 import { dateIn, noisyHours, tEn, tIn } from '../i18n'
+import { usePlace } from '../features'
 import { Sheet } from '../ui'
 
 /** The notice the estate office prints for a household that isn't on Keynection: in its language, with English below. */
 export default function PaperNoticeSheet({ notice, onClose, onPrinted }: { notice: PaperNotice; onClose: () => void; onPrinted: () => void }) {
   const t = tIn(notice.lang)
+  const place = usePlace()
   const both = (key: string, vars?: Record<string, string | number>) => (
     notice.lang === 'en' ? <>{tEn(key, vars)}</> : <>{t(key, vars)}<span className="paper-en">{tEn(key, vars)}</span></>
   )
@@ -19,7 +21,7 @@ export default function PaperNoticeSheet({ notice, onClose, onPrinted }: { notic
       <div className="print-area paper">
         <div className="paper-head">
           <b>{both('paper.title')}</b>
-          <span className="mono">#{String(notice.id).padStart(4, '0')} · Taman Demo</span>
+          <span className="mono">#{String(notice.id).padStart(4, '0')} · {place.name}</span>
         </div>
         <p className="paper-to">{both('paper.to', { label: notice.unit_label })}</p>
         <p>{both('paper.from', { name: notice.from_name, label: notice.from_label })}</p>

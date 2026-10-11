@@ -10,6 +10,8 @@ export interface UnitInfo {
   phase_id: string
   kind: 'terrace' | 'apartment'
   label: string
+  /** Terrace houses: the road the house is on. */
+  street?: string | null
   resident_name: string
   row: string | null
   facing_row: string | null
@@ -625,10 +627,55 @@ export interface AuthMe {
   signed_in: boolean
   kind?: 'household' | 'staff'
   unit_id?: string | null
+  /** A household's phase. */
+  phase_id?: string | null
   name?: string
   role?: 'estate' | 'sdp' | null
   /** How many digital keys (passkeys) this household or staff member has. */
   passkeys?: number
+}
+
+/** A phase of a township, with the streets and blocks notices can go to. */
+export interface PhaseInfo {
+  id: string
+  name: string
+  note: string | null
+  imported_by: string | null
+  imported_at: string | null
+  homes: number
+  joined: number
+  streets: string[]
+  blocks: string[]
+}
+
+/** What importing SDP's handover list would do (or did). Lines are the file's own line numbers. */
+export interface ImportReport {
+  errors: { line: number; message: string }[]
+  more_errors: number
+  warnings: { line: number; message: string }[]
+  more_warnings: number
+  homes: number
+  added: number
+  updated: number
+  unchanged: number
+  kept: number
+  streets: string[]
+  blocks: string[]
+  circle_sizes: Record<string, number>
+  sample: { unit: string; label: string; circle: string[] }[]
+}
+
+/** One welcome-pack card: the owner's own one-time join code. */
+export interface WelcomeCard {
+  unit_id: string
+  label: string
+  street: string | null
+  block: string | null
+  owner: string | null
+  handover_date: string
+  lang: Lang
+  token: string
+  expires_at: string
 }
 
 /** A WebAuthn ceremony the server started: the browser answers `options`, then sends back `challenge_id`. */
@@ -686,6 +733,13 @@ function signInAgain(status: number, path = '') {
   window.location.replace(`/?signin=${Date.now()}`)
 }
 
+let phaseId = 'demo'
+/** Which phase SDP's screens and the phase listing show (demo mode: the fictional one). */
+export function setPhaseId(id: string): void {
+  phaseId = id
+}
+const inPhase = (path: string) => `${path}${path.includes('?') ? '&' : '?'}phase_id=${encodeURIComponent(phaseId)}`
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response
   try {
@@ -722,7 +776,8 @@ const json = (method: string, body: unknown): RequestInit => ({
 export const MAX_PHOTO_BYTES = 12 * 1024 * 1024
 
 export const api = {
-  units: () => request<UnitInfo[]>('/api/units?phase_id=demo'),
+  units: () => request<UnitInfo[]>(inPhase('/api/units')),
+  phases: () => request<PhaseInfo[]>('/api/phases'),
   card: (unitId: string) =>
     request<{ neighbours: (Neighbour & { known: boolean })[]; known_count: number }>(`/api/units/${unitId}/card`),
   sendIntro: (body: { from_unit_id: string; message: string; lang: string; renovation?: Renovation; to_unit_ids?: string[]; delegate_id?: number }) =>
@@ -761,7 +816,7 @@ export const api = {
   contractorView: (token: string) => request<ContractorView>(`/api/passes/view?token=${encodeURIComponent(token)}`),
 
   myWarranty: (unitId: string) => request<WarrantyTicket[]>(`/api/units/${unitId}/warranty`),
-  warrantyQueue: () => request<WarrantyTicket[]>('/api/warranty?phase_id=demo'),
+  warrantyQueue: () => request<WarrantyTicket[]>(inPhase('/api/warranty')),
   /** SDP's subcontractor photographs the finished repair (pilot); the owner still decides whether it is done. */
   submitRepair: (ticketId: number, subcontractor: string, file: File) => {
     const form = new FormData()
@@ -776,7 +831,7 @@ export const api = {
 
   history: (unitId: string) =>
     request<{ events: HistoryEvent[]; chain_ok: boolean; first_bad_index: number | null }>(`/api/units/${unitId}/history`),
-  dashboard: () => request<Dashboard>('/api/dashboard?phase_id=demo'),
+  dashboard: () => request<Dashboard>(inPhase('/api/dashboard')),
 
   directory: (unitId: string) => request<Directory>(`/api/units/${unitId}/directory`),
   impact: (unitId: string, works: WorksType) => request<ImpactItem[]>(`/api/units/${unitId}/impact?works_type=${works}`),
@@ -786,8 +841,8 @@ export const api = {
   respondContact: (id: number, unitId: string, accept: boolean) =>
     request<ContactRequest>(`/api/contact-requests/${id}/respond`, json('POST', { unit_id: unitId, accept })),
   notices: (unitId: string) => request<Notice[]>(`/api/units/${unitId}/notices`),
-  allNotices: () => request<Notice[]>('/api/notices?phase_id=demo'),
-  postNotice: (audience: string, title: string, body: string) => request<Notice>('/api/notices?phase_id=demo', json('POST', { audience, title, body })),
+  allNotices: () => request<Notice[]>(inPhase('/api/notices')),
+  postNotice: (audience: string, title: string, body: string) => request<Notice>(inPhase('/api/notices'), json('POST', { audience, title, body })),
   wave: (from: string, to: string) => request('/api/waves', json('POST', { from_unit_id: from, to_unit_id: to })),
   react: (messageId: number, unitId: string, emoji: string) =>
     request<{ emoji: string; unit_id: string }[]>(`/api/messages/${messageId}/react`, json('POST', { unit_id: unitId, emoji })),
@@ -851,7 +906,7 @@ export const api = {
     request<Concern>('/api/concerns', json('POST', { from_unit_id: from, intro_id: introId, category, note, delegate_id: delegateId ?? null })),
   concernStep: (id: number, step: 'acknowledge' | 'resolve' | 'escalate', unitId: string, note = '') =>
     request<Concern>(`/api/concerns/${id}/${step}`, json('POST', { unit_id: unitId, note })),
-  estateConcerns: () => request<Concern[]>('/api/estate/concerns?phase_id=demo'),
+  estateConcerns: () => request<Concern[]>(inPhase('/api/estate/concerns')),
   estateAction: (id: number, action: 'remind' | 'resolve', note = '') =>
     request<Concern>(`/api/concerns/${id}/estate`, json('POST', { action, note })),
   reports: () => request<ModerationReport[]>('/api/moderation/reports'),
@@ -861,11 +916,19 @@ export const api = {
   joinLookup: (token: string) => request<JoinInfo>('/api/join/lookup', json('POST', { token })),
   join: (body: { token: string; display_name: string; lang: Lang; consent: boolean; whatsapp_alerts: boolean; easy_mode: boolean }) =>
     request<UnitInfo>('/api/join', json('POST', body)),
-  frontDesk: () => request<FrontDesk>('/api/estate/frontdesk?phase_id=demo'),
+  frontDesk: () => request<FrontDesk>(inPhase('/api/estate/frontdesk')),
   paperStep: (id: number, step: 'printed' | 'delivered', staff: string) =>
     request<PaperNotice>(`/api/paper-notices/${id}/${step}`, json('POST', { staff_name: staff })),
   estateRenovation: (body: { unit_id: string; staff_name: string; owner_signed: boolean; message: string; lang: Lang; renovation: Renovation }) =>
     request<{ id: number; recipients: string[]; paper_notices: string[] }>('/api/estate/renovations', json('POST', body)),
   whatsapp: (unitId: string) => request<WhatsAppOutbox>(`/api/units/${unitId}/whatsapp`),
   planPhase: (layout: PhaseLayout) => request<PhasePlan>('/api/planner/preview', json('POST', layout)),
+  previewImport: (name: string, csv: string, existing?: string) =>
+    request<ImportReport>('/api/phases/import/preview', json('POST', { name, csv, phase_id: existing ?? null })),
+  saveImport: (name: string, csv: string, existing?: string) =>
+    request<{ phase: PhaseInfo; added: number; updated: number; unchanged: number; kept: number }>(
+      '/api/phases/import', json('POST', { name, csv, phase_id: existing ?? null })),
+  welcomeSheet: (from?: string, to?: string) =>
+    request<{ phase: string; codes: WelcomeCard[] }>(`/api/phases/${encodeURIComponent(phaseId)}/join-codes`,
+      json('POST', { handover_from: from || null, handover_to: to || null })),
 }

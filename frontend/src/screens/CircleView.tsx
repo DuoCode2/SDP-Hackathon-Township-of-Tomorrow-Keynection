@@ -96,6 +96,8 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
   const [dir, setDir] = useState<Directory | null>(null)
   const [reqs, setReqs] = useState<{ incoming: ContactRequest[]; outgoing: ContactRequest[] } | null>(null)
   const [mode, setMode] = useState<'people' | 'map'>('people')
+  // The plan drawing is of the demo's own layout; a real phase shows its people only.
+  const drawn = !usePilot()
   const [view, setView] = useState<'terrace' | 'apartment'>(me.kind)
   const [selected, setSelected] = useState<string | null>(null)
   const [profile, setProfile] = useState<Member | null>(null)
@@ -150,9 +152,9 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
 
   return (
     <section className="screen">
-      <ScreenTitle eyebrow={`${me.label} · ${me.kind === 'terrace' ? 'Jalan Demo 1' : t('place.block', { b: me.block ?? '' })}`} title={t('circle.title')}
+      <ScreenTitle eyebrow={`${me.label} · ${me.kind === 'terrace' ? me.street ?? '' : t('place.block', { b: me.block ?? '' })}`} title={t('circle.title')}
         subtitle={t('circle.subtitle')}
-        aside={<span className="hide-easy"><Segmented value={mode} onChange={setMode} options={[{ id: 'people', label: t('circle.people') }, { id: 'map', label: t('circle.map') }]} /></span>} />
+        aside={drawn && <span className="hide-easy"><Segmented value={mode} onChange={setMode} options={[{ id: 'people', label: t('circle.people') }, { id: 'map', label: t('circle.map') }]} /></span>} />
 
       {!dir ? <Card><Skeleton lines={6} /></Card> : mode === 'people' ? (
         <>

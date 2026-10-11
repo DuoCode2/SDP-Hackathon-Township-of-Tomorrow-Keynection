@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { ClipboardPen, Eye, KeyRound, Printer, QrCode, Send, Smartphone, UserCheck, UserPlus } from 'lucide-react'
-import { api, type FrontDesk as Desk, type PaperNotice, type UnitInfo } from '../api'
+import { api, type FrontDesk as Desk, type PaperNotice, type UnitInfo, type WelcomeCard } from '../api'
 import { EnglishOnly } from '../i18n'
 import { usePilot } from '../features'
 import { joinKey } from '../screens/JoinView'
 import RenovationWizard from '../screens/RenovationWizard'
 import { Badge, Card, CardHead, Empty, formatDate, Sheet, shortRange, Skeleton, useToast } from '../ui'
 import PaperNoticeSheet from './PaperNotice'
+import WelcomeSheet from './WelcomeSheet'
 
 const STAFF = 'jiran5.staff'
 function storedStaff(): string {
@@ -42,6 +43,11 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
   const [role, setRole] = useState<'estate' | 'sdp'>('estate')
   const [signed, setSigned] = useState(false)
   const [wizard, setWizard] = useState(false)
+  // Pilot: welcome-pack cards for every home still to join, or those whose keys are handed over in a date range.
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [confirmPacks, setConfirmPacks] = useState(false)
+  const [sheet, setSheet] = useState<{ phase: string; codes: WelcomeCard[] } | null>(null)
 
   useEffect(() => {
     let live = true
@@ -115,7 +121,19 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
     }
   }
 
+  async function makePacks() {
+    setConfirmPacks(false)
+    try {
+      const r = await api.welcomeSheet(from || undefined, to || undefined)
+      setSheet(r)
+      onChange()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not make the cards', 'error')
+    }
+  }
+
   if (!desk) return <Card><Skeleton lines={5} /></Card>
+  const packs = units.filter((u) => !u.joined && (!from || u.handover_date >= from) && (!to || u.handover_date <= to)).length
   const owners = units.filter((u) => u.joined)
   const ownerUnit = units.find((u) => u.id === (owner || owners[0]?.id))
   const names = Object.fromEntries(units.map((u) => [u.id, u.resident_name]))
@@ -130,6 +148,30 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
           </label>
         )}
       </Card>
+
+      {pilot && (
+        <Card>
+          <CardHead icon={<Printer size={16} />} title="Welcome packs"
+            sub="A card for every home still to join: the owner's own QR code, valid once until two weeks after their keys." />
+          <div className="grid-2">
+            <label className="field">Keys handed over from<input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setConfirmPacks(false) }} /></label>
+            <label className="field">Until<input type="date" value={to} onChange={(e) => { setTo(e.target.value); setConfirmPacks(false) }} /></label>
+          </div>
+          {confirmPacks ? (
+            <div className="confirm-row">
+              <span className="small">New codes for {packs} home(s). Any card printed before for these homes stops working.</span>
+              <span className="btn-row">
+                <button className="btn btn-sm btn-primary" onClick={makePacks}><Printer size={14} /> Make {packs} card(s)</button>
+                <button className="btn btn-sm" onClick={() => setConfirmPacks(false)}>Cancel</button>
+              </span>
+            </div>
+          ) : (
+            <button className="btn btn-sm btn-primary" disabled={packs === 0} onClick={() => setConfirmPacks(true)}>
+              <Printer size={14} /> {packs === 0 ? 'No home still to join in these dates' : `Make welcome-pack cards (${packs})`}
+            </button>
+          )}
+        </Card>
+      )}
 
       <Card>
         <CardHead icon={<KeyRound size={16} />} title="Handover · join codes" sub="One-time code for the welcome pack. Valid 14 days; a new code cancels the old one." />
@@ -219,6 +261,7 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
           {!pilot && code.kind === 'join' && <button className="btn btn-primary btn-block" onClick={openAsResident}><Eye size={15} /> Open the join page as {code.label} (demo)</button>}
         </Sheet>
       )}
+      {sheet && <WelcomeSheet phase={sheet.phase} cards={sheet.codes} onClose={() => setSheet(null)} />}
       {printing && <PaperNoticeSheet notice={printing} onClose={() => setPrinting(null)}
         onPrinted={() => { if (printing.status === 'to_print' && staffOk) step(printing, 'printed') }} />}
       {wizard && ownerUnit && (

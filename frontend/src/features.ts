@@ -31,6 +31,18 @@ export const PilotProvider = PilotContext.Provider
 /** The pilot session, or null in the demo. */
 export const usePilot = () => useContext(PilotContext)
 
+/** The phase on screen, so the township's own names appear: in the demo, the fictional Taman Demo. */
+export interface Place {
+  id: string
+  name: string
+  streets: string[]
+  blocks: string[]
+}
+export const DEMO_PLACE: Place = { id: 'demo', name: 'Taman Demo', streets: ['Jalan Demo 1'], blocks: ['A'] }
+const PlaceContext = createContext<Place>(DEMO_PLACE)
+export const PlaceProvider = PlaceContext.Provider
+export const usePlace = () => useContext(PlaceContext)
+
 // Claude translates typed words and writes the renovation notice from one sentence, when the server has a key.
 // Without one (or offline) the same screens work as before, so the app only needs to know which to say.
 let aiStatus: Promise<AiStatus> | null = null

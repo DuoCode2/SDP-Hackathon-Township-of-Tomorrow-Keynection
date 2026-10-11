@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Building2, Calculator, Camera, CalendarClock, CircleUserRound, Columns2, Compass, Grid3x3, HandHeart, Hexagon, Languages, LayoutDashboard, LogOut, MessagesSquare, Network, ShieldHalf, Smartphone } from 'lucide-react'
-import { api, onReachability, type AuthMe, type UnitInfo } from './api'
+import { api, onReachability, setPhaseId, type AuthMe, type PhaseInfo, type UnitInfo } from './api'
 import { Avatar, ToastProvider } from './ui'
 import type { GuideLang, TabId } from './guide'
 import { EnglishOnly, LangProvider, langChosen, useDates, useLang, type UiLang } from './i18n'
@@ -8,7 +8,7 @@ import { HelperProvider, useActing, useHelper } from './helper'
 import Guide from './components/Guide'
 import CastPicker, { roleOf } from './components/Cast'
 import { Logo } from './components/Art'
-import { FOCUS_TABS, PilotProvider, ShowAllProvider, usePilot, type Pilot } from './features'
+import { FOCUS_TABS, PilotProvider, PlaceProvider, ShowAllProvider, usePilot, usePlace, type Pilot, type Place } from './features'
 import CircleView from './screens/CircleView'
 import ChatsView from './screens/ChatsView'
 import WorksView from './screens/WorksView'
@@ -117,6 +117,20 @@ function Gate() {
   useEffect(() => { refresh() }, [refresh])
   const signOut = useCallback(() => { api.signout().catch(() => {}).finally(refresh) }, [refresh])
   const pilot = useMemo<Pilot | null>(() => (me?.mode === 'pilot' && me.signed_in ? { me, refresh, signOut } : null), [me, refresh, signOut])
+  // Pilot: the phases this person may see (a household: its own), and which one staff are looking at.
+  const [phases, setPhases] = useState<PhaseInfo[] | null>(null)
+  const [chosen, setChosen] = useState<string | null>(storedPhase)
+  const loadPhases = useCallback(() => { api.phases().then(setPhases).catch(() => setPhases([])) }, [])
+  const signedIn = pilot ? `${pilot.me.kind}:${pilot.me.unit_id ?? pilot.me.name}` : ''
+  useEffect(() => {
+    setPhases(null)
+    if (signedIn) loadPhases()
+  }, [signedIn, loadPhases])
+  const choose = useCallback((id: string) => {
+    setChosen(id)
+    try { localStorage.setItem(PHASE, id) } catch { /* private window: not remembered */ }
+    loadPhases()
+  }, [loadPhases])
 
   if (!me) {
     return down ? (
@@ -128,13 +142,39 @@ function Gate() {
       </div>
     ) : <div className="boot" aria-busy="true" />
   }
-  if (me.mode === 'demo') return <Shell />
+  if (me.mode === 'demo') {
+    setPhaseId('demo')
+    return <Shell />
+  }
   if (!pilot) return <SignInView initialJoin={link.join} initialCode={link.code} onSignedIn={() => { setLink({}); refresh() }} />
-  return <PilotProvider value={pilot}>{me.kind === 'staff' ? <StaffShell /> : <Shell pinned={me.unit_id ?? undefined} />}</PilotProvider>
+  if (!phases) return <div className="boot" aria-busy="true" />
+  const current = me.kind === 'staff' ? phases.find((x) => x.id === chosen) ?? phases[0] : phases.find((x) => x.id === me.phase_id)
+  if (current) setPhaseId(current.id)  // every listing and SDP screen is about this phase
+  const place: Place = current ? { id: current.id, name: current.name, streets: current.streets, blocks: current.blocks }
+    : { id: '', name: 'Keynection', streets: [], blocks: [] }
+  return (
+    <PilotProvider value={pilot}>
+      <PlaceProvider value={place}>
+        {me.kind === 'staff'
+          ? <StaffShell phases={phases} current={current ?? null} onPhase={choose} />
+          : <Shell pinned={me.unit_id ?? undefined} />}
+      </PlaceProvider>
+    </PilotProvider>
+  )
+}
+
+const PHASE = 'keynection.phase'
+function storedPhase(): string | null {
+  try {
+    return localStorage.getItem(PHASE)
+  } catch {
+    return null
+  }
 }
 
 function Shell({ pinned }: { pinned?: string }) {
   const { lang: uiLang, setLang: setUiLang, t } = useLang()
+  const place = usePlace()
   const dates = useDates()
   const [units, setUnits] = useState<UnitInfo[]>([])
   const [panes, setPanes] = useState<PaneState[]>([{ me: pinned ?? 'T-12', tab: 'circle' }])
@@ -279,7 +319,7 @@ function Shell({ pinned }: { pinned?: string }) {
           </nav>
         ))}
         <dl className="title-block" aria-label="Drawing title block">
-          <div className="tb-wide"><dt>Project</dt><dd><Building2 size={12} /> {pinned ? 'Keynection pilot' : 'Taman Demo · Phase 1'}</dd></div>
+          <div className="tb-wide"><dt>Project</dt><dd><Building2 size={12} /> {pinned ? place.name : 'Taman Demo · Phase 1'}</dd></div>
           <div><dt>Sheet</dt><dd>{page.no} / {String(shownNav.length).padStart(2, '0')}</dd></div>
           <div><dt>Rev</dt><dd>0.5</dd></div>
           <div className="tb-wide"><dt>{pinned ? 'Signed in as' : 'Viewing as'}</dt><dd>{curUnit ? `${curUnit.resident_name} · ${curUnit.label}` : '–'}</dd></div>
@@ -378,10 +418,10 @@ const STAFF_NAV = [
   { id: 'impact', icon: Calculator },
 ] as const
 
-function StaffShell() {
+function StaffShell({ phases, current, onPhase }: { phases: PhaseInfo[]; current: PhaseInfo | null; onPhase: (id: string) => void }) {
   const pilot = usePilot()!
   const { t } = useLang()
-  const [tab, setTab] = useState<(typeof STAFF_NAV)[number]['id']>('sdp')
+  const [tab, setTab] = useState<(typeof STAFF_NAV)[number]['id']>(current ? 'sdp' : 'planner')
   const [version, setVersion] = useState(0)
   const changed = () => setVersion((v) => v + 1)
   const no = (id: string) => String(STAFF_NAV.findIndex((i) => i.id === id) + 1).padStart(2, '0')
@@ -411,7 +451,7 @@ function StaffShell() {
           })}
         </nav>
         <dl className="title-block" aria-label="Drawing title block">
-          <div className="tb-wide"><dt>Project</dt><dd><Building2 size={12} /> Keynection pilot</dd></div>
+          <div className="tb-wide"><dt>Phase</dt><dd><Building2 size={12} /> {current ? `${current.name} · ${current.joined}/${current.homes} joined` : 'None yet'}</dd></div>
           <div className="tb-wide"><dt>Signed in as</dt><dd>{pilot.me.name} · {pilot.me.role === 'sdp' ? 'SDP' : 'Estate office'}</dd></div>
           <div className="tb-wide"><dt>Keys</dt><dd>{pilot.me.passkeys ?? 0} on record</dd></div>
         </dl>
@@ -428,15 +468,28 @@ function StaffShell() {
             <b>{t(`nav.${tab}`)}</b>
           </div>
           <div className="topbar-right">
+            {phases.length > 1 && current && (
+              <select className="phase-pick" value={current.id} onChange={(e) => onPhase(e.target.value)} aria-label="Phase">
+                {phases.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+              </select>
+            )}
             <span className="pilot-tag">{t('si.pilot')} · {pilot.me.name}</span>
             <button className="btn btn-sm" onClick={pilot.signOut}><LogOut size={14} /> Sign out</button>
           </div>
         </header>
         <main className="content face-blueprint">
           <div className="content-inner">
-            <EnglishOnly>
-              {tab === 'sdp' && <DashboardView version={version} onChange={changed} />}
-              {tab === 'planner' && <PlannerView />}
+            <EnglishOnly key={current?.id ?? 'none'}>
+              {tab === 'sdp' && (current ? <DashboardView version={version} onChange={changed} /> : (
+                <section className="screen">
+                  <div className="card empty-phase">
+                    <b>No phase yet</b>
+                    <p className="muted">Start with SDP's handover list: import it in Phase setup, check every circle, then print the welcome packs.</p>
+                    <button className="btn btn-primary btn-sm" onClick={() => setTab('planner')}><Grid3x3 size={14} /> Go to Phase setup</button>
+                  </div>
+                </section>
+              ))}
+              {tab === 'planner' && <PlannerView phases={phases} current={current} onImported={(id) => { onPhase(id); setTab('sdp') }} />}
               {tab === 'impact' && <ImpactView />}
             </EnglishOnly>
           </div>

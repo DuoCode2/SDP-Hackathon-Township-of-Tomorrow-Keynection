@@ -23,7 +23,7 @@ SEED_HELPERS = [("T-20", "Mei Fong", "child")]
 
 PHASE = {
     "id": "demo",
-    "name": "Taman Demo (fictional phase)",
+    "name": "Taman Demo",  # fictional: see the note
     "note": "Two facing terrace rows on Jalan Demo 1 and one apartment block. Made-up data for the prototype.",
 }
 
@@ -53,7 +53,7 @@ def demo_notices() -> list[tuple[str, str, str]]:
     return [
         ("block:A", "Block A water tank cleaning",
          f"Water supply to Block A pauses on {_day(_next(5, today))}, 9am to 1pm. Please store water the night before."),
-        ("terrace", "Drain clearing on Jalan Demo 1",
+        ("street:Jalan Demo 1", "Drain clearing on Jalan Demo 1",
          f"Contractors will clear the roadside drains on {_day(_next(3, today))}. Please keep cars off the drain covers."),
         ("phase", "Renovation hours in Taman Demo",
          "Noisy renovation work only Monday to Saturday, 9am to 6pm, and never on Sundays or public holidays. "
@@ -109,11 +109,11 @@ def demo_units() -> list[dict]:
     # South row: houses 10-15, facing north row houses 20-25 (house 12 faces 22).
     for pos in range(6):
         units.append({
-            "id": f"T-{10 + pos}", "phase_id": "demo", "kind": "terrace", "label": f"No. {10 + pos}",
+            "id": f"T-{10 + pos}", "phase_id": "demo", "kind": "terrace", "label": f"No. {10 + pos}", "street": "Jalan Demo 1",
             "resident_name": _SOUTH_NAMES[pos], "row": "south", "facing_row": "north", "pos": pos,
         })
         units.append({
-            "id": f"T-{20 + pos}", "phase_id": "demo", "kind": "terrace", "label": f"No. {20 + pos}",
+            "id": f"T-{20 + pos}", "phase_id": "demo", "kind": "terrace", "label": f"No. {20 + pos}", "street": "Jalan Demo 1",
             "resident_name": _NORTH_NAMES[pos], "row": "north", "facing_row": "south", "pos": pos,
         })
     # Block A: floors 11-16 shown (the lower floors are left out of the demo), units 1-4 per floor.

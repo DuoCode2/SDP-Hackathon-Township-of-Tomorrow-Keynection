@@ -11,7 +11,10 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS phases (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    note TEXT
+    note TEXT,
+    -- Pilot: who last imported SDP's handover list for this phase, and when.
+    imported_by TEXT,
+    imported_at TEXT
 );
 CREATE TABLE IF NOT EXISTS units (
     id TEXT PRIMARY KEY,
@@ -19,6 +22,8 @@ CREATE TABLE IF NOT EXISTS units (
     kind TEXT NOT NULL,
     label TEXT NOT NULL,
     resident_name TEXT,
+    -- Terrace houses: the road the house is on (the second ring, and street notices).
+    street TEXT,
     terrace_row TEXT,
     facing_row TEXT,
     block TEXT,
@@ -321,7 +326,7 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 TABLES = ("auth_challenges", "webauthn_handles", "passkeys", "sessions", "access_codes", "staff", "paper_notices", "join_codes", "delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
           "warranty_tickets", "gate_logs", "passes", "incidents", "photos",
           "intro_recipients", "intros", "events", "units", "phases")
@@ -332,8 +337,20 @@ def drop_all(conn: sqlite3.Connection) -> None:
         conn.execute(f"DROP TABLE IF EXISTS {table}")
 
 
-def init_db(conn: sqlite3.Connection) -> None:
-    # The prototype only holds fictional demo data, so an older database layout is simply rebuilt.
+class SchemaChangeError(RuntimeError):
+    """A newer Keynection needs a change to a pilot database that could lose records: stop instead."""
+
+
+def init_db(conn: sqlite3.Connection, keep_data: bool = False) -> None:
+    """Demo: the fictional phase, and an older database layout is simply rebuilt from it. Pilot (keep_data): real
+    households' records are never dropped and nothing fictional is added; a newer layout only adds tables and
+    columns, and anything else stops the server before a single record changes."""
+    if keep_data:
+        _upgrade_in_place(conn)
+        conn.executescript(SCHEMA)
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+        conn.commit()
+        return
     if conn.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
         drop_all(conn)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
@@ -343,15 +360,54 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _upgrade_in_place(conn: sqlite3.Connection) -> None:
+    """Bring a pilot database up to this layout by adding what is missing. Checks everything first and changes
+    nothing if any part can't be done by adding (a renamed or removed column, a new required column...)."""
+    if conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION:
+        return
+    ref = sqlite3.connect(":memory:")
+    ref.row_factory = sqlite3.Row
+    ref.executescript(SCHEMA)
+    have = {r["name"] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    adds, problems = [], []
+    for table in [r["name"] for r in ref.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")]:
+        if table not in have:
+            continue  # a new table: created by the schema script
+        want = {c["name"]: c for c in ref.execute(f"PRAGMA table_info({table})")}
+        cols = {c["name"]: c for c in conn.execute(f"PRAGMA table_info({table})")}
+        problems += [f"{table}.{n} is not in this version" for n in cols if n not in want]
+        problems += [f"{table}.{n} changed type" for n, c in cols.items() if n in want and c["type"] != want[n]["type"]]
+        unique = {c["name"] for i in ref.execute(f"PRAGMA index_list({table})") if i["unique"]
+                  for c in ref.execute(f"PRAGMA index_info({i['name']})")}
+        for name, col in want.items():
+            if name in cols:
+                continue
+            if col["pk"] or name in unique or (col["notnull"] and col["dflt_value"] is None):
+                problems.append(f"{table}.{name} can't be added to existing records")
+                continue
+            sql = f"{name} {col['type']}" + (" NOT NULL" if col["notnull"] else "")
+            sql += f" DEFAULT {col['dflt_value']}" if col["dflt_value"] is not None else ""
+            sql += "".join(f" REFERENCES {fk['table']}({fk['to']})" for fk in ref.execute(f"PRAGMA foreign_key_list({table})")
+                           if fk["from"] == name)
+            adds.append(f"ALTER TABLE {table} ADD COLUMN {sql}")
+    ref.close()
+    if problems:
+        raise SchemaChangeError("This version of Keynection can't upgrade the pilot database without risking records ("
+                                + "; ".join(problems) + "). Nothing was changed. Back up the database and ask the team "
+                                "for a written migration.")
+    for sql in adds:
+        conn.execute(sql)
+
+
 def _seed(conn: sqlite3.Connection) -> None:
     conn.execute("INSERT INTO phases (id, name, note) VALUES (?, ?, ?)", (PHASE["id"], PHASE["name"], PHASE["note"]))
     handover = handover_date()
     for u in demo_units():
         joined = u["id"] not in NOT_JOINED
         conn.execute(
-            "INSERT INTO units (id, phase_id, kind, label, resident_name, terrace_row, facing_row, block, floor, pos,"
-            " lang, handover_date, record_name, joined_at, consent_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (u["id"], u["phase_id"], u["kind"], u["label"], u["resident_name"] if joined else u["label"],
+            "INSERT INTO units (id, phase_id, kind, label, resident_name, street, terrace_row, facing_row, block, floor, pos,"
+            " lang, handover_date, record_name, joined_at, consent_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (u["id"], u["phase_id"], u["kind"], u["label"], u["resident_name"] if joined else u["label"], u.get("street"),
              u.get("row"), u.get("facing_row"), u.get("block"), u.get("floor"), u["pos"], u["lang"], handover,
              u["resident_name"], handover if joined else None, CONSENT_VERSION if joined else None),
         )

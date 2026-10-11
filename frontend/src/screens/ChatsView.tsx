@@ -10,7 +10,7 @@ import {
 } from '../api'
 import { byWho, noisyHours, refusal, subjectText, useDates, useT, type Translate } from '../i18n'
 import { useHelper } from '../helper'
-import { useAi } from '../features'
+import { useAi, usePlace } from '../features'
 import { LANG_TAG } from '../components/Cast'
 import ConcernCard from '../components/ConcernCard'
 import { Avatar, Empty, Sheet, Skeleton, Stamp, useCelebrate, useToast } from '../ui'
@@ -153,6 +153,7 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
 function OfficialThread({ me, data, onRead, onBack }: { me: UnitInfo; data: Official | null; onRead: () => void; onBack?: () => void }) {
   const t = useT()
   const dates = useDates()
+  const place = usePlace()
   useEffect(() => {
     if (data && data.unread > 0) api.officialRead(me.id).then(onRead).catch(() => {})
   }, [data, me.id, onRead])
@@ -162,7 +163,7 @@ function OfficialThread({ me, data, onRead, onBack }: { me: UnitInfo; data: Offi
         {onBack && <button className="icon-btn" onClick={onBack} aria-label="Back to list"><ArrowLeft size={16} /></button>}
         <span className="official-avatar lg"><Building2 size={20} /></span>
         <div className="grow">
-          <b>{t('estate.full')} <BadgeCheck size={14} className="verified" /></b>
+          <b>{t('estate.full', { place: place.name })} <BadgeCheck size={14} className="verified" /></b>
           <small><Megaphone size={11} /> {t('estate.sub', { place: t(me.kind === 'terrace' ? 'place.lorong' : 'place.blockWord') })}</small>
         </div>
       </header>
@@ -172,7 +173,7 @@ function OfficialThread({ me, data, onRead, onBack }: { me: UnitInfo; data: Offi
         {data?.notices.slice().reverse().map((n) => (
           <div key={n.id} className="official-notice">
             <div className="official-notice-top">
-              <Stamp tone="blue" tilt={0}>{t(n.audience === 'phase' ? 'audience.phase' : n.audience === 'terrace' ? 'audience.terrace' : 'audience.block')}</Stamp>
+              <Stamp tone="blue" tilt={0}>{n.audience === 'phase' ? t('audience.phase') : n.audience.startsWith('street:') ? n.audience.slice(7) : t('place.block', { b: n.audience.slice(6) })}</Stamp>
               <small>{dates.date(n.created_at)} · {dates.time(new Date(n.created_at))}</small>
             </div>
             <b>{n.title}</b>

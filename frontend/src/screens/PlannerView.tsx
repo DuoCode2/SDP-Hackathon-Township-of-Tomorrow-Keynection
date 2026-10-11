@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Building, Download, Grid3x3, Home, ListChecks, Timer, TriangleAlert } from 'lucide-react'
-import { api, ApiError, type PhaseLayout, type PhasePlan, type WorksType } from '../api'
+import { api, ApiError, type PhaseInfo, type PhaseLayout, type PhasePlan, type WorksType } from '../api'
+import { usePilot } from '../features'
+import PhaseImport from '../components/PhaseImport'
 import { Card, CardHead, ScreenTitle, Segmented, Skeleton } from '../ui'
 
 const PRESETS: { id: string; label: string; layout: PhaseLayout }[] = [
@@ -14,8 +16,14 @@ const WORKS: { id: WorksType; label: string }[] = [
 ]
 export const PLANNER_HOMES = 'jiran5.planner.homes'
 
-/** SDP sets up a new phase from its site plan: every circle and notice zone, worked out with the live rules. */
-export default function PlannerView() {
+/** SDP sets up a new phase from its site plan: every circle and notice zone, worked out with the live rules.
+ *  Pilot: the real phase comes from SDP's handover list (import card on top); the layout explorer stays below. */
+export default function PlannerView({ phases = [], current = null, onImported }: {
+  phases?: PhaseInfo[]
+  current?: PhaseInfo | null
+  onImported?: (phaseId: string) => void
+}) {
+  const pilot = usePilot()
   const [preset, setPreset] = useState('mixed')
   const [layout, setLayout] = useState<PhaseLayout>(PRESETS[2].layout)
   const [plan, setPlan] = useState<PhasePlan | null>(null)
@@ -55,7 +63,10 @@ export default function PlannerView() {
   return (
     <section className="screen">
       <ScreenTitle eyebrow="SDP · New phase" title="Phase setup"
-        subtitle="Describe the layout from the site plan. Keynection works out every household's circle and who each kind of renovation must notify, with the same rules the app uses. Nothing is saved." />
+        subtitle={pilot
+          ? 'Import SDP’s handover list to set up a real phase. Below, try a layout from the site plan before the list is ready: nothing there is saved.'
+          : "Describe the layout from the site plan. Keynection works out every household's circle and who each kind of renovation must notify, with the same rules the app uses. Nothing is saved."} />
+      {pilot && onImported && <PhaseImport phases={phases} current={current} onImported={onImported} />}
       <div className="cols">
         <div className="col">
           <Card>

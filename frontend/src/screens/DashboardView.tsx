@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Activity, Building2, Camera, Clock4, Flag, Handshake, HeartHandshake, House, Inbox, KeyRound, Megaphone, MessagesSquare, MicOff, RotateCcw, Send, ShieldCheck, ShieldX, Sparkles, UserCheck, Wrench } from 'lucide-react'
 import { api, type Concern, type Dashboard, type ModerationReport, type Notice, type WarrantyTicket } from '../api'
-import { SHOW_CONTRACTOR_PASSES, usePilot } from '../features'
+import { SHOW_CONTRACTOR_PASSES, usePilot, usePlace, type Place } from '../features'
 import ConcernCard from '../components/ConcernCard'
 import FrontDesk from '../components/FrontDesk'
 import WarrantyClock from '../components/WarrantyClock'
@@ -15,6 +15,7 @@ const SUBCONTRACTORS = ['Jaya Plaster Sdn Bhd', 'Kemas Waterproofing', 'Bina Teg
 export default function DashboardView({ version, onChange, onViewAs }: { version: number; onChange: () => void; onViewAs?: (unitId: string) => void }) {
   const toast = useToast()
   const pilot = usePilot()
+  const place = usePlace()
   const [d, setD] = useState<Dashboard | null>(null)
   const [queue, setQueue] = useState<WarrantyTicket[]>([])
   const [concerns, setConcerns] = useState<Concern[]>([])
@@ -53,7 +54,7 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
 
   return (
     <section className="screen">
-      <ScreenTitle eyebrow="SDP · Taman Demo" title="Command view" subtitle="What SDP's handover, warranty and estate teams would see in PACC."
+      <ScreenTitle eyebrow={`SDP · ${place.name}`} title="Command view" subtitle="What SDP's handover, warranty and estate teams would see in PACC."
         aside={d && <div className="live-pill quiet"><span className="pulse" /> LIVE · {d.households} households</div>} />
       {!d ? (
         <Skeleton lines={6} />
@@ -298,12 +299,17 @@ function ReportItem({ report: r, onChange }: { report: ModerationReport; onChang
   )
 }
 
-const AUDIENCE: Record<string, string> = { phase: 'Whole township', terrace: 'Jalan Demo 1', 'block:A': 'Block A' }
+/** Who a notice goes to, from the phase's own streets and blocks. */
+function audiences(place: Place): Record<string, string> {
+  return Object.fromEntries([['phase', 'Whole township'], ...place.streets.map((s) => [`street:${s}`, s]),
+    ...place.blocks.map((b) => [`block:${b}`, `Block ${b}`])])
+}
 
 /** Ring 3: one-way notices to a street, a block or the whole township. Residents can't reply-all. */
 function NoticeDesk({ notices, onChange }: { notices: Notice[]; onChange: () => void }) {
   const toast = useToast()
-  const [audience, setAudience] = useState('block:A')
+  const AUDIENCE = audiences(usePlace())
+  const [audience, setAudience] = useState(() => Object.keys(AUDIENCE).find((k) => k.startsWith('block:')) ?? 'phase')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   async function post() {

@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("the name needs at least 2 characters")
     conn = db.connect(os.environ.get("JIRAN_DB_PATH", str(DEFAULT_DB)))
     try:
-        db.init_db(conn)
+        db.init_db(conn, keep_data=True)  # never rebuilds a pilot's records
         staff_id, token, expires = auth.add_staff(conn, name, args.role)
     finally:
         conn.close()

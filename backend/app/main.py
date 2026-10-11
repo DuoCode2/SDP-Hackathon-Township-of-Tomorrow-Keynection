@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from . import ai, auth, db, ledger, quiet, talk, vision
 from .neighbours import Unit, impact_reason, impact_zone, inverse_relation, neighbour_circle, street_or_block
+from . import phase_import
 from .planner import MAX_HOMES, home_count, plan_phase
 from .seed import CONSENT_VERSION, CONSENT_VERSION_AI
 from .triage import triage_hint
@@ -35,7 +36,7 @@ log = logging.getLogger("keynection")
 DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "app.db"
 DEMO_PHOTO_DIR = Path(__file__).resolve().parent / "demo_photos"
 MAX_REQUEST_BYTES = vision.MAX_UPLOAD_BYTES + 512 * 1024  # photo plus form fields
-UNIT_ID = r"^[A-Z]-\d{1,3}(-\d{1,2})?$"
+UNIT_ID = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$"
 PHOTO_ID = re.compile(r"^[0-9a-f]{32}$")
 DATE = r"^\d{4}-\d{2}-\d{2}$"
 HHMM = r"^([01]\d|2[0-3]):[0-5]\d$"
@@ -90,7 +91,7 @@ def staff_only() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     conn = db.connect(db_path())
-    db.init_db(conn)
+    db.init_db(conn, keep_data=not demo_mode())  # a pilot's records are never rebuilt
     _expire_voice(conn)
     conn.close()
     vision.warm_up()  # pay OpenCV's start-up cost now, not during the first demo comparison
@@ -323,7 +324,7 @@ def _to_unit(row: sqlite3.Row) -> Unit:
 
 
 def _unit_json(row: sqlite3.Row) -> dict[str, Any]:
-    return {"id": row["id"], "phase_id": row["phase_id"], "kind": row["kind"], "label": row["label"],
+    return {"id": row["id"], "phase_id": row["phase_id"], "kind": row["kind"], "label": row["label"], "street": row["street"],
             "resident_name": row["resident_name"], "row": row["terrace_row"], "facing_row": row["facing_row"],
             "block": row["block"], "floor": row["floor"], "pos": row["pos"], "lang": row["lang"],
             "handover_date": row["handover_date"], "joined": row["joined_at"] is not None}
@@ -604,18 +605,57 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _phase_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
+    homes = conn.execute("SELECT * FROM units WHERE phase_id = ?", (row["id"],)).fetchall()
+    return {"id": row["id"], "name": row["name"], "note": row["note"], "imported_by": row["imported_by"],
+            "imported_at": row["imported_at"], "homes": len(homes), "joined": sum(h["joined_at"] is not None for h in homes),
+            "streets": sorted({h["street"] for h in homes if h["kind"] == "terrace" and h["street"]}),
+            "blocks": sorted({h["block"] for h in homes if h["kind"] == "apartment" and h["block"]})}
+
+
+def _phase_id(conn: sqlite3.Connection, phase_id: str | None) -> str:
+    """The phase a listing or an SDP screen is about: the one asked for; otherwise the fictional phase in demo mode,
+    or in a pilot the household's own phase, or the only phase there is."""
+    if phase_id:
+        if conn.execute("SELECT 1 FROM phases WHERE id = ?", (phase_id,)).fetchone() is None:
+            raise HTTPException(404, "phase not found")
+        return phase_id
+    if demo_mode():
+        return "demo"
+    actor = _current_actor.get()
+    if actor is not None and actor.unit_id:
+        return _unit_row(conn, actor.unit_id)["phase_id"]
+    ids = [r["id"] for r in conn.execute("SELECT id FROM phases ORDER BY id")]
+    if not ids:
+        raise HTTPException(409, {"code": "no_phase", "message": "No phase yet: import SDP's handover list in Phase setup."})
+    if len(ids) > 1:
+        raise HTTPException(422, {"code": "phase", "message": "Choose a phase."})
+    return ids[0]
+
+
+def _place_name(conn: sqlite3.Connection, phase_id: str) -> str:
+    row = conn.execute("SELECT name FROM phases WHERE id = ?", (phase_id,)).fetchone()
+    return row["name"] if row else "Keynection"
+
+
 @app.get("/api/phases")
 def phases(conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
-    return [dict(r) for r in conn.execute("SELECT * FROM phases")]
+    """The phases, with their streets and blocks (for notices). A household in a pilot sees its own phase only."""
+    actor = _current_actor.get()
+    rows = conn.execute("SELECT * FROM phases ORDER BY name").fetchall()
+    if not demo_mode() and actor is not None and actor.unit_id:
+        mine = _unit_row(conn, actor.unit_id)["phase_id"]
+        rows = [r for r in rows if r["id"] == mine]
+    return [_phase_json(conn, r) for r in rows]
 
 
 @app.get("/api/units")
-def units(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+def units(phase_id: str | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
     """The phase layout. Names are included in demo mode (for the demo cast); in a pilot only for the household's
     own home and for the estate office, which already holds the handover list. A real deployment never exposes a
     resident directory. Who is renovating is not here either: see /directory."""
     actor = _current_actor.get()
-    rows = conn.execute("SELECT * FROM units WHERE phase_id = ? ORDER BY id", (phase_id,)).fetchall()
+    rows = conn.execute("SELECT * FROM units WHERE phase_id = ? ORDER BY id", (_phase_id(conn, phase_id),)).fetchall()
     named = lambda r: demo_mode() or (actor is not None and (actor.is_staff or actor.unit_id == r["id"]))  # noqa: E731
     return [_unit_json(r) if named(r) else _unit_public(r) for r in rows]
 
@@ -668,7 +708,7 @@ def directory(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dic
             item["resident_name"] = row["resident_name"]
         nearby.append(item)
     return {"circle": card["neighbours"], "nearby": nearby, "works": sorted(_works_visible_to(conn, unit_id)),
-            "ring2_label": "Jalan Demo 1" if me["kind"] == "terrace" else f"Block {me['block']}",
+            "ring2_label": (me["street"] or "") if me["kind"] == "terrace" else f"Block {me['block']}",
             "township_homes": len(rows)}
 
 
@@ -1392,13 +1432,13 @@ def escalate_concern(concern_id: int, body: ConcernActionIn, conn: sqlite3.Conne
 
 
 @app.get("/api/estate/concerns", dependencies=[Depends(staff_only)])
-def estate_concerns(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+def estate_concerns(phase_id: str | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
     """SDP estate team's view: only concerns a neighbour escalated. Until then a concern stays between the two homes
     (neighbour first, privately), so the estate team never sees, or counts, the ones neighbours settle themselves."""
     rows = conn.execute(
         "SELECT c.* FROM concerns c JOIN units u ON u.id = c.from_unit_id WHERE u.phase_id = ? AND c.escalated_at IS NOT NULL"
         " ORDER BY CASE c.status WHEN 'escalated' THEN 0 ELSE 1 END, c.id DESC",
-        (phase_id,),
+        (_phase_id(conn, phase_id),),
     ).fetchall()
     per_reno: dict[int, int] = {}
     for r in rows:
@@ -1502,7 +1542,7 @@ class RespondIn(BaseModel):
 
 
 class NoticeIn(BaseModel):
-    audience: Literal["phase", "terrace", "block:A"]
+    audience: str = Field(..., pattern=r"^(phase|street:.{1,80}|block:.{1,40})$")  # checked against the phase
     title: str = Field(..., min_length=3, max_length=80)
     body: str = Field(..., min_length=3, max_length=400)
 
@@ -1574,7 +1614,7 @@ def respond_contact(request_id: int, body: RespondIn, conn: sqlite3.Connection =
 
 
 def _audiences(unit: sqlite3.Row) -> tuple[str, ...]:
-    return ("phase", "terrace") if unit["kind"] == "terrace" else ("phase", f"block:{unit['block']}")
+    return ("phase", f"street:{unit['street']}") if unit["kind"] == "terrace" else ("phase", f"block:{unit['block']}")
 
 
 @app.get("/api/units/{unit_id}/notices")
@@ -1587,13 +1627,18 @@ def notices_for(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> l
 
 
 @app.get("/api/notices")
-def all_notices(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
-    return [dict(r) for r in conn.execute("SELECT * FROM notices WHERE phase_id = ? ORDER BY id DESC", (phase_id,))]
+def all_notices(phase_id: str | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+    return [dict(r) for r in conn.execute("SELECT * FROM notices WHERE phase_id = ? ORDER BY id DESC", (_phase_id(conn, phase_id),))]
 
 
 @app.post("/api/notices", status_code=201, dependencies=[Depends(staff_only)])
-def post_notice(body: NoticeIn, phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
-    """Estate team only (no sign-in in the prototype). One-way: residents cannot reply to the whole township."""
+def post_notice(body: NoticeIn, phase_id: str | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Estate team only. One-way: residents cannot reply to the whole township. A street or block must be in the phase."""
+    phase_id = _phase_id(conn, phase_id)
+    phase = _phase_json(conn, conn.execute("SELECT * FROM phases WHERE id = ?", (phase_id,)).fetchone())
+    kind, _, place = body.audience.partition(":")
+    if kind != "phase" and place not in phase["streets" if kind == "street" else "blocks"]:
+        raise HTTPException(422, f"{place} isn't a {kind} in {phase['name']}.")
     cur = conn.execute("INSERT INTO notices (phase_id, audience, title, body, author, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                        (phase_id, body.audience, body.title.strip(), body.body.strip(), ESTATE, db.now()))
     conn.commit()
@@ -1790,7 +1835,8 @@ def official_account(unit_id: str, conn: sqlite3.Connection = Depends(get_conn))
     notices = notices_for(unit_id, conn)
     last_read = int(_profile_row(conn, unit_id)["notices_read_at"] or 0)  # id of the newest notice already seen
     conn.commit()
-    return {"name": "Taman Demo Estate Office", "verified": True, "notices": notices,
+    name = f"{_place_name(conn, _unit_row(conn, unit_id)['phase_id'])} Estate Office"
+    return {"name": name, "verified": True, "notices": notices,
             "unread": sum(1 for n in notices if n["id"] > last_read)}
 
 
@@ -1810,6 +1856,7 @@ VOICE_RETENTION_DAYS = 30
 REPORTED_VOICE_MAX_DAYS = 90  # an open report keeps the audio for review, up to this limit
 VOICE_SWEEP_SECONDS = 3600
 JOIN_CODE_DAYS = 14  # a join code from the handover pack works for two weeks, once
+MAX_SHEET = 1000  # welcome packs printed at a time
 MAX_DELEGATES = 2
 DELEGATE_RELATIONS = ("child", "spouse", "sibling", "caregiver", "other")
 
@@ -2451,11 +2498,11 @@ def _submit_repair(conn: sqlite3.Connection, ticket: sqlite3.Row, raw: bytes, su
 
 
 @app.get("/api/warranty", dependencies=[Depends(staff_only)])
-def warranty_queue(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+def warranty_queue(phase_id: str | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
     """SDP warranty team's queue."""
     rows = conn.execute(
         "SELECT w.* FROM warranty_tickets w JOIN units u ON u.id = w.unit_id WHERE u.phase_id = ? ORDER BY w.id DESC",
-        (phase_id,),
+        (_phase_id(conn, phase_id),),
     ).fetchall()
     return [_ticket_json(conn, r) for r in rows]
 
@@ -2569,7 +2616,8 @@ def _community_health(conn: sqlite3.Connection, unit_ids: list[str]) -> dict[str
             "households_reached_out": len(days), "active_circles_30d": active}
 
 @app.get("/api/dashboard", dependencies=[Depends(staff_only)])
-def dashboard(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+def dashboard(phase_id: str | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    phase_id = _phase_id(conn, phase_id)
     unit_ids = [r["id"] for r in conn.execute("SELECT id FROM units WHERE phase_id = ?", (phase_id,))]
     marks = ",".join("?" * len(unit_ids))
 
@@ -2661,16 +2709,96 @@ def issue_join_code(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) 
     row = _unit_row(conn, unit_id)
     if row["joined_at"] is not None:
         raise HTTPException(409, "This household has already joined. A lost phone is handled at the estate office, with ID.")
+    expires = (datetime.now(timezone.utc) + timedelta(days=JOIN_CODE_DAYS)).isoformat(timespec="seconds")
+    token = _new_join_code(conn, unit_id, expires)
+    conn.commit()
+    return {"token": token, "expires_at": expires}
+
+
+def _new_join_code(conn: sqlite3.Connection, unit_id: str, expires: str) -> str:
+    """A one-time code for the welcome pack. Only its hash is kept, and it cancels any older code of that home."""
     token = secrets.token_urlsafe(24)
-    now = datetime.now(timezone.utc)
-    expires = (now + timedelta(days=JOIN_CODE_DAYS)).isoformat(timespec="seconds")
     conn.execute("UPDATE join_codes SET expires_at = ? WHERE unit_id = ? AND used_at IS NULL AND expires_at > ?",
                  (db.now(), unit_id, db.now()))
     conn.execute("INSERT INTO join_codes (unit_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?)",
                  (unit_id, _token_hash(token), db.now(), expires))
-    db.append_event(conn, unit_id, "join_code_issued", {"expires_at": expires})
+    actor = _current_actor.get()
+    db.append_event(conn, unit_id, "join_code_issued", {"expires_at": expires, **({"by": actor.name} if actor else {})})
+    return token
+
+
+class JoinSheetIn(BaseModel):
+    handover_from: date | None = None
+    handover_to: date | None = None
+
+
+@app.post("/api/phases/{phase_id}/join-codes")
+def issue_join_sheet(phase_id: str, body: JoinSheetIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Welcome-pack codes for every home of a phase still to join (or those handed over in a date range), to print
+    in one go. Each works once, from now until two weeks after that home's handover date; a new sheet cancels the
+    old codes. The owner's name comes from SDP's own handover list and is printed only on their card."""
+    _pilot_only()
+    phase_id = _phase_id(conn, phase_id)
+    rows = conn.execute("SELECT * FROM units WHERE phase_id = ? AND joined_at IS NULL"
+                        " ORDER BY handover_date, street, block, floor, pos, id",  # in the order keys are handed over
+                        (phase_id,)).fetchall()
+    if body.handover_from:
+        rows = [r for r in rows if r["handover_date"] >= body.handover_from.isoformat()]
+    if body.handover_to:
+        rows = [r for r in rows if r["handover_date"] <= body.handover_to.isoformat()]
+    if len(rows) > MAX_SHEET:
+        raise HTTPException(422, f"Print up to {MAX_SHEET} welcome packs at a time: choose a shorter range of handover dates.")
+    today = datetime.now(timezone.utc).date()
+    codes = []
+    for r in rows:
+        start = max(today, date.fromisoformat(r["handover_date"]))
+        expires = datetime.combine(min(start, today + timedelta(days=90)) + timedelta(days=JOIN_CODE_DAYS),
+                                   datetime.min.time(), timezone.utc).isoformat(timespec="seconds")
+        codes.append({"unit_id": r["id"], "label": r["label"], "street": r["street"], "block": r["block"],
+                      "owner": r["record_name"], "handover_date": r["handover_date"], "lang": r["lang"],
+                      "token": _new_join_code(conn, r["id"], expires), "expires_at": expires})
     conn.commit()
-    return {"token": token, "expires_at": expires}
+    return {"phase": _place_name(conn, phase_id), "codes": codes}
+
+
+# ---------- a real phase, from SDP's handover list (pilot) ----------
+
+class PhaseImportIn(BaseModel):
+    name: str = Field(..., min_length=2, max_length=80)
+    phase_id: str | None = Field(None, max_length=40)  # an existing phase to add homes to or correct
+    csv: str = Field(..., min_length=1, max_length=phase_import.MAX_BYTES)
+    staff_name: str | None = Field(None, max_length=40)
+
+
+def _checked_list(conn: sqlite3.Connection, body: PhaseImportIn) -> phase_import.Report:
+    _pilot_only()
+    if body.phase_id is not None:
+        _phase_id(conn, body.phase_id)  # must exist
+    _check_shared_text(body.name)
+    report = phase_import.parse(body.csv)
+    phase_import.check(conn, report, body.phase_id)
+    return report
+
+
+@app.post("/api/phases/import/preview")
+def phase_import_preview(body: PhaseImportIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """What importing this list would do: every circle, and every line that needs fixing. Nothing is saved."""
+    return _checked_list(conn, body).json()
+
+
+@app.post("/api/phases/import")
+def phase_import_save(body: PhaseImportIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Save a list with no mistakes: the phase, its homes and their handover records, under the staff member's name."""
+    report = _checked_list(conn, body)
+    if report.errors:
+        raise HTTPException(422, {"code": "import", "message": f"{len(report.errors) + report.more_errors} line(s) need fixing first.",
+                                  "report": report.json()})
+    actor = _current_actor.get()
+    phase_id = body.phase_id or phase_import.new_phase_id(conn, body.name)
+    phase_import.apply(conn, report, phase_id, body.name.strip(), actor.name if actor else (body.staff_name or "SDP staff"))
+    log.info("Phase %s imported: %d added, %d corrected", phase_id, len(report.added), len(report.updated))
+    return {"phase": _phase_json(conn, conn.execute("SELECT * FROM phases WHERE id = ?", (phase_id,)).fetchone()),
+            **{k: v for k, v in report.json().items() if k in ("added", "updated", "unchanged", "kept")}}
 
 
 @app.post("/api/join/lookup")
@@ -2716,7 +2844,7 @@ PUBLIC_ENDPOINTS = {"health", "ai_status", "join_lookup", "join", "auth_me", "au
 DEMO_ENDPOINTS = {"reset_demo", "demo_photos", "use_demo_photo", "submit_demo_repair"}
 SIGNED_IN_ENDPOINTS = {"units", "phases", "photo_file", "incident_image", "warranty_image", "auth_passkey_options",
                        "auth_add_passkey"}  # anyone signed in; the photo endpoints check whose photo it is
-STAFF_ENDPOINTS = {"estate_concerns", "estate_action", "moderation_reports", "reported_voice", "review_report",
+STAFF_ENDPOINTS = {"phase_import_preview", "phase_import_save", "issue_join_sheet", "estate_concerns", "estate_action", "moderation_reports", "reported_voice", "review_report",
                    "all_notices", "post_notice", "warranty_queue", "submit_repair", "dashboard", "issue_join_code",
                    "front_desk", "paper_printed", "paper_delivered", "estate_register_renovation", "whatsapp_outbox",
                    "planner_preview", "issue_reentry_code", "add_staff_member"}
@@ -2819,7 +2947,8 @@ def _me_json(conn: sqlite3.Connection, actor: auth.Actor | None) -> dict[str, An
     if actor is None:
         return {"mode": "demo" if demo_mode() else "pilot", "signed_in": False}
     return {"mode": "pilot", "signed_in": True, "kind": "staff" if actor.is_staff else "household",
-            "unit_id": actor.unit_id, "name": actor.name, "role": actor.role, "passkeys": auth.passkey_count(conn, actor.subject)}
+            "unit_id": actor.unit_id, "phase_id": _unit_row(conn, actor.unit_id)["phase_id"] if actor.unit_id else None,
+            "name": actor.name, "role": actor.role, "passkeys": auth.passkey_count(conn, actor.subject)}
 
 
 class CredentialIn(BaseModel):
@@ -2968,9 +3097,9 @@ def _paper_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
 
 
 @app.get("/api/estate/frontdesk")
-def front_desk(phase_id: str = "demo", conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+def front_desk(phase_id: str | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     _require_sign_in_or_demo()
-    units = conn.execute("SELECT * FROM units WHERE phase_id = ? ORDER BY id", (phase_id,)).fetchall()
+    units = conn.execute("SELECT * FROM units WHERE phase_id = ? ORDER BY id", (_phase_id(conn, phase_id),)).fetchall()
     not_joined = []
     for u in units:
         if u["joined_at"] is not None:
@@ -3113,7 +3242,8 @@ def whatsapp_outbox(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) 
     for r in conn.execute("SELECT * FROM warranty_tickets WHERE unit_id = ? AND status = 'repair_submitted' AND repaired_at IS NOT NULL", (unit_id,)):
         add(r["repaired_at"], "repair", ("open",), subject=r["subject"])
     out.sort(key=lambda m: m["at"])
-    return {"channel": "whatsapp", "lang": lang, "business_name": "Keynection · Taman Demo", "messages": out[-25:]}
+    return {"channel": "whatsapp", "lang": lang, "business_name": f"Keynection · {_place_name(conn, me['phase_id'])}",
+            "messages": out[-25:]}
 
 
 # ---------- phase setup ----------
