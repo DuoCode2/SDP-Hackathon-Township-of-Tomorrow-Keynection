@@ -1,8 +1,10 @@
 import asyncio
 import base64
 import contextvars
+import csv
 import hashlib
 import hmac
+import io
 import json
 import logging
 import os
@@ -11,6 +13,7 @@ import secrets
 import shutil
 import sqlite3
 import uuid
+import zipfile
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
@@ -2667,7 +2670,8 @@ def _submit_repair(conn: sqlite3.Connection, ticket: sqlite3.Row, raw: bytes, su
         (out / f"w{ticket['id']}_{photo['id'][:12]}_overlay.jpg").write_bytes(comp.overlay_jpeg)
         (out / f"w{ticket['id']}_{photo['id'][:12]}_after.jpg").write_bytes(comp.aligned_after_jpeg)
         (out / f"w{ticket['id']}_{photo['id'][:12]}_before.jpg").write_bytes(comp.before_jpeg)
-    procore_ref = ticket["procore_ref"] or f"PC-{2000 + ticket['id']}"  # simulated link to the Procore defect item
+    # The demo shows a simulated Procore item; a pilot shows only the number SDP's warranty team writes back.
+    procore_ref = ticket["procore_ref"] or (f"PC-{2000 + ticket['id']}" if demo_mode() else None)
     conn.execute(
         "UPDATE warranty_tickets SET status = 'repair_submitted', subcontractor = ?, procore_ref = ?, repair_photo_id = ?,"
         " repair_check = ?, repaired_at = ? WHERE id = ?",
@@ -2679,6 +2683,108 @@ def _submit_repair(conn: sqlite3.Connection, ticket: sqlite3.Row, raw: bytes, su
     })
     conn.commit()
     return _ticket_json(conn, _ticket_row(conn, ticket["id"]))
+
+
+# ---------- warranty tickets to SDP's defect system (Procore) ----------
+
+PUNCH_LIST = ["Item Name", "Description", "Location", "Trade", "Assigned To", "Due Date", "Priority", "Reference", "Status",
+              "Reported On", "Days Left", "Procore Item", "Photos"]
+STATUS_NAME = {"open": "Open", "repair_submitted": "Repair submitted", "closed": "Closed"}
+CHECK_TEXT = {"restored": "matches the pre-work photo again", "still_changed": "still differs from the pre-work photo",
+              "unverified": "could not be compared with the pre-work photo"}
+PUNCH_LIST_README = """Keynection warranty tickets for Procore, {phase}, exported {day}.
+
+punch-list.csv: one row per warranty ticket. The columns use the names of Procore's punch list import (Item Name,
+Location, Assigned To, Due Date as MM/DD/YYYY, Priority). Procore asks that its template is not changed, so
+download the punch list import template of your own Procore project (Procore Imports) and copy each column of
+this file into the matching column of the template.
+
+photos/: each ticket's defect photo, the photo from before the neighbour's works (when there is one) and the
+repair photo, named by Reference (KN-...). Attach them to the Procore item.
+
+Once the item is in Procore, type its number on the ticket in Keynection (Command view, Warranty), so both
+systems point at each other and the owner sees SDP logged it.
+
+Homes appear by unit only: residents' names are not in this file. Keep it only as long as it is needed.
+"""
+
+
+class WarrantyExportIn(BaseModel):
+    which: Literal["new", "open", "all"] = "new"  # new: not taken into Procore yet; open: not closed; all
+
+
+@app.post("/api/warranty/export")
+def warranty_export(body: WarrantyExportIn, phase_id: str | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> Response:
+    """SDP's warranty team takes tickets into Procore: a punch list (CSV) and the photos, as one ZIP. The tickets in
+    it are marked as exported, so the next 'new' download has only tickets that came in since."""
+    phase_id = _phase_id(conn, phase_id)
+    where = {"new": "w.exported_at IS NULL", "open": "w.status != 'closed'", "all": "1 = 1"}[body.which]
+    rows = conn.execute(f"SELECT w.* FROM warranty_tickets w JOIN units u ON u.id = w.unit_id WHERE u.phase_id = ? AND {where}"
+                        " ORDER BY w.id", (phase_id,)).fetchall()
+    if not rows:
+        raise HTTPException(409, "Nothing new to export since the last download." if body.which == "new" else "No tickets to export.")
+    place = _place_name(conn, phase_id)
+    folder = data_dir("photos")
+    sheet, pack_buf = io.StringIO(), io.BytesIO()
+    writer = csv.writer(sheet)
+    writer.writerow(PUNCH_LIST)
+    with zipfile.ZipFile(pack_buf, "w", zipfile.ZIP_DEFLATED) as pack:
+        for r in rows:
+            unit = _unit_row(conn, r["unit_id"])
+            clock = _warranty_clock(unit, r)
+            ref = f"KN-{r['id']}"
+            photos = []
+            for kind, pid in (("defect", r["defect_photo_id"]), ("before", r["baseline_photo_id"]), ("repair", r["repair_photo_id"])):
+                if pid and (folder / f"{pid}.jpg").exists():
+                    name = f"{ref}-{kind}.jpg"
+                    pack.write(folder / f"{pid}.jpg", f"photos/{name}")
+                    photos.append(name)
+            check = json.loads(r["repair_check"]) if r["repair_check"] else None
+            notes = [f"Opened through Keynection on {date.fromisoformat(clock['notice_date']):%d %b %Y} (the owner's written notice;"
+                     f" the developer repairs within {HDA_REPAIR_DAYS} days)."]
+            if r["baseline_photo_id"]:
+                notes.append("A photo from before the neighbour's works is attached.")
+            if check:
+                notes.append(f"Repair photo {CHECK_TEXT.get(check.get('verdict'), CHECK_TEXT['unverified'])}.")
+            if r["reopen_count"]:
+                notes.append(f"Reopened {r['reopen_count']} time(s) after the owner rejected a repair.")
+            if r["owner_note"]:
+                notes.append(f"Owner's note: {r['owner_note']}")
+            where_is = unit["street"] if unit["kind"] == "terrace" else f"Block {unit['block']}"
+            open_now = r["status"] != "closed"
+            writer.writerow([
+                f"{r['subject']} ({unit['label']})"[:255], " ".join(notes), " > ".join(x for x in (place, where_is, unit["label"]) if x),
+                "", r["subcontractor"] or "", date.fromisoformat(clock["repair_due"]).strftime("%m/%d/%Y"),
+                "High" if open_now and (clock["overdue"] or clock["days_left"] <= 7) else "Medium", ref, STATUS_NAME[r["status"]],
+                date.fromisoformat(clock["notice_date"]).strftime("%m/%d/%Y"), clock["days_left"] if open_now else "",
+                r["procore_ref"] or "", "; ".join(photos),
+            ])
+        day = datetime.now(MALAYSIA).date()
+        pack.writestr("punch-list.csv", "\ufeff" + sheet.getvalue())  # the mark tells Excel it is UTF-8
+        pack.writestr("README.txt", PUNCH_LIST_README.format(phase=place, day=f"{day:%d %b %Y}"))
+    stamp = db.now()
+    conn.executemany("UPDATE warranty_tickets SET exported_at = ? WHERE id = ? AND exported_at IS NULL", [(stamp, r["id"]) for r in rows])
+    conn.commit()
+    log.info("%d warranty ticket(s) exported for Procore", len(rows))
+    return Response(pack_buf.getvalue(), media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="keynection-warranty-{day:%Y%m%d}.zip"'})
+
+
+class ProcoreRefIn(BaseModel):
+    ref: str = Field(..., min_length=1, max_length=40, pattern=r"^[A-Za-z0-9][A-Za-z0-9#./ _-]*$")
+    staff_name: str = Field(..., min_length=2, max_length=40)
+
+
+@app.post("/api/warranty/{ticket_id}/procore")
+def warranty_procore(ticket_id: int, body: ProcoreRefIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """The Procore item number, written on the ticket: both systems point at each other, and the owner's home log
+    shows that SDP logged the defect."""
+    ticket = _ticket_row(conn, ticket_id)
+    ref = body.ref.strip()
+    conn.execute("UPDATE warranty_tickets SET procore_ref = ? WHERE id = ?", (ref, ticket_id))
+    db.append_event(conn, ticket["unit_id"], "procore_linked", {"ticket_id": ticket_id, "procore_ref": ref})
+    conn.commit()
+    return _ticket_json(conn, _ticket_row(conn, ticket_id))
 
 
 @app.get("/api/warranty", dependencies=[Depends(staff_only)])
@@ -3028,7 +3134,7 @@ PUBLIC_ENDPOINTS = {"health", "ai_status", "join_lookup", "join", "auth_me", "au
 DEMO_ENDPOINTS = {"reset_demo", "demo_photos", "use_demo_photo", "submit_demo_repair"}
 SIGNED_IN_ENDPOINTS = {"units", "phases", "photo_file", "incident_image", "warranty_image", "auth_passkey_options",
                        "auth_add_passkey", "push_key", "push_status", "push_subscribe", "push_unsubscribe", "push_test"}  # anyone signed in; the photo endpoints check whose photo it is
-STAFF_ENDPOINTS = {"pilot_status", "estate_close_account", "phase_import_preview", "phase_import_save", "issue_join_sheet", "estate_concerns", "estate_action", "moderation_reports", "reported_voice", "review_report",
+STAFF_ENDPOINTS = {"warranty_export", "warranty_procore", "pilot_status", "estate_close_account", "phase_import_preview", "phase_import_save", "issue_join_sheet", "estate_concerns", "estate_action", "moderation_reports", "reported_voice", "review_report",
                    "all_notices", "post_notice", "warranty_queue", "submit_repair", "dashboard", "issue_join_code",
                    "front_desk", "paper_printed", "paper_delivered", "estate_register_renovation", "whatsapp_outbox",
                    "planner_preview", "issue_reentry_code", "add_staff_member"}

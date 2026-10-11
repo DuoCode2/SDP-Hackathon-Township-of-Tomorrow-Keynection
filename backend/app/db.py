@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS warranty_tickets (
     repair_check TEXT,
     owner_note TEXT,
     reopen_count INTEGER NOT NULL DEFAULT 0,
+    exported_at TEXT,  -- pilot: when SDP's warranty team last took it into Procore
     opened_at TEXT NOT NULL,
     repaired_at TEXT,
     closed_at TEXT
@@ -352,7 +353,7 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 TABLES = ("settings", "deliveries", "push_subscriptions", "auth_challenges", "webauthn_handles", "passkeys", "sessions", "access_codes", "staff", "paper_notices", "join_codes", "delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
           "warranty_tickets", "gate_logs", "passes", "incidents", "photos",
           "intro_recipients", "intros", "events", "units", "phases")

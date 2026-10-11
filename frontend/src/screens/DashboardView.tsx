@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Activity, Building2, Camera, Clock4, Flag, Handshake, HeartHandshake, House, Inbox, KeyRound, Megaphone, MessagesSquare, MicOff, RotateCcw, Send, ShieldCheck, ShieldX, Sparkles, UserCheck, Wrench } from 'lucide-react'
+import { Activity, Building2, Camera, Clock4, Download, Flag, Link2, Handshake, HeartHandshake, House, Inbox, KeyRound, Megaphone, MessagesSquare, MicOff, RotateCcw, Send, ShieldCheck, ShieldX, Sparkles, UserCheck, Wrench } from 'lucide-react'
 import { api, type Concern, type Dashboard, type ModerationReport, type Notice, type WarrantyTicket } from '../api'
 import { SHOW_CONTRACTOR_PASSES, usePilot, usePlace, type Place } from '../features'
 import ConcernCard from '../components/ConcernCard'
@@ -85,6 +85,7 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
                 <Card>
                   <CardHead icon={<Wrench size={16} />} tone="blue" title="Warranty queue" sub="Building-defect decisions land here with the photos attached"
                     right={<div className="head-badges"><Badge tone="blue">{d.warranty_open} open</Badge><Badge tone="brand">{d.warranty_closed} closed</Badge></div>} />
+                  {pilot && queue.length > 0 && <ToProcore queue={queue} onChange={onChange} />}
                   {queue.length === 0 ? (
                     <Empty art="inbox" icon={<Inbox size={22} />} title="No tickets yet">When neighbours agree a change is a building defect, the ticket appears here automatically.</Empty>
                   ) : (
@@ -178,6 +179,71 @@ function Kpi({ icon, label, value, sub }: { icon: ReactNode; label: string; valu
   )
 }
 
+/** Pilot: the warranty team takes tickets into Procore (a punch list and the photos), then writes the item number back. */
+function ToProcore({ queue, onChange }: { queue: WarrantyTicket[]; onChange: () => void }) {
+  const toast = useToast()
+  const [which, setWhich] = useState<'new' | 'open' | 'all'>('new')
+  const [busy, setBusy] = useState(false)
+  async function download() {
+    setBusy(true)
+    try {
+      const zip = await api.warrantyExport(which)
+      const url = URL.createObjectURL(zip)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `keynection-warranty-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.zip`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 2000)
+      toast('Downloaded: a punch list and the photos, ready for Procore')
+      onChange()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not prepare the download', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const open = queue.filter((t) => t.status !== 'closed').length
+  return (
+    <div className="to-procore">
+      <div className="small"><b>To Procore</b> · a punch list (CSV) with each ticket's photos. Copy the columns into your project's Procore import template, then type each item's number on its ticket below.</div>
+      <div className="btn-row">
+        <select value={which} onChange={(e) => setWhich(e.target.value as 'new' | 'open' | 'all')} aria-label="Which tickets">
+          <option value="new">New since the last download</option>
+          <option value="open">All open ({open})</option>
+          <option value="all">All ({queue.length})</option>
+        </select>
+        <button className="btn btn-sm btn-primary" disabled={busy} onClick={download}><Download size={14} /> Download for Procore</button>
+      </div>
+    </div>
+  )
+}
+
+/** Pilot: the Procore item number, written on the ticket (the owner's home log shows SDP logged it). */
+function ProcoreNumber({ ticket, onChange }: { ticket: WarrantyTicket; onChange: () => void }) {
+  const toast = useToast()
+  const pilot = usePilot()
+  const [ref, setRef] = useState(ticket.procore_ref ?? '')
+  async function save() {
+    try {
+      await api.linkProcore(ticket.id, ref.trim(), pilot?.me.name ?? '')
+      toast(`Procore item ${ref.trim()} linked to ticket #${String(ticket.id).padStart(3, '0')}`)
+      onChange()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not save', 'error')
+    }
+  }
+  return (
+    <div className="procore-number">
+      <label className="field">Procore item no.
+        <input value={ref} maxLength={40} placeholder="e.g. 457" onChange={(e) => setRef(e.target.value)} />
+      </label>
+      <button className="btn btn-sm" disabled={!ref.trim() || ref.trim() === (ticket.procore_ref ?? '')} onClick={save}><Link2 size={14} /> Link</button>
+    </div>
+  )
+}
+
 function QueueItem({ ticket, onChange }: { ticket: WarrantyTicket; onChange: () => void }) {
   const toast = useToast()
   const pilot = usePilot()
@@ -224,6 +290,7 @@ function QueueItem({ ticket, onChange }: { ticket: WarrantyTicket; onChange: () 
         {ticketBadge(tEn, ticket.status)}
       </div>
       <WarrantyClock clock={ticket.clock} closed={ticket.status === 'closed'} compact />
+      {pilot && <ProcoreNumber key={ticket.procore_ref ?? ''} ticket={ticket} onChange={onChange} />}
       {ticket.status === 'open' && (
         <>
           {pilot ? (

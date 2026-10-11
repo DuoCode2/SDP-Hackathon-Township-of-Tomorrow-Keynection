@@ -1655,6 +1655,12 @@ button.ring-row:hover { background: var(--surface-2); }
 .health-grid dt { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .health-grid dd { margin: 0; font-size: 13.5px; color: var(--ink); word-break: break-word; }
 
+/* Pilot: warranty tickets to Procore */
+.to-procore { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); }
+.to-procore select { height: 34px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface); color: var(--ink); font-weight: 600; }
+.procore-number { display: flex; align-items: flex-end; gap: 8px; }
+.procore-number .field { flex: 1; min-width: 0; }
+
 /* Welcome-pack cards: on screen over everything, and on paper two to a row, never split across pages. */
 .welcome-sheet { position: fixed; inset: 0; z-index: 300; overflow: auto; padding: 16px; background: var(--bg); }
 .welcome-sheet-bar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: -16px -16px 16px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--line-2); }

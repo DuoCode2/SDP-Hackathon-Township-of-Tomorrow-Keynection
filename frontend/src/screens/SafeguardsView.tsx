@@ -184,6 +184,7 @@ const RISKS: Risk[] = [
       { text: 'Every line of the handover list is checked before anything is saved (two homes in one place, a reused unit code, a date that doesn’t exist); a household that joined keeps its place', built: true },
       { text: 'Welcome-pack codes work once, until two weeks after that home’s keys; printing a new set cancels the old codes', built: true },
       { text: 'A newer version of Keynection never rebuilds a pilot’s records: it only adds tables and columns, and stops before changing anything else', built: true },
+      { text: 'Warranty tickets go to SDP’s defect system (Procore) as a punch list with photos, homes by unit only; a pilot shows only the Procore number SDP writes back, never an invented one', built: true },
       { text: 'Encryption at rest and an access log the household can see', built: false },
     ],
   },

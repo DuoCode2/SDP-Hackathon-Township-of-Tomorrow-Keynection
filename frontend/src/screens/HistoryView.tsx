@@ -57,6 +57,16 @@ function describe(t: Translate, dates: ReturnType<typeof useDates>, label: (id: 
       return { icon: <KeyRound size={17} />, title: t('lg.joinCode') }
     case 'joined':
       return { icon: <UserPlus size={17} />, title: t('lg.joined') }
+    case 'digital_key_added':
+      return { icon: <KeyRound size={17} />, title: t('lg.key') }
+    case 'reentry_code_issued':
+      return { icon: <KeyRound size={17} />, title: t('lg.reentry') }
+    case 'signed_in_again':
+      return { icon: <KeyRound size={17} />, title: t('lg.signedAgain') }
+    case 'account_closed':
+      return { icon: <UserPlus size={17} />, title: t('lg.closed'), detail: s('by') === 'household' ? t('lg.closed.self') : t('lg.closed.estate', { by: s('by') }) }
+    case 'procore_linked':
+      return { icon: <Wrench size={17} />, title: t('lg.procore', { n: String(p.ticket_id ?? '').padStart(3, '0') }), detail: s('procore_ref') }
     case 'notice_delivered_on_paper':
       return { icon: <MailCheck size={17} />, title: t('lg.paper'), detail: t('lg.paper.d', { to: s('delivered_to'), by: s('delivered_by') }) }
     default:

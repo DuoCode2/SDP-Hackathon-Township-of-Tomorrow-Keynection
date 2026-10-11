@@ -885,6 +885,18 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, 'Could not prepare your data')
     return res.blob()
   },
+  /** Pilot: warranty tickets for Procore, as a ZIP (a punch list and the photos). */
+  warrantyExport: async (which: 'new' | 'open' | 'all') => {
+    const res = await fetch(inPhase('/api/warranty/export'), json('POST', { which }))
+    signInAgain(res.status)
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      throw new ApiError(res.status, typeof body?.detail === 'string' ? body.detail : 'Could not prepare the download')
+    }
+    return res.blob()
+  },
+  linkProcore: (ticketId: number, ref: string, staffName: string) =>
+    request<WarrantyTicket>(`/api/warranty/${ticketId}/procore`, json('POST', { ref, staff_name: staffName })),
   officialRead: (unitId: string) => request(`/api/units/${unitId}/official/read`, { method: 'POST' }),
   conversations: (unitId: string) => request<Conversation[]>(`/api/units/${unitId}/conversations`),
   thread: (unitId: string, otherId: string) => request<Thread>(`/api/units/${unitId}/conversations/${otherId}`),

@@ -74,6 +74,17 @@ Pilot health**.
    **Share → Add to Home Screen** first; the app shows how).
 4. A lost phone: **Front desk → Lost phone · re-entry code**, after checking the owner's ID.
 
+## 5a. Warranty tickets into Procore
+
+**Command view → Warranty → To Procore** downloads a ZIP: `punch-list.csv` (one row per ticket, with the column
+names of Procore's punch list import: Item Name, Location, Assigned To, Due Date as MM/DD/YYYY, Priority), the
+defect, pre-work and repair photos named by Reference (`KN-…`), and a README. Procore asks that its import template
+is not changed, so copy each column into the punch list import template of your own Procore project (Procore
+Imports), and attach the photos to the items. Then type each Procore item number on its ticket in Keynection: the
+owner's home log shows that SDP logged the defect. "New since the last download" gives only tickets not downloaded
+before. Homes appear by unit only, never by name. A direct link to Procore's API needs your Procore company and
+project IDs and an API client; the export works without them.
+
 ## 6. Backups
 
 - Every day the server copies the database and mirrors the photos into `/data/backups`, keeping 14 days (the
