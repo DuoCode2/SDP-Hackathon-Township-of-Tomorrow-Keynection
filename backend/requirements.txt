@@ -13,3 +13,6 @@ httpx==0.28.1
 anthropic==1.13.0
 # Passkey sign-in for pilot mode (WebAuthn).
 webauthn==3.0.1
+# Pilot notifications (web push): encrypts each alert for one phone (RFC 8291); signing and sending use
+# cryptography and httpx, already here.
+http_ece==1.2.1

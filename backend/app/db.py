@@ -281,6 +281,32 @@ CREATE TABLE IF NOT EXISTS auth_challenges (
     subject TEXT,
     expires_at TEXT NOT NULL
 );
+-- Pilot: phones that turned notifications on (web push). The endpoint is the address of that phone at its push
+-- service (Google, Apple, Mozilla or Microsoft); the two keys let this server encrypt alerts for that phone only.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subject TEXT NOT NULL,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    last_sent_at TEXT,
+    failures INTEGER NOT NULL DEFAULT 0
+);
+-- Each alert goes to a household (or the estate office) once per channel: sent, or skipped (a chat alert at night).
+CREATE TABLE IF NOT EXISTS deliveries (
+    subject TEXT NOT NULL,
+    ref TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('sent', 'skipped')),
+    at TEXT NOT NULL,
+    PRIMARY KEY (subject, ref, channel)
+);
+-- This server's own settings, e.g. its notification signing key (made once, kept with the data).
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS paper_notices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     intro_id INTEGER NOT NULL REFERENCES intros(id),
@@ -326,8 +352,8 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 13
-TABLES = ("auth_challenges", "webauthn_handles", "passkeys", "sessions", "access_codes", "staff", "paper_notices", "join_codes", "delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
+SCHEMA_VERSION = 14
+TABLES = ("settings", "deliveries", "push_subscriptions", "auth_challenges", "webauthn_handles", "passkeys", "sessions", "access_codes", "staff", "paper_notices", "join_codes", "delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
           "warranty_tickets", "gate_logs", "passes", "incidents", "photos",
           "intro_recipients", "intros", "events", "units", "phases")
 

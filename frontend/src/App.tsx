@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Building2, Calculator, Camera, CalendarClock, CircleUserRound, Columns2, Compass, Grid3x3, HandHeart, Hexagon, Languages, LayoutDashboard, LogOut, MessagesSquare, Network, ShieldHalf, Smartphone } from 'lucide-react'
 import { api, onReachability, setPhaseId, type AuthMe, type PhaseInfo, type UnitInfo } from './api'
+import { forgetThisPhone, onOpenTab, syncPush } from './push'
 import { Avatar, ToastProvider } from './ui'
 import type { GuideLang, TabId } from './guide'
 import { EnglishOnly, LangProvider, langChosen, useDates, useLang, type UiLang } from './i18n'
@@ -115,7 +116,9 @@ function Gate() {
     api.authMe().then((m) => { setMe(m); setDown(false) }).catch(() => setDown(true))
   }, [])
   useEffect(() => { refresh() }, [refresh])
-  const signOut = useCallback(() => { api.signout().catch(() => {}).finally(refresh) }, [refresh])
+  const signOut = useCallback(() => {
+    forgetThisPhone().finally(() => api.signout().catch(() => {}).finally(refresh))
+  }, [refresh])
   const pilot = useMemo<Pilot | null>(() => (me?.mode === 'pilot' && me.signed_in ? { me, refresh, signOut } : null), [me, refresh, signOut])
   // Pilot: the phases this person may see (a household: its own), and which one staff are looking at.
   const [phases, setPhases] = useState<PhaseInfo[] | null>(null)
@@ -124,7 +127,10 @@ function Gate() {
   const signedIn = pilot ? `${pilot.me.kind}:${pilot.me.unit_id ?? pilot.me.name}` : ''
   useEffect(() => {
     setPhases(null)
-    if (signedIn) loadPhases()
+    if (signedIn) {
+      loadPhases()
+      void syncPush()  // a phone with notifications on keeps getting them for whoever is signed in now
+    }
   }, [signedIn, loadPhases])
   const choose = useCallback((id: string) => {
     setChosen(id)
@@ -195,6 +201,13 @@ function Shell({ pinned }: { pinned?: string }) {
   useEffect(() => {
     api.units().then((u) => setUnits(u)).catch(() => {})
   }, [version])
+  // Pilot: a tapped notification opens its screen.
+  useEffect(() => {
+    if (!pinned) return
+    return onOpenTab((tab) => {
+      if (RESIDENT_TABS.includes(tab as TabId)) setPanes((ps) => ps.map((p, i) => (i === 0 ? { ...p, tab: tab as TabId, peer: undefined } : p)))
+    })
+  }, [pinned])
   // Pilot, first visit on this phone: the app speaks the language the household chose when it joined.
   useEffect(() => {
     const mine = pinned ? units.find((u) => u.id === pinned) : undefined
@@ -422,6 +435,7 @@ function StaffShell({ phases, current, onPhase }: { phases: PhaseInfo[]; current
   const pilot = usePilot()!
   const { t } = useLang()
   const [tab, setTab] = useState<(typeof STAFF_NAV)[number]['id']>(current ? 'sdp' : 'planner')
+  useEffect(() => onOpenTab((t) => { if (t === 'sdp') setTab('sdp') }), [])
   const [version, setVersion] = useState(0)
   const changed = () => setVersion((v) => v + 1)
   const no = (id: string) => String(STAFF_NAV.findIndex((i) => i.id === id) + 1).padStart(2, '0')

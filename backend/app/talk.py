@@ -370,6 +370,20 @@ def quiet_note(state: str | None, lang: str) -> str:
     return (QUIET_NOTE[state].get(lang) or QUIET_NOTE[state]["en"]) if state else ""
 
 
+# The first notification after a phone turns them on, so the household knows it works.
+PUSH_TEST = {
+    "en": "Notifications are on for this phone. Keynection will tell you about renovation notices, messages and repairs.",
+    "ms": "Pemberitahuan dihidupkan untuk telefon ini. Keynection akan memaklumkan notis ubah suai, mesej dan pembaikan.",
+    "zh": "这支手机已开启通知。装修通知、讯息和维修进度，Keynection 都会告诉你。",
+    "ta": "இந்தத் தொலைபேசிக்கு அறிவிப்புகள் இயக்கப்பட்டன. புதுப்பிப்பு அறிவிப்புகள், செய்திகள், பழுதுபார்ப்புகள் பற்றி "
+          "Keynection உங்களுக்குச் சொல்லும்.",
+}
+
+
+def push_test_text(lang: str) -> str:
+    return PUSH_TEST.get(lang) or PUSH_TEST["en"]
+
+
 def wa_text(key: str, lang: str, **values: str) -> str:
     template = WA_TEMPLATES[key].get(lang) or WA_TEMPLATES[key]["en"]
     return template.format(**values)

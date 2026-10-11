@@ -9,6 +9,7 @@ import { Logo } from '../components/Art'
 import IntroWizard from './IntroWizard'
 import QuietTimesCard from '../components/QuietTimes'
 import { usePilot, useShowAll } from '../features'
+import { NotificationsAsk } from '../components/Notifications'
 
 interface Props {
   me: UnitInfo
@@ -155,6 +156,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
       <ScreenTitle eyebrow={`${me.label} · ${me.kind === 'terrace' ? me.street ?? '' : t('place.block', { b: me.block ?? '' })}`} title={t('circle.title')}
         subtitle={t('circle.subtitle')}
         aside={drawn && <span className="hide-easy"><Segmented value={mode} onChange={setMode} options={[{ id: 'people', label: t('circle.people') }, { id: 'map', label: t('circle.map') }]} /></span>} />
+      {!drawn && <NotificationsAsk />}
 
       {!dir ? <Card><Skeleton lines={6} /></Card> : mode === 'people' ? (
         <>

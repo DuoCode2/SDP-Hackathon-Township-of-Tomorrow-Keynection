@@ -9,6 +9,7 @@ import RenovationWizard from '../screens/RenovationWizard'
 import { Badge, Card, CardHead, Empty, formatDate, Sheet, shortRange, Skeleton, useToast } from '../ui'
 import PaperNoticeSheet from './PaperNotice'
 import WelcomeSheet from './WelcomeSheet'
+import { NotificationsCard } from './Notifications'
 
 const STAFF = 'jiran5.staff'
 function storedStaff(): string {
@@ -148,6 +149,7 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
           </label>
         )}
       </Card>
+      {pilot && <NotificationsCard staff />}
 
       {pilot && (
         <Card>

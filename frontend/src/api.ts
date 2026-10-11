@@ -928,6 +928,11 @@ export const api = {
   saveImport: (name: string, csv: string, existing?: string) =>
     request<{ phase: PhaseInfo; added: number; updated: number; unchanged: number; kept: number }>(
       '/api/phases/import', json('POST', { name, csv, phase_id: existing ?? null })),
+  pushKey: () => request<{ key: string }>('/api/push/key'),
+  pushStatus: () => request<{ devices: number }>('/api/push/status'),
+  pushSubscribe: (sub: PushSubscriptionJSON) => request<{ devices: number }>('/api/push/subscriptions', json('POST', sub)),
+  pushUnsubscribe: (endpoint: string) => request<{ devices: number }>('/api/push/subscriptions/remove', json('POST', { endpoint })),
+  pushTest: () => request<{ sent: number; failed: number }>('/api/push/test', { method: 'POST' }),
   welcomeSheet: (from?: string, to?: string) =>
     request<{ phase: string; codes: WelcomeCard[] }>(`/api/phases/${encodeURIComponent(phaseId)}/join-codes`,
       json('POST', { handover_from: from || null, handover_to: to || null })),

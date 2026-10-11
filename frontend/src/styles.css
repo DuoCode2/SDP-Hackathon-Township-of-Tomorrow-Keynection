@@ -1633,6 +1633,13 @@ button.ring-row:hover { background: var(--surface-2); }
 .import-ok { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--accent-text); }
 .confirm-row { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--amber-bg); border: 1px solid var(--amber-line); }
 
+/* Pilot notifications: the one-time ask on the neighbours screen */
+.push-ask { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 16px; background: var(--accent-bg); border: 1px solid var(--accent-line, var(--line-2)); color: var(--ink); }
+.push-ask > svg { flex: none; color: var(--accent-text); }
+.push-ask .grow { display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: 13.5px; line-height: 1.4; }
+.push-ask .grow small { color: var(--text-2); font-size: 12.5px; }
+.push-ask .btn { flex: none; }
+
 /* Welcome-pack cards: on screen over everything, and on paper two to a row, never split across pages. */
 .welcome-sheet { position: fixed; inset: 0; z-index: 300; overflow: auto; padding: 16px; background: var(--bg); }
 .welcome-sheet-bar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: -16px -16px 16px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--line-2); }

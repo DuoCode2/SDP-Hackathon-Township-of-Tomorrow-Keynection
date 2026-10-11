@@ -109,9 +109,10 @@ def end_session(conn: sqlite3.Connection, token: str | None) -> None:
 
 
 def retire_all(conn: sqlite3.Connection, subject: str) -> None:
-    """A lost phone: every key and session of this subject stops working."""
+    """A lost phone: every key and session of this subject stops working, and no more alerts go to its phones."""
     conn.execute("DELETE FROM sessions WHERE subject = ?", (subject,))
     conn.execute("DELETE FROM passkeys WHERE subject = ?", (subject,))
+    conn.execute("DELETE FROM push_subscriptions WHERE subject = ?", (subject,))
     conn.commit()
 
 

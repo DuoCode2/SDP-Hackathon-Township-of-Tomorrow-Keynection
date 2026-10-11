@@ -13,6 +13,7 @@ import { Avatar, Card, CardHead, ScreenTitle, Skeleton, useToast } from '../ui'
 import { replayWelcome } from './CircleView'
 import { usePilot } from '../features'
 import { cancelled, keysSupported, makeKey, problem } from '../passkey'
+import { NotificationsCard } from '../components/Notifications'
 
 const RELATIONS: Delegate['relation'][] = ['child', 'spouse', 'sibling', 'caregiver', 'other']
 
@@ -110,6 +111,7 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
 
         <div className="col sticky">
           {pilot && <DigitalKeys />}
+          {pilot && <NotificationsCard />}
           <Card>
             <CardHead icon={<EyeOff size={16} />} title={t('me.see')} />
             <div className="share-grid">

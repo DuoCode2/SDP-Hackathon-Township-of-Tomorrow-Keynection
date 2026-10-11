@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import parse_qs, urlparse
 
+import httpx
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
@@ -26,7 +27,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from . import ai, auth, db, ledger, quiet, talk, vision
 from .neighbours import Unit, impact_reason, impact_zone, inverse_relation, neighbour_circle, street_or_block
-from . import phase_import
+from . import phase_import, push
 from .planner import MAX_HOMES, home_count, plan_phase
 from .seed import CONSENT_VERSION, CONSENT_VERSION_AI
 from .triage import triage_hint
@@ -100,8 +101,11 @@ async def lifespan(_: FastAPI):
     else:
         log.info("AI off: set ANTHROPIC_API_KEY to turn on translation and notice writing; everything else works as before")
     sweeper = asyncio.create_task(_voice_sweeper())
+    sender = None if demo_mode() else asyncio.create_task(_alert_sender())  # the demo only previews alerts
     yield
     sweeper.cancel()
+    if sender:
+        sender.cancel()
 
 
 def _sweep_once() -> int:
@@ -2843,7 +2847,7 @@ PUBLIC_ENDPOINTS = {"health", "ai_status", "join_lookup", "join", "auth_me", "au
                     "auth_signout", "auth_redeem_code", "gate_scan", "contractor_view"}
 DEMO_ENDPOINTS = {"reset_demo", "demo_photos", "use_demo_photo", "submit_demo_repair"}
 SIGNED_IN_ENDPOINTS = {"units", "phases", "photo_file", "incident_image", "warranty_image", "auth_passkey_options",
-                       "auth_add_passkey"}  # anyone signed in; the photo endpoints check whose photo it is
+                       "auth_add_passkey", "push_key", "push_status", "push_subscribe", "push_unsubscribe", "push_test"}  # anyone signed in; the photo endpoints check whose photo it is
 STAFF_ENDPOINTS = {"phase_import_preview", "phase_import_save", "issue_join_sheet", "estate_concerns", "estate_action", "moderation_reports", "reported_voice", "review_report",
                    "all_notices", "post_notice", "warranty_queue", "submit_repair", "dashboard", "issue_join_code",
                    "front_desk", "paper_printed", "paper_delivered", "estate_register_renovation", "whatsapp_outbox",
@@ -3168,25 +3172,23 @@ def estate_register_renovation(body: EstateRenovationIn, conn: sqlite3.Connectio
 
 # ---------- what reaches a household on WhatsApp ----------
 
-@app.get("/api/units/{unit_id}/whatsapp", dependencies=[Depends(staff_only)])
-def whatsapp_outbox(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
-    """The alerts this household would get from the Keynection WhatsApp Business account, in its own language.
-    Chat alerts never contain the message itself; quiet mode holds back chat alerts but not formal notices."""
+def _alerts(conn: sqlite3.Connection, unit_id: str) -> list[dict[str, Any]]:
+    """Everything this household is told about, in its own language and in time order: the WhatsApp preview shows
+    it, and in a pilot it goes to the phones that turned notifications on. Each alert has a stable reference so it
+    goes out once, and the screen a tap opens. Chat alerts never contain the message itself; quiet mode holds back
+    chat alerts but not formal notices."""
     me = _unit_row(conn, unit_id)
     p = _profile_row(conn, unit_id)
-    if me["joined_at"] is None:
-        return {"channel": "paper", "lang": me["lang"], "messages": []}
-    if not p["whatsapp_alerts"]:
-        return {"channel": "app", "lang": me["lang"], "messages": []}
     lang, quiet_mode = me["lang"], bool(p["quiet_mode"])
     out: list[dict[str, Any]] = []
 
     now = db.now()
 
-    def add(at: str, key: str, buttons: tuple[str, ...] = (), social: bool = False, **values: Any) -> None:
+    def add(at: str, key: str, ref: str, buttons: tuple[str, ...] = (), social: bool = False, tab: str = "chats",
+            **values: Any) -> None:
         if social and quiet_mode:
             return
-        out.append({"at": at, "kind": key, "scheduled": at > now,
+        out.append({"at": at, "kind": key, "ref": ref, "social": social, "tab": tab, "lang": lang, "scheduled": at > now,
                     "text": talk.wa_text(key, lang, **{k: str(v) for k, v in values.items()}),
                     "buttons": [talk.wa_button(b, lang) for b in buttons]})
 
@@ -3195,55 +3197,262 @@ def whatsapp_outbox(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) 
         if r["renovation"]:
             reno = json.loads(r["renovation"])
             scope = (_intro_in(r, lang) or {}).get("scope") or reno["scope"]
-            add(r["created_at"], "reno", ("open", "concern"), name=r["name"], label=r["label"], scope=scope,
+            add(r["created_at"], "reno", f"intro:{r['id']}", ("open", "concern"), name=r["name"], label=r["label"], scope=scope,
                 start=talk.date_text(reno["start"], lang), end=talk.date_text(reno["end"], lang),
                 hours=talk.hours_text(reno, lang), quiet=talk.quiet_note(r["quiet"], lang), contractor=reno.get("contractor") or "-")
             # Then, on their own: a reminder to photograph before the work starts, and a check once it has ended.
             first, last = date.fromisoformat(reno["start"]), date.fromisoformat(reno["end"])
             if _local_date(r["created_at"]) < first:
-                add(max(_at_local(first - timedelta(days=3), "09:00"), r["created_at"]), "reno_photo", ("photo",),
-                    label=r["label"], start=talk.date_text(reno["start"], lang))
-            add(_at_local(last + timedelta(days=1), "10:00"), "reno_done", ("all_good", "changed"),
-                label=r["label"], end=talk.date_text(reno["end"], lang))
+                add(max(_at_local(first - timedelta(days=3), "09:00"), r["created_at"]), "reno_photo", f"intro:{r['id']}:photo",
+                    ("photo",), tab="evidence", label=r["label"], start=talk.date_text(reno["start"], lang))
+            add(_at_local(last + timedelta(days=1), "10:00"), "reno_done", f"intro:{r['id']}:done", ("all_good", "changed"),
+                tab="evidence", label=r["label"], end=talk.date_text(reno["end"], lang))
         else:
-            add(r["created_at"], "hello", ("wave",), social=True, name=r["name"], label=r["label"])
+            add(r["created_at"], "hello", f"intro:{r['id']}", ("wave",), social=True, name=r["name"], label=r["label"])
     for r in conn.execute("SELECT m.*, u.resident_name AS name, u.label FROM messages m JOIN units u ON u.id = m.from_unit_id"
                           " WHERE m.to_unit_id = ? AND m.withheld = 0 AND m.kind != 'system'", (unit_id,)):
-        add(r["created_at"], "voice" if r["kind"] == "voice" else "message", ("open",), social=True, name=r["name"], label=r["label"])
+        add(r["created_at"], "voice" if r["kind"] == "voice" else "message", f"message:{r['id']}", ("open",), social=True,
+            name=r["name"], label=r["label"])
     for r in conn.execute("SELECT w.*, u.resident_name AS name, u.label FROM waves w JOIN units u ON u.id = w.from_unit_id"
                           " WHERE w.to_unit_id = ?", (unit_id,)):
         if not _blocked(conn, unit_id, r["from_unit_id"]):
-            add(r["created_at"], "wave", ("wave",), social=True, name=r["name"], label=r["label"])
+            add(r["created_at"], "wave", f"wave:{r['id']}", ("wave",), social=True, name=r["name"], label=r["label"])
     for r in conn.execute("SELECT c.*, u.label FROM contact_requests c JOIN units u ON u.id = c.from_unit_id WHERE c.to_unit_id = ?", (unit_id,)):
-        add(r["created_at"], "request", ("accept",), social=True, label=r["label"])
+        add(r["created_at"], "request", f"request:{r['id']}", ("accept",), social=True, tab="circle", label=r["label"])
     for r in conn.execute("SELECT * FROM concerns WHERE to_unit_id = ? OR from_unit_id = ?", (unit_id, unit_id)):
         other = _unit_row(conn, r["from_unit_id"] if r["to_unit_id"] == unit_id else r["to_unit_id"])
+        ref = f"concern:{r['id']}"
         if r["to_unit_id"] == unit_id:  # my renovation
-            add(r["created_at"], "concern_new", ("open",), label=other["label"], category=talk.category_label(r["category"], lang))
+            add(r["created_at"], "concern_new", f"{ref}:new", ("open",), label=other["label"],
+                category=talk.category_label(r["category"], lang))
             if r["escalated_at"]:
-                add(r["escalated_at"], "concern_estate_owner", ("open",))
+                add(r["escalated_at"], "concern_estate_owner", f"{ref}:estate", ("open",))
         else:  # a concern I raised
             if r["acknowledged_at"]:
-                add(r["acknowledged_at"], "concern_reply", ("open",), name=other["resident_name"], label=other["label"])
+                add(r["acknowledged_at"], "concern_reply", f"{ref}:reply", ("open",), name=other["resident_name"], label=other["label"])
             if r["resolved_at"]:
-                add(r["resolved_at"], "concern_sorted", ("open",), name=other["resident_name"], label=other["label"])
+                add(r["resolved_at"], "concern_sorted", f"{ref}:sorted", ("open",), name=other["resident_name"], label=other["label"])
             if r["escalated_at"]:
-                add(r["escalated_at"], "concern_estate_raiser", ("open",))
+                add(r["escalated_at"], "concern_estate_raiser", f"{ref}:estate", ("open",))
         if r["closed_at"]:
-            add(r["closed_at"], "concern_closed", ("open",), note=r["estate_note"] or "-")
+            add(r["closed_at"], "concern_closed", f"{ref}:closed", ("open",), note=r["estate_note"] or "-")
     audiences = _audiences(me)
     for r in conn.execute(f"SELECT * FROM notices WHERE phase_id = ? AND audience IN ({','.join('?' * len(audiences))})",
                           (me["phase_id"], *audiences)):
-        add(r["created_at"], "notice", ("open",), title=r["title"], body=r["body"])
+        add(r["created_at"], "notice", f"notice:{r['id']}", ("open",), title=r["title"], body=r["body"])
     for r in conn.execute("SELECT * FROM intros WHERE from_unit_id = ? AND renovation IS NOT NULL", (unit_id,)):
         reno = json.loads(r["renovation"])
-        add(_at_local(date.fromisoformat(reno["end"]) + timedelta(days=1), "10:00"), "reno_done_owner", ("open",),
-            end=talk.date_text(reno["end"], lang))
+        add(_at_local(date.fromisoformat(reno["end"]) + timedelta(days=1), "10:00"), "reno_done_owner", f"intro:{r['id']}:owner",
+            ("open",), tab="works", end=talk.date_text(reno["end"], lang))
     for r in conn.execute("SELECT * FROM warranty_tickets WHERE unit_id = ? AND status = 'repair_submitted' AND repaired_at IS NOT NULL", (unit_id,)):
-        add(r["repaired_at"], "repair", ("open",), subject=r["subject"])
+        add(r["repaired_at"], "repair", f"ticket:{r['id']}:{r['repaired_at']}", ("open",), tab="evidence", subject=r["subject"])
     out.sort(key=lambda m: m["at"])
-    return {"channel": "whatsapp", "lang": lang, "business_name": f"Keynection · {_place_name(conn, me['phase_id'])}",
-            "messages": out[-25:]}
+    return out
+
+
+@app.get("/api/units/{unit_id}/whatsapp", dependencies=[Depends(staff_only)])
+def whatsapp_outbox(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """The alerts this household would get from the Keynection WhatsApp Business account, in its own language."""
+    me = _unit_row(conn, unit_id)
+    if me["joined_at"] is None:
+        return {"channel": "paper", "lang": me["lang"], "messages": []}
+    if not _profile_row(conn, unit_id)["whatsapp_alerts"]:
+        return {"channel": "app", "lang": me["lang"], "messages": []}
+    shown = ("at", "kind", "scheduled", "text", "buttons")
+    return {"channel": "whatsapp", "lang": me["lang"], "business_name": f"Keynection · {_place_name(conn, me['phase_id'])}",
+            "messages": [{k: a[k] for k in shown} for a in _alerts(conn, unit_id)[-25:]]}
+
+
+def _staff_alerts(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    """What the estate office's phones are told about: a reported message to review, a concern passed to the estate
+    office, a new warranty ticket. In English, like SDP's screens, and never the words of a reported message."""
+    phases = {r["id"]: r["name"] for r in conn.execute("SELECT id, name FROM phases")}
+    out: list[dict[str, Any]] = []
+
+    def add(at: str, ref: str, text: str) -> None:
+        out.append({"at": at, "ref": ref, "social": False, "tab": "sdp", "lang": "en", "text": text})
+
+    for r in conn.execute("SELECT r.id, r.created_at, u.phase_id FROM reports r JOIN units u ON u.id = r.reporter_unit_id"):
+        add(r["created_at"], f"report:{r['id']}", f"A message was reported in {phases[r['phase_id']]}. Review it in Keynection.")
+    for r in conn.execute("SELECT c.id, c.escalated_at, f.label AS from_label, t.label AS to_label, t.phase_id FROM concerns c"
+                          " JOIN units f ON f.id = c.from_unit_id JOIN units t ON t.id = c.to_unit_id WHERE c.escalated_at IS NOT NULL"):
+        add(r["escalated_at"], f"concern:{r['id']}:estate",
+            f"A concern from {r['from_label']} about the renovation at {r['to_label']} ({phases[r['phase_id']]}) is now with the estate office.")
+    for r in conn.execute("SELECT w.id, w.opened_at, w.subject, u.label, u.phase_id FROM warranty_tickets w JOIN units u ON u.id = w.unit_id"):
+        add(r["opened_at"], f"ticket:{r['id']}:open", f"New warranty ticket from {r['label']} ({phases[r['phase_id']]}): {r['subject']}.")
+    out.sort(key=lambda a: a["at"])
+    return out
+
+
+# ---------- real notifications (pilot): each alert once, to the phones that turned them on ----------
+
+SOCIAL_FRESH = timedelta(minutes=30)  # a chat alert later than this stays in the app instead of ringing
+PUSH_SECONDS = 30
+
+
+def _push_contact() -> str:
+    """Who push services can contact about this server (part of every signed request)."""
+    origin = os.environ.get("KEYNECTION_ORIGIN", "").split(",")[0].strip()
+    return os.environ.get("KEYNECTION_PUSH_CONTACT", "").strip() or origin or "mailto:keynection@example.com"
+
+
+def _push_to(conn: sqlite3.Connection, phone: sqlite3.Row, alert: dict[str, Any]) -> bool:
+    """One alert to one phone. A phone its push service no longer knows is forgotten; one that keeps failing too."""
+    try:
+        status = push.send(conn, phone, alert, _push_contact())
+    except (httpx.HTTPError, OSError, ValueError) as e:
+        log.warning("push to phone %s failed: %s", phone["id"], e)
+        status = 0
+    if status in (404, 410):
+        conn.execute("DELETE FROM push_subscriptions WHERE id = ?", (phone["id"],))
+        return False
+    if 200 <= status < 300:
+        conn.execute("UPDATE push_subscriptions SET last_sent_at = ?, failures = 0 WHERE id = ?", (db.now(), phone["id"]))
+        return True
+    conn.execute("UPDATE push_subscriptions SET failures = failures + 1 WHERE id = ?", (phone["id"],))
+    conn.execute("DELETE FROM push_subscriptions WHERE id = ? AND failures >= 20", (phone["id"],))
+    return False
+
+
+def _alerts_for(conn: sqlite3.Connection, subject: str) -> list[dict[str, Any]] | None:
+    if subject.startswith("unit:"):
+        row = conn.execute("SELECT joined_at FROM units WHERE id = ?", (subject[5:],)).fetchone()
+        return _alerts(conn, subject[5:]) if row and row["joined_at"] else None
+    staff = conn.execute("SELECT 1 FROM staff WHERE id = ? AND revoked_at IS NULL", (subject.removeprefix("staff:"),)).fetchone()
+    return _staff_alerts(conn) if staff else None
+
+
+def dispatch_alerts(now: datetime | None = None) -> int:
+    """Send every alert that is due, once, to the phones that turned notifications on; returns how many alerts went
+    out. Only what happens after a phone turned them on (see _seen); between 22:00 and 07:00 nothing rings: formal
+    notices wait for the morning, chat alerts stay in the app (as do chat alerts older than half an hour)."""
+    now = now or datetime.now(timezone.utc)
+    local = now.astimezone(MALAYSIA)
+    night = local.hour >= 22 or local.hour < 7
+    conn = db.connect(db_path())
+    try:
+        phones: dict[str, list[sqlite3.Row]] = {}
+        for row in conn.execute("SELECT * FROM push_subscriptions ORDER BY id"):
+            phones.setdefault(row["subject"], []).append(row)
+        sent = 0
+        for subject, devices in phones.items():
+            alerts = _alerts_for(conn, subject)
+            if alerts is None:
+                continue
+            done = {r["ref"] for r in conn.execute("SELECT ref FROM deliveries WHERE subject = ? AND channel = 'push'", (subject,))}
+            for a in alerts:
+                at = datetime.fromisoformat(a["at"])
+                if a["ref"] in done or at > now:
+                    continue
+                if a["social"] and (night or now - at > SOCIAL_FRESH):
+                    status = "skipped"
+                elif night:
+                    continue  # a formal notice waits for the morning
+                else:
+                    message = {"title": "Keynection", "body": a["text"], "tag": a["ref"], "url": f"/#tab={a['tab']}", "lang": a["lang"]}
+                    for device in devices:
+                        _push_to(conn, device, message)
+                    status, sent = "sent", sent + 1
+                conn.execute("INSERT OR IGNORE INTO deliveries (subject, ref, channel, status, at) VALUES (?, ?, 'push', ?, ?)",
+                             (subject, a["ref"], status, now.isoformat(timespec="seconds")))
+                done.add(a["ref"])
+            conn.commit()
+        return sent
+    finally:
+        conn.close()
+
+
+async def _alert_sender() -> None:
+    """Pilot: look for alerts to send every half minute while the server runs."""
+    while True:
+        await asyncio.sleep(PUSH_SECONDS)
+        try:
+            await asyncio.to_thread(dispatch_alerts)
+        except Exception:  # never let a failed send stop the server
+            log.exception("sending notifications failed")
+
+
+class PushSubscriptionIn(BaseModel):
+    endpoint: str = Field(..., max_length=1000)
+    keys: dict[str, str]
+
+
+class PushEndpointIn(BaseModel):
+    endpoint: str = Field(..., max_length=1000)
+
+
+def _devices(conn: sqlite3.Connection, subject: str) -> int:
+    return conn.execute("SELECT COUNT(*) FROM push_subscriptions WHERE subject = ?", (subject,)).fetchone()[0]
+
+
+def _signed_in() -> auth.Actor:
+    _pilot_only()
+    actor = _current_actor.get()
+    if actor is None:
+        raise HTTPException(401, {"code": "signin", "message": "Please sign in again."})
+    return actor
+
+
+@app.get("/api/push/key")
+def push_key(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
+    """This server's public key: a phone accepts notifications signed with it, and from nobody else."""
+    _signed_in()
+    return {"key": push.public_key(conn)}
+
+
+@app.get("/api/push/status")
+def push_status(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, int]:
+    return {"devices": _devices(conn, _signed_in().subject)}
+
+
+def _seen(conn: sqlite3.Connection, subject: str) -> None:
+    """A phone that turns notifications on starts from now: whatever has already happened stays in the app instead of
+    arriving all at once. Reminders still to come (a photo before the works start) will ring."""
+    stamp = db.now()
+    for a in _alerts_for(conn, subject) or []:
+        if a["at"] <= stamp:
+            conn.execute("INSERT OR IGNORE INTO deliveries (subject, ref, channel, status, at) VALUES (?, ?, 'push', 'skipped', ?)",
+                         (subject, a["ref"], stamp))
+
+
+@app.post("/api/push/subscriptions")
+def push_subscribe(body: PushSubscriptionIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, int]:
+    """This phone turns notifications on. A phone that turns them on again (or for someone else) is updated."""
+    actor = _signed_in()
+    if not push.allowed(body.endpoint):
+        raise HTTPException(422, "Notifications can only go through Google's, Apple's, Mozilla's or Microsoft's push service.")
+    if not push.valid_keys(body.keys.get("p256dh", ""), body.keys.get("auth", "")):
+        raise HTTPException(422, "This phone's notification keys aren't valid. Please try again.")
+    conn.execute("INSERT INTO push_subscriptions (subject, endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?)"
+                 " ON CONFLICT(endpoint) DO UPDATE SET subject = excluded.subject, p256dh = excluded.p256dh,"
+                 " auth = excluded.auth, created_at = excluded.created_at, failures = 0",
+                 (actor.subject, body.endpoint, body.keys["p256dh"], body.keys["auth"], db.now()))
+    _seen(conn, actor.subject)
+    conn.commit()
+    return {"devices": _devices(conn, actor.subject)}
+
+
+@app.post("/api/push/subscriptions/remove")
+def push_unsubscribe(body: PushEndpointIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, int]:
+    """This phone turns notifications off (also when signing out). Only the signed-in person's own phones."""
+    actor = _signed_in()
+    conn.execute("DELETE FROM push_subscriptions WHERE endpoint = ? AND subject = ?", (body.endpoint, actor.subject))
+    conn.commit()
+    return {"devices": _devices(conn, actor.subject)}
+
+
+@app.post("/api/push/test")
+def push_test(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, int]:
+    """A first notification to every phone of the signed-in person, so they see it works."""
+    actor = _signed_in()
+    lang = _unit_row(conn, actor.unit_id)["lang"] if actor.unit_id else "en"
+    text = talk.push_test_text(lang) if actor.unit_id else (
+        "Notifications are on for this device. Keynection will tell you about reported messages, concerns passed to "
+        "the estate office and new warranty tickets.")
+    alert = {"title": "Keynection", "body": text, "tag": "test", "url": "/#tab=me" if actor.unit_id else "/#tab=sdp", "lang": lang}
+    results = [_push_to(conn, d, alert) for d in conn.execute("SELECT * FROM push_subscriptions WHERE subject = ?", (actor.subject,)).fetchall()]
+    conn.commit()
+    return {"sent": sum(results), "failed": len(results) - sum(results)}
 
 
 # ---------- phase setup ----------
