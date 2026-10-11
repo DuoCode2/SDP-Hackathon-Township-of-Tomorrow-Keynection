@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   ArrowUpRight, BellOff, Ban, Check, Download, EyeOff, Fingerprint, Hand, HandHeart, Hexagon, KeyRound, Languages, Lock, LogOut, MessageCircle,
-  ShieldHalf, Type, UserPlus, UserRound,
+  ShieldHalf, Type, UserPlus, UserRound, UserX,
 } from 'lucide-react'
 import { api, type Delegate, type Lang, type Profile, type UnitInfo } from '../api'
 import { LANGS } from '../messages'
@@ -14,6 +14,7 @@ import { replayWelcome } from './CircleView'
 import { usePilot } from '../features'
 import { cancelled, keysSupported, makeKey, problem } from '../passkey'
 import { NotificationsCard } from '../components/Notifications'
+import { forgetThisPhone } from '../push'
 
 const RELATIONS: Delegate['relation'][] = ['child', 'spouse', 'sibling', 'caregiver', 'other']
 
@@ -39,7 +40,7 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
     }
   }, [me.id, version])
 
-  async function update(patch: Partial<Omit<Profile, 'unit_id' | 'blocked'>>, done?: string) {
+  async function update(patch: Partial<Omit<Profile, 'unit_id' | 'blocked'>> & { name?: string }, done?: string) {
     setSaving(true)
     setTone(null)
     try {
@@ -77,6 +78,7 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
                 <div className="profile-bio">{p.bio ? `“${p.bio}”` : t('me.noBio')}</div>
               </div>
             </div>
+            {pilot && <NameField me={me} saving={saving} onSave={(name) => update({ name }, t('me.nameSaved'))} />}
             <label className="field">{t('me.bioField')}
               <input value={bio} maxLength={80} onChange={(e) => { setBio(e.target.value); setTone(null) }} placeholder={t('me.bioPlaceholder')} />
             </label>
@@ -133,6 +135,7 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
           </Card>
 
           <YourData me={me} />
+          {pilot && <CloseAccount me={me} />}
 
           <Card>
             <CardHead icon={<Languages size={16} />} title={t('me.shortcuts')} />
@@ -148,6 +151,56 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
 }
 
 /** Pilot mode: the phones that can sign in as this home, add one more, or sign out. */
+/** Pilot: correct the name neighbours see (PDPA). The same checks as at joining. */
+function NameField({ me, saving, onSave }: { me: UnitInfo; saving: boolean; onSave: (name: string) => void }) {
+  const t = useT()
+  const [name, setName] = useState(me.resident_name)
+  return (
+    <div className="name-field">
+      <label className="field">{t('me.nameField')}
+        <input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
+      </label>
+      <button className="btn btn-sm" disabled={saving || name.trim().length < 2 || name.trim() === me.resident_name} onClick={() => onSave(name.trim())}>
+        <Check size={14} /> {t('btn.save')}
+      </button>
+    </div>
+  )
+}
+
+/** Pilot: the household closes its account (PDPA). It types its own unit to confirm; then it is signed out. */
+function CloseAccount({ me }: { me: UnitInfo }) {
+  const t = useT()
+  const toast = useToast()
+  const pilot = usePilot()
+  const [typed, setTyped] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function close() {
+    setBusy(true)
+    try {
+      await forgetThisPhone()
+      await api.closeAccount(me.id, typed)
+      try { sessionStorage.setItem('keynection.closed', '1') } catch { /* private window: no note on the next screen */ }
+      pilot?.refresh()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : t('si.failed'), 'error')
+      setBusy(false)
+    }
+  }
+  return (
+    <Card className="danger-card">
+      <CardHead icon={<UserX size={16} />} tone="red" title={t('close.title')} />
+      <p className="small">{t('close.what')}</p>
+      <small className="muted">{t('close.first')} {t('close.again')}</small>
+      <label className="field">{t('close.type', { label: me.label })}
+        <input value={typed} maxLength={40} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
+      </label>
+      <button className="btn btn-sm btn-danger" disabled={busy || typed.trim().toLowerCase() !== me.label.toLowerCase()} onClick={close}>
+        <UserX size={14} /> {t('close.button')}
+      </button>
+    </Card>
+  )
+}
+
 function DigitalKeys() {
   const t = useT()
   const toast = useToast()

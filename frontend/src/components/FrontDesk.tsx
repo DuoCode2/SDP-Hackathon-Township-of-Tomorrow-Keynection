@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
-import { ClipboardPen, Eye, KeyRound, Printer, QrCode, Send, Smartphone, UserCheck, UserPlus } from 'lucide-react'
+import { ClipboardPen, Eye, KeyRound, Printer, QrCode, Send, Smartphone, UserCheck, UserPlus, UserX } from 'lucide-react'
 import { api, type FrontDesk as Desk, type PaperNotice, type UnitInfo, type WelcomeCard } from '../api'
 import { EnglishOnly } from '../i18n'
 import { usePilot } from '../features'
@@ -48,6 +48,10 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [confirmPacks, setConfirmPacks] = useState(false)
+  // Pilot: an owner asks at the counter to close their account (after an ID check).
+  const [closing, setClosing] = useState('')
+  const [idChecked, setIdChecked] = useState(false)
+  const [confirmClose, setConfirmClose] = useState(false)
   const [sheet, setSheet] = useState<{ phase: string; codes: WelcomeCard[] } | null>(null)
 
   useEffect(() => {
@@ -130,6 +134,21 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
       onChange()
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Could not make the cards', 'error')
+    }
+  }
+
+  async function closeAccount() {
+    const unit = units.find((u) => u.id === closing)
+    if (!unit) return
+    try {
+      await api.estateCloseAccount(unit.id, staff.trim(), idChecked)
+      toast(`${unit.label}: account closed. Records stay by unit until their time is up.`)
+      setClosing('')
+      setIdChecked(false)
+      setConfirmClose(false)
+      onChange()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not close the account', 'error')
     }
   }
 
@@ -233,6 +252,32 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
             </label>
             <button className="btn btn-sm btn-primary desk-signed" disabled={!lost} onClick={reentry}><KeyRound size={14} /> Issue re-entry code</button>
           </div>
+        </Card>
+      )}
+      {pilot && (
+        <Card>
+          <CardHead icon={<UserX size={16} />} tone="red" title="Close an account (owner's request)"
+            sub="Check the owner's ID first. Their name, messages, photos, keys and notifications are deleted; records stay by unit until their time is up. Recorded under your name." />
+          <div className="grid-2">
+            <label className="field">Household
+              <select value={closing} onChange={(e) => { setClosing(e.target.value); setConfirmClose(false) }}>
+                <option value="">Choose…</option>
+                {owners.map((u) => <option key={u.id} value={u.id}>{u.label}{u.resident_name ? ` · ${u.resident_name}` : ''}</option>)}
+              </select>
+            </label>
+            <label className="switch-row consent desk-signed"><input type="checkbox" checked={idChecked} onChange={(e) => setIdChecked(e.target.checked)} /> I checked the owner's ID</label>
+          </div>
+          {confirmClose ? (
+            <div className="confirm-row">
+              <span className="small">This can't be undone. The household can join again later with a new join code.</span>
+              <span className="btn-row">
+                <button className="btn btn-sm btn-danger" onClick={closeAccount}><UserX size={14} /> Close this account</button>
+                <button className="btn btn-sm" onClick={() => setConfirmClose(false)}>Cancel</button>
+              </span>
+            </div>
+          ) : (
+            <button className="btn btn-sm" disabled={!closing || !idChecked} onClick={() => setConfirmClose(true)}><UserX size={14} /> Close account…</button>
+          )}
         </Card>
       )}
       {pilot && (

@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from . import ai, auth, db, ledger, quiet, talk, vision
 from .neighbours import Unit, impact_reason, impact_zone, inverse_relation, neighbour_circle, street_or_block
-from . import phase_import, push
+from . import backup, phase_import, privacy, push
 from .planner import MAX_HOMES, home_count, plan_phase
 from .seed import CONSENT_VERSION, CONSENT_VERSION_AI
 from .triage import triage_hint
@@ -95,6 +95,10 @@ async def lifespan(_: FastAPI):
     db.init_db(conn, keep_data=not demo_mode())  # a pilot's records are never rebuilt
     _expire_voice(conn)
     conn.close()
+    try:
+        _daily_care()
+    except Exception:  # a failed backup or clean-up must not stop the server from starting
+        log.exception("daily clean-up and backup failed")
     vision.warm_up()  # pay OpenCV's start-up cost now, not during the first demo comparison
     if ai.enabled():
         log.info("AI translation and notice writing on (%s)", ai.model_name())
@@ -111,9 +115,49 @@ async def lifespan(_: FastAPI):
 def _sweep_once() -> int:
     conn = db.connect(db_path())
     try:
-        return _expire_voice(conn)
+        removed = _expire_voice(conn)
     finally:
         conn.close()
+    _daily_care()
+    return removed
+
+
+def _folders() -> dict[str, Path]:
+    return {name: data_dir(name) for name in ("photos", "compare", "voice")}
+
+
+def sweep_records(now: datetime | None = None) -> dict[str, int]:
+    """Delete the messages, photos and records whose time is up (see privacy.py). Returns what went, by kind."""
+    conn = db.connect(db_path())
+    try:
+        gone = privacy.sweep(conn, now or datetime.now(timezone.utc), _folders())
+    finally:
+        conn.close()
+    if gone:
+        log.info("records whose time was up deleted: %s", gone)
+    return gone
+
+
+def backup_dir() -> Path:
+    return Path(os.environ.get("KEYNECTION_BACKUP_DIR", "").strip() or data_dir("backups"))
+
+
+def _daily_care() -> None:
+    """Once a day: delete what the privacy notice says goes, then (pilot) back everything up, kept 14 days."""
+    now = datetime.now(timezone.utc)
+    conn = db.connect(db_path())
+    try:
+        row = conn.execute("SELECT value FROM settings WHERE key = 'records_swept_at'").fetchone()
+        if row and now - datetime.fromisoformat(row[0]) < timedelta(hours=23):
+            return
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('records_swept_at', ?)", (now.isoformat(timespec="seconds"),))
+        conn.commit()
+    finally:
+        conn.close()
+    sweep_records(now)
+    if not demo_mode():
+        made = backup.backup_now(db_path(), backup_dir(), {name: data_dir(name) for name in ("photos", "compare")}, now)
+        log.info("backup written: %s", made.name)
 
 
 async def _voice_sweeper() -> None:
@@ -1670,6 +1714,7 @@ class ReactIn(BaseModel):
 
 
 class ProfileIn(BaseModel):
+    name: str | None = Field(None, min_length=2, max_length=40)  # the name neighbours see (PDPA: correct your data)
     bio: str | None = Field(None, max_length=80)
     accept_requests: bool | None = None
     allow_waves: bool | None = None
@@ -1820,6 +1865,9 @@ def get_profile(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> d
 def update_profile(unit_id: str, body: ProfileIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     _require_joined(conn, unit_id)
     _profile_row(conn, unit_id)
+    if body.name is not None:
+        _check_name(body.name.strip())
+        conn.execute("UPDATE units SET resident_name = ? WHERE id = ?", (body.name.strip(), unit_id))
     if body.bio is not None:
         _check_shared_text(body.bio)
         conn.execute("UPDATE profiles SET bio = ? WHERE unit_id = ?", (body.bio.strip(), unit_id))
@@ -1967,9 +2015,8 @@ def revoke_delegate(delegate_id: int, body: RevokeIn, conn: sqlite3.Connection =
 
 @app.get("/api/units/{unit_id}/export")
 def export_my_data(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> JSONResponse:
-    """PDPA right of access: everything Keynection holds about this household, as one file.
-    Other residents appear by unit only, never by name. It bundles a whole household's records, so outside demo mode
-    it stays off until residents sign in (WhatsApp one-time code in the pilot)."""
+    """PDPA right of access: everything Keynection holds about this household, as one file. Other residents appear
+    by unit only, never by name. In a pilot only the signed-in household gets its own (the guard checks the unit)."""
     _require_sign_in_or_demo()
     me = _unit_row(conn, unit_id)
     label = lambda uid: _unit_row(conn, uid)["label"] if uid else "Estate team"  # noqa: E731
@@ -1995,7 +2042,7 @@ def export_my_data(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
                          "text": f"Voice message ({r['body']}s)" if r["kind"] == "voice" else r["body"], "sent_by": r["sent_by"]})
     data = {
         "exported_at": db.now(),
-        "about": "Your data held by Keynection (prototype). Other residents are listed by unit, not by name.",
+        "about": "Your data held by Keynection. Other residents are listed by unit, not by name.",
         "household": {"unit": me["label"], "kind": me["kind"], "reading_language": me["lang"], "handover_date": me["handover_date"],
                       "joined_at": me["joined_at"], "privacy_notice_agreed": me["consent_version"],
                       "whatsapp_alerts": bool(p["whatsapp_alerts"]), "easy_mode": bool(p["easy_mode"])},
@@ -2023,7 +2070,49 @@ def export_my_data(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
         "home_log": db.unit_events(conn, unit_id),
     }
     conn.commit()
-    return JSONResponse(data, headers={"Content-Disposition": f'attachment; filename="keynection-{me["label"].replace(" ", "").replace(".", "")}-my-data.json"'})
+    return JSONResponse(data, headers={"Content-Disposition": f'attachment; filename="{_export_name(me["label"])}"'})
+
+
+def _export_name(label: str) -> str:
+    """keynection-No2Jln21-my-data.json: letters, digits and dashes only, whatever the address looks like."""
+    return f"keynection-{re.sub(r'[^A-Za-z0-9-]', '', label) or 'home'}-my-data.json"
+
+
+# ---------- closing an account (PDPA): the household itself, or the estate office after checking ID ----------
+
+class CloseIn(BaseModel):
+    confirm: str = Field(..., max_length=40)  # the household types its own unit, e.g. "No. 11"
+
+
+@app.post("/api/units/{unit_id}/close")
+def close_my_account(unit_id: str, body: CloseIn, response: Response, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, bool]:
+    """The household leaves Keynection: its name, messages, photos, keys and phones go; records its neighbours and
+    SDP rely on stay, by unit only, until their time is up (privacy.py). Pilot only: the demo cast stays."""
+    _pilot_only()
+    row = _require_joined(conn, unit_id)
+    if body.confirm.strip().casefold() != row["label"].casefold():
+        raise HTTPException(422, f"To close the account, type your unit exactly: {row['label']}.")
+    privacy.close_account(conn, unit_id, "household", _folders())
+    response.delete_cookie(auth.SESSION_COOKIE, path="/")
+    return {"closed": True}
+
+
+class EstateCloseIn(BaseModel):
+    staff_name: str = Field(..., min_length=2, max_length=40)
+    unit_id: str = Field(..., pattern=UNIT_ID)
+    id_checked: bool
+
+
+@app.post("/api/estate/close-account")
+def estate_close_account(body: EstateCloseIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, bool]:
+    """For an owner who asks at the counter (no phone, lost access): only after checking their ID, on record."""
+    _pilot_only()
+    if not body.id_checked:
+        raise HTTPException(422, "Check the owner's ID first: closing deletes the household's messages and photos.")
+    _check_shared_text(body.staff_name)
+    _require_joined(conn, body.unit_id)
+    privacy.close_account(conn, body.unit_id, f"estate office ({body.staff_name.strip()})", _folders())
+    return {"closed": True}
 
 
 # ---------- layer 3: prove ----------
@@ -2848,7 +2937,7 @@ PUBLIC_ENDPOINTS = {"health", "ai_status", "join_lookup", "join", "auth_me", "au
 DEMO_ENDPOINTS = {"reset_demo", "demo_photos", "use_demo_photo", "submit_demo_repair"}
 SIGNED_IN_ENDPOINTS = {"units", "phases", "photo_file", "incident_image", "warranty_image", "auth_passkey_options",
                        "auth_add_passkey", "push_key", "push_status", "push_subscribe", "push_unsubscribe", "push_test"}  # anyone signed in; the photo endpoints check whose photo it is
-STAFF_ENDPOINTS = {"phase_import_preview", "phase_import_save", "issue_join_sheet", "estate_concerns", "estate_action", "moderation_reports", "reported_voice", "review_report",
+STAFF_ENDPOINTS = {"estate_close_account", "phase_import_preview", "phase_import_save", "issue_join_sheet", "estate_concerns", "estate_action", "moderation_reports", "reported_voice", "review_report",
                    "all_notices", "post_notice", "warranty_queue", "submit_repair", "dashboard", "issue_join_code",
                    "front_desk", "paper_printed", "paper_delivered", "estate_register_renovation", "whatsapp_outbox",
                    "planner_preview", "issue_reentry_code", "add_staff_member"}

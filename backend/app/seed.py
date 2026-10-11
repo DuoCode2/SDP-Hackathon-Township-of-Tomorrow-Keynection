@@ -10,8 +10,9 @@ MALAYSIA = timezone(timedelta(hours=8))
 HANDOVER_DAYS_AGO = 14
 # Version of the plain-language privacy notice a household agrees to when it joins (PDPA consent). Where AI is on,
 # the notice has one more paragraph (what residents type is translated by Claude, outside Malaysia): its own version.
-CONSENT_VERSION = "pilot-2026-10"
-CONSENT_VERSION_AI = "pilot-2026-10-ai"
+# 10b: how long each kind of data is kept, said exactly; backups; closing the account in the app.
+CONSENT_VERSION = "pilot-2026-10b"
+CONSENT_VERSION_AI = "pilot-2026-10b-ai"
 
 # Households that have not joined Keynection yet. Until they do, neighbours see their unit number only, never a name,
 # and renovation notices reach them on paper through the estate office.

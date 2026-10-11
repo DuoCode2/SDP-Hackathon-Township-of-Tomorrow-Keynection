@@ -1640,6 +1640,12 @@ button.ring-row:hover { background: var(--surface-2); }
 .push-ask .grow small { color: var(--text-2); font-size: 12.5px; }
 .push-ask .btn { flex: none; }
 
+/* Pilot privacy: correcting the name, closing the account */
+.name-field { display: flex; align-items: flex-end; gap: 8px; }
+.name-field .field { flex: 1; min-width: 0; }
+.danger-card { border-color: var(--red-line); }
+.danger-card .field input { border-color: var(--red-line); }
+
 /* Welcome-pack cards: on screen over everything, and on paper two to a row, never split across pages. */
 .welcome-sheet { position: fixed; inset: 0; z-index: 300; overflow: auto; padding: 16px; background: var(--bg); }
 .welcome-sheet-bar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: -16px -16px 16px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--line-2); }

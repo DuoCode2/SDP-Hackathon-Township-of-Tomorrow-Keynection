@@ -26,6 +26,16 @@ export default function SignInView({ initialJoin, initialCode, onSignedIn }: {
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const supported = keysSupported()
+  // Just closed the account on this phone: say so once.
+  const [closed] = useState(() => {
+    try {
+      const was = sessionStorage.getItem('keynection.closed') === '1'
+      sessionStorage.removeItem('keynection.closed')
+      return was
+    } catch {
+      return false
+    }
+  })
 
   async function redeem(token: string) {
     setBusy(true)
@@ -78,6 +88,7 @@ export default function SignInView({ initialJoin, initialCode, onSignedIn }: {
           <h1>{t('si.title')}</h1>
           <p>{t('si.lead')}</p>
         </div>
+        {closed && <Card className="join-card"><b>{t('close.done')}</b><small className="muted">{t('close.again')}</small></Card>}
         <Card className="join-card">
           {!supported && <div className="tone-check"><TriangleAlert size={15} /><div>{t('si.unsupported')}</div></div>}
           {note && <div className="tone-check" role="alert"><TriangleAlert size={15} /><div>{note}</div></div>}

@@ -857,7 +857,7 @@ export const api = {
   },
   voiceUrl: (messageId: number, unitId: string) => `/api/messages/${messageId}/voice?unit_id=${encodeURIComponent(unitId)}`,
   profile: (unitId: string) => request<Profile>(`/api/units/${unitId}/profile`),
-  updateProfile: (unitId: string, patch: Partial<Omit<Profile, 'unit_id' | 'blocked'>>) =>
+  updateProfile: (unitId: string, patch: Partial<Omit<Profile, 'unit_id' | 'blocked'>> & { name?: string }) =>
     request<Profile>(`/api/units/${unitId}/profile`, json('PUT', patch)),
   official: (unitId: string) => request<Official>(`/api/units/${unitId}/official`),
   delegates: (unitId: string) => request<Delegate[]>(`/api/units/${unitId}/delegates`),
@@ -928,6 +928,9 @@ export const api = {
   saveImport: (name: string, csv: string, existing?: string) =>
     request<{ phase: PhaseInfo; added: number; updated: number; unchanged: number; kept: number }>(
       '/api/phases/import', json('POST', { name, csv, phase_id: existing ?? null })),
+  closeAccount: (unitId: string, confirm: string) => request<{ closed: boolean }>(`/api/units/${unitId}/close`, json('POST', { confirm })),
+  estateCloseAccount: (unitId: string, staffName: string, idChecked: boolean) =>
+    request<{ closed: boolean }>('/api/estate/close-account', json('POST', { unit_id: unitId, staff_name: staffName, id_checked: idChecked })),
   pushKey: () => request<{ key: string }>('/api/push/key'),
   pushStatus: () => request<{ devices: number }>('/api/push/status'),
   pushSubscribe: (sub: PushSubscriptionJSON) => request<{ devices: number }>('/api/push/subscriptions', json('POST', sub)),
