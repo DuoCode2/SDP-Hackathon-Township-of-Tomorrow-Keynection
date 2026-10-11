@@ -2,7 +2,8 @@
 # Settings come from the host: PORT (set by the host), a volume mounted at /data so the database and photos survive
 # restarts, and either JIRAN_SITE_PASSWORD (the demo: required online, the demo has no sign-in) or, for a pilot with
 # real households, JIRAN_DEMO_MODE=0 and KEYNECTION_ORIGIN (everyone signs in with a digital key; no site password).
-# The first staff member of a pilot: python backend/scripts/add_staff.py "Name" --role estate (in the container).
+# The first staff member of a pilot: set KEYNECTION_FIRST_STAFF="Name" (their sign-in link appears in the log), or run
+# python backend/scripts/add_staff.py "Name" --role estate in the container. See docs/pilot-deployment.md.
 
 # 1) Build the web app (same Node major version as the team's laptops)
 FROM node:24-slim AS web

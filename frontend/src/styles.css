@@ -1646,6 +1646,15 @@ button.ring-row:hover { background: var(--surface-2); }
 .danger-card { border-color: var(--red-line); }
 .danger-card .field input { border-color: var(--red-line); }
 
+/* Pilot health, for staff */
+.health-checks { margin: 0; padding: 10px 12px; list-style: none; display: grid; gap: 6px; border-radius: 12px; background: var(--amber-bg); border: 1px solid var(--amber-line); color: var(--amber); font-size: 13px; }
+.health-checks li { display: flex; gap: 8px; align-items: flex-start; }
+.health-checks svg { flex: none; margin-top: 2px; }
+.health-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 8px 14px; margin: 0; }
+.health-grid div { display: flex; flex-direction: column; gap: 2px; }
+.health-grid dt { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.health-grid dd { margin: 0; font-size: 13.5px; color: var(--ink); word-break: break-word; }
+
 /* Welcome-pack cards: on screen over everything, and on paper two to a row, never split across pages. */
 .welcome-sheet { position: fixed; inset: 0; z-index: 300; overflow: auto; padding: 16px; background: var(--bg); }
 .welcome-sheet-bar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: -16px -16px 16px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--line-2); }

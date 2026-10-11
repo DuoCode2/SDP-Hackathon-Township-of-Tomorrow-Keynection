@@ -665,6 +665,21 @@ export interface ImportReport {
   sample: { unit: string; label: string; circle: string[] }[]
 }
 
+/** Pilot health, for staff: setup still to do, backups, sign-ups. */
+export interface PilotStatus {
+  checks: string[]
+  origin: string | null
+  last_backup: string | null
+  backups: number
+  records_swept_at: string | null
+  phases: number
+  homes: number
+  joined: number
+  staff: number
+  phones: number
+  ai: boolean
+}
+
 /** One welcome-pack card: the owner's own one-time join code. */
 export interface WelcomeCard {
   unit_id: string
@@ -931,6 +946,7 @@ export const api = {
   closeAccount: (unitId: string, confirm: string) => request<{ closed: boolean }>(`/api/units/${unitId}/close`, json('POST', { confirm })),
   estateCloseAccount: (unitId: string, staffName: string, idChecked: boolean) =>
     request<{ closed: boolean }>('/api/estate/close-account', json('POST', { unit_id: unitId, staff_name: staffName, id_checked: idChecked })),
+  pilotStatus: () => request<PilotStatus>('/api/pilot/status'),
   pushKey: () => request<{ key: string }>('/api/push/key'),
   pushStatus: () => request<{ devices: number }>('/api/push/status'),
   pushSubscribe: (sub: PushSubscriptionJSON) => request<{ devices: number }>('/api/push/subscriptions', json('POST', sub)),

@@ -4,6 +4,7 @@ import { api, type Concern, type Dashboard, type ModerationReport, type Notice, 
 import { SHOW_CONTRACTOR_PASSES, usePilot, usePlace, type Place } from '../features'
 import ConcernCard from '../components/ConcernCard'
 import FrontDesk from '../components/FrontDesk'
+import PilotHealth from '../components/PilotHealth'
 import WarrantyClock from '../components/WarrantyClock'
 import { Badge, Card, CardHead, CountUp, Empty, formatDate, Ring, ScreenTitle, Segmented, Skeleton, useToast } from '../ui'
 import { ticketBadge } from './RepairView'
@@ -56,6 +57,7 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
     <section className="screen">
       <ScreenTitle eyebrow={`SDP · ${place.name}`} title="Command view" subtitle="What SDP's handover, warranty and estate teams would see in PACC."
         aside={d && <div className="live-pill quiet"><span className="pulse" /> LIVE · {d.households} households</div>} />
+      {pilot && <PilotHealth version={version} />}
       {!d ? (
         <Skeleton lines={6} />
       ) : (

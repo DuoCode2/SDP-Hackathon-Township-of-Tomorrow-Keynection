@@ -33,6 +33,12 @@ from .seed import CONSENT_VERSION, CONSENT_VERSION_AI
 from .triage import triage_hint
 
 log = logging.getLogger("keynection")
+if not log.handlers:  # uvicorn sets up its own loggers only: without this, Keynection's own lines never show
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:     %(message)s"))
+    log.addHandler(_handler)
+    log.setLevel(logging.INFO)
+    log.propagate = False
 
 DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "app.db"
 DEMO_PHOTO_DIR = Path(__file__).resolve().parent / "demo_photos"
@@ -99,6 +105,16 @@ async def lifespan(_: FastAPI):
         _daily_care()
     except Exception:  # a failed backup or clean-up must not stop the server from starting
         log.exception("daily clean-up and backup failed")
+    if not demo_mode():
+        conn = db.connect(db_path())
+        try:
+            first = _first_staff(conn)
+            if first:
+                log.warning("%s", first)
+            for check in _pilot_checks(conn):
+                log.warning("Pilot setup: %s", check)
+        finally:
+            conn.close()
     vision.warm_up()  # pay OpenCV's start-up cost now, not during the first demo comparison
     if ai.enabled():
         log.info("AI translation and notice writing on (%s)", ai.model_name())
@@ -136,6 +152,62 @@ def sweep_records(now: datetime | None = None) -> dict[str, int]:
     if gone:
         log.info("records whose time was up deleted: %s", gone)
     return gone
+
+
+def _origin() -> str:
+    return os.environ.get("KEYNECTION_ORIGIN", "").split(",")[0].strip().rstrip("/")
+
+
+def _first_staff(conn: sqlite3.Connection) -> str | None:
+    """A pilot on a host with no command line (Render, Railway): KEYNECTION_FIRST_STAFF="Farah Aziz" makes the first
+    staff member at start-up, and the one-time sign-in link goes to the server log, which only whoever runs the
+    server can read. Until someone has signed in, every start makes a fresh link (the old one stops working), so an
+    expired link is fixed by a restart. After the first sign-in this does nothing."""
+    name = os.environ.get("KEYNECTION_FIRST_STAFF", "").strip()
+    if demo_mode() or len(name) < 2:
+        return None
+    staff = conn.execute("SELECT * FROM staff WHERE revoked_at IS NULL ORDER BY id").fetchall()
+    subjects = [f"staff:{r['id']}" for r in staff]
+    marks = ",".join("?" * len(subjects))
+    if subjects and (conn.execute(f"SELECT 1 FROM sessions WHERE subject IN ({marks})", subjects).fetchone()
+                     or conn.execute(f"SELECT 1 FROM passkeys WHERE subject IN ({marks})", subjects).fetchone()
+                     or conn.execute(f"SELECT 1 FROM access_codes WHERE subject IN ({marks}) AND used_at IS NOT NULL", subjects).fetchone()):
+        return None  # someone has signed in: staff add colleagues in the app from now on
+    role = os.environ.get("KEYNECTION_FIRST_STAFF_ROLE", "estate").strip()
+    role = role if role in ("estate", "sdp") else "estate"
+    mine = next((r for r in staff if r["name"].casefold() == name.casefold()), None)
+    if mine is None and staff:
+        return None  # another staff member was added some other way: leave it to them
+    if mine is None:
+        _, token, expires = auth.add_staff(conn, name, role)
+    else:
+        token, expires = auth.issue_code(conn, "staff", f"staff:{mine['id']}")
+    return (f"First staff member {name}: open {_origin()}/?code={token} on your own phone to sign in and make your "
+            f"digital key (works once, until {expires}; a restart makes a new link until someone has signed in).")
+
+
+def _pilot_checks(conn: sqlite3.Connection) -> list[str]:
+    """What still stands between this server and a working pilot, in plain words: logged at start-up, shown to staff."""
+    if demo_mode():
+        return []
+    out = []
+    origin = _origin()
+    if not origin:
+        out.append("Set KEYNECTION_ORIGIN to this server's address (https://...): digital keys are made for that address.")
+    elif urlparse(origin).scheme != "https" and urlparse(origin).hostname != "localhost":
+        out.append("KEYNECTION_ORIGIN should start with https://: phones make digital keys only on a secure address.")
+    if os.environ.get("JIRAN_SITE_PASSWORD"):
+        out.append("Remove JIRAN_SITE_PASSWORD: in a pilot everyone signs in with a digital key, and residents need no shared password.")
+    if not conn.execute("SELECT COUNT(*) FROM staff WHERE revoked_at IS NULL").fetchone()[0]:
+        out.append("No staff member yet: set KEYNECTION_FIRST_STAFF to their name and restart (or run scripts/add_staff.py).")
+    if conn.execute("SELECT 1 FROM phases WHERE id = 'demo'").fetchone():
+        out.append("This database holds the fictional Taman Demo phase: give the pilot a new, empty database (JIRAN_DB_PATH).")
+    elif not conn.execute("SELECT COUNT(*) FROM phases").fetchone()[0]:
+        out.append("No phase yet: sign in as staff and import SDP's handover list in Phase setup.")
+    last = backup.newest(backup_dir())
+    if last is None or datetime.now(timezone.utc) - last > timedelta(hours=26):
+        out.append("No backup in the last day: check the server can write to its backups folder.")
+    return out
 
 
 def backup_dir() -> Path:
@@ -2078,6 +2150,25 @@ def _export_name(label: str) -> str:
     return f"keynection-{re.sub(r'[^A-Za-z0-9-]', '', label) or 'home'}-my-data.json"
 
 
+# ---------- pilot health, for staff ----------
+
+@app.get("/api/pilot/status")
+def pilot_status(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Is the pilot healthy? What setup still needs, the last backup, how many homes have joined, phones with
+    notifications on. Numbers only: never who."""
+    _pilot_only()
+    last = backup.newest(backup_dir())
+    swept = conn.execute("SELECT value FROM settings WHERE key = 'records_swept_at'").fetchone()
+    count = lambda sql: conn.execute(sql).fetchone()[0]  # noqa: E731
+    return {"checks": _pilot_checks(conn), "origin": _origin() or None,
+            "last_backup": last.isoformat(timespec="seconds") if last else None,
+            "backups": len(list(backup_dir().glob("keynection-*.db"))), "records_swept_at": swept[0] if swept else None,
+            "phases": count("SELECT COUNT(*) FROM phases"), "homes": count("SELECT COUNT(*) FROM units"),
+            "joined": count("SELECT COUNT(*) FROM units WHERE joined_at IS NOT NULL"),
+            "staff": count("SELECT COUNT(*) FROM staff WHERE revoked_at IS NULL"),
+            "phones": count("SELECT COUNT(*) FROM push_subscriptions"), "ai": ai.enabled()}
+
+
 # ---------- closing an account (PDPA): the household itself, or the estate office after checking ID ----------
 
 class CloseIn(BaseModel):
@@ -2937,7 +3028,7 @@ PUBLIC_ENDPOINTS = {"health", "ai_status", "join_lookup", "join", "auth_me", "au
 DEMO_ENDPOINTS = {"reset_demo", "demo_photos", "use_demo_photo", "submit_demo_repair"}
 SIGNED_IN_ENDPOINTS = {"units", "phases", "photo_file", "incident_image", "warranty_image", "auth_passkey_options",
                        "auth_add_passkey", "push_key", "push_status", "push_subscribe", "push_unsubscribe", "push_test"}  # anyone signed in; the photo endpoints check whose photo it is
-STAFF_ENDPOINTS = {"estate_close_account", "phase_import_preview", "phase_import_save", "issue_join_sheet", "estate_concerns", "estate_action", "moderation_reports", "reported_voice", "review_report",
+STAFF_ENDPOINTS = {"pilot_status", "estate_close_account", "phase_import_preview", "phase_import_save", "issue_join_sheet", "estate_concerns", "estate_action", "moderation_reports", "reported_voice", "review_report",
                    "all_notices", "post_notice", "warranty_queue", "submit_repair", "dashboard", "issue_join_code",
                    "front_desk", "paper_printed", "paper_delivered", "estate_register_renovation", "whatsapp_outbox",
                    "planner_preview", "issue_reentry_code", "add_staff_member"}

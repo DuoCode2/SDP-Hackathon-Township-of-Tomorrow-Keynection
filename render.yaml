@@ -1,0 +1,29 @@
+# Keynection pilot on Render, as a Blueprint (Render dashboard -> New -> Blueprint -> this repository).
+# A separate service from the judges' demo: pilot mode, an empty database on its own persistent disk, and new
+# versions deploy only when someone clicks Deploy. See docs/pilot-deployment.md.
+services:
+  - type: web
+    name: keynection-pilot
+    runtime: docker
+    region: singapore
+    plan: 0.5c-512mb  # a persistent disk needs a paid instance
+    branch: review-fixes
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeployTrigger: "off"  # a pilot changes on purpose, not on every push
+    disk:
+      name: keynection-data
+      mountPath: /data  # the database, photos and daily backups (Dockerfile: JIRAN_DB_PATH=/data/app.db)
+      sizeGB: 5
+    envVars:
+      - key: JIRAN_DEMO_MODE
+        value: "0"
+      # Render asks for these when the Blueprint is created.
+      - key: KEYNECTION_ORIGIN  # the pilot's final https:// address: digital keys are made for it
+        sync: false
+      - key: KEYNECTION_FIRST_STAFF  # the first estate-office staff member; their sign-in link appears in the log
+        sync: false
+      - key: KEYNECTION_PUSH_CONTACT  # optional, e.g. mailto:estate@your-domain
+        sync: false
+      - key: ANTHROPIC_API_KEY  # optional: AI translation and notice writing
+        sync: false
