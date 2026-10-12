@@ -307,6 +307,37 @@ def test_an_account_without_the_fallback_option_still_gets_answers(monkeypatch):
     assert ["fallbacks" in b for b in seen] == [True, False, False]  # asked once with it, never again
 
 
+def test_a_request_turned_down_for_another_reason_keeps_the_fallback_and_logs_why(monkeypatch, caplog):
+    import json
+
+    import httpx2
+
+    monkeypatch.setattr(ai, "_use_fallback", True)
+    seen = []
+
+    def network(request):
+        seen.append(json.loads(request.content))
+        return httpx2.Response(400, json={"type": "error", "error": {"type": "invalid_request_error",
+                                                                      "message": "Your credit balance is too low"}})
+
+    _sdk(monkeypatch, network)
+    with caplog.at_level("WARNING", logger="keynection.ai"):
+        assert ai.check_message("T-12", "Good evening!", "ms") is None
+        assert ai.check_message("T-12", "Good night!", "ms") is None
+    assert ["fallbacks" in b for b in seen] == [True, False, True, False]  # the option was not the reason: kept
+    assert "Your credit balance is too low" in caplog.text and "fallback option was refused" not in caplog.text
+
+
+def test_other_answers_from_the_api_are_logged_with_their_reason(monkeypatch, caplog):
+    import httpx2
+
+    _sdk(monkeypatch, lambda request: httpx2.Response(402, json={"type": "error", "error": {
+        "type": "billing_error", "message": "Add credit to continue"}}))
+    with caplog.at_level("WARNING", logger="keynection.ai"):
+        assert ai.check_message("T-12", "Good afternoon!", "ms") is None
+    assert "Claude answered 402" in caplog.text and "Add credit to continue" in caplog.text
+
+
 def test_no_network_a_refusal_or_a_cut_off_answer_means_no_ai(monkeypatch):
     import httpx2
 

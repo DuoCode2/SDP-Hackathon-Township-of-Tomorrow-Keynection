@@ -73,6 +73,16 @@ def _claude() -> Any:
     return _client
 
 
+def _why(e: Exception) -> str:
+    """The API's own reason for turning a request down, for the server log: a request ID alone says nothing about
+    what to fix (a key without credit, an option the account lacks...)."""
+    body = getattr(e, "body", None)
+    error = body.get("error") if isinstance(body, dict) else None
+    if isinstance(error, dict) and error.get("message"):
+        return str(error["message"])[:300]
+    return str(e)[:300]
+
+
 def _ask(system: str, text: str, schema: type[T], *, effort: str, max_tokens: int, timeout: float) -> T | None:
     """Claude's answer in the shape of schema, or None when there is none to use: the caller carries on without AI."""
     global _use_fallback
@@ -91,14 +101,18 @@ def _ask(system: str, text: str, schema: type[T], *, effort: str, max_tokens: in
             **fallback,
         )
     except anthropic.BadRequestError as e:
-        if fallback:  # an account without the fallback option: ask again without it, and stop asking for it
-            log.warning("The fallback option was refused (request %s); asking without it from now on", e.request_id)
+        if fallback:  # perhaps an account without the fallback option: ask once more without it
             _use_fallback = False
-            return _ask(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout)
-        log.warning("Claude refused the request (request %s); carrying on without AI", e.request_id)
+            answer = _ask(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout)
+            if answer is None:  # refused without it too: the option was not the reason, so keep asking with it
+                _use_fallback = True
+            else:
+                log.warning("The fallback option was refused (%s); asking without it from now on", _why(e))
+            return answer
+        log.warning("Claude refused the request (request %s: %s); carrying on without AI", e.request_id, _why(e))
         return None
     except anthropic.APIStatusError as e:
-        log.warning("Claude answered %s (request %s); carrying on without AI", e.status_code, e.request_id)
+        log.warning("Claude answered %s (request %s: %s); carrying on without AI", e.status_code, e.request_id, _why(e))
         return None
     except anthropic.APIConnectionError:  # no network, or no answer in time
         log.warning("Claude could not be reached; carrying on without AI")
