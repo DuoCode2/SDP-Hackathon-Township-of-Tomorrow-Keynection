@@ -725,7 +725,10 @@ class OwnerResponseIn(BaseModel):
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    """For the host's health checks. On Render it also names the branch and commit it runs (Render sets both), so
+    anyone can see which version is live after a deploy."""
+    running = {"version": os.environ.get("RENDER_GIT_COMMIT", "")[:7], "branch": os.environ.get("RENDER_GIT_BRANCH", "")}
+    return {"status": "ok", **{k: v for k, v in running.items() if v}}
 
 
 def _phase_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:

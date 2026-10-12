@@ -16,8 +16,10 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-RENO = {"scope": "Extend kitchen (rear wall)", "start": "2026-10-15", "end": "2026-10-30",
-        "contractor": "ABC Renovation", "contractor_cidb_registered": True}
+TODAY = datetime.now(timezone(timedelta(hours=8))).date()
+RENO = {"scope": "Extend kitchen (rear wall)", "start": (TODAY + timedelta(days=5)).isoformat(),
+        "end": (TODAY + timedelta(days=20)).isoformat(), "contractor": "ABC Renovation", "contractor_cidb_registered": True}
+RECENT_KEYS = (TODAY - timedelta(days=14)).isoformat()  # like the demo: keys two weeks ago
 
 
 @pytest.fixture()
@@ -59,10 +61,17 @@ def _jpeg() -> bytes:
     return buf.getvalue()
 
 
-def _sweep(when: str) -> dict:
+def _sweep(when: str | datetime) -> dict:
     from app.main import sweep_records
 
-    return sweep_records(datetime.fromisoformat(when).replace(tzinfo=timezone.utc))
+    return sweep_records(when if isinstance(when, datetime) else datetime.fromisoformat(when).replace(tzinfo=timezone.utc))
+
+
+def _period_over(keys: str) -> datetime:
+    """When a home's defect liability period (24 months) plus one year is over."""
+    from app.privacy import _add_months
+
+    return datetime.combine(_add_months(datetime.fromisoformat(keys).date(), 36), datetime.min.time(), timezone.utc)
 
 
 def _say(client, sign_in, frm: str, to: str, text: str) -> int:
@@ -76,14 +85,15 @@ def _say(client, sign_in, frm: str, to: str, text: str) -> int:
 # ---------- how long ----------
 
 def test_records_stay_until_a_year_after_the_defect_liability_period(client, sign_in):
-    """Keys handed over on 2026-09-27 (the demo's default): the period ends 2028-09-27, plus a year: 2029-09-27."""
-    _keys_handed_over("T-11", "2026-09-27")
-    _keys_handed_over("T-12", "2026-09-27")
+    """Keys two weeks ago: the 24-month period ends, plus a year, three years after the keys."""
+    _keys_handed_over("T-11", RECENT_KEYS)
+    _keys_handed_over("T-12", RECENT_KEYS)
     message = _say(client, sign_in, "T-12", "T-11", "Hello neighbour")
     log = _count("SELECT COUNT(*) FROM events WHERE unit_id = 'T-11'")
-    _sweep("2029-09-01")
+    over = _period_over(RECENT_KEYS)
+    _sweep(over - timedelta(days=20))
     assert _count("SELECT COUNT(*) FROM messages WHERE id = ?", message) == 1
-    _sweep("2029-10-01")
+    _sweep(over + timedelta(days=1))
     assert _count("SELECT COUNT(*) FROM messages WHERE id = ?", message) == 0
     assert _count("SELECT COUNT(*) FROM events WHERE unit_id = 'T-11'") == log  # the home log stays with the unit
 
@@ -91,19 +101,20 @@ def test_records_stay_until_a_year_after_the_defect_liability_period(client, sig
 def test_after_that_a_record_is_kept_a_year_from_when_it_was_made(client, sign_in):
     _keys_handed_over("T-11", "2021-10-01")  # long past the period plus a year
     _keys_handed_over("T-10", "2021-10-01")
-    _keys_handed_over("T-12", "2026-09-27")  # a newer neighbour: shared records follow the later date
+    _keys_handed_over("T-12", RECENT_KEYS)  # a newer neighbour: shared records follow the later date
     old_pair = _say(client, sign_in, "T-10", "T-11", "Morning")
     shared = _say(client, sign_in, "T-12", "T-11", "Hi")
-    _sweep("2027-09-01")
+    made = datetime.now(timezone.utc)
+    _sweep(made + timedelta(days=330))
     assert _count("SELECT COUNT(*) FROM messages WHERE id IN (?, ?)", old_pair, shared) == 2
-    _sweep("2027-11-01")  # a year after they were made
+    _sweep(made + timedelta(days=370))  # a year after they were made
     assert _count("SELECT COUNT(*) FROM messages WHERE id = ?", old_pair) == 0
     assert _count("SELECT COUNT(*) FROM messages WHERE id = ?", shared) == 1  # T-12's period isn't over
 
 
 def test_renovation_records_photos_and_waves_go_together_when_their_time_is_up(client, sign_in, tmp_path):
     for unit in ("T-11", "T-12", "T-13", "T-21", "T-22", "T-23"):
-        _keys_handed_over(unit, "2026-09-27")
+        _keys_handed_over(unit, RECENT_KEYS)
     client.cookies.clear()
     sign_in(client, "T-12")
     intro = client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi", "renovation": RENO}).json()["id"]
@@ -117,9 +128,10 @@ def test_renovation_records_photos_and_waves_go_together_when_their_time_is_up(c
 
     stored = data_dir("photos") / f"{photo['id']}.jpg"
     assert stored.exists()
-    _sweep("2029-09-01")
+    over = _period_over(RECENT_KEYS)
+    _sweep(over - timedelta(days=20))
     assert _count("SELECT COUNT(*) FROM intros WHERE id = ?", intro) == 1 and stored.exists()
-    _sweep("2029-10-01")
+    _sweep(over + timedelta(days=1))
     assert _count("SELECT COUNT(*) FROM intros WHERE id = ?", intro) == 0
     assert _count("SELECT COUNT(*) FROM intro_recipients WHERE intro_id = ?", intro) == 0
     assert _count("SELECT COUNT(*) FROM concerns WHERE intro_id = ?", intro) == 0

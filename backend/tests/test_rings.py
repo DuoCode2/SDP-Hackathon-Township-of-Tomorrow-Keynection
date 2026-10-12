@@ -1,10 +1,14 @@
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.neighbours import Unit, impact_zone, street_or_block
 from app.seed import demo_units
 
-RENO = {"scope": "Re-tile bathroom", "start": "2026-10-15", "end": "2026-10-30"}
+# Works that start in five days (Malaysia), so they are always still to come or under way when the tests run.
+_START = datetime.now(timezone(timedelta(hours=8))).date() + timedelta(days=5)
+RENO = {"scope": "Re-tile bathroom", "start": _START.isoformat(), "end": (_START + timedelta(days=15)).isoformat()}
 
 
 @pytest.fixture()

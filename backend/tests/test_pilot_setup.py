@@ -101,3 +101,18 @@ def test_staff_see_whether_the_pilot_is_healthy(pilot, monkeypatch, sign_in):
         assert status["homes"] == 0 and status["staff"] == 1 and status["phones"] == 0
         assert any("handover list" in c for c in status["checks"])
         assert status["origin"] == "https://pilot.example.com"
+
+
+def test_health_says_which_version_is_running(tmp_path, monkeypatch):
+    """On Render, the health check names the branch and commit it runs, so anyone can see which version is live."""
+    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "health.db"))
+    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    from app.main import app
+
+    with TestClient(app) as client:
+        monkeypatch.delenv("RENDER_GIT_COMMIT", raising=False)
+        monkeypatch.delenv("RENDER_GIT_BRANCH", raising=False)
+        assert client.get("/api/health").json() == {"status": "ok"}
+        monkeypatch.setenv("RENDER_GIT_COMMIT", "ed647b8628cfc9d4573f4efcbcac7c82d91b99cf")
+        monkeypatch.setenv("RENDER_GIT_BRANCH", "main")
+        assert client.get("/api/health").json() == {"status": "ok", "version": "ed647b8", "branch": "main"}

@@ -7,7 +7,7 @@ services:
     runtime: docker
     region: singapore
     plan: 0.5c-512mb  # a persistent disk needs a paid instance
-    branch: review-fixes
+    branch: main
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     autoDeployTrigger: "off"  # a pilot changes on purpose, not on every push

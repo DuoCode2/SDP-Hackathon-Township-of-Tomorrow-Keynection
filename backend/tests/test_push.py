@@ -5,7 +5,7 @@ rings at night. The demo is unchanged."""
 import base64
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import http_ece
 import pytest
@@ -14,8 +14,11 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from fastapi.testclient import TestClient
 
-RENO = {"scope": "Extend kitchen (rear wall)", "start": "2026-10-15", "end": "2026-10-30",
-        "contractor": "ABC Renovation", "contractor_cidb_registered": True}
+def _reno() -> dict:
+    """Works starting ten days from today (Malaysia), so the photo reminder, three days before, is still to come."""
+    start = datetime.now(timezone(timedelta(hours=8))).date() + timedelta(days=10)
+    return {"scope": "Extend kitchen (rear wall)", "start": start.isoformat(), "end": (start + timedelta(days=15)).isoformat(),
+            "contractor": "ABC Renovation", "contractor_cidb_registered": True}
 
 
 def b64u(data: bytes) -> str:
@@ -162,12 +165,14 @@ def test_a_neighbours_renovation_notice_reaches_the_phone_once_in_its_language(c
     assert _dispatch() == 0  # what happened before the phone turned notifications on stays in the app
     client.cookies.clear()
     sign_in(client, "T-12")
-    assert client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi", "renovation": RENO}).status_code == 201
+    reno = _reno()
+    assert client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi", "renovation": reno}).status_code == 201
     assert _dispatch() == 1
     assert "Notis ubah suai" in phone.texts()[0] and phone.inbox[0]["url"].endswith("tab=chats")
     assert _dispatch() == 0 and len(phone.inbox) == 1  # once
     # Three days before the work starts, on its own: photograph your side.
-    start = datetime(2026, 10, 12, 1, 5, tzinfo=timezone.utc)  # 09:05 in Malaysia, three days before the 15th
+    day = date.fromisoformat(reno["start"]) - timedelta(days=3)
+    start = datetime(day.year, day.month, day.day, 1, 5, tzinfo=timezone.utc)  # 09:05 in Malaysia, three days before
     assert _dispatch(start) == 1 and "foto" in phone.texts()[1].lower()
 
 
