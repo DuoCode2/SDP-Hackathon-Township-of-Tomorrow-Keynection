@@ -6,7 +6,7 @@ Sime Darby Property University Hackathon 2026 · People 赛道。**Every key com
 
 **示范预设只显示主线**：邻居、聊天、装修、照片与维修、影响估算、触达管道，正好是 3 分钟评审路线会走到的 6 页。其余功能（屋历、我、SDP 后台、新 phase 设定、风险清单、5 户以外的联系请求）收在导览底部的「显示全部功能」，评审问到长者、隐私、推广或风险时再打开；浏览器会记住这个选择。主线的页面清单在 `frontend/src/features.ts` 的 `FOCUS_TABS`。
 
-项目原名 Jiran5，2026年10月10日改名为 Keynection（key 钥匙 + connection 连结）。2026年10月12日内部名称也全部改成 Keynection：设定名称是 `KEYNECTION_…`（旧的 `JIRAN_…` 仍然有效，旧服务器不用改设定）；密码页 cookie 和浏览器记住的设定会自动搬到新名字，不会把人登出，也不会忘掉选过的语言。同一天网上版搬到 keynection.onrender.com（旧网址自动转过去），GitHub 仓库也改名为 SDP-Hackathon-Township-of-Tomorrow-Keynection。（文中的马来文 jiran 是「邻居」的意思，不是旧名。）
+项目原名 Jiran5，2026年10月10日改名为 Keynection（key 钥匙 + connection 连结）。2026年10月12日内部名称也全部改成 Keynection：设定名称是 `KEYNECTION_…`（旧的 `JIRAN_…` 仍然有效，旧服务器不用改设定）；密码页 cookie 和浏览器记住的设定会自动搬到新名字，不会把人登出，也不会忘掉选过的语言。同一天网上版搬到 keynection.onrender.com（旧网址 jiran5.onrender.com 已停用），GitHub 仓库也改名为 SDP-Hackathon-Township-of-Tomorrow-Keynection。（文中的马来文 jiran 是「邻居」的意思，不是旧名。）
 
 所有住户、门牌、姓名和示范照片都是虚构或程序画出来的，不是 SDP 的真实数据，也没有真实住户的照片。
 
@@ -122,7 +122,7 @@ cd prototype/backend
 
 一个容器同时跑后端和打包好的网页（`Dockerfile`）。不用 Vercel：它没有能长期保存的硬盘（SQLite 和照片会消失），也不能跑语音自动删除这种背景工作。
 
-**现在放在 Render 免费版**：https://keynection.onrender.com （DuoCode 的 Render 工作区，新加坡）。旧网址 https://jiran5.onrender.com 是另一个服务，设了 `KEYNECTION_MOVED_TO`：打开它的任何一页都会转到新网址的同一页。浏览器按网址记密码，所以在新网址要再输入一次。
+**现在放在 Render 免费版**：https://keynection.onrender.com （DuoCode 的 Render 工作区，新加坡）。旧网址 jiran5.onrender.com 已经停用：2026年10月12日删除，它从来没有发给团队以外的人。
 
 - 设定：Language 选 Docker、Branch 选 `main`、Instance Type 选 Free、Health Check Path 填 `/api/health`、Auto-Deploy 是 On Commit（推送到 `main` 就自动重新部署，约 2 分钟）
 - 环境变量 **`KEYNECTION_SITE_PASSWORD`**（演示版一定要设）：打开网址会先看到我们自己的三语密码页（中、英、马来文，只有一个密码框，任何浏览器和 app 里的内建浏览器都能用）。输对后这个浏览器记住 30 天；改密码等于让所有人重新输入。演示版没有登入（靠顶栏切换角色），不设的话任何拿到网址的人都能重置示范、上传档案。试点模式不用设，见下面「试点模式」
