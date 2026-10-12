@@ -41,7 +41,7 @@ export default function ChannelsView({ me, version }: { me: UnitInfo; version: n
               <small>Good morning</small>
               <b>{me.joined ? me.resident_name : 'Owner'} · {me.label}</b>
             </div>
-            <div className="app-tile jiran">
+            <div className="app-tile keynection">
               <Network size={20} />
               <span className="grow"><b>Neighbours · Keynection</b><small>{me.joined ? `${unread} new · your circle, chats and notices` : 'Join with the code in your welcome pack'}</small></span>
               {unread > 0 && <span className="unread">{unread}</span>}

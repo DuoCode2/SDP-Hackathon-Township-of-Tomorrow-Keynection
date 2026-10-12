@@ -27,9 +27,9 @@ LIST = "\n".join([HEADER, *TERRACES, *FLATS]) + "\n"
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "pilot.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "0")  # a real pilot: starts with no phase at all
-    monkeypatch.delenv("JIRAN_SITE_PASSWORD", raising=False)
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "pilot.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")  # a real pilot: starts with no phase at all
+    monkeypatch.delenv("KEYNECTION_SITE_PASSWORD", raising=False)
     from app.main import app
 
     with TestClient(app) as c:
@@ -46,7 +46,7 @@ def _as_staff(client) -> None:
     """Sign the client back in as the staff member made by the `staff` fixture."""
     from app import auth, db
 
-    conn = db.connect(os.environ["JIRAN_DB_PATH"])
+    conn = db.connect(os.environ["KEYNECTION_DB_PATH"])
     try:
         staff_id = conn.execute("SELECT id FROM staff ORDER BY id").fetchone()[0]
         client.cookies.clear()
@@ -80,7 +80,7 @@ def _lines(report, kind="errors"):
 def _db_text() -> str:
     from app import db
 
-    conn = db.connect(os.environ["JIRAN_DB_PATH"])
+    conn = db.connect(os.environ["KEYNECTION_DB_PATH"])
     try:
         return str([tuple(r) for r in conn.execute("SELECT * FROM units")])
     finally:
@@ -170,7 +170,7 @@ def test_saving_creates_the_phase_with_every_home_and_its_handover_record(staff)
     assert homes["C21-01"]["resident_name"] == "No. 1 Jln 2/1"  # neighbours see the address until the owner joins
     from app import db
 
-    conn = db.connect(os.environ["JIRAN_DB_PATH"])
+    conn = db.connect(os.environ["KEYNECTION_DB_PATH"])
     first = conn.execute("SELECT type, payload FROM events WHERE unit_id = 'C21-01' ORDER BY id LIMIT 1").fetchone()
     assert first["type"] == "handover" and "2026-09-01" in first["payload"]  # every home log starts with the handover
 

@@ -13,4 +13,4 @@ if not exist "frontend\node_modules\@simplewebauthn\browser" call npm --prefix f
 
 start "Keynection API :8000" cmd /k ""backend\.venv\Scripts\python.exe" -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload --reload-dir backend\app"
 start "Keynection web :5173" cmd /k "npm --prefix frontend run dev"
-if not defined JIRAN_NO_BROWSER start "" /b cmd /c "ping -n 7 127.0.0.1 >nul & start http://localhost:5173"
+if not defined KEYNECTION_NO_BROWSER if not defined JIRAN_NO_BROWSER start "" /b cmd /c "ping -n 7 127.0.0.1 >nul & start http://localhost:5173"

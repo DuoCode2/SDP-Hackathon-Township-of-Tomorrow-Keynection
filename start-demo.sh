@@ -21,7 +21,7 @@ echo "[3/3] Building the app..."
 npm --prefix frontend run build --silent
 
 echo "Running at http://localhost:8000 (Ctrl+C to stop)"
-if [ -z "${JIRAN_NO_BROWSER:-}" ]; then
+if [ -z "${KEYNECTION_NO_BROWSER:-}${JIRAN_NO_BROWSER:-}" ]; then
   (sleep 4; (command -v open >/dev/null && open http://localhost:8000) || (command -v xdg-open >/dev/null && xdg-open http://localhost:8000) || true) &
 fi
 exec backend/.venv/bin/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000

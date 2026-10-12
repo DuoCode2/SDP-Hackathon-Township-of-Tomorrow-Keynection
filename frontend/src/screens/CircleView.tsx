@@ -10,6 +10,7 @@ import IntroWizard from './IntroWizard'
 import QuietTimesCard from '../components/QuietTimes'
 import { usePilot, useShowAll } from '../features'
 import { NotificationsAsk } from '../components/Notifications'
+import { forget, remember, remembered } from '../storage'
 
 interface Props {
   me: UnitInfo
@@ -54,12 +55,11 @@ const langName = (t: Translate, code: string) => t(`lang.${code}`)
 /** Who lives around you and who you can talk to: people first, the plan one tap away. */
 // The welcome greets each household once. Seen is remembered per household on this device; the Me page and a
 // demo reset bring it back. (A private window remembers nothing, so it shows once per page load there.)
-const SEEN_KEY = 'jiran5.welcome.seen'
 const seenThisLoad = new Set<string>()
 
 function seenHomes(): string[] {
   try {
-    return JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]') as string[]
+    return JSON.parse(remembered('welcome.seen') ?? '[]') as string[]
   } catch {
     return []
   }
@@ -71,21 +71,13 @@ function welcomeSeen(unitId: string): boolean {
 
 function markWelcomeSeen(unitId: string) {
   seenThisLoad.add(unitId)
-  try {
-    localStorage.setItem(SEEN_KEY, JSON.stringify([...new Set([...seenHomes(), unitId])]))
-  } catch {
-    /* private window: remembered for this page load only */
-  }
+  remember('welcome.seen', JSON.stringify([...new Set([...seenHomes(), unitId])]))  // a private window: this load only
 }
 
 /** Bring the welcome back (from the Me page, or after a demo reset). */
 export function replayWelcome() {
   seenThisLoad.clear()
-  try {
-    localStorage.removeItem(SEEN_KEY)
-  } catch {
-    /* private window: nothing stored anyway */
-  }
+  forget('welcome.seen')
 }
 
 export default function CircleView({ me, units, version, onChange, onViewAs, onOpenChat, onOpenEvidence }: Props) {

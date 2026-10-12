@@ -6,8 +6,8 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "test.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     from app.main import app
 
     with TestClient(app) as c:
@@ -135,7 +135,7 @@ def test_reported_voice_is_not_kept_forever(client):
 def test_bulk_export_and_reported_audio_need_sign_in_outside_demo_mode(client, monkeypatch, sign_in):
     msg = _voice(client)
     rep = client.post(f"/api/messages/{msg['id']}/report", json={"unit_id": "T-11", "reason": "harassment"}).json()
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
     assert client.get("/api/units/T-12/export").status_code == 401
     assert client.get(f"/api/moderation/reports/{rep['id']}/voice").status_code == 401
     sign_in(client, "T-11")  # a household downloads its own data, nobody else's, and can't play reported audio

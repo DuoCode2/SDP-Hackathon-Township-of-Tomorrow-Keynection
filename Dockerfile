@@ -1,7 +1,8 @@
 # Keynection online: one container serves the API and the built web app on one port, like start-demo.bat.
 # Settings come from the host: PORT (set by the host), a volume mounted at /data so the database and photos survive
-# restarts, and either JIRAN_SITE_PASSWORD (the demo: required online, the demo has no sign-in) or, for a pilot with
-# real households, JIRAN_DEMO_MODE=0 and KEYNECTION_ORIGIN (everyone signs in with a digital key; no site password).
+# restarts, and either KEYNECTION_SITE_PASSWORD (the demo: required online, the demo has no sign-in) or, for a pilot
+# with real households, KEYNECTION_DEMO_MODE=0 and KEYNECTION_ORIGIN (everyone signs in with a digital key; no site
+# password). Demo mode is the default. Servers set up with the old JIRAN_ names keep working.
 # The first staff member of a pilot: set KEYNECTION_FIRST_STAFF="Name" (their sign-in link appears in the log), or run
 # python backend/scripts/add_staff.py "Name" --role estate in the container. See docs/pilot-deployment.md.
 
@@ -17,8 +18,7 @@ RUN npm run build
 FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    JIRAN_DB_PATH=/data/app.db \
-    JIRAN_DEMO_MODE=1
+    KEYNECTION_DB_PATH=/data/app.db
 WORKDIR /app
 COPY backend/requirements.txt backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt

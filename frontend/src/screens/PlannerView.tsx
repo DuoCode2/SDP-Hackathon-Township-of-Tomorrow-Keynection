@@ -3,6 +3,7 @@ import { Building, Download, Grid3x3, Home, ListChecks, Timer, TriangleAlert } f
 import { api, ApiError, type PhaseInfo, type PhaseLayout, type PhasePlan, type WorksType } from '../api'
 import { usePilot } from '../features'
 import PhaseImport from '../components/PhaseImport'
+import { remember } from '../storage'
 import { Card, CardHead, ScreenTitle, Segmented, Skeleton } from '../ui'
 
 const PRESETS: { id: string; label: string; layout: PhaseLayout }[] = [
@@ -14,7 +15,7 @@ const WORKS: { id: WorksType; label: string }[] = [
   { id: 'wet', label: 'Bathroom, kitchen, plumbing' }, { id: 'hacking', label: 'Hacking, drilling' },
   { id: 'structural', label: 'Extension, structural' }, { id: 'light', label: 'Painting, carpentry' },
 ]
-export const PLANNER_HOMES = 'jiran5.planner.homes'
+export const PLANNER_HOMES = 'planner.homes'  // remembered (storage.ts)
 
 /** SDP sets up a new phase from its site plan: every circle and notice zone, worked out with the live rules.
  *  Pilot: the real phase comes from SDP's handover list (import card on top); the layout explorer stays below. */
@@ -36,7 +37,7 @@ export default function PlannerView({ phases = [], current = null, onImported }:
       api.planPhase(layout).then((p) => {
         setPlan(p)
         setError(null)
-        try { localStorage.setItem(PLANNER_HOMES, String(p.homes)) } catch { /* private window */ }
+        remember(PLANNER_HOMES, String(p.homes))
       }).catch((e) => setError(e instanceof ApiError ? e.message : 'Could not work out this layout'))
     }, 250)
     return () => window.clearTimeout(timer.current)

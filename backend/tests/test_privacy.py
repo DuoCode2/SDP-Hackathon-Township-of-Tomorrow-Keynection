@@ -24,20 +24,20 @@ RECENT_KEYS = (TODAY - timedelta(days=14)).isoformat()  # like the demo: keys tw
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "test.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")  # seed the fictional phase, then switch to pilot mode
-    monkeypatch.delenv("JIRAN_SITE_PASSWORD", raising=False)
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")  # seed the fictional phase, then switch to pilot mode
+    monkeypatch.delenv("KEYNECTION_SITE_PASSWORD", raising=False)
     from app.main import app
 
     with TestClient(app) as c:
-        monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+        monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
         yield c
 
 
 def _db() -> sqlite3.Connection:
     from app import db
 
-    return db.connect(os.environ["JIRAN_DB_PATH"])
+    return db.connect(os.environ["KEYNECTION_DB_PATH"])
 
 
 def _count(sql: str, *args) -> int:
@@ -142,9 +142,9 @@ def test_renovation_records_photos_and_waves_go_together_when_their_time_is_up(c
 def test_a_warranty_ticket_still_open_is_never_swept_away(client, monkeypatch):
     from test_layers_2_4 import _warranty_ticket
 
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     ticket = _warranty_ticket(client)
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
     _sweep("2032-01-01")
     assert _count("SELECT COUNT(*) FROM warranty_tickets WHERE id = ?", ticket["id"]) == 1  # SDP still owes a repair
     conn = _db()
@@ -249,7 +249,7 @@ def test_a_reported_message_stays_for_the_estate_offices_review(client, sign_in)
 
 
 def test_the_demo_households_cant_be_closed(client, monkeypatch):
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     assert client.post("/api/units/T-11/close", json={"confirm": "No. 11"}).status_code == 409
 
 

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, type Lang } from './api'
+import { remember, remembered } from './storage'
 
 // Interface language for the resident screens: English, Bahasa Melayu, 中文. That includes Evidence (photos, cases,
 // repairs), where residents make decisions. Works, the home log and SDP's screens are still English. Whatever the
@@ -902,35 +903,21 @@ const LangContext = createContext<{ lang: UiLang; setLang: (l: UiLang) => void; 
   lang: 'en', setLang: () => {}, t: (k, v) => translate('en', k, v),
 })
 
-// Storage keys keep the project's first name (Jiran5) so saved choices survive the rename.
-const STORE = 'jiran5.uiLang'
 function initial(): UiLang {
-  try {
-    const v = localStorage.getItem(STORE)
-    return v === 'ms' || v === 'zh' ? v : 'en'
-  } catch {
-    return 'en'
-  }
+  const v = remembered('uiLang')
+  return v === 'ms' || v === 'zh' ? v : 'en'
 }
 
 /** Pilot: until someone on this phone picks a language, the app speaks the one the household chose at joining. */
 export function langChosen(): boolean {
-  try {
-    return localStorage.getItem(STORE) !== null
-  } catch {
-    return false
-  }
+  return remembered('uiLang') !== null
 }
 
 export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, set] = useState<UiLang>(initial)
   const setLang = useCallback((l: UiLang) => {
     set(l)
-    try {
-      localStorage.setItem(STORE, l)
-    } catch {
-      /* private window: not remembered */
-    }
+    remember('uiLang', l)
   }, [])
   const t = useCallback<Translate>((k, v) => translate(lang, k, v), [lang])
   return <LangContext.Provider value={{ lang, setLang, t }}>{children}</LangContext.Provider>

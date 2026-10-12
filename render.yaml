@@ -13,10 +13,10 @@ services:
     autoDeployTrigger: "off"  # a pilot changes on purpose, not on every push
     disk:
       name: keynection-data
-      mountPath: /data  # the database, photos and daily backups (Dockerfile: JIRAN_DB_PATH=/data/app.db)
+      mountPath: /data  # the database, photos and daily backups (Dockerfile: KEYNECTION_DB_PATH=/data/app.db)
       sizeGB: 5
     envVars:
-      - key: JIRAN_DEMO_MODE
+      - key: KEYNECTION_DEMO_MODE
         value: "0"
       # Render asks for these when the Blueprint is created.
       - key: KEYNECTION_ORIGIN  # the pilot's final https:// address: digital keys are made for it

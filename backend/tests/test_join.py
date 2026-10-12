@@ -9,8 +9,8 @@ RENO = {"scope": "Extend kitchen (rear wall)", "start": "2026-10-15", "end": "20
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "test.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     from app.main import app
 
     with TestClient(app) as c:
@@ -100,7 +100,7 @@ def test_joining_moves_unprinted_paper_notices_into_the_app(client):
 
 
 def test_staff_tools_need_staff_sign_in_outside_demo_mode(client, monkeypatch, sign_in):
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
     assert client.post("/api/units/T-23/join-code").status_code == 401
     assert client.get("/api/estate/frontdesk").status_code == 401
     sign_in(client, "T-12")  # a household can't issue codes or open the front desk

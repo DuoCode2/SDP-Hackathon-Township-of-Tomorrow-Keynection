@@ -16,13 +16,13 @@ HEADER = ["Item Name", "Description", "Location", "Trade", "Assigned To", "Due D
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "test.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")  # seed the fictional phase, then switch to pilot mode
-    monkeypatch.delenv("JIRAN_SITE_PASSWORD", raising=False)
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")  # seed the fictional phase, then switch to pilot mode
+    monkeypatch.delenv("KEYNECTION_SITE_PASSWORD", raising=False)
     from app.main import app
 
     with TestClient(app) as c:
-        monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+        monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
         yield c
 
 
@@ -30,9 +30,9 @@ def client(tmp_path, monkeypatch):
 def ticket(client, monkeypatch, sign_in):
     from test_layers_2_4 import _warranty_ticket
 
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     made = _warranty_ticket(client)
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
     sign_in(client, "staff:Farah")
     return made
 
@@ -85,7 +85,7 @@ def test_staff_write_procores_item_number_back_on_the_ticket(client, ticket):
     from app import db
     import os
 
-    conn = db.connect(os.environ["JIRAN_DB_PATH"])
+    conn = db.connect(os.environ["KEYNECTION_DB_PATH"])
     last = conn.execute("SELECT type, payload FROM events WHERE unit_id = 'T-11' ORDER BY id DESC LIMIT 1").fetchone()
     assert last["type"] == "procore_linked" and "PI-0457" in last["payload"]  # the owner can see SDP logged it
     conn.close()
@@ -106,7 +106,7 @@ def test_a_pilot_never_invents_a_procore_number(client, ticket):
 def test_the_demo_still_shows_a_simulated_procore_number(client, monkeypatch):
     from test_layers_2_4 import _warranty_ticket
 
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     made = _warranty_ticket(client)
     done = client.post(f"/api/warranty/{made['id']}/repair/demo", json={"name": "wall_repair_good", "subcontractor": "Jaya Plaster Sdn Bhd"})
     assert done.json()["procore_ref"] == f"PC-{2000 + made['id']}"

@@ -64,9 +64,9 @@ def test_a_change_that_could_lose_data_stops_instead(tmp_path):
 
 
 def test_the_pilot_server_starts_without_the_fictional_phase(tmp_path, monkeypatch):
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "server.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
-    monkeypatch.delenv("JIRAN_SITE_PASSWORD", raising=False)
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "server.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
+    monkeypatch.delenv("KEYNECTION_SITE_PASSWORD", raising=False)
     from app.main import app
 
     with TestClient(app):
@@ -78,7 +78,7 @@ def test_the_pilot_server_starts_without_the_fictional_phase(tmp_path, monkeypat
 def test_adding_the_first_staff_member_never_rebuilds_a_pilot_database(tmp_path, monkeypatch):
     conn = _old_pilot(tmp_path)
     conn.close()
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "pilot.db"))
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "pilot.db"))
     from scripts.add_staff import main
 
     assert main(["Farah Aziz"]) == 0

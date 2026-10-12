@@ -1,4 +1,4 @@
-"""Online, the whole site sits behind one shared password (JIRAN_SITE_PASSWORD): the prototype has no sign-in,
+"""Online, the whole site sits behind one shared password (KEYNECTION_SITE_PASSWORD): the prototype has no sign-in,
 so without it anyone with the link could reset the demo or upload files. Locally (no password set) nothing changes.
 
 People get our own three-language password page, not the browser's built-in box: that box asks for a user name,
@@ -15,9 +15,9 @@ PASSWORD = "kopi-o-kosong-2026"
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "test.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
-    monkeypatch.delenv("JIRAN_SITE_PASSWORD", raising=False)
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
+    monkeypatch.delenv("KEYNECTION_SITE_PASSWORD", raising=False)
     from app.main import app
 
     with TestClient(app) as c:
@@ -26,7 +26,7 @@ def client(tmp_path, monkeypatch):
 
 @pytest.fixture()
 def gated(client, monkeypatch):
-    monkeypatch.setenv("JIRAN_SITE_PASSWORD", PASSWORD)
+    monkeypatch.setenv("KEYNECTION_SITE_PASSWORD", PASSWORD)
     return client
 
 
@@ -73,7 +73,7 @@ def test_the_right_password_opens_the_site_for_this_browser(gated):
     r = _sign_in(gated, PASSWORD)
     assert r.status_code == 303 and r.headers["location"] == "/"
     cookie = r.headers["set-cookie"].lower()
-    assert "jiran5_site=" in cookie and "httponly" in cookie and "samesite=lax" in cookie
+    assert "keynection_site=" in cookie and "httponly" in cookie and "samesite=lax" in cookie
     assert "max-age=2592000" in cookie  # 30 days
     assert PASSWORD.lower() not in cookie  # the browser keeps a keyed hash, never the password
     assert gated.get("/api/units").status_code == 200  # the test client sends the cookie back
@@ -98,7 +98,7 @@ def test_pages_are_checked_with_the_server_every_time(gated):
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
     assert r.headers["cache-control"] == "no-cache"
     gated.cookies.clear()
-    gated.cookies.set("jiran5_site", "ended")
+    gated.cookies.set("keynection_site", "ended")
     assert gated.get("/").headers["cache-control"] == "no-store"  # the password page is never stored
 
 
@@ -109,10 +109,10 @@ def test_the_cookie_is_marked_secure_behind_https(gated):
 
 
 def test_a_forged_or_old_cookie_does_not_open_it(gated, monkeypatch):
-    gated.cookies.set("jiran5_site", "forged")
+    gated.cookies.set("keynection_site", "forged")
     assert gated.get("/api/units").status_code == 401
-    old = hmac.new(b"the-old-password", b"jiran5-site-v1", hashlib.sha256).hexdigest()
-    gated.cookies.set("jiran5_site", old)
+    old = hmac.new(b"the-old-password", b"keynection-site-v1", hashlib.sha256).hexdigest()
+    gated.cookies.set("keynection_site", old)
     assert gated.get("/api/units").status_code == 401  # changing the password signs everyone out
 
 
@@ -134,5 +134,5 @@ def test_the_health_check_stays_open_for_the_host(gated):
 
 def test_search_engines_are_asked_not_to_index_it(client, monkeypatch):
     assert client.get("/api/units").headers["x-robots-tag"] == "noindex, nofollow"
-    monkeypatch.setenv("JIRAN_SITE_PASSWORD", PASSWORD)
+    monkeypatch.setenv("KEYNECTION_SITE_PASSWORD", PASSWORD)
     assert client.get("/").headers["x-robots-tag"] == "noindex, nofollow"

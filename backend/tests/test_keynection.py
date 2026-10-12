@@ -15,9 +15,9 @@ RENO = {"scope": "Extend kitchen (rear wall)", "start": "2026-10-15", "end": "20
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "test.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
-    monkeypatch.delenv("JIRAN_SITE_PASSWORD", raising=False)
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
+    monkeypatch.delenv("KEYNECTION_SITE_PASSWORD", raising=False)
     from app.main import app
 
     with TestClient(app) as c:
@@ -38,11 +38,11 @@ def test_alerts_carry_the_new_name():
 
 
 def test_password_page_and_whatsapp_account_use_the_new_name(client, monkeypatch):
-    monkeypatch.setenv("JIRAN_SITE_PASSWORD", "local-test-only")
+    monkeypatch.setenv("KEYNECTION_SITE_PASSWORD", "local-test-only")
     page = client.get("/", headers={"Accept": "text/html"}).text
     shown = re.sub(r"<[^>]+>", "", page)  # what people read: the logo was "Jiran<span>5</span>", split by a tag
     assert "Keynection" in shown and "Jiran5" not in shown and "Jiran5" not in page
-    monkeypatch.delenv("JIRAN_SITE_PASSWORD")
+    monkeypatch.delenv("KEYNECTION_SITE_PASSWORD")
     client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Works soon", "lang": "en", "renovation": RENO})
     assert client.get("/api/units/T-11/whatsapp").json()["business_name"] == "Keynection · Taman Demo"
 

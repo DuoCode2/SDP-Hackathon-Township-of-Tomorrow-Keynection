@@ -42,7 +42,7 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
   async function reset() {
     await api.resetDemo()
     try {
-      Object.keys(sessionStorage).filter((k) => k.startsWith('j5pass:') || k.startsWith('j5join:')).forEach((k) => sessionStorage.removeItem(k))
+      Object.keys(sessionStorage).filter((k) => k.startsWith('keynection.pass:') || k.startsWith('keynection.join:')).forEach((k) => sessionStorage.removeItem(k))
       replayWelcome()
     } catch {
       /* storage blocked */

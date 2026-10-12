@@ -11,7 +11,7 @@ import { replayWelcome } from './CircleView'
 
 
 // The demo keeps an issued code in this browser tab only, the way a resident would scan it from the welcome pack.
-export const joinKey = (unitId: string) => `j5join:${unitId}`
+export const joinKey = (unitId: string) => `keynection.join:${unitId}`
 function storedCode(unitId: string): string | null {
   try {
     return sessionStorage.getItem(joinKey(unitId))

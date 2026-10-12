@@ -10,14 +10,10 @@ import { Badge, Card, CardHead, Empty, formatDate, Sheet, shortRange, Skeleton, 
 import PaperNoticeSheet from './PaperNotice'
 import WelcomeSheet from './WelcomeSheet'
 import { NotificationsCard } from './Notifications'
+import { remember, remembered } from '../storage'
 
-const STAFF = 'jiran5.staff'
 function storedStaff(): string {
-  try {
-    return localStorage.getItem(STAFF) || 'Aishah'
-  } catch {
-    return 'Aishah'
-  }
+  return remembered('staff') || 'Aishah'
 }
 
 const PAPER_BADGE: Record<PaperNotice['status'], { tone: 'amber' | 'blue' | 'brand' | 'neutral'; label: string }> = {
@@ -68,7 +64,7 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
 
   const saveStaff = (v: string) => {
     setStaff(v)
-    try { localStorage.setItem(STAFF, v) } catch { /* private window */ }
+    remember('staff', v)
   }
   const staffOk = staff.trim().length >= 2
 

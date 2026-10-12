@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Calculator, Clock4, Info, MessageSquareWarning, Scale, Users, Wallet } from 'lucide-react'
 import { Card, CardHead, ScreenTitle } from '../ui'
 import { PLANNER_HOMES } from './PlannerView'
+import { remembered } from '../storage'
 
 // Two parts. The main measure, neighbour connection, starts from real census data and uses the census's own question,
 // so the pilot can be compared with it. The cost lines below it are an illustrative model, not a forecast: every one
@@ -40,7 +41,7 @@ const INPUTS: Input[] = [
 function initial(): Record<string, number> {
   const v = Object.fromEntries(INPUTS.map((i) => [i.key, i.value]))
   try {
-    const homes = Number(localStorage.getItem(PLANNER_HOMES))
+    const homes = Number(remembered(PLANNER_HOMES))
     if (homes > 0) v.homes = homes
   } catch {
     /* storage blocked: keep the default */

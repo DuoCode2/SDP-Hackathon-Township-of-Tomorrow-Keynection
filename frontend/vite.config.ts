@@ -4,8 +4,8 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    // JIRAN_API_PORT lets a second copy (e.g. a test backend) run beside the demo on 8000.
-    proxy: { '/api': `http://127.0.0.1:${process.env.JIRAN_API_PORT ?? '8000'}` },
+    // KEYNECTION_API_PORT (or the old JIRAN_API_PORT) lets a second copy (e.g. a test backend) run beside the demo on 8000.
+    proxy: { '/api': `http://127.0.0.1:${process.env.KEYNECTION_API_PORT ?? process.env.JIRAN_API_PORT ?? '8000'}` },
     // The file watcher missed some edits on Windows during setup; polling makes reloads reliable.
     watch: { usePolling: true, interval: 300 },
   },

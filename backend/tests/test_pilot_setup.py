@@ -10,9 +10,9 @@ from fastapi.testclient import TestClient
 @pytest.fixture()
 def pilot(tmp_path, monkeypatch):
     """A fresh pilot server, as on its first day; returns a function that (re)starts it."""
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "data" / "app.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
-    for name in ("JIRAN_SITE_PASSWORD", "KEYNECTION_FIRST_STAFF", "KEYNECTION_FIRST_STAFF_ROLE"):
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "data" / "app.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
+    for name in ("KEYNECTION_SITE_PASSWORD", "KEYNECTION_FIRST_STAFF", "KEYNECTION_FIRST_STAFF_ROLE"):
         monkeypatch.delenv(name, raising=False)
     from app.main import app
 
@@ -25,7 +25,7 @@ def pilot(tmp_path, monkeypatch):
 def _conn():
     from app import db
 
-    return db.connect(os.environ["JIRAN_DB_PATH"])
+    return db.connect(os.environ["KEYNECTION_DB_PATH"])
 
 
 def test_the_first_staff_member_comes_from_a_setting_and_signs_in_with_the_logged_link(pilot, monkeypatch):
@@ -60,8 +60,8 @@ def test_an_unused_first_link_is_replaced_at_the_next_start(pilot, monkeypatch):
 
 
 def test_the_demo_ignores_the_first_staff_setting(tmp_path, monkeypatch):
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "demo.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "demo.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     monkeypatch.setenv("KEYNECTION_FIRST_STAFF", "Farah Aziz")
     from app import main
 
@@ -75,21 +75,21 @@ def test_start_up_says_what_is_still_missing(pilot, monkeypatch):
     from app import main
 
     monkeypatch.delenv("KEYNECTION_ORIGIN", raising=False)
-    monkeypatch.setenv("JIRAN_SITE_PASSWORD", "shared-secret")
+    monkeypatch.setenv("KEYNECTION_SITE_PASSWORD", "shared-secret")
     with pilot():
         conn = _conn()
         checks = " | ".join(main._pilot_checks(conn))
         conn.close()
-    for words in ("KEYNECTION_ORIGIN", "JIRAN_SITE_PASSWORD", "KEYNECTION_FIRST_STAFF", "handover list"):
+    for words in ("KEYNECTION_ORIGIN", "KEYNECTION_SITE_PASSWORD", "KEYNECTION_FIRST_STAFF", "handover list"):
         assert words in checks
     monkeypatch.setenv("KEYNECTION_ORIGIN", "http://pilot.example.com")
-    monkeypatch.delenv("JIRAN_SITE_PASSWORD")
+    monkeypatch.delenv("KEYNECTION_SITE_PASSWORD")
     monkeypatch.setenv("KEYNECTION_FIRST_STAFF", "Farah Aziz")
     with pilot():
         conn = _conn()
         checks = " | ".join(main._pilot_checks(conn))
         conn.close()
-    assert "https://" in checks and "JIRAN_SITE_PASSWORD" not in checks and "KEYNECTION_FIRST_STAFF" not in checks
+    assert "https://" in checks and "KEYNECTION_SITE_PASSWORD" not in checks and "KEYNECTION_FIRST_STAFF" not in checks
 
 
 def test_staff_see_whether_the_pilot_is_healthy(pilot, monkeypatch, sign_in):
@@ -105,8 +105,8 @@ def test_staff_see_whether_the_pilot_is_healthy(pilot, monkeypatch, sign_in):
 
 def test_health_says_which_version_is_running(tmp_path, monkeypatch):
     """On Render, the health check names the branch and commit it runs, so anyone can see which version is live."""
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "health.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "health.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     from app.main import app
 
     with TestClient(app) as client:

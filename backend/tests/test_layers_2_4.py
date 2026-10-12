@@ -7,8 +7,8 @@ RENO = {"scope": "Extend kitchen (rear wall)", "start": "2026-10-15", "end": "20
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "test.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     from app.main import app
 
     with TestClient(app) as c:
@@ -38,7 +38,7 @@ def test_only_the_renovating_home_can_issue_a_pass(client):
 def test_token_is_shown_once_and_never_stored(client):
     intro_id = _reno(client)
     issued = _issue(client, intro_id).json()
-    assert issued["qr_payload"] == f"J5PASS:{issued['token']}" and len(issued["token"]) >= 30
+    assert issued["qr_payload"] == f"KNPASS:{issued['token']}" and len(issued["token"]) >= 30
     listed = client.get("/api/units/T-12/works").json()["mine"][0]["passes"][0]
     assert "token" not in listed and "token_hash" not in listed
 
@@ -87,7 +87,7 @@ def test_gate_log_appears_on_the_pass(client):
 
 def test_simulated_time_is_demo_only(client, monkeypatch):
     token = _issue(client, _reno(client)).json()["token"]
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
     assert client.post("/api/gate/scan", json={"token": token, "at": "2026-10-16T10:00"}).status_code == 403
 
 

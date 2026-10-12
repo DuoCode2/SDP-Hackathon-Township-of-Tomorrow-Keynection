@@ -4,7 +4,7 @@ The first staff member of a pilot is made here, on the server, so no web page ca
 signed-in staff add colleagues in the app. The code works once, for a week; with it the person signs in on their own
 phone and makes their digital key.
 
-Run from prototype/backend, with the same JIRAN_DB_PATH as the server:
+Run from prototype/backend, with the same KEYNECTION_DB_PATH as the server:
     .venv/Scripts/python scripts/add_staff.py "Farah Aziz" --role estate
 """
 import argparse
@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app import auth, db  # noqa: E402
-from app.main import DEFAULT_DB  # noqa: E402
+from app.main import db_path  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     name = args.name.strip()
     if len(name) < 2:
         parser.error("the name needs at least 2 characters")
-    conn = db.connect(os.environ.get("JIRAN_DB_PATH", str(DEFAULT_DB)))
+    conn = db.connect(db_path())
     try:
         db.init_db(conn, keep_data=True)  # never rebuilds a pilot's records
         staff_id, token, expires = auth.add_staff(conn, name, args.role)

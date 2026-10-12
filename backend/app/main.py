@@ -71,8 +71,18 @@ HOUSE_RULES = [text for _, text in HOUSE_RULE_LIST]
 HOUSE_RULE_CODES = [code for code, _ in HOUSE_RULE_LIST]
 
 
+def setting(name: str, default: str | None = None) -> str | None:
+    """A server setting, KEYNECTION_<name>. A server set up under the project's first name (JIRAN_<name>) keeps
+    working: the old name is still read when the new one isn't set."""
+    for prefix in ("KEYNECTION_", "JIRAN_"):
+        value = os.environ.get(prefix + name)
+        if value is not None:
+            return value
+    return default
+
+
 def db_path() -> str:
-    return os.environ.get("JIRAN_DB_PATH", str(DEFAULT_DB))
+    return setting("DB_PATH") or str(DEFAULT_DB)
 
 
 def data_dir(name: str) -> Path:
@@ -82,8 +92,8 @@ def data_dir(name: str) -> Path:
 
 
 def demo_mode() -> bool:
-    """Demo-only endpoints (reset, sample photos) are on for local runs and off when JIRAN_DEMO_MODE=0."""
-    return os.environ.get("JIRAN_DEMO_MODE", "1") == "1"
+    """Demo-only endpoints (reset, sample photos) are on for local runs and off when KEYNECTION_DEMO_MODE=0."""
+    return setting("DEMO_MODE", "1") == "1"
 
 
 # Who is asking, once the sign-in guard below has checked the session (pilot mode). None in demo mode.
@@ -199,12 +209,13 @@ def _pilot_checks(conn: sqlite3.Connection) -> list[str]:
         out.append("Set KEYNECTION_ORIGIN to this server's address (https://...): digital keys are made for that address.")
     elif urlparse(origin).scheme != "https" and urlparse(origin).hostname != "localhost":
         out.append("KEYNECTION_ORIGIN should start with https://: phones make digital keys only on a secure address.")
-    if os.environ.get("JIRAN_SITE_PASSWORD"):
-        out.append("Remove JIRAN_SITE_PASSWORD: in a pilot everyone signs in with a digital key, and residents need no shared password.")
+    if setting("SITE_PASSWORD"):
+        out.append("Remove KEYNECTION_SITE_PASSWORD (or JIRAN_SITE_PASSWORD): in a pilot everyone signs in with a digital key,"
+                   " and residents need no shared password.")
     if not conn.execute("SELECT COUNT(*) FROM staff WHERE revoked_at IS NULL").fetchone()[0]:
         out.append("No staff member yet: set KEYNECTION_FIRST_STAFF to their name and restart (or run scripts/add_staff.py).")
     if conn.execute("SELECT 1 FROM phases WHERE id = 'demo'").fetchone():
-        out.append("This database holds the fictional Taman Demo phase: give the pilot a new, empty database (JIRAN_DB_PATH).")
+        out.append("This database holds the fictional Taman Demo phase: give the pilot a new, empty database (KEYNECTION_DB_PATH).")
     elif not conn.execute("SELECT COUNT(*) FROM phases").fetchone()[0]:
         out.append("No phase yet: sign in as staff and import SDP's handover list in Phase setup.")
     last = backup.newest(backup_dir())
@@ -283,15 +294,16 @@ app.router.dependencies.append(Depends(_sign_in_guard))  # every route declared 
 app.add_middleware(BodyLimit, limit=MAX_REQUEST_BYTES)  # added first = innermost (see the class)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("JIRAN_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
+    allow_origins=(setting("ALLOWED_ORIGINS") or "http://localhost:5173,http://127.0.0.1:5173").split(","),
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
 )
 
 
-# The cookie and the hash context keep the project's first name (Jiran5): renaming them would sign everyone out
-# and change nothing anyone sees.
-SITE_COOKIE = "jiran5_site"
+SITE_COOKIE = "keynection_site"
+# Browsers that passed the password page before the rename hold the old cookie: it still works, and is swapped for
+# the new one on their next visit, so nobody has to type the password again.
+OLD_SITE_COOKIE = "jiran5_site"
 SITE_COOKIE_SECONDS = 30 * 24 * 3600
 SITE_LOGIN_PATH = "/site-login"
 SITE_LOGIN_MAX_BYTES = 4096  # a one-field form; anything bigger is not a person typing a password
@@ -300,13 +312,13 @@ SITE_LOGIN_MAX_BYTES = 4096  # a one-field form; anything bigger is not a person
 def _site_password() -> str | None:
     """Online the prototype sits behind one shared password: it has no sign-in, so without this anyone with the
     link could reset the demo or upload files. Not set (local runs): the site is open, as before."""
-    return os.environ.get("JIRAN_SITE_PASSWORD") or None
+    return setting("SITE_PASSWORD") or None
 
 
-def _site_token(password: str) -> str:
+def _site_token(password: str, context: bytes = b"keynection-site-v1") -> str:
     """What the browser keeps after the password page: a keyed hash, never the password. A new password signs
     everyone out."""
-    return hmac.new(password.encode(), b"jiran5-site-v1", hashlib.sha256).hexdigest()
+    return hmac.new(password.encode(), context, hashlib.sha256).hexdigest()
 
 
 def _site_password_ok(request: Request) -> bool:
@@ -315,6 +327,10 @@ def _site_password_ok(request: Request) -> bool:
         return True
     cookie = request.cookies.get(SITE_COOKIE, "")
     if cookie and hmac.compare_digest(cookie.encode(), _site_token(password).encode()):
+        return True
+    old = request.cookies.get(OLD_SITE_COOKIE, "")
+    if old and hmac.compare_digest(old.encode(), _site_token(password, b"jiran5-site-v1").encode()):
+        request.state.old_site_cookie = True  # valid: swap it for the new one on the way out
         return True
     # Scripts may send the password as HTTP Basic (any user name). Responses never ask for it, so browsers do not
     # pop their own login box, which some in-app browsers cannot show at all.
@@ -398,8 +414,21 @@ async def _site_login(request: Request) -> HTMLResponse | RedirectResponse:
     return response
 
 
+def _moved_to(request: Request) -> RedirectResponse | None:
+    """KEYNECTION_MOVED_TO on a server that changed address: every visit goes to the same page at the new one
+    (links already shared keep working). The host's health check still answers here."""
+    target = (setting("MOVED_TO") or "").strip().rstrip("/")
+    if not target or request.url.path == "/api/health":
+        return None
+    query = f"?{request.url.query}" if request.url.query else ""
+    return RedirectResponse(f"{target}{request.url.path}{query}", status_code=307)
+
+
 @app.middleware("http")
 async def guard(request: Request, call_next):
+    moved = _moved_to(request)
+    if moved is not None:
+        return moved
     if _site_password() and request.url.path == SITE_LOGIN_PATH and request.method == "POST":
         response = await _site_login(request)
     elif not _site_password_ok(request):
@@ -414,6 +443,11 @@ async def guard(request: Request, call_next):
         if length and length.isdigit() and int(length) > MAX_REQUEST_BYTES:
             return JSONResponse({"detail": "Request too large. Photos must be under 12 MB."}, status_code=413)
         response = await call_next(request)
+    if getattr(request.state, "old_site_cookie", False):
+        secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+        response.set_cookie(SITE_COOKIE, _site_token(_site_password() or ""), max_age=SITE_COOKIE_SECONDS, httponly=True,
+                            samesite="lax", secure=secure, path="/")
+        response.delete_cookie(OLD_SITE_COOKIE, path="/")
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
@@ -2497,7 +2531,7 @@ def issue_pass(intro_id: int, body: PassIn, conn: sqlite3.Connection = Depends(g
     conn.commit()
     row = conn.execute("SELECT * FROM passes WHERE id = ?", (cur.lastrowid,)).fetchone()
     # The token is returned exactly once; the server cannot show it again.
-    return {**_pass_json(conn, row), "token": token, "qr_payload": f"J5PASS:{token}"}
+    return {**_pass_json(conn, row), "token": token, "qr_payload": f"KNPASS:{token}"}
 
 
 @app.post("/api/passes/{pass_id}/revoke")
@@ -2872,7 +2906,7 @@ def home_history(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> 
 
 @app.post("/api/demo/reset")
 def reset_demo(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
-    """Wipe and re-seed the fictional demo data (for rehearsals). Disabled when JIRAN_DEMO_MODE=0."""
+    """Wipe and re-seed the fictional demo data (for rehearsals). Disabled when KEYNECTION_DEMO_MODE=0."""
     if not demo_mode():
         raise HTTPException(403, "demo mode is off")
     db.drop_all(conn)
@@ -3233,7 +3267,7 @@ def _relying_party(request: Request) -> tuple[str, list[str]]:
 
 def _pilot_only() -> None:
     if demo_mode():
-        raise HTTPException(409, "Sign-in is part of pilot mode (JIRAN_DEMO_MODE=0); the demo switches households instead.")
+        raise HTTPException(409, "Sign-in is part of pilot mode (KEYNECTION_DEMO_MODE=0); the demo switches households instead.")
 
 
 def _me_json(conn: sqlite3.Connection, actor: auth.Actor | None) -> dict[str, Any]:
@@ -3768,6 +3802,6 @@ def planner_preview(body: PlannerIn) -> dict[str, Any]:
 
 # ---------- built web app (demo mode: one process, one port) ----------
 # Mounted last so every /api route above takes precedence. Present only after `npm run build`.
-STATIC_DIR = Path(os.environ.get("JIRAN_STATIC_DIR", Path(__file__).resolve().parents[2] / "frontend" / "dist"))
+STATIC_DIR = Path(setting("STATIC_DIR") or Path(__file__).resolve().parents[2] / "frontend" / "dist")
 if STATIC_DIR.is_dir():
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="web")

@@ -206,7 +206,7 @@ function Schedule({ data, all, noisy }: { data: Works; all: Item[]; noisy: Item[
 
 // ---------- passes ----------
 
-const tokenKey = (id: number) => `j5pass:${id}`
+const tokenKey = (id: number) => `keynection.pass:${id}`
 const readToken = (id: number) => {
   try {
     return sessionStorage.getItem(tokenKey(id))
@@ -301,7 +301,7 @@ function PassCard({ pass, me, item, gate, onChange }: { pass: Pass; me: UnitInfo
 
   useEffect(() => {
     if (!token) return
-    QRCode.toDataURL(`J5PASS:${token}`, { margin: 1, width: 320, errorCorrectionLevel: 'M', color: { dark: '#0b1220', light: '#ffffff' } })
+    QRCode.toDataURL(`KNPASS:${token}`, { margin: 1, width: 320, errorCorrectionLevel: 'M', color: { dark: '#0b1220', light: '#ffffff' } })
       .then(setQr)
       .catch(() => setQr(null))
   }, [token])

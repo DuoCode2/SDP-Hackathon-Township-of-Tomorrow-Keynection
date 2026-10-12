@@ -9,6 +9,10 @@ def no_real_ai(monkeypatch):
     tests that need them swap in a stand-in (see test_ai.py)."""
     for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "KEYNECTION_AI", "KEYNECTION_AI_MODEL", "KEYNECTION_ORIGIN"):
         monkeypatch.delenv(name, raising=False)
+    # Server settings, under both names (the old JIRAN_ ones are still read): each test sets what it needs.
+    for name in ("DB_PATH", "DEMO_MODE", "SITE_PASSWORD", "MOVED_TO", "STATIC_DIR", "ALLOWED_ORIGINS"):
+        for prefix in ("KEYNECTION_", "JIRAN_"):
+            monkeypatch.delenv(prefix + name, raising=False)
     from app import ai
 
     ai.reset()
@@ -21,7 +25,7 @@ def sign_in():
     def _sign_in(client, who: str) -> None:
         from app import auth, db
 
-        conn = db.connect(os.environ["JIRAN_DB_PATH"])
+        conn = db.connect(os.environ["KEYNECTION_DB_PATH"])
         try:
             if who.startswith("staff:"):
                 staff_id, _, _ = auth.add_staff(conn, who[6:], "estate")

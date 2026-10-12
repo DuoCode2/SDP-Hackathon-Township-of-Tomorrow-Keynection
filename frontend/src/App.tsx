@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Building2, Calculator, Camera, CalendarClock, CircleUserRound, Columns2, Compass, Grid3x3, HandHeart, Hexagon, Languages, LayoutDashboard, LogOut, MessagesSquare, Network, ShieldHalf, Smartphone } from 'lucide-react'
 import { api, onReachability, setPhaseId, type AuthMe, type PhaseInfo, type UnitInfo } from './api'
 import { forgetThisPhone, onOpenTab, syncPush } from './push'
+import { remember, remembered } from './storage'
 import { Avatar, ToastProvider } from './ui'
 import type { GuideLang, TabId } from './guide'
 import { EnglishOnly, LangProvider, langChosen, useDates, useLang, type UiLang } from './i18n'
@@ -80,11 +81,7 @@ function storedShowAll(): boolean {
 }
 
 function storedLang(): GuideLang {
-  try {
-    return localStorage.getItem('jiran5.guideLang') === 'en' ? 'en' : 'zh'
-  } catch {
-    return 'zh'
-  }
+  return remembered('guideLang') === 'en' ? 'en' : 'zh'
 }
 
 export default function App() {
@@ -265,11 +262,7 @@ function Shell({ pinned }: { pinned?: string }) {
 
   const pickLang = (l: GuideLang) => {
     setLang(l)
-    try {
-      localStorage.setItem('jiran5.guideLang', l)
-    } catch {
-      // Private window: the choice just isn't remembered.
-    }
+    remember('guideLang', l)
   }
 
   // One switch for the interface; the guide follows it (it has English and Chinese).

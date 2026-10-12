@@ -1,4 +1,4 @@
-"""SDP back-office actions need a staff sign-in in pilot mode (JIRAN_DEMO_MODE=0): signed out, nobody can post as
+"""SDP back-office actions need a staff sign-in in pilot mode (KEYNECTION_DEMO_MODE=0): signed out, nobody can post as
 the estate team, clear reports, submit repairs or read the queues. In demo mode anyone can try them."""
 import io
 
@@ -9,8 +9,8 @@ from PIL import Image
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "test.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     from app.main import app
 
     with TestClient(app) as c:
@@ -38,12 +38,12 @@ STAFF_CALLS = [
 
 @pytest.mark.parametrize("method,url,kwargs", STAFF_CALLS, ids=[c[1] for c in STAFF_CALLS])
 def test_staff_actions_are_closed_outside_demo_mode(client, monkeypatch, method, url, kwargs):
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
     assert getattr(client, method)(url, **kwargs).status_code == 401  # signed out: please sign in
 
 
 def test_closed_even_before_the_request_is_checked(client, monkeypatch):
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
     assert client.post("/api/notices", json={}).status_code == 401  # not 422: no hints about the expected fields
 
 

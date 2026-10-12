@@ -9,8 +9,8 @@ from PIL import Image
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "test.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     from app.main import app
 
     with TestClient(app) as c:
@@ -75,7 +75,7 @@ def test_change_seen_after_work_began_is_suggested_as_renovation_with_a_caveat(c
     }).json()["id"]
     baseline = _demo(client, "T-11", "wall_before", "baseline", intro_id).json()
     # Pretend the pre-work photo was taken before the 2020 works began.
-    conn = sqlite3.connect(os.environ["JIRAN_DB_PATH"])
+    conn = sqlite3.connect(os.environ["KEYNECTION_DB_PATH"])
     conn.execute("UPDATE photos SET created_at = '2020-01-05T02:00:00+00:00' WHERE id = ?", (baseline["id"],))
     conn.commit()
     conn.close()
@@ -90,7 +90,7 @@ def test_follow_up_must_be_taken_after_the_pre_work_photo(client):
     intro_id = _renovation_by_12(client)
     followup = _demo(client, "T-11", "wall_after_crack", "followup").json()
     baseline = _demo(client, "T-11", "wall_before", "baseline", intro_id).json()
-    conn = sqlite3.connect(os.environ["JIRAN_DB_PATH"])
+    conn = sqlite3.connect(os.environ["KEYNECTION_DB_PATH"])
     conn.execute("UPDATE photos SET created_at = '2020-01-01T00:00:00+00:00' WHERE id = ?", (followup["id"],))
     conn.commit()
     conn.close()
@@ -158,7 +158,7 @@ def test_photo_ids_cannot_be_used_for_path_tricks(client):
 
 
 def test_demo_endpoints_are_disabled_outside_demo_mode(client, monkeypatch):
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
     assert client.post("/api/demo/reset").status_code == 403
     assert client.get("/api/demo/photos").status_code == 403
 

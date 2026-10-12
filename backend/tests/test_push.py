@@ -53,13 +53,13 @@ class Phone:
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "test.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")  # seed the fictional phase, then switch to pilot mode
-    monkeypatch.delenv("JIRAN_SITE_PASSWORD", raising=False)
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")  # seed the fictional phase, then switch to pilot mode
+    monkeypatch.delenv("KEYNECTION_SITE_PASSWORD", raising=False)
     from app.main import app
 
     with TestClient(app) as c:
-        monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+        monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
         yield c
 
 
@@ -106,7 +106,7 @@ def _dispatch(now: datetime | None = None) -> int:
 # ---------- turning notifications on ----------
 
 def test_the_demo_has_no_real_notifications(client, monkeypatch, sign_in):
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     assert client.get("/api/push/key").status_code == 409
 
 
@@ -256,8 +256,8 @@ def test_staff_hear_about_reports_and_new_warranty_tickets(client, sign_in, push
     assert _dispatch() == 1 and "report" in desk.texts()[0].lower() and desk.inbox[0]["url"].endswith("tab=sdp")
     from test_layers_2_4 import _warranty_ticket
 
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     _warranty_ticket(client)
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
     assert _dispatch() == 1 and "warranty" in desk.texts()[1].lower()
     assert "You will regret this" not in json.dumps(desk.inbox)  # staff read reports in the app, not on a lock screen

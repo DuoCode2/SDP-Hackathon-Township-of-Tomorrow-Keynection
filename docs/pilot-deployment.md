@@ -1,7 +1,7 @@
 # Running a Keynection pilot
 
 For SDP's IT team. The judges' demo stays as it is; a pilot is a **separate server in pilot mode**
-(`JIRAN_DEMO_MODE=0`) with an empty database. Everyone signs in with their own phone's digital key (a passkey:
+(`KEYNECTION_DEMO_MODE=0`) with an empty database. Everyone signs in with their own phone's digital key (a passkey:
 fingerprint, face or screen lock), and the server decides who is asking on every request.
 
 ## 1. Choose the address first
@@ -28,7 +28,7 @@ The instance and the disk are paid plans: check Render's current prices.
 ```bash
 docker build -t keynection .
 docker run -d --name keynection -p 8000:8000 -v keynection-data:/data \
-  -e JIRAN_DEMO_MODE=0 -e KEYNECTION_ORIGIN=https://keynection.your-domain \
+  -e KEYNECTION_DEMO_MODE=0 -e KEYNECTION_ORIGIN=https://keynection.your-domain \
   -e KEYNECTION_FIRST_STAFF="Farah Aziz" keynection
 ```
 
@@ -39,15 +39,19 @@ instance: the database is SQLite on one disk.
 
 | Setting | | |
 |---|---|---|
-| `JIRAN_DEMO_MODE` | required | `0` for a pilot |
+| `KEYNECTION_DEMO_MODE` | required | `0` for a pilot |
 | `KEYNECTION_ORIGIN` | required | The pilot's `https://` address; digital keys only work there |
+| `KEYNECTION_MOVED_TO` | optional | On an old server only: sends every visit to the same page at this new address |
 | `KEYNECTION_FIRST_STAFF` | first start | The first staff member's name (see step 4) |
 | `KEYNECTION_FIRST_STAFF_ROLE` | optional | `estate` (default) or `sdp` |
 | `KEYNECTION_PUSH_CONTACT` | optional | How push services can reach you, e.g. `mailto:estate@your-domain` (default: the address) |
 | `KEYNECTION_BACKUP_DIR` | optional | Where daily backups go (default: `backups` next to the database) |
 | `ANTHROPIC_API_KEY` | optional | Turns on AI translation and notice writing (text goes to Anthropic, outside Malaysia) |
-| `JIRAN_DB_PATH` | set by the image | `/data/app.db` |
-| `JIRAN_SITE_PASSWORD` | **never** in a pilot | Residents sign in with digital keys, not a shared password |
+| `KEYNECTION_DB_PATH` | set by the image | `/data/app.db` |
+| `KEYNECTION_SITE_PASSWORD` | **never** in a pilot | Residents sign in with digital keys, not a shared password |
+
+Servers set up before the rename may use the old names (`JIRAN_DEMO_MODE`, `JIRAN_DB_PATH`, `JIRAN_SITE_PASSWORD`):
+they still work; when both are set, the `KEYNECTION_` one counts.
 
 ## 4. The first staff member
 
@@ -102,7 +106,7 @@ and says why in the log: deploy the previous version again and contact the team.
 
 ## 8. Privacy and security checklist
 
-- `KEYNECTION_ORIGIN` is an `https://` address; `JIRAN_SITE_PASSWORD` is not set.
+- `KEYNECTION_ORIGIN` is an `https://` address; `KEYNECTION_SITE_PASSWORD` is not set.
 - Staff sign in with their own phone's digital key; the first staff member is made only from the server.
 - Notifications go only through Google's, Apple's, Mozilla's or Microsoft's push service, encrypted for each phone.
 - Data is kept as the privacy notice (`pilot-2026-10b`) says: records are deleted automatically when their time is

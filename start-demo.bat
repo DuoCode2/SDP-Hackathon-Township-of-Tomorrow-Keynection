@@ -44,7 +44,7 @@ echo  Running at http://localhost:8000
 if defined ANTHROPIC_API_KEY (echo  AI translation and notice writing: on) else (echo  AI translation and notice writing: off - set ANTHROPIC_API_KEY to turn it on)
 echo  Keep this window open during the demo. Close it to stop.
 echo.
-if not defined JIRAN_NO_BROWSER start "" /b cmd /c "ping -n 5 127.0.0.1 >nul & start http://localhost:8000"
+if not defined KEYNECTION_NO_BROWSER if not defined JIRAN_NO_BROWSER start "" /b cmd /c "ping -n 5 127.0.0.1 >nul & start http://localhost:8000"
 "backend\.venv\Scripts\python.exe" -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
 goto :eof
 

@@ -16,13 +16,13 @@ RENO = {"scope": "Extend kitchen", "start": "2026-10-15", "end": "2026-10-30", "
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("JIRAN_DB_PATH", str(tmp_path / "test.db"))
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")  # seed the fictional phase, then switch to pilot mode
-    monkeypatch.delenv("JIRAN_SITE_PASSWORD", raising=False)
+    monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")  # seed the fictional phase, then switch to pilot mode
+    monkeypatch.delenv("KEYNECTION_SITE_PASSWORD", raising=False)
     from app.main import app
 
     with TestClient(app) as c:
-        monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+        monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
         yield c
 
 
@@ -50,7 +50,7 @@ def _staff(client, name="Farah") -> None:
     from app import auth, db
 
     import os
-    conn = db.connect(os.environ["JIRAN_DB_PATH"])
+    conn = db.connect(os.environ["KEYNECTION_DB_PATH"])
     try:
         _, token, _ = auth.add_staff(conn, name, "estate")  # what scripts/add_staff.py does
     finally:
@@ -61,7 +61,7 @@ def _staff(client, name="Farah") -> None:
 # ---------- demo mode is unchanged ----------
 
 def test_demo_mode_needs_no_sign_in(client, monkeypatch):
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     assert client.get("/api/auth/me").json() == {"mode": "demo", "signed_in": False}
     assert client.get("/api/units/T-12/conversations").status_code == 200
 
@@ -246,9 +246,9 @@ def test_every_refusal_says_why_so_the_phone_can_say_it_in_the_readers_language(
 def test_staff_upload_the_repair_photo_and_only_the_owner_closes_it(client, monkeypatch, sign_in):
     from test_layers_2_4 import _warranty_ticket
 
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     ticket = _warranty_ticket(client)  # the defect and its photos, the quick way
-    monkeypatch.setenv("JIRAN_DEMO_MODE", "0")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
     _staff(client)
     assert [t["id"] for t in client.get("/api/warranty").json()] == [ticket["id"]]
     from app.main import DEMO_PHOTO_DIR
