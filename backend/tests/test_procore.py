@@ -110,3 +110,25 @@ def test_the_demo_still_shows_a_simulated_procore_number(client, monkeypatch):
     made = _warranty_ticket(client)
     done = client.post(f"/api/warranty/{made['id']}/repair/demo", json={"name": "wall_repair_good", "subcontractor": "Jaya Plaster Sdn Bhd"})
     assert done.json()["procore_ref"] == f"PC-{2000 + made['id']}"
+
+
+def test_the_demo_says_its_invented_procore_number_is_a_demo_number(client, monkeypatch):
+    """The demo invents PC-20xx so the screens have something to show; the server says so (procore_demo), and every
+    screen that shows the number marks it, so a judge never takes it for a real Procore item."""
+    from test_layers_2_4 import _warranty_ticket
+
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
+    made = _warranty_ticket(client)
+    assert made["procore_ref"] is None and made["procore_demo"] is False  # nothing invented until a repair is submitted
+    done = client.post(f"/api/warranty/{made['id']}/repair/demo", json={"name": "wall_repair_good", "subcontractor": "Jaya Plaster Sdn Bhd"}).json()
+    assert done["procore_ref"] == f"PC-{2000 + made['id']}" and done["procore_demo"] is True
+    queue = {t["id"]: t for t in client.get("/api/warranty").json()}
+    assert queue[made["id"]]["procore_demo"] is True  # SDP's queue
+    assert client.get("/api/units/T-11/warranty").json()[0]["procore_demo"] is True  # the owner's card
+
+
+def test_a_number_sdp_writes_back_is_never_called_a_demo_number(client, ticket):
+    assert ticket["procore_demo"] is False
+    assert client.post(f"/api/warranty/{ticket['id']}/procore", json={"ref": "PI-0457", "staff_name": "Farah"}).status_code == 200
+    queued = {t["id"]: t for t in client.get("/api/warranty").json()}[ticket["id"]]  # staff see their queue, not a home's list
+    assert queued["procore_ref"] == "PI-0457" and queued["procore_demo"] is False

@@ -3,8 +3,11 @@
   "private": true,
   "description": "Walks the 3-minute judge route in a real browser and saves a screenshot per step (see docs/testing-overview.md, layer 3).",
   "scripts": {
-    "route": "playwright test",
-    "route:headed": "playwright test --headed",
+    "route": "playwright test route.spec.ts",
+    "route:headed": "playwright test route.spec.ts --headed",
+    "warranty": "playwright test warranty.spec.ts",
+    "monkey": "playwright test monkey.spec.ts",
+    "all": "playwright test",
     "report": "playwright show-report"
   },
   "devDependencies": {

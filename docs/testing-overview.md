@@ -1,6 +1,6 @@
 # How Keynection is tested
 
-> **给队员的中文摘要**：测试分五层，底层是 326 个自动测试（后端，用 AI 替身，永远不连真的 AI），往上是前端的严格类型检查、浏览器自动走完评审路线并截图、人工按 `test-plan.md` 核对、真手机核对；每次推送到 GitHub 都自动跑前两层。最后一节老实写了还没测到的东西。**数字只在这里写一次**，README 和其他文件引用这一页。
+> **给队员的中文摘要**：测试分五层，底层是 332 个自动测试（后端，用 AI 替身，永远不连真的 AI），往上是前端的严格类型检查、浏览器自动走完评审路线并截图、人工按 `test-plan.md` 核对、真手机核对；每次推送到 GitHub 都自动跑前两层。最后一节老实写了还没测到的东西。**数字只在这里写一次**，README 和其他文件引用这一页。
 
 ```
                      ┌───────────────────────────┐
@@ -12,13 +12,13 @@
                      ├───────────────────────────┤
                      │  Front end: strict types    │  npm run build (TypeScript strict, Vite)
                      ├───────────────────────────┤
-                     │  326 server tests           │  backend/tests (pytest), ~2½ min, every push (CI)
+                     │  332 server tests           │  backend/tests (pytest), ~2½ min, every push (CI)
                      └───────────────────────────┘
 ```
 
-## Layer 1 — 326 automated server tests
+## Layer 1 — 332 automated server tests
 
-`cd backend && .venv/Scripts/python -m pytest -q` — 326 collected, all passing on 17 Oct 2026 (about 2½ minutes on a laptop). Each test gets its own SQLite database in a temporary folder; the AI is a **stand-in** (`tests/conftest.py`), so no test ever reaches Anthropic or Google. The count below is what pytest collects (parametrised cases counted separately).
+`cd backend && .venv/Scripts/python -m pytest -q` — 332 collected, all passing on 17 Oct 2026 (about 2 minutes on a laptop). Each test gets its own SQLite database in a temporary folder; the AI is a **stand-in** (`tests/conftest.py`), so no test ever reaches Anthropic or Google. The count below is what pytest collects (parametrised cases counted separately).
 
 | What they protect | Files | Tests |
 |---|---|---|
@@ -26,9 +26,9 @@
 | **Who may do what** — only owners close tickets, only recipients report, only raisers escalate; residents can't record an inspector's finding; blocks, quiet mode, daily caps; staff screens closed without staff sign-in; nobody writes to a home log by hand; in a pilot the server decides identity on every household endpoint; the site password gate; PDPA deletion, closure, backups | `test_decisions.py`, `test_hello_safety.py`, `test_talk.py`, `test_layers_2_4.py`, `test_staff_gating.py`, `test_signin.py`, `test_site_gate.py`, `test_privacy.py`, `test_care.py` | 10 + 11 + 19 + 14 + 12 + 13 + 13 + 12 + 13 = **117** |
 | **Languages** — quick replies and notices in English, Malay, Chinese and Tamil; dates and hours written per reader; every server-generated line carries a code so the screen can show it in the reader's language | `test_keynection.py`, `test_codes.py`, `test_talk.py` (shared above) | 11 + 11 = **22** |
 | **AI, with the stand-in** — one sentence → notice fields, rule-breaking answers dropped; translation and calmer wording per reader; insults still refused; no key / no answer / network down → everything works as before; daily allowance; only the text leaves; the official SDK is exercised with the network swapped out; Gemini is demo-only | `test_ai.py` | **26** |
-| **Pilot mode** — passkey sign-in, re-entry codes, CSV import that refuses a bad row, welcome packs, push subscriptions and encryption, Procore export, the first staff member, start-up self-checks, no rebuild of a pilot's data | `test_signin.py` (above), `test_pilot_setup.py`, `test_pilot_data.py`, `test_procore.py`, `test_push.py`, `test_join.py` | 7 + 6 + 5 + 10 + 13 = **41** |
-| **Demo and surface** — waves, reactions, voice notes, profiles, the official account; evidence API; the shared demo that starts over after a quiet spell with loosened caps; old `JIRAN_` names still working; health check | `test_social.py`, `test_evidence_api.py`, `test_shared_demo.py`, `test_rename.py`, `test_api.py` | 14 + 13 + 8 + 6 + 5 = **46** |
-| | **Total (29 files)** | **326** |
+| **Pilot mode** — passkey sign-in, re-entry codes, CSV import that refuses a bad row, welcome packs, push subscriptions and encryption, Procore export, the first staff member, start-up self-checks, no rebuild of a pilot's data | `test_signin.py` (above), `test_pilot_setup.py`, `test_pilot_data.py`, `test_procore.py`, `test_push.py`, `test_join.py` | 7 + 6 + 7 + 10 + 13 = **43** |
+| **Demo and surface** — waves, reactions, voice notes, profiles, the official account; evidence API; the shared demo that starts over after a quiet spell with loosened caps; old `JIRAN_` names still working; health check; `.env.example` complete and honest | `test_social.py`, `test_evidence_api.py`, `test_shared_demo.py`, `test_rename.py`, `test_api.py`, `test_env_example.py` | 14 + 13 + 8 + 6 + 5 + 4 = **50** |
+| | **Total (30 files)** | **332** |
 
 Three files answer the question judges ask most, "who is stopped from doing what": `test_staff_gating.py` (every SDP screen closes without a staff sign-in; nobody can write to a home log directly), `test_decisions.py` (propose, agree, disagree, inspector: who may take each step), `test_hello_safety.py` (blocks, quiet mode, tone, contact details, daily caps, approvals before structural works).
 
@@ -40,7 +40,13 @@ Three tests were written after our own security review, each named for the probl
 
 ## Layer 3 — scripted browser walk
 
-`e2e/` holds a Playwright script that starts the server with the AI stand-in, walks the six steps of the judge route (K01–K14, fourteen checks) in a desktop browser at 1920×1080 and saves a screenshot per step to `evidence/route-screenshots/` (17 frames, about 20 seconds; first run 17 Oct 2026, all steps passing, no browser console errors). It is run before each submission as a regression check; the screenshots go into the deck and the appendix. It uses the text on screen (button labels, headings) rather than test hooks, so a renamed button fails the walk on purpose. How to run it: `e2e/README.md`.
+`e2e/` holds three Playwright scripts against the server with the AI stand-in, in a desktop browser at 1920×1080, each starting from the fictional phase as seeded (how to run them: `e2e/README.md`):
+
+- `route.spec.ts` walks the six steps of the judge route (K01–K14, fourteen checks) and saves a screenshot per step to `evidence/route-screenshots/` (17 frames, about 20 seconds). The screenshots go into the deck and the appendix.
+- `warranty.spec.ts` walks K16: a building-defect decision, SDP's repair, the owner sending it back and accepting a proper one; checks that SDP has no Close button and that the demo's invented Procore number is marked as such in all three interface languages (three more frames).
+- `monkey.spec.ts` makes 250 random clicks and keystrokes across every screen (seed printed, repeatable with `MONKEY_SEED`) and fails on any uncaught error, 5xx answer or the error boundary appearing; the app's own refusals (a second wave today, an insult, a cap) are allowed.
+
+First run 17 Oct 2026: all three passing, no browser console errors. They read the text on screen (button labels, headings) rather than test hooks, so a renamed button fails a walk on purpose.
 
 ## Layer 4 — manual plan
 
@@ -58,6 +64,8 @@ Three tests were written after our own security review, each named for the probl
 
 - The error boundary (a screen that throws shows "Something went wrong on this screen" in three languages with a Reload button, nothing lost on the server): verified locally on 17 Oct 2026 by throwing on purpose, then removing the throw.
 - The shared demo's reset: verified locally with `KEYNECTION_DEMO_IDLE_MINUTES=0.1`.
+- `start-demo.bat`: the "port 8000 already in use" message (with the process id) and the `--lan` option (prints the Wi-Fi address; the health check answered on it) were both run by hand on 17 Oct 2026. `start-demo.sh` has the same two changes, checked for syntax only (no Mac here).
+- `.env.example` is kept complete by `test_env_example.py`: every setting the code or the deployment files read is listed, nothing else is, and each has a line saying what it does.
 - Pilot mode sign-in with a passkey, the CSV import and the Procore export: verified in a local browser in pilot mode (`keynection-pilot`, `keynection-procore-check` in `.claude/launch.json`).
 
 ## Not covered yet (honest list)

@@ -1,8 +1,8 @@
 # Manual test plan: the judge route and the safety boundaries
 
-> **给队员的中文摘要**：这是人能读的测试清单，和 `evidence/device-check/README.md` 用同一套编号（K00–K15 是评审 3 分钟路线，每一步一条；K16–K21 是六条安全边界；K22–K23 是没开 AI 时的替代走法和共用演示的自动重置）。每一条写明怎么做、应该看到什么、在哪台设备核对过。评审看不懂 326 个自动测试，但看得懂这一页。做法：开始前清掉浏览器里这个网站的储存资料（或用无痕模式），这样看到的才是评审第一眼的样子。
+> **给队员的中文摘要**：这是人能读的测试清单，和 `evidence/device-check/README.md` 用同一套编号（K00–K15 是评审 3 分钟路线，每一步一条；K16–K21 是六条安全边界；K22–K23 是没开 AI 时的替代走法和共用演示的自动重置）。每一条写明怎么做、应该看到什么、在哪台设备核对过。评审看不懂 332 个自动测试，但看得懂这一页。做法：开始前清掉浏览器里这个网站的储存资料（或用无痕模式），这样看到的才是评审第一眼的样子。
 
-Keynection has 326 automated server tests (`testing-overview.md`). This page is the part a person walks through: the 3-minute judge route step by step, then the boundaries that protect residents. The numbering is shared with the real-device record in `evidence/device-check/README.md`, so one table serves both.
+Keynection has 332 automated server tests (`testing-overview.md`). This page is the part a person walks through: the 3-minute judge route step by step, then the boundaries that protect residents. The numbering is shared with the real-device record in `evidence/device-check/README.md`, so one table serves both.
 
 ## Before you start
 
@@ -38,7 +38,7 @@ These are what keep neighbours safe from each other and from the tool. Each is a
 
 | ID | Boundary | Do | Expect | Automated test |
 |---|---|---|---|---|
-| K16 | **Only the owner closes a warranty ticket** | Show every feature → Siti's Photos & repairs: record *Building defect* → SDP → Warranty: **Sample: poor patch** → back to Siti | SDP can submit a repair but has no Close button; Siti sees *Not fixed* / *Accept*; *Not fixed* reopens the ticket and the 30-day clock does **not** restart | `test_talk.py`, `test_layers_2_4.py` |
+| K16 | **Only the owner closes a warranty ticket** | Show every feature → Siti's Photos & repairs: record *Building defect* → SDP → Warranty: **Sample: poor patch** → back to Siti | SDP can submit a repair but has no Close button; the invented Procore number reads *PC-… (demo)* in SDP's queue and *Procore PC-… (demo number)* on Siti's card (in all three interface languages); Siti sees *Not fixed* / *Accept*; *Not fixed* reopens the ticket and the 30-day clock does **not** restart. Also walked by `e2e/warranty.spec.ts` | `test_talk.py`, `test_layers_2_4.py`, `test_procore.py` |
 | K17 | **Beyond the five, unit numbers only** | Aiman → Neighbours → Map → tap No. 15 | Shown as "No. 15" with no name and no Message button; only **Request to connect** with a reason; after Nurul accepts (switch cast), the name appears | `test_rings.py` |
 | K18 | **Insults are refused** | In any chat type an obvious insult (the demo's word list includes "stupid") and send | Refused with a tone message; nothing is delivered or logged as sent | `test_hello_safety.py`, `test_talk.py` |
 | K19 | **Nobody is in Keynection without consent** | Aiman → Neighbours: look at No. 23 | Unit number only, no Message, no Wave; the renovation notice for No. 23 appears at Front desk as a **paper notice** in that home's language with English below | `test_join.py` |

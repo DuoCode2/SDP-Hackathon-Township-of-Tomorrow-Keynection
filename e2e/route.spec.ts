@@ -1,57 +1,22 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
-import fs from 'node:fs'
-import path from 'node:path'
+import { expect, test, type Locator } from '@playwright/test'
+import { dismissWelcome, judgeStep, resetDemo, shot, watchErrors } from './helpers'
 
 // Walks the 3-minute judge route exactly as the Guide lists it (frontend/src/guide.ts, JUDGE_ROUTE) and saves one
 // screenshot per step, numbered like docs/test-plan.md and evidence/device-check/README.md (K01–K14). It reads the
 // text a judge reads (button labels, headings), on purpose: a renamed button fails the walk.
 // The server is the AI stand-in (serve.mjs): AI screens show, every AI answer is marked [stand-in].
 
-const SHOTS = process.env.ROUTE_SHOTS_DIR ?? path.resolve(__dirname, '..', '..', 'evidence', 'route-screenshots')
-fs.mkdirSync(SHOTS, { recursive: true })
-
 const SENTENCE = 'Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 5'
 const SHARP_MALAY = 'Rumah awak bising macam kilang! Tak reti hormat jiran ke?'
 const TAMIL = /[஀-௿]/
-
-async function shot(page: Page, name: string, { keepToast = false } = {}) {
-  // A toast from the previous step lasts about 3 s; wait it out so each frame shows its own step (unless it is the point).
-  if (!keepToast) await expect(page.locator('.toast')).toHaveCount(0, { timeout: 6000 })
-  await page.waitForTimeout(350) // let the last transition settle
-  await page.screenshot({ path: path.join(SHOTS, `${name}.png`) })
-}
-
-/** Click step n of the judge route in the Guide (opens the Guide first if it is closed). */
-async function judgeStep(page: Page, n: number) {
-  const guide = page.locator('aside.guide')
-  if (!(await guide.evaluate((el) => el.classList.contains('open')))) {
-    await page.getByRole('button', { name: /^(Guide|Panduan|导览)$/ }).click()
-    await expect(guide).toHaveClass(/open/)
-  }
-  await guide.locator('ol.route-judge > li').nth(n - 1).getByRole('button').click()
-  await expect(guide.locator('ol.route-judge > li').nth(n - 1).getByRole('button')).toHaveClass(/here/)
-}
 
 async function next(sheet: Locator) {
   await sheet.getByRole('button', { name: /^Next$/ }).click()
 }
 
-/** The welcome card greets each household once, in a sheet over the Neighbours screen; close it (after a photo). */
-async function dismissWelcome(page: Page, shotName?: string) {
-  // The sheet appears once the directory has loaded, a moment after the screen; give it that moment.
-  const welcome = page.getByRole('dialog').filter({ hasText: /meet your neighbours/i })
-  await welcome.waitFor({ state: 'visible', timeout: 4000 }).catch(() => null)
-  if (!(await welcome.isVisible().catch(() => false))) return
-  if (shotName) await shot(page, shotName)
-  await welcome.getByRole('button', { name: 'Look around first' }).click()
-  await expect(welcome).toBeHidden()
-}
-
 test('the 3-minute judge route, with a screenshot per step', async ({ page }) => {
-  const errors: string[] = []
-  page.on('pageerror', (e) => errors.push(`page error: ${e.message}`))
-  // A heated message is answered with 422 and a calmer wording (by design); the browser logs that as a resource error.
-  page.on('console', (m) => { if (m.type() === 'error' && !/422/.test(m.text())) errors.push(`console: ${m.text()}`) })
+  const errors = watchErrors(page)
+  await resetDemo(page)
   await page.goto('/')
   await expect(page.getByRole('button', { name: /^(Guide|Panduan|导览)$/ })).toBeVisible()
   await expect(page.locator('article.person-card').first()).toBeVisible() // the directory has loaded
@@ -178,11 +143,14 @@ test('the 3-minute judge route, with a screenshot per step', async ({ page }) =>
 
   await test.step('K14 The Guide in both languages', async () => {
     const guide = page.locator('aside.guide')
+    await guide.locator('.guide-body').evaluate((el) => el.scrollTo({ top: 0 })) // the hints above the route in frame
     await guide.locator('.guide-head .toggle').getByRole('button', { name: '中文', exact: true }).click()
     await expect(guide).toContainText('3 分钟评审路线')
+    await expect(guide).toContainText('不会真的发出') // what "preview" and "illustration" mean
     await shot(page, 'K14-guide-zh')
     await guide.locator('.guide-head .toggle').getByRole('button', { name: 'EN', exact: true }).click()
     await expect(guide).toContainText('3-minute judge route')
+    await expect(guide).toContainText('send nothing and are not SDP’s real app')
     await shot(page, 'K14-guide-en')
   })
 

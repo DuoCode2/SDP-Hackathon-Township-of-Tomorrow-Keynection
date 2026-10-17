@@ -1,7 +1,7 @@
 # Keynection 原型
 
 [![Tests](https://github.com/DuoCode2/SDP-Hackathon-Township-of-Tomorrow-Keynection/actions/workflows/ci.yml/badge.svg)](https://github.com/DuoCode2/SDP-Hackathon-Township-of-Tomorrow-Keynection/actions/workflows/ci.yml)
-（每次推送到 GitHub 自动跑 326 个后端测试和前端编译；仓库是私有的，徽章只有能打开仓库的人看得到。设定在 `.github/workflows/ci.yml`。）
+（每次推送到 GitHub 自动跑 332 个后端测试和前端编译；仓库是私有的，徽章只有能打开仓库的人看得到。设定在 `.github/workflows/ci.yml`。）
 
 Sime Darby Property University Hackathon 2026 · People 赛道。**Every key comes with five neighbours：每一把钥匙都附送五户邻居。**
 
@@ -82,11 +82,12 @@ Sime Darby Property University Hackathon 2026 · People 赛道。**Every key com
 
 | 档案 | 用在 | 做什么 |
 |---|---|---|
-| `start-demo.bat` | Windows，演示、彩排 | 双击就好。第一次会自动装好全部套件（要几分钟），之后每次只需约 10 秒。自动打开 http://localhost:8000 ，前后端同一个窗口、同一个端口。演示时窗口不要关，关掉就停止 |
+| `start-demo.bat` | Windows，演示、彩排 | 双击就好。第一次会自动装好全部套件（要几分钟），之后每次只需约 10 秒。自动打开 http://localhost:8000 ，前后端同一个窗口、同一个端口。演示时窗口不要关，关掉就停止。如果 8000 端口已被占（通常是上一个演示窗口还开着），它会直接说明是哪个进程、怎么关，而不是报一长串错误 |
 | `start-demo.sh` | macOS / Linux | 同上，在终端执行 `./start-demo.sh` |
+| 两者加 `--lan`（或先设 `KEYNECTION_LAN=1`） | 彩排 | 同时开放给同一个 Wi-Fi 的手机，并印出手机要打开的网址（例 http://192.168.1.5:8000 ）。本机演示没有密码，只在可信的网络用；Windows 第一次会问要不要让 Python 通过防火墙 |
 | `start-dev.bat` | 改代码时 | 开两个窗口：后端（改 Python 自动重载）和前端（改画面即时更新），打开 http://localhost:5173 。要先跑过一次 `start-demo.bat` |
 
-不想自动开浏览器：先设环境变量 `KEYNECTION_NO_BROWSER=1`。
+不想自动开浏览器：先设环境变量 `KEYNECTION_NO_BROWSER=1`。所有设定名称和用途列在 `.env.example`（服务器直接读环境变量，不读这个档；有测试保证它和代码一致）。
 
 ### 手动启动（开发者用）
 
@@ -109,7 +110,7 @@ npm run dev
 
 打开 http://localhost:5173 。电脑上是网页版：左边是导航，右边是「导览」面板（中文/英文切换，说明这一页的功能，并列出可以一键跳转的演示路线）；窗口窄于 1240 像素时导览改成按右上角按钮滑出；窄于 900 像素（手机）时改为全屏加底部导航。服务器默认只在本机开放，同一 Wi-Fi 里的其他人连不进来。
 
-测试（326 个，2026-10-17 跑过全部通过）：
+测试（332 个，2026-10-17 跑过全部通过）：
 
 ```bash
 cd prototype/backend
@@ -288,7 +289,7 @@ cd prototype/backend
 | [`docs/feature-status.md`](docs/feature-status.md) | 每个功能是真做、有金钥才开、模拟（画面上怎么标）、试点才开、收起来、还是没做 |
 | [`docs/technical-summary.md`](docs/technical-summary.md) | 架构一张图、四个状态机（不满阶梯、案件决定、保修单、联系请求）、权限表、资料去向、前十条已知限制和试点怎么补 |
 | [`docs/key-decisions.md`](docs/key-decisions.md) | 17 条关键决定：决定、理由、放弃了什么 |
-| [`docs/testing-overview.md`](docs/testing-overview.md) | 测试金字塔五层；326 个测试按「保护什么」分组；老实列出还没测到的 |
+| [`docs/testing-overview.md`](docs/testing-overview.md) | 测试金字塔五层；332 个测试按「保护什么」分组；老实列出还没测到的 |
 | [`docs/test-plan.md`](docs/test-plan.md) | 人工测试计划：K00–K15 评审路线、K16–K21 安全边界、K22–K23 没开 AI 与共用演示重置；编号和真机核对表一致 |
 | [`docs/glossary.md`](docs/glossary.md) | 统一用语，中英对照：投影片、访谈、导览、画面都照这一页 |
 
@@ -319,7 +320,7 @@ backend/
   app/main.py            FastAPI 接口与安全设置（四层、聊天、不满、审核、保修时钟都在这里）
   scripts/make_demo_photos.py
   scripts/ai_standin_server.py  验证用：用替身 AI 开服务器（端口由参数决定），不用金钥就能在浏览器看 AI 画面，答案都标 [stand-in]；`.claude/launch.json` 的 keynection-ai-standin 就是用它
-  tests/                 326 个测试（test_quiet.py 按邻居作息排时段、屋主保留至少 4 小时、只在法定时段内排、安静时间保密且有上限、通知写明是否避开且发出后不改写、两边同时施工与建议开工日、自动提醒的时间、噪音反映对照约定、后台数字；test_ai.py 一句话写通知、不合规则的回答被丢掉、按读者语言翻译讯息和通知（WhatsApp、纸本也是）、太冲先劝、辱骂仍挡、AI 没回应照旧、每户每天上限、只送文字不送名字，全部用替身不连真的 AI，另外走官方套件但把网络换掉，检查送出的格式、备用选项被拒时自动改问、断网和被拒都照旧；test_keynection.py 新名字、淡米尔文的快捷回复与通知、按读者语言写日期和施工时段；test_site_gate.py 网上版三语密码页、记住 30 天、改密码全部失效、页面不被缓存绕过、健康检查不用密码、noindex；test_codes.py 屋规、门卫判定、聊天自动通知与列表预览都附代码；test_decisions.py 谁能决定什么：提出、同意、不同意、检查员；test_staff_gating.py 关掉演示模式时后台全部关闭、不能任意写屋历；test_hello_safety.py 打招呼的封锁、安静模式、语气、联系方式、次数，装修日期与批准、装修连结期限；test_triage.py 时间判断与理由代码；test_ledger.py 同时写入不分叉；test_talk.py 聊天、不满、审核、时钟、物业只看升级的不满；test_rings.py 三层邻居、通知范围、联系请求、公告；test_social.py Wave、表情、语音、个人资料、官方帐号；test_care.py 语音 30 天删除、家人代办、下载我的资料、邻里关系数据、联系方式与冒充检查、以今天计算的示范日期；test_join.py 交屋加入、纸本通知、物业代登记、简易模式隐私、WhatsApp 通知、新 phase 设定）
+  tests/                 332 个测试（test_quiet.py 按邻居作息排时段、屋主保留至少 4 小时、只在法定时段内排、安静时间保密且有上限、通知写明是否避开且发出后不改写、两边同时施工与建议开工日、自动提醒的时间、噪音反映对照约定、后台数字；test_ai.py 一句话写通知、不合规则的回答被丢掉、按读者语言翻译讯息和通知（WhatsApp、纸本也是）、太冲先劝、辱骂仍挡、AI 没回应照旧、每户每天上限、只送文字不送名字，全部用替身不连真的 AI，另外走官方套件但把网络换掉，检查送出的格式、备用选项被拒时自动改问、断网和被拒都照旧；test_keynection.py 新名字、淡米尔文的快捷回复与通知、按读者语言写日期和施工时段；test_site_gate.py 网上版三语密码页、记住 30 天、改密码全部失效、页面不被缓存绕过、健康检查不用密码、noindex；test_codes.py 屋规、门卫判定、聊天自动通知与列表预览都附代码；test_decisions.py 谁能决定什么：提出、同意、不同意、检查员；test_staff_gating.py 关掉演示模式时后台全部关闭、不能任意写屋历；test_hello_safety.py 打招呼的封锁、安静模式、语气、联系方式、次数，装修日期与批准、装修连结期限；test_triage.py 时间判断与理由代码；test_ledger.py 同时写入不分叉；test_talk.py 聊天、不满、审核、时钟、物业只看升级的不满；test_rings.py 三层邻居、通知范围、联系请求、公告；test_social.py Wave、表情、语音、个人资料、官方帐号；test_care.py 语音 30 天删除、家人代办、下载我的资料、邻里关系数据、联系方式与冒充检查、以今天计算的示范日期；test_join.py 交屋加入、纸本通知、物业代登记、简易模式隐私、WhatsApp 通知、新 phase 设定）
 frontend/src/
   App.tsx                外框：导航（跟着页面性格变）、图框、语言切换、角色卡、Both sides 分屏、代办横幅、手机版底栏
   i18n.tsx               住户页面的英文、马来文、中文字典与语言切换

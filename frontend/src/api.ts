@@ -219,6 +219,8 @@ export interface WarrantyTicket {
   status: 'open' | 'repair_submitted' | 'closed'
   subcontractor: string | null
   procore_ref: string | null
+  /** True when the number was invented by the demo (never in a pilot): the screens say "demo number". */
+  procore_demo: boolean
   defect_photo: Photo
   baseline_photo: Photo | null
   repair_photo: Photo | null

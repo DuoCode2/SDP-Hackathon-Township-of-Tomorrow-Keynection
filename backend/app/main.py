@@ -2726,6 +2726,9 @@ def _ticket_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     return {"id": row["id"], "unit_id": row["unit_id"], "unit_label": unit["label"], "resident_name": unit["resident_name"],
             "incident_id": row["incident_id"], "subject": row["subject"], "status": row["status"],
             "subcontractor": row["subcontractor"], "procore_ref": row["procore_ref"],
+            # The demo invents PC-20xx when a repair is submitted (see _submit_repair); the screens mark it as a demo
+            # number. A pilot shows only what SDP's warranty team wrote back, so this is never true there.
+            "procore_demo": demo_mode() and row["procore_ref"] == f"PC-{2000 + row['id']}",
             "defect_photo": photo(row["defect_photo_id"]), "baseline_photo": photo(row["baseline_photo_id"]),
             "repair_photo": photo(row["repair_photo_id"]), "repair_check": check, "images": images,
             "owner_note": row["owner_note"], "reopen_count": row["reopen_count"], "opened_at": row["opened_at"],

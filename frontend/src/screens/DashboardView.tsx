@@ -283,7 +283,7 @@ function QueueItem({ ticket, onChange }: { ticket: WarrantyTicket; onChange: () 
       <div className="card-row">
         <img className="thumb" style={{ width: 64, height: 48 }} src={(ticket.repair_photo ?? ticket.defect_photo).thumb_url} alt="" loading="lazy" />
         <div className="grow">
-          <div className="mono muted">#{String(ticket.id).padStart(3, '0')} · {ticket.unit_label}{ticket.procore_ref ? ` · ${ticket.procore_ref}` : ''}</div>
+          <div className="mono muted">#{String(ticket.id).padStart(3, '0')} · {ticket.unit_label}{ticket.procore_ref ? ` · ${ticket.procore_ref}${ticket.procore_demo ? ' (demo)' : ''}` : ''}</div>
           <div className="card-title" style={{ fontSize: 14 }}>{ticket.subject}</div>
           {ticket.reopen_count > 0 && <div className="small" style={{ color: 'var(--red)' }}>Owner rejected: “{ticket.owner_note}”</div>}
         </div>

@@ -599,6 +599,8 @@ const D: Record<string, Entry> = {
   'ev.reportedBy': ['Reported by {label} · {date}', 'Dilaporkan oleh {label} · {date}', '{label} 报告 · {date}'],
   'ev.warrantyRepairs': ['Warranty repairs', 'Pembaikan waranti', '保修维修'], 'ev.warrantyNo': ['Warranty #{n}', 'Waranti #{n}', '保修 #{n}'],
   'ev.opened': ['Opened {date}', 'Dibuka {date}', '{date} 开单'], 'ev.rejectedN': [' · rejected {n}×', ' · ditolak {n}×', ' · 驳回 {n} 次'],
+  'ev.procore': ['Procore {ref}', 'Procore {ref}', 'Procore {ref}'],
+  'ev.procoreDemo': ['Procore {ref} (demo number)', 'Procore {ref} (nombor demo)', 'Procore {ref}（示范编号）'],
   'task.photoNeeded': ['Photo needed', 'Foto diperlukan', '需要拍照'], 'task.sealed': ['Sealed', 'Dimeterai', '已封存'], 'task.optional': ['Optional', 'Pilihan', '可选'],
   'task.tipBack': ['Stand 1.5–2 m back so the whole {what} fits', 'Berdiri 1.5–2 m ke belakang supaya seluruh {what} masuk dalam gambar', '退后 1.5–2 米，让整面{what}都拍进去'],
   'task.wall': ['wall', 'dinding', '墙'], 'task.ceilingArea': ['ceiling area', 'kawasan siling', '天花板'],

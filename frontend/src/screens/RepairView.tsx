@@ -29,7 +29,7 @@ export default function RepairView({ me, ticket, onBack, onChanged }: {
     <section className="screen">
       <button className="back" onClick={onBack}><ChevronLeft size={18} /> {t('nav.evidence')}</button>
       <div className="screen-title">
-        <div className="eyebrow">{t('ev.warrantyNo', { n: String(w.id).padStart(3, '0') })}{w.procore_ref ? ` · Procore ${w.procore_ref}` : ''}</div>
+        <div className="eyebrow">{t('ev.warrantyNo', { n: String(w.id).padStart(3, '0') })}{w.procore_ref ? ` · ${t(w.procore_demo ? 'ev.procoreDemo' : 'ev.procore', { ref: w.procore_ref })}` : ''}</div>
         <h1>{subjectText(t, w.subject)}</h1>
         <p>{t('rp.opened', { label: w.unit_label, date: date(w.opened_at) })}{w.subcontractor ? t('rp.repairedBy', { who: w.subcontractor }) : ''}</p>
       </div>

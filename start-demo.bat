@@ -1,8 +1,14 @@
 @echo off
 REM Keynection demo: double-click to run. Sets itself up on first run, then serves everything on one port.
+REM   start-demo.bat --lan   (or set KEYNECTION_LAN=1 first): also listen on the local network and print the address
+REM   that phones on the same Wi-Fi can open, for rehearsals. Trusted networks only: the local demo has no password.
 setlocal
 cd /d "%~dp0"
 title Keynection demo
+set "PORT=8000"
+set "HOST=127.0.0.1"
+if /i "%~1"=="--lan" set "KEYNECTION_LAN=1"
+if "%KEYNECTION_LAN%"=="1" set "HOST=0.0.0.0"
 
 echo.
 echo  ==============================
@@ -39,13 +45,31 @@ if not exist "frontend\node_modules" (
 echo  [3/3] Building the app...
 call npm --prefix frontend run build --silent || goto :fail
 
+REM Something is already listening on the port (usually a demo window left open): say so plainly instead of
+REM letting the server fail with a long Python error.
+set "BUSY="
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr /r /c:":%PORT% .*LISTENING"') do if not defined BUSY set "BUSY=%%p"
+if defined BUSY (
+  echo.
+  echo  Port %PORT% is already in use ^(process id %BUSY%^). Is another Keynection window still open?
+  echo  Close it, or run:  taskkill /pid %BUSY% /f   and then double-click this file again.
+  goto :fail
+)
+
 echo.
-echo  Running at http://localhost:8000
+echo  Running at http://localhost:%PORT%
+if "%KEYNECTION_LAN%"=="1" (
+  echo  Phones on this Wi-Fi can open:
+  for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
+    for /f "tokens=* delims= " %%b in ("%%a") do echo      http://%%b:%PORT%
+  )
+  echo  ^(the local demo has no password, so use a trusted network; Windows may ask to allow Python through the firewall^)
+)
 if defined ANTHROPIC_API_KEY (echo  AI translation and notice writing: on) else (echo  AI translation and notice writing: off - set ANTHROPIC_API_KEY to turn it on)
 echo  Keep this window open during the demo. Close it to stop.
 echo.
-if not defined KEYNECTION_NO_BROWSER if not defined JIRAN_NO_BROWSER start "" /b cmd /c "ping -n 5 127.0.0.1 >nul & start http://localhost:8000"
-"backend\.venv\Scripts\python.exe" -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
+if not defined KEYNECTION_NO_BROWSER if not defined JIRAN_NO_BROWSER start "" /b cmd /c "ping -n 5 127.0.0.1 >nul & start http://localhost:%PORT%"
+"backend\.venv\Scripts\python.exe" -m uvicorn app.main:app --app-dir backend --host %HOST% --port %PORT%
 goto :eof
 
 :fail

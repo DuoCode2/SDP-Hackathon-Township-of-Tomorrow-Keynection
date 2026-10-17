@@ -50,7 +50,7 @@
 | Phase setup from a site plan (lorongs, rows, blocks, floors) → circles and ranges in milliseconds, download by unit | Live (read-only, nothing stored) | Phase setup | Semi-D, shoplots and odd plots by the estate office |
 | Safeguards: 14 risks, Built / Pilot per measure | Live (a list) | Safeguards | — |
 | **CIDB registration check** | **Simulated** (a tick the owner makes; "simulated check in the prototype") | Step 4 | CIDB's registry |
-| **Procore reference on a demo warranty ticket** | **Simulated** (PC-… invented in the demo only) | Warranty card | A pilot shows only the number SDP writes back |
+| **Procore reference on a demo warranty ticket** | **Simulated** (PC-… invented in the demo only; the server says so with `procore_demo`) | Owner's card: *Procore PC-… (demo number)*; SDP's queue: *PC-… (demo)* | A pilot shows only the number SDP writes back, never marked |
 | **Contractor QR passes and guardhouse scan** | **Switched off** (`SHOW_CONTRACTOR_PASSES` in `frontend/src/features.ts`; server and tests kept) | — | Estate systems already do this |
 
 ## Pilot-only (`KEYNECTION_DEMO_MODE=0`)
