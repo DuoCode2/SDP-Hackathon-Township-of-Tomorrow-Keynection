@@ -552,6 +552,8 @@ span.msg-tr { text-decoration: none; }
 .ai-box-row { display: flex; gap: 8px; align-items: stretch; }
 .ai-box-row textarea { flex: 1; min-width: 0; resize: vertical; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--line-2); background: var(--surface); font: inherit; font-size: 13.5px; line-height: 1.45; color: var(--text); }
 .ai-box-row .btn { flex: none; align-self: flex-end; }
+.ai-examples { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.ai-examples .btn { flex: none; }
 .ai-note { font-size: 12.5px; color: var(--text-2); }
 .ai-filled { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px dashed color-mix(in srgb, var(--violet) 40%, transparent); font-size: 12.5px; line-height: 1.5; color: var(--text-2); }
 .ai-filled > b { display: flex; align-items: center; gap: 6px; color: var(--violet); }
@@ -890,6 +892,8 @@ button.ring-row:hover { background: var(--surface-2); }
 .wizard-lead { font-size: 13.5px; line-height: 1.55; color: var(--text-2); }
 .wizard-note { display: flex; align-items: flex-start; gap: 7px; padding: 9px 11px; border-radius: 9px; font-size: 12px; line-height: 1.5; color: var(--text-2); background: var(--surface-2); border: 1px dashed var(--line-2); }
 .wizard-note svg { flex: none; margin-top: 2px; color: var(--accent-text); }
+.permit-guide b { color: var(--text); }
+.permit-guide a { color: var(--accent-text); font-weight: 700; white-space: nowrap; }
 /* The sheet scrolls; its parts must keep their height. Left to shrink, a long step squeezed under the buttons. */
 .sheet > * { flex-shrink: 0; }
 /* Back / Next stay at the bottom of the sheet while a long step scrolls, so the next step is always one tap away. */

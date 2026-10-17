@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bath, Building, CalendarClock, Drill, Lock, Paintbrush, Send, ShieldCheck, Sparkles, TriangleAlert } from 'lucide-react'
+import { Bath, Building, CalendarClock, Drill, Landmark, Lock, Paintbrush, Send, ShieldCheck, Sparkles, TriangleAlert } from 'lucide-react'
 import { api, ApiError, type ImpactItem, type QuietPlan, type Renovation, type RenovationDraft, type UnitInfo, type WorksType } from '../api'
 import { LANGS, introTemplate, type Lang } from '../messages'
 import PlanMap from '../components/PlanMap'
@@ -9,6 +9,9 @@ import { useAi } from '../features'
 import { Segmented, Sheet, Steps, useToast } from '../ui'
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+// KPKT circular Bil. 3/2026, the national renovation guideline every council follows since 1 April 2026.
+const GUIDELINE_URL = 'https://www.kpkt.gov.my/kpkt/resources/user_1/MENGENAI%20KPKT/PEKELILING/2026/PK_KSU_KPKT_Bil.3_Tahun_2026_GP_Kerja_Ubahsuai_Bangunan.pdf'
 
 /** A local calendar date n days from today, as YYYY-MM-DD. */
 function daysFromToday(n: number): string {
@@ -132,12 +135,22 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   const blocked = works === 'structural' && (strata ? reno.management_approval !== 'approved' : reno.council_permit !== 'approved')
 
   /** The owner's one sentence fills in the steps; whatever AI left empty keeps what was there. Nothing is sent. */
-  async function fillIn() {
+  // One sentence in each language a judge can try without typing; each is a different kind of work, so the
+  // notice list on the next step changes with it.
+  const EXAMPLES = [
+    { label: 'English', text: 'Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 5' },
+    { label: 'Bahasa Melayu', text: 'Nak pecah jubin dapur dan gerudi dinding mulai Isnin depan selama tiga minggu, Kontraktor Maju, Isnin hingga Jumaat 9 pagi hingga 5 petang' },
+    { label: '中文', text: '下个月初开始油漆和做木工，大概一个星期，承包商是兴隆装修，平日早上九点到下午五点' },
+  ]
+
+  async function fillIn(text?: string) {
+    const what = (text ?? said).trim()
+    if (text !== undefined) setSaid(text)
     setReading(true)
     setAiNote(null)
     setFilled(null)
     try {
-      const d = await api.renovationDraft(me.id, said.trim())
+      const d = await api.renovationDraft(me.id, what)
       setWorks(d.works_type)
       setReno((r) => {
         const start = d.start ?? r.start
@@ -203,9 +216,15 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
               <div className="ai-box-row">
                 <textarea rows={2} maxLength={500} value={said} onChange={(e) => setSaid(e.target.value)} placeholder={t('ai.reno.placeholder')}
                   aria-label={t('ai.reno.title')} />
-                <button className="btn btn-primary" disabled={!said.trim() || reading} onClick={fillIn}>
+                <button className="btn btn-primary" disabled={!said.trim() || reading} onClick={() => fillIn()}>
                   <Sparkles size={14} /> {reading ? t('ai.reno.working') : t('ai.reno.fill')}
                 </button>
+              </div>
+              <div className="ai-examples">
+                <small className="muted">{t('ai.reno.try')}</small>
+                {EXAMPLES.map((x) => (
+                  <button key={x.label} type="button" className="btn btn-sm" disabled={reading} onClick={() => fillIn(x.text)}>{x.label}</button>
+                ))}
               </div>
               {aiNote && <div className="ai-note">{aiNote}</div>}
               {filled && (
@@ -231,7 +250,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
                 <button key={w.id} className={`works-card ${works === w.id ? 'on' : ''}`} onClick={() => pickWorks(w.id)}>
                   <Icon size={20} />
                   <b>{t(`works.${w.id}`)}</b>
-                  <small>{t(`works.${w.id}.d`)}</small>
+                  <small>{t(!strata && (w.id === 'wet' || w.id === 'hacking') ? `works.${w.id}.d.landed` : `works.${w.id}.d`)}</small>
                 </button>
               )
             })}
@@ -312,6 +331,13 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
               </select>
             </label>
           )}
+          <div className="wizard-note permit-guide">
+            <Landmark size={13} />
+            <div>
+              <b>{t('permit.guide.title')}</b> {t(`permit.guide.${works}`)} {t('permit.guide.how')}{' '}
+              <a href={GUIDELINE_URL} target="_blank" rel="noreferrer">{t('permit.guide.link')}</a>
+            </div>
+          </div>
           <div className="grid-2">
             <label className="field">{t('reno.permit')}
               <select value={reno.council_permit ?? ''} onChange={set('council_permit')}>
@@ -325,6 +351,9 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
               <input value={reno.permit_ref ?? ''} onChange={set('permit_ref')} maxLength={40} disabled={reno.council_permit === 'not_needed'} placeholder="e.g. PBT/2026/0412" />
             </label>
           </div>
+          {!strata && reno.council_permit === 'not_needed' && works !== 'light' && (
+            <div className="tone-check"><TriangleAlert size={15} /><div>{t('permit.guide.check')}</div></div>
+          )}
           {blocked && <div className="tone-check"><ShieldCheck size={15} /><div><b>{t('reno.approvalFirst')}</b>{t(strata ? 'reno.blockedStrata' : 'reno.blockedTerrace')}</div></div>}
         </div>
       )}
@@ -339,7 +368,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
             <div><dt>{t('reno.notified')}</dt><dd>{t('reno.homes', { n: zone?.length ?? '–' })}</dd></div>
             <div><dt>{t('reno.approvals')}</dt><dd>{strata
               ? `JMB/MC · ${t(!reno.management_approval ? 'reno.notStated' : reno.management_approval === 'approved' ? 'reno.jmbApproved' : 'reno.jmbPending')}`
-              : `PBT · ${t(!reno.council_permit ? 'reno.notStated' : reno.council_permit === 'approved' ? 'reno.permitApproved' : reno.council_permit === 'applied' ? 'reno.permitApplied' : 'reno.permitNone')}`}</dd></div>
+              : `PBT · ${t(!reno.council_permit ? (works === 'light' ? 'reno.notStated' : 'reno.notStatedNeeded') : reno.council_permit === 'approved' ? 'reno.permitApproved' : reno.council_permit === 'applied' ? 'reno.permitApplied' : 'reno.permitNone')}`}</dd></div>
           </dl>
           <div className="composer-message">
             <label className="field">{t('intro.language')}

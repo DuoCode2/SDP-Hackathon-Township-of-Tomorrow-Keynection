@@ -24,8 +24,15 @@ def _reno(client) -> int:
 def test_house_rules_come_with_codes(client):
     _reno(client)
     w = client.get("/api/units/T-12/works").json()
-    assert len(w["house_rule_codes"]) == len(w["house_rules"]) == 5
+    assert len(w["house_rule_codes"]) == len(w["house_rules"]) == 4  # a terrace: no lift to protect
     assert w["house_rule_codes"][0] == "noisy_hours_only"
+    assert "protect_lift" not in w["house_rule_codes"]
+
+
+def test_apartment_house_rules_include_the_lift(client):
+    w = client.get("/api/units/A-15-3/works").json()
+    assert len(w["house_rule_codes"]) == len(w["house_rules"]) == 5
+    assert "protect_lift" in w["house_rule_codes"]
 
 
 @pytest.mark.parametrize("at,code,values", [

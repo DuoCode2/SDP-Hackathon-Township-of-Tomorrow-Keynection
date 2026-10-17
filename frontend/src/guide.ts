@@ -132,7 +132,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         '如果收到通知的某户这几天另一边也在施工，系统会提醒并建议改到哪天开工',
         '时间到了自己提醒：开工前 3 天提醒邻居拍照，完工后一天问双方有没有变化；邻居反映噪音时，系统自动标明当时是在约定时段内、安静时段，还是时段外',
         '通知用对方的阅读语言送达（屋主写的话由 AI 翻好）；还没加入的住户由物业送纸本，同样是他的语言',
-        '装修卡片显示地方政府（PBT）准证状态',
+        '装修卡片显示地方政府（PBT）准证状态；登记第 4 步按工程类型说明 2026年4月1日起全国统一装修指南要的是免准证、装修准证还是建筑图则，准证状态仍由屋主自己填',
       ],
       en: [
         'Live "quiet hours now?" status at the top',
@@ -143,7 +143,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         'If a home the notice reaches already has works on its other side on those days, the owner is warned and offered a start date that avoids it',
         'Reminders go out by themselves: photograph three days before works start, and a check the day after they end; a noise concern records whether it came during the agreed hours, a quiet break or outside them',
         'Notices arrive in each reader’s language (the owner’s own words translated by AI); homes not on the app get paper from the estate office, in their language too',
-        'Renovation cards show the council (PBT) permit status',
+        'Renovation cards show the council (PBT) permit status; step 4 of the form says, for this kind of work, whether the national renovation guideline (in force 1 April 2026) expects no permit, a renovation permit or building plans — the status itself stays the owner’s to fill in',
       ],
     },
     why: {

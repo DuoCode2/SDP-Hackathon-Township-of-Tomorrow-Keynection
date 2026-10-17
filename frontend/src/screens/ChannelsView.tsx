@@ -70,6 +70,7 @@ export default function ChannelsView({ me, version }: { me: UnitInfo; version: n
 
       <div className="phones">
         <figure className="phone-wrap">
+          <Badge tone="blue">Step one · preview, nothing is sent</Badge>
           <div className="phone wa">
             <div className="phone-status dark"><span>9:41</span><span>●●● ▮</span></div>
             <div className="wa-head">

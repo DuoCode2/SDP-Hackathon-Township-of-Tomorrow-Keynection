@@ -191,6 +191,9 @@ const D: Record<string, Entry> = {
   'works.wet': ['Bathroom, kitchen or plumbing', 'Bilik air, dapur atau paip', '浴室、厨房或水管'], 'works.wet.d': ['Water can leak downwards: the two floors below are told', 'Air boleh bocor ke bawah: dua tingkat di bawah dimaklumkan', '水会往下漏：会通知楼下两层'],
   'works.hacking': ['Hacking, drilling or removing tiles', 'Pecah, gerudi atau buang jubin', '打墙、钻孔或拆瓷砖'], 'works.hacking.d': ['Noise and vibration travel two floors up and down', 'Bunyi dan gegaran merebak dua tingkat ke atas dan ke bawah', '噪音和震动会传到上下两层'],
   'works.structural': ['Extension or structural change', 'Tambahan atau ubah struktur', '扩建或改动结构'], 'works.structural.d': ['Needs approval first (council, or JMB/MC in a strata building)', 'Perlu kelulusan dahulu (PBT, atau JMB/MC bagi bangunan strata)', '需要先获批准（地方政府，或分层大楼的 JMB/MC）'],
+  // The same two kinds of work in a terrace: no floors above or below, so the shared walls and the road decide.
+  'works.wet.d.landed': ['Pipes and drilling run along the shared walls: both next-door homes and the homes across the road are told', 'Kerja paip dan gerudi melalui dinding kongsi: jiran kiri dan kanan serta rumah seberang jalan dimaklumkan', '水管和钻孔沿着共用墙：左右两户和对面的住户都会被通知'],
+  'works.hacking.d.landed': ['Noise and vibration cross the shared walls: both next-door homes and the homes across the road are told', 'Bunyi dan gegaran menembusi dinding kongsi: jiran kiri dan kanan serta rumah seberang jalan dimaklumkan', '噪音和震动会穿过共用墙：左右两户和对面的住户都会被通知'],
   'works.light': ['Painting or carpentry', 'Mengecat atau kerja kayu', '油漆或木工'], 'works.light.d': ['Quieter work: only the homes sharing a wall are told', 'Kerja lebih senyap: hanya rumah yang berkongsi dinding dimaklumkan', '较安静的工程：只通知共用墙的邻居'],
   // A suggested description for each kind of work; the owner can change it.
   'works.wet.scope': ['Re-tile bathroom', 'Tukar jubin bilik air', '重铺浴室瓷砖'],
@@ -202,6 +205,7 @@ const D: Record<string, Entry> = {
   'ai.reno.hint': ['In any language. AI fills in the steps for you to check.', 'Dalam apa-apa bahasa. AI mengisi langkah-langkah untuk anda semak.', '用什么语言都行，AI 帮你填好每一步，你再检查。'],
   'ai.reno.placeholder': ['e.g. Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 5', 'cth. Tukar jubin bilik air utama mulai Isnin depan selama dua minggu, ABC Renovation, hari bekerja 9 hingga 5', '例：下礼拜一开始重铺主人房浴室瓷砖，做两个星期，ABC Renovation 负责，平日九点到五点'],
   'ai.reno.fill': ['Fill it in for me', 'Isikan untuk saya', '帮我填好'],
+  'ai.reno.try': ['Or try one of these:', 'Atau cuba salah satu:', '或者试试这几句：'],
   'ai.reno.working': ['Reading what you wrote…', 'Sedang membaca…', '正在理解你写的…'],
   'ai.reno.done': ['Filled in by AI. Check each step before you send.', 'Diisi oleh AI. Semak setiap langkah sebelum menghantar.', 'AI 已帮你填好，发送前请逐步检查。'],
   'ai.reno.yours': ['Approvals and the CIDB tick stay yours to confirm in step 4.', 'Kelulusan dan tanda CIDB tetap anda sahkan sendiri di langkah 4.', '批准和 CIDB 仍由你在第 4 步亲自确认。'],
@@ -222,6 +226,18 @@ const D: Record<string, Entry> = {
   'reno.permit': ['Council (PBT) permit', 'Permit PBT', '地方政府（PBT）准证'], 'reno.permitApproved': ['Approved', 'Diluluskan', '已批准'], 'reno.permitApplied': ['Applied, waiting', 'Dipohon, menunggu', '已申请，等待中'],
   'reno.permitNone': ['Not needed for this work', 'Tidak perlu untuk kerja ini', '这项工程不需要'], 'reno.permitRef': ['Permit reference', 'Rujukan permit', '准证编号'],
   'reno.choose': ['Choose…', 'Pilih…', '请选择…'], 'reno.notStated': ['Not stated', 'Tidak dinyatakan', '未填写'],
+  // The national renovation guideline (KPKT circular Bil. 3/2026, in force 1 April 2026) sorts work into three kinds:
+  // no permit, a renovation permit on a sketch plan, or building plans with a CCC. Step 4 says which one this kind of
+  // work usually falls under, so the owner knows what the council will ask for; the choice stays the owner's.
+  'permit.guide.title': ['National renovation guideline (KPKT, in force 1 April 2026):', 'Garis panduan ubah suai kebangsaan (KPKT, berkuat kuasa 1 April 2026):', '全国装修指南（房屋及地方政府部，2026年4月1日起生效）：'],
+  'permit.guide.wet': ['changing pipes or sanitary fittings, or tiling more than 6.5 m², needs a renovation permit from the council.', 'menukar paip atau kelengkapan sanitari, atau jubin melebihi 6.5 m², perlu permit ubah suai daripada PBT.', '改水管或卫生设备、铺超过 6.5 平方米的瓷砖，要向地方政府申请装修准证。'],
+  'permit.guide.hacking': ['removing or laying tiles over 6.5 m², or small changes to internal walls, needs a renovation permit; touching the structure needs building plans and a CCC.', 'membuang atau memasang jubin melebihi 6.5 m², atau ubahan kecil dinding dalaman, perlu permit ubah suai; kerja struktur perlu pelan bangunan dan CCC.', '拆或铺超过 6.5 平方米的瓷砖、小改内墙，要申请装修准证；动到结构要建筑图则和竣工合格证（CCC）。'],
+  'permit.guide.structural': ['a kitchen, porch or side extension needs a renovation permit on a sketch plan; a change to the structure needs building plans and a CCC from a professional.', 'sambungan dapur, anjung atau sisi perlu permit ubah suai dengan pelan lakar; ubahan struktur perlu pelan bangunan dan CCC daripada profesional.', '厨房、前廊或侧面加建要用草图申请装修准证；改动结构要由专业人士出建筑图则和竣工合格证（CCC）。'],
+  'permit.guide.light': ['painting needs no permit (colours follow the council’s guideline); built-in cabinets or counters are on the permit list.', 'mengecat tidak perlu permit (warna ikut garis panduan PBT); kabinet atau kaunter bina dalam ada dalam senarai permit.', '油漆不需要准证（颜色按地方政府指南）；订做的柜子或柜台在准证清单里。'],
+  'permit.guide.how': ['Apply online through the council’s OSC 3.0 Plus; a renovation permit takes up to 14 days. In a strata building, JMB/MC approval comes first.', 'Mohon dalam talian melalui OSC 3.0 Plus PBT; permit ubah suai mengambil masa sehingga 14 hari. Di bangunan strata, kelulusan JMB/MC dahulu.', '通过地方政府的一站式中心（OSC 3.0 Plus）在线申请，装修准证最多 14 天。分层大楼要先取得 JMB/MC 批准。'],
+  'permit.guide.link': ['Read the circular', 'Baca pekeliling', '看通告原文'],
+  'permit.guide.check': ['Under the national guideline this kind of work usually needs a permit. Keep “Not needed” only if the council told you so.', 'Mengikut garis panduan kebangsaan, kerja jenis ini biasanya perlu permit. Kekalkan “Tidak perlu” hanya jika PBT memberitahu begitu.', '按全国指南，这类工程通常需要准证。只有地方政府明说不需要，才保留「不需要」。'],
+  'reno.notStatedNeeded': ['Not stated · usually needs a permit', 'Tidak dinyatakan · biasanya perlu permit', '未填写 · 通常需要准证'],
   'reno.approvalFirst': ['Approval first', 'Kelulusan dahulu', '先取得批准'],
   'reno.blockedStrata': ['Structural work can only be registered once the JMB/MC has approved it.', 'Kerja struktur hanya boleh didaftarkan selepas JMB/MC meluluskannya.', '结构工程要等 JMB/MC 批准后才能登记。'],
   'reno.blockedTerrace': ['Structural work can only be registered once the council permit is approved.', 'Kerja struktur hanya boleh didaftarkan selepas permit PBT diluluskan.', '结构工程要等地方政府准证批准后才能登记。'],
