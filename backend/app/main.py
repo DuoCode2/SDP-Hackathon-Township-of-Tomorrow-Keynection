@@ -12,6 +12,8 @@ import re
 import secrets
 import shutil
 import sqlite3
+import threading
+import time
 import uuid
 import zipfile
 from collections.abc import Iterator
@@ -70,6 +72,13 @@ HOUSE_RULE_LIST = [
 ]
 HOUSE_RULES = [text for _, text in HOUSE_RULE_LIST]
 HOUSE_RULE_CODES = [code for code, _ in HOUSE_RULE_LIST]
+APARTMENT_ONLY_RULES = {"protect_lift"}  # a terrace has no lift or shared corridor to protect
+
+
+def house_rules_for(kind: str) -> tuple[list[str], list[str]]:
+    """The estate's rules for this kind of home: the texts (the record) and their codes (the reader's language)."""
+    rules = [(code, text) for code, text in HOUSE_RULE_LIST if kind == "apartment" or code not in APARTMENT_ONLY_RULES]
+    return [text for _, text in rules], [code for code, _ in rules]
 
 
 def db_path() -> str:
@@ -96,6 +105,8 @@ def staff_only() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    global _last_request
+    _last_request = None  # a fresh start never counts as a quiet spell
     conn = db.connect(db_path())
     db.init_db(conn, keep_data=not demo_mode())  # a pilot's records are never rebuilt
     _expire_voice(conn)
@@ -448,9 +459,57 @@ async def guard(request: Request, call_next):
     return response
 
 
+# ---------- the shared demo ----------
+# The online demo is one database for everyone who opens it. After a quiet spell it starts over by itself, so the
+# next visitor begins from the fictional phase as seeded, not from the last visitor's clicks; and the per-day limits
+# that keep a real neighbour from becoming a nuisance are loosened, so one visitor's wave or notice doesn't block
+# the next. A pilot never resets and keeps every limit as it is.
+DEMO_IDLE_MINUTES = 20  # KEYNECTION_DEMO_IDLE_MINUTES overrides it
+DEMO_WAVE_WINDOW = timedelta(minutes=5)  # a pilot: one wave per neighbour per day
+DEMO_CAP_FACTOR = 10  # hellos, notices and waves a day
+_last_request: float | None = None  # time.monotonic() of the last API request; None since start-up
+_idle_lock = threading.Lock()
+
+
+def demo_idle_seconds() -> float:
+    return float(setting("DEMO_IDLE_MINUTES", str(DEMO_IDLE_MINUTES))) * 60
+
+
+def daily_cap(per_day: int) -> int:
+    return per_day * DEMO_CAP_FACTOR if demo_mode() else per_day
+
+
+def wave_window() -> timedelta:
+    return DEMO_WAVE_WINDOW if demo_mode() else timedelta(days=1)
+
+
+def _reset_demo_data(conn: sqlite3.Connection) -> None:
+    db.drop_all(conn)
+    for folder in ("photos", "compare", "voice"):
+        shutil.rmtree(data_dir(folder))
+    db.init_db(conn)
+    ai.reset()  # the daily AI allowance starts over with the households
+
+
+def start_over_if_idle(conn: sqlite3.Connection) -> bool:
+    """Demo mode only: when the last request was a quiet spell ago, rebuild the fictional data before this one."""
+    global _last_request
+    if not demo_mode():
+        return False
+    now = time.monotonic()
+    with _idle_lock:
+        quiet = _last_request is not None and now - _last_request > demo_idle_seconds()
+        _last_request = now
+        if quiet:
+            _reset_demo_data(conn)
+            log.info("demo data started over after a quiet spell")
+        return quiet
+
+
 def get_conn() -> Iterator[sqlite3.Connection]:
     conn = db.connect(db_path())
     try:
+        start_over_if_idle(conn)
         yield conn
     finally:
         conn.close()
@@ -982,7 +1041,7 @@ def send_intro(body: IntroIn, conn: sqlite3.Connection = Depends(get_conn)) -> d
     kind = "NOT NULL" if body.renovation else "NULL"
     sent = conn.execute(f"SELECT COUNT(*) FROM intros WHERE from_unit_id = ? AND created_at > ? AND renovation IS {kind}",
                         (body.from_unit_id, since)).fetchone()[0]
-    limit = MAX_RENOVATION_NOTICES_PER_DAY if body.renovation else MAX_HELLOS_PER_DAY
+    limit = daily_cap(MAX_RENOVATION_NOTICES_PER_DAY if body.renovation else MAX_HELLOS_PER_DAY)
     if sent >= limit:
         raise HTTPException(429, f"At most {limit} {'renovation notices' if body.renovation else 'hellos'} a day. Try again tomorrow.")
     sent_by = _delegate_name(conn, body.from_unit_id, body.delegate_id)
@@ -1097,9 +1156,9 @@ def neighbour_card(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
             " WHERE i.from_unit_id = ? AND r.unit_id = ? AND r.acked_at IS NOT NULL",
             (n["id"], unit_id),
         ).fetchone() is not None
-        since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
+        recent = (datetime.now(timezone.utc) - wave_window()).isoformat(timespec="seconds")
         waved = conn.execute("SELECT 1 FROM waves WHERE from_unit_id = ? AND to_unit_id = ? AND created_at > ?",
-                             (unit_id, n["id"], since)).fetchone() is not None
+                             (unit_id, n["id"], recent)).fetchone() is not None
         out.append({**n, "known": they_replied or i_replied or _mutual(conn, unit_id, n["id"]), "bio": _profile_row(conn, n["id"])["bio"],
                     "waved_today": waved, "allow_waves": bool(_profile_row(conn, n["id"])["allow_waves"])})
     return {"unit_id": unit_id, "neighbours": out, "known_count": sum(n["known"] for n in out),
@@ -1870,13 +1929,14 @@ def wave(body: WaveIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str
     _check_can_reach(conn, body.from_unit_id, body.to_unit_id)
     if not _profile_row(conn, body.to_unit_id)["allow_waves"]:
         raise HTTPException(409, "This neighbour has turned waves off. You can still send a message.")
-    since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
+    recent = (datetime.now(timezone.utc) - wave_window()).isoformat(timespec="seconds")
     if conn.execute("SELECT 1 FROM waves WHERE from_unit_id = ? AND to_unit_id = ? AND created_at > ?",
-                    (body.from_unit_id, body.to_unit_id, since)).fetchone():
+                    (body.from_unit_id, body.to_unit_id, recent)).fetchone():
         raise HTTPException(409, "You already waved today.")
+    since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
     if conn.execute("SELECT COUNT(*) FROM waves WHERE from_unit_id = ? AND created_at > ?",
-                    (body.from_unit_id, since)).fetchone()[0] >= MAX_WAVES_PER_DAY:
-        raise HTTPException(429, f"At most {MAX_WAVES_PER_DAY} waves a day.")
+                    (body.from_unit_id, since)).fetchone()[0] >= daily_cap(MAX_WAVES_PER_DAY):
+        raise HTTPException(429, f"At most {daily_cap(MAX_WAVES_PER_DAY)} waves a day.")
     cur = conn.execute("INSERT INTO waves (from_unit_id, to_unit_id, created_at) VALUES (?, ?, ?)",
                        (body.from_unit_id, body.to_unit_id, db.now()))
     conn.commit()
@@ -2491,8 +2551,9 @@ def works(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[st
          "relation_to_me": i["relation_to_me"], "renovation": i["renovation"]}
         for i in inbox(unit_id, conn) if i["renovation"]
     ]
+    rules, codes = house_rules_for(me["kind"])
     return {"mine": mine, "nearby": nearby, "gate_hours": f"{GATE_OPEN}-{GATE_CLOSE}, Mon-Sat",
-            "gate_open": GATE_OPEN, "gate_close": GATE_CLOSE, "house_rules": HOUSE_RULES, "house_rule_codes": HOUSE_RULE_CODES}
+            "gate_open": GATE_OPEN, "gate_close": GATE_CLOSE, "house_rules": rules, "house_rule_codes": codes}
 
 
 @app.post("/api/intros/{intro_id}/passes", status_code=201)
@@ -2593,7 +2654,7 @@ def contractor_view(token: str, conn: sqlite3.Connection = Depends(get_conn)) ->
     notified = conn.execute("SELECT COUNT(*) FROM intro_recipients WHERE intro_id = ?", (row["intro_id"],)).fetchone()[0]
     return {"status": row["status"], "contractor_name": row["contractor_name"], "unit_label": unit["label"],
             "scope": reno["scope"], "start": reno["start"], "end": reno["end"], "noisy_hours": reno.get("noisy_hours"),
-            "entry_hours": f"{GATE_OPEN}-{GATE_CLOSE}, Mon-Sat", "house_rules": HOUSE_RULES,
+            "entry_hours": f"{GATE_OPEN}-{GATE_CLOSE}, Mon-Sat", "house_rules": house_rules_for(unit["kind"])[0],
             "neighbours_notified": notified, "prework_photos_on_record": photos}
 
 
@@ -2899,10 +2960,7 @@ def reset_demo(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
     """Wipe and re-seed the fictional demo data (for rehearsals). Disabled when KEYNECTION_DEMO_MODE=0."""
     if not demo_mode():
         raise HTTPException(403, "demo mode is off")
-    db.drop_all(conn)
-    for folder in ("photos", "compare", "voice"):
-        shutil.rmtree(data_dir(folder))
-    db.init_db(conn)
+    _reset_demo_data(conn)
     return {"status": "reset"}
 
 

@@ -26,6 +26,10 @@ export const UI: Record<string, Text> = {
     zh: '只走主线：交钥匙 → 认识左右和对面 5 户 → 装修通知就是自我介绍 → 万一出事有公平记录 → SDP 怎么检查效果',
     en: 'The main story only: keys → meet the five homes beside and opposite → the renovation notice is the introduction → a fair record if something goes wrong → how SDP checks it works',
   },
+  sharedDemo: {
+    zh: '这是大家共用的演示：没人用 20 分钟后会自动回到起点。如果某一步显示「今天已做过」，到 SDP 页底按「Reset demo data」。',
+    en: 'This demo is shared: after 20 quiet minutes it starts over by itself. If a step says it was already done today, press "Reset demo data" at the bottom of the SDP page.',
+  },
   about: {
     zh: 'Keynection：每一把钥匙都附送五户邻居。从交钥匙那天起，帮屋主认识左右和对面这 5 户；装修季是邻居变朋友还是变仇人的关键期，所以装修通知就是第一次自我介绍。万一出了裂缝漏水，公平的记录、分流和保修在背后撑着。',
     en: 'Keynection: every key comes with five neighbours. From the day they get their keys, owners meet the five homes beside and opposite them. Renovation season decides whether neighbours become friends or enemies, so the renovation notice doubles as the first introduction. If a crack or leak appears, a fair record, triage and the warranty back it up.',
@@ -33,8 +37,8 @@ export const UI: Record<string, Text> = {
   fictional: { zh: '所有住户、门牌和照片都是虚构的示范资料。', en: 'All residents, units and photos are fictional demo data.' },
   aiOn: { zh: 'AI 已开启：打字自动翻译、太冲先劝、一句话写装修通知', en: 'AI on: typed words translated, heated ones calmed, the notice written from one sentence' },
   aiOff: {
-    zh: 'AI 没开（服务器没有 ANTHROPIC_API_KEY）：路线照样能走，只是打的字照原文送、装修通知要逐步填',
-    en: 'AI off (no ANTHROPIC_API_KEY on the server): the route still works; typed words go as written and the notice is filled in step by step',
+    zh: 'AI 没开（服务器没有 AI 金钥）：路线照样能走，只是打的字照原文送、装修通知要逐步填',
+    en: 'AI off (no AI key on the server): the route still works; typed words go as written and the notice is filled in step by step',
   },
   showAll: { zh: '显示全部功能', en: 'Show every feature' },
   showAllHint: {
@@ -90,7 +94,7 @@ export const PAGES: Record<TabId, PageGuide> = {
     },
     features: {
       zh: [
-        '用什么语言打字都行：对方收到的是 AI（Claude）翻好的他的语言，标着「AI 翻译」，原文点一下就看到',
+        '用什么语言打字都行：对方收到的是 AI 翻好的他的语言（设计上用 Claude；网上演示可能用 Gemini），标着「AI 翻译」，原文点一下就看到',
         '快捷回复不用上网也会翻：Siti 用马来文按，Aiman 看到英文；隔壁 Kumar 读淡米尔文',
         '「提出不满」：先私下告诉装修户 → 对方回复或处理 → 不行再升级给 SDP 物业团队；每一步写进两户屋历',
         '语气检查：AI 觉得太冲时，先给一个意思不变、比较平和的说法，你自己选发哪个；明显的辱骂一律发不出去',
@@ -98,7 +102,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         '「交换电话」要双方都同意才生效',
       ],
       en: [
-        'Type in any language: your neighbour reads it in theirs, translated by AI (Claude), marked "Translated by AI", with the original one tap away',
+        'Type in any language: your neighbour reads it in theirs, translated by AI (Claude by design; the online demo may use Gemini), marked "Translated by AI", with the original one tap away',
         'Quick replies are translated even offline: Siti taps in Malay, Aiman reads English, Kumar next door reads Tamil',
         '"Raise a concern": tell the renovating neighbour privately → they reply or fix it → if not, escalate to SDP’s estate team; every step goes into both home logs',
         'Tone check: when AI thinks a message sounds heated, it offers a calmer wording with the same facts and you choose which to send; obvious insults are never sent',

@@ -106,7 +106,7 @@ npm run dev
 
 打开 http://localhost:5173 。电脑上是网页版：左边是导航，右边是「导览」面板（中文/英文切换，说明这一页的功能，并列出可以一键跳转的演示路线）；窗口窄于 1240 像素时导览改成按右上角按钮滑出；窄于 900 像素（手机）时改为全屏加底部导航。服务器默认只在本机开放，同一 Wi-Fi 里的其他人连不进来。
 
-测试（317 个，2026-10-17 跑过全部通过）：
+测试（326 个，2026-10-17 跑过全部通过）：
 
 ```bash
 cd prototype/backend
@@ -169,10 +169,10 @@ cd prototype/backend
 
 ## 3 分钟评审路线
 
-导览最上面就是这条路线，点一步会自动跳到对应画面和住户。导览的语言跟浏览器走：中文浏览器显示中文，其余（评审、SDP）显示英文，右上角可以切换，切过会记住；顶栏的按钮名称跟介面语言走（Guide / Panduan / 导览）。只走主线：
+导览最上面就是这条路线，点一步会自动跳到对应画面和住户。网上演示版是所有评审共用一个资料库：演示模式下没人用 20 分钟（`KEYNECTION_DEMO_IDLE_MINUTES` 可改）就自动回到示范资料的起点；挥手「今天已打过」在演示里只算 5 分钟，打招呼、装修通知、挥手的每日上限放宽 10 倍——这样前一位评审做过的事不会挡住后一位。试点模式（`KEYNECTION_DEMO_MODE=0`）完全不受影响：不会自动重置，上限照旧。导览的语言跟浏览器走：中文浏览器显示中文，其余（评审、SDP）显示英文，右上角可以切换，切过会记住；顶栏的按钮名称跟介面语言走（Guide / Panduan / 导览）。只走主线：
 
 1. **交钥匙那天**：Aiman（No. 12）首页就是左右和对面 5 户邻居 → 对 Siti 按「👋 Wave」
-2. **装修通知就是自我介绍**：Works →「Register renovation」→ 在「Just say it in one sentence」打一句（例：Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 →「When」那一步系统已按邻居作息排好（避开 Siti 宝宝午睡 13–15 点、Hafiz 夜班补眠 9–11 点，不说是谁）→ 检查后发送（还没加入的 No. 23 由物业送纸本）
+2. **装修通知就是自我介绍**：Works →「Register renovation」→ 在「Just say it in one sentence」打一句（例：Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5；或按框下的英文、马来文、华文示例句，一点就填）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 →「When」那一步系统已按邻居作息排好（避开 Siti 宝宝午睡 13–15 点、Hafiz 夜班补眠 9–11 点，不说是谁）→ 检查后发送（还没加入的 No. 23 由物业送纸本）
 3. **隔壁 Kumar（No. 13）读淡米尔文**：触达管道里看到他在 WhatsApp 收到的是淡米尔文装修通知，连 Aiman 写的工程说明也由 AI 翻好；下面还有两条会自己发出的提醒（开工前 3 天提醒拍照、完工后一天问有没有变化）
 4. 按「Both sides」（左 Aiman、右 Siti）→ Siti 打开 Aiman 的通知，看到「吵闹时段已避开你的安静时间」，宝宝午睡不用她开口 → 回 👋 → 再用马来文打一句冲的话（例：Rumah awak bising macam kilang! Tak reti hormat jiran ke?）→ AI 先给她平和的说法 → Aiman 看到英文，原文点一下就有
 
@@ -293,7 +293,7 @@ backend/
   app/main.py            FastAPI 接口与安全设置（四层、聊天、不满、审核、保修时钟都在这里）
   scripts/make_demo_photos.py
   scripts/ai_standin_server.py  验证用：用替身 AI 开服务器（端口由参数决定），不用金钥就能在浏览器看 AI 画面，答案都标 [stand-in]；`.claude/launch.json` 的 keynection-ai-standin 就是用它
-  tests/                 317 个测试（test_quiet.py 按邻居作息排时段、屋主保留至少 4 小时、只在法定时段内排、安静时间保密且有上限、通知写明是否避开且发出后不改写、两边同时施工与建议开工日、自动提醒的时间、噪音反映对照约定、后台数字；test_ai.py 一句话写通知、不合规则的回答被丢掉、按读者语言翻译讯息和通知（WhatsApp、纸本也是）、太冲先劝、辱骂仍挡、AI 没回应照旧、每户每天上限、只送文字不送名字，全部用替身不连真的 AI，另外走官方套件但把网络换掉，检查送出的格式、备用选项被拒时自动改问、断网和被拒都照旧；test_keynection.py 新名字、淡米尔文的快捷回复与通知、按读者语言写日期和施工时段；test_site_gate.py 网上版三语密码页、记住 30 天、改密码全部失效、页面不被缓存绕过、健康检查不用密码、noindex；test_codes.py 屋规、门卫判定、聊天自动通知与列表预览都附代码；test_decisions.py 谁能决定什么：提出、同意、不同意、检查员；test_staff_gating.py 关掉演示模式时后台全部关闭、不能任意写屋历；test_hello_safety.py 打招呼的封锁、安静模式、语气、联系方式、次数，装修日期与批准、装修连结期限；test_triage.py 时间判断与理由代码；test_ledger.py 同时写入不分叉；test_talk.py 聊天、不满、审核、时钟、物业只看升级的不满；test_rings.py 三层邻居、通知范围、联系请求、公告；test_social.py Wave、表情、语音、个人资料、官方帐号；test_care.py 语音 30 天删除、家人代办、下载我的资料、邻里关系数据、联系方式与冒充检查、以今天计算的示范日期；test_join.py 交屋加入、纸本通知、物业代登记、简易模式隐私、WhatsApp 通知、新 phase 设定）
+  tests/                 326 个测试（test_quiet.py 按邻居作息排时段、屋主保留至少 4 小时、只在法定时段内排、安静时间保密且有上限、通知写明是否避开且发出后不改写、两边同时施工与建议开工日、自动提醒的时间、噪音反映对照约定、后台数字；test_ai.py 一句话写通知、不合规则的回答被丢掉、按读者语言翻译讯息和通知（WhatsApp、纸本也是）、太冲先劝、辱骂仍挡、AI 没回应照旧、每户每天上限、只送文字不送名字，全部用替身不连真的 AI，另外走官方套件但把网络换掉，检查送出的格式、备用选项被拒时自动改问、断网和被拒都照旧；test_keynection.py 新名字、淡米尔文的快捷回复与通知、按读者语言写日期和施工时段；test_site_gate.py 网上版三语密码页、记住 30 天、改密码全部失效、页面不被缓存绕过、健康检查不用密码、noindex；test_codes.py 屋规、门卫判定、聊天自动通知与列表预览都附代码；test_decisions.py 谁能决定什么：提出、同意、不同意、检查员；test_staff_gating.py 关掉演示模式时后台全部关闭、不能任意写屋历；test_hello_safety.py 打招呼的封锁、安静模式、语气、联系方式、次数，装修日期与批准、装修连结期限；test_triage.py 时间判断与理由代码；test_ledger.py 同时写入不分叉；test_talk.py 聊天、不满、审核、时钟、物业只看升级的不满；test_rings.py 三层邻居、通知范围、联系请求、公告；test_social.py Wave、表情、语音、个人资料、官方帐号；test_care.py 语音 30 天删除、家人代办、下载我的资料、邻里关系数据、联系方式与冒充检查、以今天计算的示范日期；test_join.py 交屋加入、纸本通知、物业代登记、简易模式隐私、WhatsApp 通知、新 phase 设定）
 frontend/src/
   App.tsx                外框：导航（跟着页面性格变）、图框、语言切换、角色卡、Both sides 分屏、代办横幅、手机版底栏
   i18n.tsx               住户页面的英文、马来文、中文字典与语言切换

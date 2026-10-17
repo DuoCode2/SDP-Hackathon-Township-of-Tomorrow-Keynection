@@ -52,6 +52,7 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, show
 
           <div className="section-label">{UI.judgeRoute[lang]}</div>
           <p className="guide-hint">{UI.judgeHint[lang]}</p>
+          <p className="guide-hint">{UI.sharedDemo[lang]}</p>
           {ai && (
             <p className={`guide-ai ${ai.on ? 'on' : ''}`}>
               <Sparkles size={13} /> {ai.on ? `${UI.aiOn[lang]} (${ai.model})` : UI.aiOff[lang]}

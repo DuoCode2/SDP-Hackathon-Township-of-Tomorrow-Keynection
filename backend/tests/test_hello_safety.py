@@ -58,7 +58,10 @@ def test_a_renovation_notice_may_give_the_contractors_number_but_not_insults(cli
 
 
 def test_hellos_are_limited_per_day(client):
-    for _ in range(3):
+    from app import main
+
+    cap = main.daily_cap(main.MAX_HELLOS_PER_DAY)  # 3 a day in a pilot; the shared demo allows ten times that
+    for _ in range(cap):
         assert _hello(client, ["T-13"]).status_code == 201
     assert _hello(client, ["T-13"]).status_code == 429
 
