@@ -1,5 +1,8 @@
 # Keynection 原型
 
+[![Tests](https://github.com/DuoCode2/SDP-Hackathon-Township-of-Tomorrow-Keynection/actions/workflows/ci.yml/badge.svg)](https://github.com/DuoCode2/SDP-Hackathon-Township-of-Tomorrow-Keynection/actions/workflows/ci.yml)
+（每次推送到 GitHub 自动跑 326 个后端测试和前端编译；仓库是私有的，徽章只有能打开仓库的人看得到。设定在 `.github/workflows/ci.yml`。）
+
 Sime Darby Property University Hackathon 2026 · People 赛道。**Every key comes with five neighbours：每一把钥匙都附送五户邻居。**
 
 主轴是**邻里连结**：从交钥匙那天起，帮屋主认识左右和对面这 5 户（来自日本搬家时向左右两户和对面三户打招呼的习惯）。交屋后的装修季是邻居变朋友还是变仇人的关键期，所以装修通知就是第一次自我介绍。万一出了裂缝漏水，公平的记录、分流和保修在背后撑着，但它们是安全网，不是主角。
@@ -112,6 +115,8 @@ npm run dev
 cd prototype/backend
 .venv/Scripts/python -m pytest -q
 ```
+
+测试的数字只在 `docs/testing-overview.md` 写一次（五层：自动测试、前端编译、浏览器自动走路线、人工测试计划、真机），其他地方引用那一页。人工核对照 `docs/test-plan.md`（K00–K23）；浏览器自动走完评审路线并截图在 `e2e/`（见 `e2e/README.md`）。
 
 重新生成示范照片（一般不需要）：
 
@@ -273,9 +278,28 @@ cd prototype/backend
 - 真实墙面通常很素，自动对齐需要画面里有墙角、插座、开关等固定物；对不齐时系统会请用户重拍，不会乱判
 - 变化检测只找"变暗"的区域（裂缝、水渍、污痕），不判断原因；强烈的阴影可能被误标成裂缝，变亮的变化（例如墙面泛白）会漏掉。路演请说"电脑视觉比对"，不要说"AI 扫描"
 
+## 交件附录与测试证据
+
+2026年10月17日加的，给评审（SDP 数码团队）看的附录，英文主体、开头附中文摘要，都在 `docs/`。顺序就是附录的顺序：
+
+| 档案 | 一句话 |
+|---|---|
+| [`docs/judging-criteria-map.md`](docs/judging-criteria-map.md) | 评审六项标准 × 权重 × 原型哪一页回答 × 评审路线第几步 × 证据档案 × 还缺什么；也是路演讲稿的骨架 |
+| [`docs/feature-status.md`](docs/feature-status.md) | 每个功能是真做、有金钥才开、模拟（画面上怎么标）、试点才开、收起来、还是没做 |
+| [`docs/technical-summary.md`](docs/technical-summary.md) | 架构一张图、四个状态机（不满阶梯、案件决定、保修单、联系请求）、权限表、资料去向、前十条已知限制和试点怎么补 |
+| [`docs/key-decisions.md`](docs/key-decisions.md) | 17 条关键决定：决定、理由、放弃了什么 |
+| [`docs/testing-overview.md`](docs/testing-overview.md) | 测试金字塔五层；326 个测试按「保护什么」分组；老实列出还没测到的 |
+| [`docs/test-plan.md`](docs/test-plan.md) | 人工测试计划：K00–K15 评审路线、K16–K21 安全边界、K22–K23 没开 AI 与共用演示重置；编号和真机核对表一致 |
+| [`docs/glossary.md`](docs/glossary.md) | 统一用语，中英对照：投影片、访谈、导览、画面都照这一页 |
+
+证据档案在团队资料夹（不在这个仓库里）：`evidence/dosm_neighbour_interaction_2020.md`（普查）、`evidence/neighbour_renovation_disputes_summary.md`（纠纷案例）、`evidence/sdp_app_reviews_summary.md`（App 评论）、`evidence/device-check/`（真机核对表，队员用手机填）、`evidence/route-screenshots/`（`e2e/` 自动走路线产生的 17 张截图）。
+
 ## 结构
 
 ```
+.github/workflows/ci.yml 每次推送自动跑后端测试和前端编译（见 docs/testing-overview.md）
+docs/                    给 SDP IT 的部署指南、WhatsApp 模板；交件附录七份（见上一节）
+e2e/                     浏览器自动走完评审路线并截图（Playwright，独立端口 8031、替身 AI；见 e2e/README.md）
 start-demo.bat / .sh     一键演示（同一个端口 8000）
 start-dev.bat            开发模式（8000 + 5173）
 Dockerfile               放上网用：建好网页，再用同一个端口跑后端
