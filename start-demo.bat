@@ -21,7 +21,7 @@ if not exist "backend\.venv\Scripts\python.exe" (
   echo  [1/3] Python packages ready
 )
 REM Set up before the AI features or the digital keys came: add the new packages.
-"backend\.venv\Scripts\python.exe" -c "import anthropic, webauthn" 2>nul || (
+"backend\.venv\Scripts\python.exe" -c "import anthropic, webauthn, google.genai" 2>nul || (
   echo        Adding new packages ^(once^)...
   "backend\.venv\Scripts\python.exe" -m pip install -q -r "backend\requirements.txt" || goto :fail
 )

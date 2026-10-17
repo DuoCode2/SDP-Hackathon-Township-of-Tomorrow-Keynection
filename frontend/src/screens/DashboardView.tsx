@@ -6,7 +6,7 @@ import ConcernCard from '../components/ConcernCard'
 import FrontDesk from '../components/FrontDesk'
 import PilotHealth from '../components/PilotHealth'
 import WarrantyClock from '../components/WarrantyClock'
-import { Badge, Card, CardHead, CountUp, Empty, formatDate, Ring, ScreenTitle, Segmented, Skeleton, useToast } from '../ui'
+import { Badge, Card, CardHead, count, CountUp, Empty, formatDate, Ring, ScreenTitle, Segmented, Skeleton, useToast } from '../ui'
 import { ticketBadge } from './RepairView'
 import { tEn } from '../i18n'
 import { replayWelcome } from './CircleView'
@@ -102,7 +102,7 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
                   ) : (
                     concerns.map((c) => (
                       <div key={c.id} className="estate-item">
-                        <div className="mono muted">{c.scope} · {c.concerns_on_renovation} concern(s) on this renovation</div>
+                        <div className="mono muted">{c.scope} · {count(c.concerns_on_renovation ?? 0, 'concern')} on this renovation</div>
                         <ConcernCard concern={c} estate onChanged={onChange} />
                       </div>
                     ))

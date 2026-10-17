@@ -69,7 +69,7 @@ const D: Record<string, Entry> = {
   'req.title': ['{n} request(s) to connect', '{n} permintaan untuk berhubung', '{n} 个联系请求'],
   'req.sub': ['From your lorong or block. You see their unit, not their name, until you accept.', 'Dari lorong atau blok anda. Anda nampak unit mereka, bukan nama, sehingga anda terima.', '来自同一条 lorong 或同一栋。接受之前只看得到门牌，看不到名字。'],
   'req.resident': ['Resident of {label}', 'Penghuni {label}', '{label} 的住户'],
-  'sayhi.title': ['{n} neighbour(s) haven’t met you yet', '{n} jiran belum berkenalan dengan anda', '还有 {n} 位邻居没认识你'],
+  'sayhi.title': ['{n} neighbour(s) you haven’t met yet','{n} jiran belum berkenalan dengan anda', '还有 {n} 位邻居没认识你'],
   'sayhi.sub': ['Send one friendly hello to all of them, in your language.', 'Hantar satu ucapan mesra kepada mereka semua, dalam bahasa anda.', '用你的语言，一次跟他们打个招呼。'],
   'section.nextDoor': ['Next door · your circle', 'Sebelah-menyebelah · bulatan anda', '隔壁 · 你的邻里圈'],
   'status.renovating': ['Renovating now · you got their notice', 'Sedang ubah suai · anda terima notis mereka', '正在装修 · 你已收到通知'],
@@ -138,7 +138,7 @@ const D: Record<string, Entry> = {
   'plan.use': ['Use the planned hours', 'Guna waktu yang dirancang', '用安排好的时段'],
   'plan.own': ['Keep my own hours', 'Kekalkan waktu saya', '用我自己的时段'],
   'plan.ownNote': ['Using your own hours: neighbours whose quiet times they cross are told so in the notice.', 'Menggunakan waktu anda sendiri: jiran yang waktu senyapnya terjejas dimaklumkan dalam notis.', '用你自己的时段：会碰到安静时间的邻居，通知里会写明。'],
-  'plan.double': ['{n} home(s) this notice reaches already have works from another neighbour on some of these days: noise from two sides at once.', '{n} rumah yang menerima notis ini sudah ada kerja daripada jiran lain pada beberapa hari yang sama: bising dari dua arah serentak.', '收到这份通知的 {n} 户，这几天已经有另一边的邻居在施工：会两边同时吵。'],
+  'plan.double': ['Another neighbour’s works already reach {n} home(s) on this list on some of these days: noise from two sides at once.','{n} rumah yang menerima notis ini sudah ada kerja daripada jiran lain pada beberapa hari yang sama: bising dari dua arah serentak.', '收到这份通知的 {n} 户，这几天已经有另一边的邻居在施工：会两边同时吵。'],
   'plan.moveTo': ['Start on {date} instead', 'Mula pada {date}', '改成 {date} 开工'],
   'quiet.avoided': ['Noisy hours planned around your quiet time', 'Waktu bising dirancang mengelak waktu senyap anda', '吵闹时段已避开你的安静时间'],
   'quiet.overlap': ['These hours cross your quiet time: you can ask in this chat', 'Waktu ini bertembung dengan waktu senyap anda: anda boleh bertanya dalam sembang ini', '这个时段碰到你的安静时间，可以在这个聊天里问对方'],
@@ -366,7 +366,7 @@ const D: Record<string, Entry> = {
   'group.sdp': ['Sime Darby Property', 'Sime Darby Property', 'Sime Darby Property'],
   'nav.planner': ['Phase setup', 'Tetapan fasa', '新 phase 设定'], 'nav.planner.sub': ['Circles from the site plan', 'Bulatan daripada pelan tapak', '从平面图算出邻里圈'], 'nav.planner.short': ['Setup', 'Tetapan', '设定'],
   'nav.impact': ['Impact model', 'Model impak', '影响估算'], 'nav.impact.sub': ['Assumptions you can change', 'Andaian yang boleh diubah', '可以调整的假设'], 'nav.impact.short': ['Impact', 'Impak', '影响'],
-  'nav.channels': ['Channels', 'Saluran', '触达管道'], 'nav.channels.sub': ['SDP App & WhatsApp', 'Aplikasi SDP & WhatsApp', 'SDP App 与 WhatsApp'], 'nav.channels.short': ['Channels', 'Saluran', '管道'],
+  'nav.channels': ['Channels', 'Saluran', '触达管道'], 'nav.channels.sub': ['Welcome pack & WhatsApp', 'Pek alu-aluan & WhatsApp', '礼包 QR 与 WhatsApp'], 'nav.channels.short': ['Channels', 'Saluran', '管道'],
 
   // households that haven't joined yet
   'nj.status': ['Not on Keynection yet', 'Belum menyertai Keynection', '还没加入 Keynection'],
@@ -465,6 +465,7 @@ const D: Record<string, Entry> = {
   'push.staffOn': ['On: reported messages, concerns passed to the estate office and new warranty tickets reach this device.', 'Hidup: mesej yang dilaporkan, kebimbangan yang dibawa ke pejabat estet dan tiket waranti baharu sampai ke peranti ini.', '已开启：被检举的讯息、转交物业的问题和新的保修单会传到这台装置。'],
   'join.p5t': ['AI translation', 'Terjemahan AI', 'AI 翻译'],
   'join.p5': ['So neighbours can read you in their own language, what you type to them is translated by an AI service (Claude, by Anthropic, processed outside Malaysia). Only the words you write are sent. Your neighbour can always see your own words, and a calmer wording is only ever a suggestion.', 'Supaya jiran boleh membacanya dalam bahasa mereka sendiri, apa yang anda taip kepada mereka diterjemah oleh perkhidmatan AI (Claude, oleh Anthropic, diproses di luar Malaysia). Hanya perkataan yang anda tulis dihantar. Jiran anda sentiasa boleh melihat kata-kata asal anda, dan ayat yang lebih tenang hanyalah cadangan.', '为了让邻居用自己的语言读你写的话，你打给他们的字会由 AI 服务（Anthropic 的 Claude，在马来西亚境外处理）翻译。只送出你写的文字。邻居随时看得到你的原文；比较平和的说法永远只是建议。'],
+  'join.p5.gemini': ['So neighbours can read you in their own language, what you type to them is translated by an AI service (Gemini, by Google, processed outside Malaysia). This demo uses Google’s free service, which may use what is sent to improve Google’s products: type only made-up details here. Only the words you write are sent. Your neighbour can always see your own words, and a calmer wording is only ever a suggestion.', 'Supaya jiran boleh membacanya dalam bahasa mereka sendiri, apa yang anda taip kepada mereka diterjemah oleh perkhidmatan AI (Gemini, oleh Google, diproses di luar Malaysia). Demo ini menggunakan perkhidmatan percuma Google, yang mungkin menggunakan apa yang dihantar untuk menambah baik produk Google: taip butiran rekaan sahaja di sini. Hanya perkataan yang anda tulis dihantar. Jiran anda sentiasa boleh melihat kata-kata asal anda, dan ayat yang lebih tenang hanyalah cadangan.', '为了让邻居用自己的语言读你写的话，你打给他们的字会由 AI 服务（Google 的 Gemini，在马来西亚境外处理）翻译。这个演示用的是 Google 的免费服务，送去的内容可能会被 Google 用来改进产品，所以这里只输入虚构的内容。只送出你写的文字。邻居随时看得到你的原文；比较平和的说法永远只是建议。'],
   'join.consent': ['I have read this privacy notice ({version}) and agree to it.', 'Saya telah membaca notis privasi ini ({version}) dan bersetuju.', '我已阅读这份隐私声明（{version}）并同意。'],
   'join.wa': ['Send me short alerts on WhatsApp (never the content of messages)', 'Hantar notifikasi ringkas melalui WhatsApp (tanpa isi mesej)', '用 WhatsApp 发简短通知给我（不会有讯息内容）'],
   'join.finish': ['Join Keynection', 'Sertai Keynection', '加入 Keynection'],
@@ -733,7 +734,7 @@ const D: Record<string, Entry> = {
   'rule.carry_pass': ['Workers must carry this pass and show it at the guardhouse', 'Pekerja mesti membawa pas ini dan menunjukkannya di pondok pengawal', '工人必须带着这张通行证，在警卫亭出示'],
   'wk.passesEmpty.title': ['Passes come from the renovating home', 'Pas dikeluarkan oleh rumah yang mengubah suai', '通行证由装修户发出'],
   'wk.passesEmpty.body': ['Register your renovation with the button above. You can then give your contractor a QR pass; the guardhouse scans it and only lets workers in on allowed days and hours.', 'Daftar ubah suai anda dengan butang di atas. Kemudian anda boleh memberi kontraktor pas QR; pondok pengawal mengimbasnya dan hanya membenarkan pekerja masuk pada hari dan waktu yang dibenarkan.', '先用上面的按钮登记装修，之后就能给承包商发 QR 通行证；警卫亭扫码，只在允许的日子和时段让工人进来。'],
-  'wk.passMeta': ['{dates} · {n} neighbours told · {p} pre-work photo(s) on record', '{dates} · {n} jiran dimaklumkan · {p} foto sebelum kerja direkodkan', '{dates} · 已通知 {n} 户邻居 · 已有 {p} 张开工前照片'],
+  'wk.passMeta': ['{dates} · {n} neighbour(s) told · {p} pre-work photo(s) on record','{dates} · {n} jiran dimaklumkan · {p} foto sebelum kerja direkodkan', '{dates} · 已通知 {n} 户邻居 · 已有 {p} 张开工前照片'],
   'wk.issue': ['Issue contractor pass', 'Keluarkan pas kontraktor', '发承包商通行证'], 'wk.limit': ['Limit of 3 active passes', 'Had 3 pas aktif', '最多 3 张有效通行证'],
   'wk.issued': ['Contractor pass issued', 'Pas kontraktor dikeluarkan', '已发出承包商通行证'], 'wk.issueFail': ['Could not issue pass', 'Tidak dapat mengeluarkan pas', '无法发出通行证'],
   'wk.revokedToast': ['Pass cancelled: the gate will refuse it from now on', 'Pas dibatalkan: pagar akan menolaknya mulai sekarang', '通行证已撤销：之后闸门会拒绝它'],
@@ -820,6 +821,7 @@ const TA: Record<string, string> = {
   'join.p4': 'எப்போது வேண்டுமானாலும் உங்கள் தகவல்களைப் பதிவிறக்கலாம், திருத்தலாம், அல்லது "Me" பக்கத்தில் உங்கள் கணக்கை மூடலாம் (நிர்வாக அலுவலகத்திடமும் கேட்கலாம்).',
   'join.p5t': 'AI மொழிபெயர்ப்பு',
   'join.p5': 'அண்டைவீட்டார் தங்கள் சொந்த மொழியில் படிக்க, நீங்கள் அவர்களுக்குத் தட்டச்சு செய்வது ஒரு AI சேவையால் (Anthropic நிறுவனத்தின் Claude, மலேசியாவுக்கு வெளியே செயலாக்கப்படுகிறது) மொழிபெயர்க்கப்படும். நீங்கள் எழுதும் சொற்கள் மட்டுமே அனுப்பப்படும். உங்கள் அண்டைவீட்டார் உங்கள் மூலச் சொற்களை எப்போதும் பார்க்கலாம்; அமைதியான சொற்றொடர் எப்போதும் ஒரு பரிந்துரை மட்டுமே.',
+  'join.p5.gemini': 'அண்டைவீட்டார் தங்கள் சொந்த மொழியில் படிக்க, நீங்கள் அவர்களுக்குத் தட்டச்சு செய்வது ஒரு AI சேவையால் (Google நிறுவனத்தின் Gemini, மலேசியாவுக்கு வெளியே செயலாக்கப்படுகிறது) மொழிபெயர்க்கப்படும். இந்த டெமோ Google-இன் இலவச சேவையைப் பயன்படுத்துகிறது; அனுப்பப்படுவதை Google தனது தயாரிப்புகளை மேம்படுத்தப் பயன்படுத்தக்கூடும், எனவே இங்கே கற்பனையான விவரங்களை மட்டுமே தட்டச்சு செய்யுங்கள். நீங்கள் எழுதும் சொற்கள் மட்டுமே அனுப்பப்படும். உங்கள் அண்டைவீட்டார் உங்கள் மூலச் சொற்களை எப்போதும் பார்க்கலாம்; அமைதியான சொற்றொடர் எப்போதும் ஒரு பரிந்துரை மட்டுமே.',
   'join.consent': 'இந்தத் தனியுரிமை அறிவிப்பை ({version}) படித்தேன், ஒப்புக்கொள்கிறேன்.',
   'join.wa': 'WhatsApp-இல் சுருக்கமான அறிவிப்புகளை அனுப்புங்கள் (செய்திகளின் உள்ளடக்கம் ஒருபோதும் இருக்காது)',
 }
@@ -878,7 +880,11 @@ const IDX: Record<UiLang, number> = { en: 0, ms: 1, zh: 2 }
 function translate(lang: Lang, key: string, vars?: Record<string, string | number>): string {
   const entry = D[key]
   let text = lang === 'ta' ? TA[key] ?? entry?.[0] ?? key : entry ? entry[IDX[lang]] || entry[0] : key
-  if (vars) for (const [k, v] of Object.entries(vars)) text = text.split(`{${k}}`).join(String(v))
+  if (vars) {
+    // English "home(s)" reads as "home" or "homes", decided by the nearest count before it: "1 home", "5 homes".
+    text = text.replace(/\{(\w+)\}([^{}]*?\w)\(s\)/g, (_, k: string, before: string) => `{${k}}${before}${Number(vars[k]) === 1 ? '' : 's'}`)
+    for (const [k, v] of Object.entries(vars)) text = text.split(`{${k}}`).join(String(v))
+  }
   return text
 }
 

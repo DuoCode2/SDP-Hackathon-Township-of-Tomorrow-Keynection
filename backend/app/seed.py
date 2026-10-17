@@ -13,6 +13,9 @@ HANDOVER_DAYS_AGO = 14
 # 10b: how long each kind of data is kept, said exactly; backups; closing the account in the app.
 CONSENT_VERSION = "pilot-2026-10b"
 CONSENT_VERSION_AI = "pilot-2026-10b-ai"
+# The demo with Gemini instead: the paragraph names Google, says its free tier may use what is sent to improve
+# Google's products, and asks for made-up details only. Never shown in a pilot (ai.provider).
+CONSENT_VERSION_AI_GEMINI = "pilot-2026-10b-ai-gemini"
 
 # Households that have not joined Keynection yet. Until they do, neighbours see their unit number only, never a name,
 # and renovation notices reach them on paper through the estate office.

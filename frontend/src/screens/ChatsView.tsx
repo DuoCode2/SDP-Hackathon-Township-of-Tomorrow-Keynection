@@ -339,7 +339,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
           const key = `${item.type}-${item.id}`
           const wrap = (node: ReactNode) => <Fragment key={key}>{sep}{node}</Fragment>
           if (item.type === 'concern') return wrap(<ConcernCard concern={item} viewer={me.id} onChanged={onChange} />)
-          if (item.type === 'intro') return wrap(<IntroCard item={item} mine={item.from_unit_id === me.id} onWave={() => ackIntro(item.id)} />)
+          if (item.type === 'intro') return wrap(<IntroCard item={item} mine={item.from_unit_id === me.id} waved={wavedToday} onWave={() => ackIntro(item.id)} />)
           if (item.type === 'wave') return wrap(<WaveItem item={item} mine={item.from_unit_id === me.id} name={n.resident_name} canWaveBack={!wavedToday && !t.blocked} onWaveBack={waveAt} />)
           if (item.kind === 'system') {
             return wrap(
@@ -568,7 +568,8 @@ function useRecorder(onDone: (blob: Blob, seconds: number) => void, onError: (me
   return { state, secs, begin, stop, cancel }
 }
 
-function IntroCard({ item, mine, onWave }: { item: ChatIntro; mine: boolean; onWave: () => void }) {
+// `waved`: the reader already waved today (from the wave bubble, say), so the card doesn't offer a second "Wave back".
+function IntroCard({ item, mine, waved, onWave }: { item: ChatIntro; mine: boolean; waved?: boolean; onWave: () => void }) {
   const t = useT()
   const dates = useDates()
   const [original, setOriginal] = useState(false)
@@ -600,7 +601,7 @@ function IntroCard({ item, mine, onWave }: { item: ChatIntro; mine: boolean; onW
           {item.quiet === 'avoided' ? <CalendarCheck size={14} /> : <CalendarX size={14} />} {t(`quiet.${item.quiet}`)}
         </div>
       )}
-      {!mine && (item.acked_at ? (
+      {!mine && (item.acked_at || waved ? (
         <div className="notice-done"><Hand size={13} /> {t('wave.backDone')}</div>
       ) : (
         <button className="btn btn-sm" onClick={onWave}><Hand size={14} /> {t('wave.back')}</button>

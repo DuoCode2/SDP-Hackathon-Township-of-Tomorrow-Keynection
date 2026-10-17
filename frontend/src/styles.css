@@ -1540,8 +1540,24 @@ button.ring-row:hover { background: var(--surface-2); }
 .compare-bars b { font-family: var(--mono); font-size: 12px; text-align: right; }
 
 /* ---------- channels: two phones ---------- */
+/* how Keynection reaches residents: key day (welcome pack), every day (WhatsApp, the web app), later (a door in the SDP App) */
+.reach-steps { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-bottom: 24px; }
+.reach-step { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: var(--radius); border: 1px solid var(--line-2); background: var(--surface); box-shadow: var(--shadow-1); }
+.reach-step.later { border-style: dashed; background: var(--surface-soft); box-shadow: none; }
+.reach-when { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.reach-when svg { color: var(--accent); }
+.reach-step.later .reach-when svg { color: var(--blue); }
+.reach-step > b { font-size: 14px; color: var(--ink); }
+.reach-step > p { font-size: 12.5px; line-height: 1.55; color: var(--text-2); }
+.reach-card { display: flex; align-items: center; gap: 12px; margin-top: 4px; padding: 10px 12px; border-radius: 12px; background: #fff; border: 1px solid var(--line-2); }
+.reach-card img, .reach-qr-blank { width: 72px; height: 72px; flex: none; border-radius: 6px; background: var(--well-2); }
+.reach-card > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.reach-card b { font-size: 12.5px; color: var(--ink); }
+.reach-card small { font-size: 11px; line-height: 1.45; color: var(--text-2); }
+@container page (min-width: 760px) { .reach-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .phones { display: flex; flex-wrap: wrap; justify-content: center; gap: 28px; }
 .phone-wrap { margin: 0; width: min(330px, 100%); display: flex; flex-direction: column; gap: 12px; }
+.phone-wrap > .badge { align-self: flex-start; }
 .phone-wrap figcaption { font-size: 12.5px; line-height: 1.55; color: var(--text-2); }
 .phone-wrap figcaption b { display: block; font-size: 14px; color: var(--ink); }
 .phone { height: 600px; display: flex; flex-direction: column; overflow: hidden; border-radius: 36px; border: 10px solid #1d2430; background: #f6f7f9; box-shadow: 0 30px 60px -30px rgba(13, 34, 64, 0.55); }

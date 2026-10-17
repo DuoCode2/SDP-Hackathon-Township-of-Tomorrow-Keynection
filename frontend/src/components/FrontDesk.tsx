@@ -4,6 +4,7 @@ import { ClipboardPen, Eye, KeyRound, Printer, QrCode, Send, Smartphone, UserChe
 import { api, type FrontDesk as Desk, type PaperNotice, type UnitInfo, type WelcomeCard } from '../api'
 import { EnglishOnly } from '../i18n'
 import { usePilot } from '../features'
+import { count } from '../ui'
 import { joinKey } from '../screens/JoinView'
 import RenovationWizard from '../screens/RenovationWizard'
 import { Badge, Card, CardHead, Empty, formatDate, Sheet, shortRange, Skeleton, useToast } from '../ui'
@@ -176,9 +177,9 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
           </div>
           {confirmPacks ? (
             <div className="confirm-row">
-              <span className="small">New codes for {packs} home(s). Any card printed before for these homes stops working.</span>
+              <span className="small">New codes for {count(packs, 'home')}. Any card printed before for these homes stops working.</span>
               <span className="btn-row">
-                <button className="btn btn-sm btn-primary" onClick={makePacks}><Printer size={14} /> Make {packs} card(s)</button>
+                <button className="btn btn-sm btn-primary" onClick={makePacks}><Printer size={14} /> Make {count(packs, 'card')}</button>
                 <button className="btn btn-sm" onClick={() => setConfirmPacks(false)}>Cancel</button>
               </span>
             </div>

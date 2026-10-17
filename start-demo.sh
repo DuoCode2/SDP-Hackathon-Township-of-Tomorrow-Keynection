@@ -12,7 +12,7 @@ if [ ! -x backend/.venv/bin/python ]; then
   backend/.venv/bin/python -m pip install -q -r backend/requirements.txt
 fi
 # Set up before the AI features or the digital keys came: add the new packages.
-backend/.venv/bin/python -c "import anthropic, webauthn" 2>/dev/null || backend/.venv/bin/python -m pip install -q -r backend/requirements.txt
+backend/.venv/bin/python -c "import anthropic, webauthn, google.genai" 2>/dev/null || backend/.venv/bin/python -m pip install -q -r backend/requirements.txt
 if [ ! -d frontend/node_modules/@simplewebauthn/browser ]; then
   echo "[2/3] Installing web packages..."
   npm --prefix frontend install --no-fund --no-audit

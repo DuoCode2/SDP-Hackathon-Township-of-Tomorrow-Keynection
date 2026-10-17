@@ -37,6 +37,19 @@ def test_alerts_carry_the_new_name():
     assert "Keynection" in talk.wa_text("message", "en", name="Siti", label="No. 11")
 
 
+def test_notice_alert_names_the_contractor_only_when_the_owner_gave_one():
+    fields = dict(name="Aiman", label="No. 12", scope="Retiling the bathroom", start="19 Oct 2026", end="1 Nov 2026",
+                  hours="weekdays 11:00–17:00", quiet="")
+    named = talk.wa_text("reno", "en", contractor=talk.contractor_note("ABC Renovation", "en"), **fields)
+    unnamed = talk.wa_text("reno", "en", contractor=talk.contractor_note(None, "en"), **fields)
+    assert "Noisy work: weekdays 11:00–17:00. Contractor: ABC Renovation. Please photograph" in named
+    assert "Noisy work: weekdays 11:00–17:00. Please photograph" in unnamed and "Contractor" not in unnamed
+    for lang, word in (("ms", "Kontraktor"), ("zh", "承包商"), ("ta", "ஒப்பந்ததாரர்")):
+        assert talk.contractor_note(None, lang) == "" and talk.contractor_note("  ", lang) == ""
+        assert f"{word}: ABC Renovation" in talk.wa_text("reno", lang, contractor=talk.contractor_note("ABC Renovation", lang), **fields).replace("：", ": ")
+        assert word not in talk.wa_text("reno", lang, contractor=talk.contractor_note(None, lang), **fields)
+
+
 def test_password_page_and_whatsapp_account_use_the_new_name(client, monkeypatch):
     monkeypatch.setenv("KEYNECTION_SITE_PASSWORD", "local-test-only")
     page = client.get("/", headers={"Accept": "text/html"}).text

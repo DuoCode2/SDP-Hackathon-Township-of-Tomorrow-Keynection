@@ -32,7 +32,8 @@ from . import ai, auth, db, ledger, quiet, talk, vision
 from .neighbours import Unit, impact_reason, impact_zone, inverse_relation, neighbour_circle, street_or_block
 from . import backup, phase_import, privacy, push
 from .planner import MAX_HOMES, home_count, plan_phase
-from .seed import CONSENT_VERSION, CONSENT_VERSION_AI
+from .seed import CONSENT_VERSION, CONSENT_VERSION_AI, CONSENT_VERSION_AI_GEMINI
+from .settings import demo_mode, setting
 from .triage import triage_hint
 
 log = logging.getLogger("keynection")
@@ -71,16 +72,6 @@ HOUSE_RULES = [text for _, text in HOUSE_RULE_LIST]
 HOUSE_RULE_CODES = [code for code, _ in HOUSE_RULE_LIST]
 
 
-def setting(name: str, default: str | None = None) -> str | None:
-    """A server setting, KEYNECTION_<name>. A server set up under the project's first name (JIRAN_<name>) keeps
-    working: the old name is still read when the new one isn't set."""
-    for prefix in ("KEYNECTION_", "JIRAN_"):
-        value = os.environ.get(prefix + name)
-        if value is not None:
-            return value
-    return default
-
-
 def db_path() -> str:
     return setting("DB_PATH") or str(DEFAULT_DB)
 
@@ -89,11 +80,6 @@ def data_dir(name: str) -> Path:
     d = Path(db_path()).parent / name
     d.mkdir(parents=True, exist_ok=True)
     return d
-
-
-def demo_mode() -> bool:
-    """Demo-only endpoints (reset, sample photos) are on for local runs and off when KEYNECTION_DEMO_MODE=0."""
-    return setting("DEMO_MODE", "1") == "1"
 
 
 # Who is asking, once the sign-in guard below has checked the session (pilot mode). None in demo mode.
@@ -132,7 +118,8 @@ async def lifespan(_: FastAPI):
     if ai.enabled():
         log.info("AI translation and notice writing on (%s)", ai.model_name())
     else:
-        log.info("AI off: set ANTHROPIC_API_KEY to turn on translation and notice writing; everything else works as before")
+        log.info("AI off: set ANTHROPIC_API_KEY (or, for the demo, GEMINI_API_KEY) to turn on translation and notice "
+                 "writing; everything else works as before")
     sweeper = asyncio.create_task(_voice_sweeper())
     sender = None if demo_mode() else asyncio.create_task(_alert_sender())  # the demo only previews alerts
     yield
@@ -212,6 +199,9 @@ def _pilot_checks(conn: sqlite3.Connection) -> list[str]:
     if setting("SITE_PASSWORD"):
         out.append("Remove KEYNECTION_SITE_PASSWORD (or JIRAN_SITE_PASSWORD): in a pilot everyone signs in with a digital key,"
                    " and residents need no shared password.")
+    if os.environ.get("GEMINI_API_KEY"):
+        out.append("GEMINI_API_KEY is not used in a pilot: Google's free tier uses what is sent to improve its products."
+                   " Remove it; for AI with real households, set ANTHROPIC_API_KEY.")
     if not conn.execute("SELECT COUNT(*) FROM staff WHERE revoked_at IS NULL").fetchone()[0]:
         out.append("No staff member yet: set KEYNECTION_FIRST_STAFF to their name and restart (or run scripts/add_staff.py).")
     if conn.execute("SELECT 1 FROM phases WHERE id = 'demo'").fetchone():
@@ -498,8 +488,8 @@ def _require_joined(conn: sqlite3.Connection, unit_id: str, message: str | None 
 
 
 def _consent_version() -> str:
-    """The privacy notice shown at joining: with AI on it says what is translated, and where."""
-    return CONSENT_VERSION_AI if ai.enabled() else CONSENT_VERSION
+    """The privacy notice shown at joining: with AI on it says what is translated, by whom, and where."""
+    return {"anthropic": CONSENT_VERSION_AI, "gemini": CONSENT_VERSION_AI_GEMINI}.get(ai.provider(), CONSENT_VERSION)
 
 
 def _today() -> str:
@@ -3522,7 +3512,8 @@ def _alerts(conn: sqlite3.Connection, unit_id: str) -> list[dict[str, Any]]:
             scope = (_intro_in(r, lang) or {}).get("scope") or reno["scope"]
             add(r["created_at"], "reno", f"intro:{r['id']}", ("open", "concern"), name=r["name"], label=r["label"], scope=scope,
                 start=talk.date_text(reno["start"], lang), end=talk.date_text(reno["end"], lang),
-                hours=talk.hours_text(reno, lang), quiet=talk.quiet_note(r["quiet"], lang), contractor=reno.get("contractor") or "-")
+                hours=talk.hours_text(reno, lang), quiet=talk.quiet_note(r["quiet"], lang),
+                contractor=talk.contractor_note(reno.get("contractor"), lang))
             # Then, on their own: a reminder to photograph before the work starts, and a check once it has ended.
             first, last = date.fromisoformat(reno["start"]), date.fromisoformat(reno["end"])
             if _local_date(r["created_at"]) < first:

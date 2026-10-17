@@ -11,6 +11,8 @@ pytest==9.1.1
 httpx==0.28.1
 # Claude, for translation and notice writing. Optional at run time: without a key (or this package) the app works as before.
 anthropic==1.13.0
+# Gemini on Google's free tier: the same AI features for the demo only (GEMINI_API_KEY; never used in a pilot).
+google-genai==2.25.0
 # Passkey sign-in for pilot mode (WebAuthn).
 webauthn==3.0.1
 # Pilot notifications (web push): encrypts each alert for one phone (RFC 8291); signing and sending use

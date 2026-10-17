@@ -53,7 +53,8 @@ const RISKS: Risk[] = [
   {
     icon: <Sparkles size={18} />, title: 'AI translation and suggestions', risk: 'A machine puts words in a neighbour’s mouth, gets a renovation wrong, or sends residents’ messages abroad.',
     measures: [
-      { text: 'Only the words being written go to Claude (Anthropic), never the directory or who is writing to whom; a name or unit number goes only if the writer typed it in', built: true },
+      { text: 'Only the words being written go to the AI service (Claude by Anthropic; the online demo may use Google’s Gemini), never the directory or who is writing to whom; a name or unit number goes only if the writer typed it in', built: true },
+      { text: 'Gemini’s free tier, whose inputs Google may use to improve its products, serves the demo’s made-up households only: a pilot never sends residents’ words to it', built: true },
       { text: 'Every translation is marked “Translated by AI” with the original one tap away; the home log and reports keep the original words', built: true },
       { text: 'A calmer wording is only a suggestion: the sender chooses which words go, and insults are still refused', built: true },
       { text: 'From one sentence, AI fills in the type of work, dates, hours and contractor; approvals and the CIDB tick stay the owner’s, and nothing is sent until the owner has checked every step', built: true },
@@ -161,7 +162,7 @@ const RISKS: Risk[] = [
       { text: 'Starts at handover, when SDP already meets every owner: the join code is in the welcome pack', built: true },
       { text: 'A new phase is set up from the site plan in seconds; end lots and corners are flagged automatically', built: true },
       { text: 'Irregular plots (semi-D, shoplots, odd shapes) are checked and corrected by the estate office', built: false },
-      { text: 'Alerts arrive on WhatsApp and Keynection sits inside the SDP App, so there is no new app to install', built: true },
+      { text: 'Nothing to install in step one: the welcome-pack code opens Keynection in the phone’s browser (add to Home Screen) and alerts arrive on WhatsApp; step two makes it a module inside the SDP App with the owner’s existing sign-in', built: true },
       { text: 'Reply rate and pre-work photo coverage are tracked on the command view', built: true },
       { text: 'The command view tracks how many next-door pairs know each other and how long it takes from keys to a first hello', built: true },
     ],

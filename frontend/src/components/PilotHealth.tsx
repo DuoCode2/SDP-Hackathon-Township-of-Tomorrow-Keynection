@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CircleCheck, HardDrive, Stethoscope, TriangleAlert } from 'lucide-react'
 import { api, type PilotStatus } from '../api'
-import { Card, CardHead, formatDate } from '../ui'
+import { Card, CardHead, count, formatDate } from '../ui'
 
 const when = (iso: string) => `${formatDate(iso)}, ${new Date(iso).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' })}`
 
@@ -17,7 +17,7 @@ export default function PilotHealth({ version }: { version: number }) {
   return (
     <Card className="pilot-health">
       <CardHead icon={<Stethoscope size={16} />} tone={s.checks.length ? 'amber' : 'brand'} title="Pilot health"
-        sub={s.checks.length ? `${s.checks.length} thing(s) to sort out` : 'Set up and running'} />
+        sub={s.checks.length ? `${count(s.checks.length, 'thing')} to sort out` : 'Set up and running'} />
       {s.checks.length > 0 ? (
         <ul className="health-checks">{s.checks.map((c) => <li key={c}><TriangleAlert size={14} /> {c}</li>)}</ul>
       ) : <div className="import-ok"><CircleCheck size={15} /> Nothing left to set up.</div>}

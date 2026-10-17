@@ -43,15 +43,15 @@ const PlaceContext = createContext<Place>(DEMO_PLACE)
 export const PlaceProvider = PlaceContext.Provider
 export const usePlace = () => useContext(PlaceContext)
 
-// Claude translates typed words and writes the renovation notice from one sentence, when the server has a key.
-// Without one (or offline) the same screens work as before, so the app only needs to know which to say.
+// AI (Claude, or Gemini in the demo) translates typed words and writes the renovation notice from one sentence, when
+// the server has a key. Without one (or offline) the same screens work as before, so the app only needs to know which to say.
 let aiStatus: Promise<AiStatus> | null = null
 /** Whether AI is on here, asked once per page load; null until known, and off if the question fails. */
 export function useAi(): AiStatus | null {
   const [status, setStatus] = useState<AiStatus | null>(null)
   useEffect(() => {
     let live = true
-    aiStatus ??= api.aiStatus().catch(() => ({ on: false, model: null }))
+    aiStatus ??= api.aiStatus().catch(() => ({ on: false, model: null, provider: null }))
     aiStatus.then((s) => live && setStatus(s))
     return () => {
       live = false

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CircleCheck, Download, FileUp, ListChecks, TriangleAlert, Upload } from 'lucide-react'
 import { api, ApiError, type ImportReport, type PhaseInfo } from '../api'
-import { Card, CardHead, useToast } from '../ui'
+import { Card, CardHead, count, useToast } from '../ui'
 
 const TEMPLATE = [
   'unit,label,type,street,row,facing_row,pos,block,floor,owner,handover,language',
@@ -156,7 +156,7 @@ export default function PhaseImport({ phases, current, onImported }: {
           )}
           {blocking > 0 ? (
             <div className="import-issues errors" role="alert">
-              <b><TriangleAlert size={14} /> {blocking} line(s) to fix before saving</b>
+              <b><TriangleAlert size={14} /> {count(blocking, 'line')} to fix before saving</b>
               <ul>{report.errors.map((e, i) => <li key={i}><span className="mono">{e.line ? `Line ${e.line}` : 'List'}</span> {e.message}</li>)}</ul>
               {report.more_errors > 0 && <small>…and {report.more_errors} more</small>}
             </div>
@@ -185,7 +185,7 @@ export default function PhaseImport({ phases, current, onImported }: {
             </table>
           </details>
           <button className="btn btn-primary" disabled={busy || blocking > 0 || changes === 0} onClick={save}>
-            <CircleCheck size={15} /> {changes === 0 ? 'Nothing new to save' : `Save ${changes} home(s) to ${phaseName}`}
+            <CircleCheck size={15} /> {changes === 0 ? 'Nothing new to save' : `Save ${count(changes, 'home')} to ${phaseName}`}
           </button>
           <small className="muted">Saved under your name. A household that has joined keeps its place and its own name.</small>
         </div>

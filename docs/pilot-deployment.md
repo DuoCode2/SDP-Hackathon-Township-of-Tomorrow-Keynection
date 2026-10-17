@@ -49,6 +49,7 @@ instance: the database is SQLite on one disk.
 | `ANTHROPIC_API_KEY` | optional | Turns on AI translation and notice writing (text goes to Anthropic, outside Malaysia) |
 | `KEYNECTION_DB_PATH` | set by the image | `/data/app.db` |
 | `KEYNECTION_SITE_PASSWORD` | **never** in a pilot | Residents sign in with digital keys, not a shared password |
+| `GEMINI_API_KEY` | **never** in a pilot | Gemini's free tier is for the demo only: Google may use what is sent to improve its products. A pilot ignores it and warns |
 
 Servers set up before the rename may use the old names (`JIRAN_DEMO_MODE`, `JIRAN_DB_PATH`, `JIRAN_SITE_PASSWORD`):
 they still work; when both are set, the `KEYNECTION_` one counts.

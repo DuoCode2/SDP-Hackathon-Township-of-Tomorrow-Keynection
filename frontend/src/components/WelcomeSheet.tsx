@@ -4,7 +4,7 @@ import QRCode from 'qrcode'
 import { Printer, X } from 'lucide-react'
 import type { WelcomeCard } from '../api'
 import { Logo } from './Art'
-import { formatDate } from '../ui'
+import { count, formatDate } from '../ui'
 
 /** Welcome-pack cards to print: one per home, with the owner's own QR code. The code works once; whoever holds the
  *  card can join as that home, so it goes into the welcome pack handed to the owner with the keys. */
@@ -25,7 +25,7 @@ export default function WelcomeSheet({ phase, cards, onClose }: { phase: string;
     <div className="print-pages welcome-sheet" role="dialog" aria-label="Welcome-pack cards">
       <div className="welcome-sheet-bar no-print">
         <div>
-          <b>{cards.length} welcome-pack card(s) · {phase}</b>
+          <b>{count(cards.length, 'welcome-pack card')} · {phase}</b>
           <small className="muted">Each code works once. Print now: the codes are not shown again.</small>
         </div>
         <div className="btn-row">

@@ -21,6 +21,11 @@ export function Avatar({ name, size = 36 }: { name: string; size?: number }) {
   )
 }
 
+/** "1 card", "3 cards": for SDP's English-only screens. Resident screens use t(), which reads "home(s)" the same way. */
+export function count(n: number, noun: string, plural = `${noun}s`): string {
+  return `${n.toLocaleString('en-MY')} ${n === 1 ? noun : plural}`
+}
+
 export function Skeleton({ lines = 3 }: { lines?: number }) {
   return (
     <div className="skeleton-group" aria-hidden>

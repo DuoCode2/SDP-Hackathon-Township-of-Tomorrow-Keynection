@@ -153,16 +153,15 @@ CATEGORY_LABELS: dict[str, dict[str, str]] = {
 
 WA_TEMPLATES: dict[str, dict[str, str]] = {
     "reno": {
-        "en": "Renovation notice from {name} ({label}): {scope}, {start} to {end}. Noisy work: {hours}.{quiet} Contractor: "
-              "{contractor}. Please photograph your side before work starts. If anything worries you, reply in Keynection.",
-        "ms": "Notis ubah suai daripada {name} ({label}): {scope}, {start} hingga {end}. Kerja bising: {hours}.{quiet} Kontraktor: "
-              "{contractor}. Sila ambil foto bahagian rumah anda sebelum kerja bermula. "
-              "Jika ada kebimbangan, balas dalam Keynection.",
-        "zh": "{name}（{label}）的装修通知：{scope}，{start} 至 {end}。吵闹时段：{hours}。{quiet}承包商：{contractor}。"
+        # {contractor} is contractor_note(): a sentence when the owner named one, nothing otherwise.
+        "en": "Renovation notice from {name} ({label}): {scope}, {start} to {end}. Noisy work: {hours}.{quiet}{contractor} "
+              "Please photograph your side before work starts. If anything worries you, reply in Keynection.",
+        "ms": "Notis ubah suai daripada {name} ({label}): {scope}, {start} hingga {end}. Kerja bising: {hours}.{quiet}{contractor} "
+              "Sila ambil foto bahagian rumah anda sebelum kerja bermula. Jika ada kebimbangan, balas dalam Keynection.",
+        "zh": "{name}（{label}）的装修通知：{scope}，{start} 至 {end}。吵闹时段：{hours}。{quiet}{contractor}"
               "开工前请先拍下你那一边的照片。有任何担心，请在 Keynection 回复。",
-        "ta": "{name} ({label}) அனுப்பிய புதுப்பிப்பு அறிவிப்பு: {scope}, {start} முதல் {end} வரை. சத்தமான வேலை: {hours}.{quiet} "
-              "ஒப்பந்ததாரர்: {contractor}. வேலை தொடங்கும் முன் உங்கள் பக்கத்தைப் படம் எடுத்து வையுங்கள். "
-              "ஏதாவது கவலை இருந்தால், Keynection-இல் பதில் அனுப்புங்கள்.",
+        "ta": "{name} ({label}) அனுப்பிய புதுப்பிப்பு அறிவிப்பு: {scope}, {start} முதல் {end} வரை. சத்தமான வேலை: {hours}.{quiet}{contractor} "
+              "வேலை தொடங்கும் முன் உங்கள் பக்கத்தைப் படம் எடுத்து வையுங்கள். ஏதாவது கவலை இருந்தால், Keynection-இல் பதில் அனுப்புங்கள்.",
     },
     "hello": {
         "en": "{name} from {label} said hello on Keynection 👋",
@@ -368,6 +367,15 @@ def hours_text(reno: dict, lang: str) -> str:
 
 def quiet_note(state: str | None, lang: str) -> str:
     return (QUIET_NOTE[state].get(lang) or QUIET_NOTE[state]["en"]) if state else ""
+
+
+# The contractor is named only when the owner gave one, so a notice without one doesn't read "Contractor: -".
+CONTRACTOR_NOTE = {"en": " Contractor: {name}.", "ms": " Kontraktor: {name}.", "zh": "承包商：{name}。", "ta": " ஒப்பந்ததாரர்: {name}."}
+
+
+def contractor_note(name: str | None, lang: str) -> str:
+    name = (name or "").strip()
+    return (CONTRACTOR_NOTE.get(lang) or CONTRACTOR_NOTE["en"]).format(name=name) if name else ""
 
 
 # The first notification after a phone turns them on, so the household knows it works.

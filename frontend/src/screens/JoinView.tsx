@@ -183,7 +183,7 @@ export default function JoinView({ me, onJoined, pilot = false, initialToken, on
               <div><dt>{tp('join.p2t')}</dt><dd>{tp('join.p2')}</dd></div>
               <div><dt>{tp('join.p3t')}</dt><dd>{tp('join.p3')}</dd></div>
               <div><dt>{tp('join.p4t')}</dt><dd>{tp('join.p4')}</dd></div>
-              {ai?.on && <div><dt>{tp('join.p5t')}</dt><dd>{tp('join.p5')}</dd></div>}
+              {ai?.on && <div><dt>{tp('join.p5t')}</dt><dd>{tp(ai.provider === 'gemini' ? 'join.p5.gemini' : 'join.p5')}</dd></div>}
             </dl>
             <label className="switch-row consent"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /><span>{tp('join.consent', { version: info.consent_version })}</span></label>
             <label className="switch-row consent"><input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} /><span>{tp('join.wa')}</span></label>

@@ -5,9 +5,10 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def no_real_ai(monkeypatch):
-    """No test talks to the real Claude. Without a key the AI features are off, as on a laptop that has none;
-    tests that need them swap in a stand-in (see test_ai.py)."""
-    for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "KEYNECTION_AI", "KEYNECTION_AI_MODEL", "KEYNECTION_ORIGIN"):
+    """No test talks to the real Claude or Gemini. Without a key the AI features are off, as on a laptop that has
+    none; tests that need them swap in a stand-in (see test_ai.py)."""
+    for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "GEMINI_API_KEY", "KEYNECTION_AI", "KEYNECTION_AI_MODEL",
+                 "KEYNECTION_GEMINI_MODEL", "KEYNECTION_ORIGIN"):
         monkeypatch.delenv(name, raising=False)
     # Server settings, under both names (the old JIRAN_ ones are still read): each test sets what it needs.
     for name in ("DB_PATH", "DEMO_MODE", "SITE_PASSWORD", "MOVED_TO", "STATIC_DIR", "ALLOWED_ORIGINS"):

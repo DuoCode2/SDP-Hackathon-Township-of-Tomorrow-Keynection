@@ -699,10 +699,11 @@ export interface KeyCeremony<T> {
   options: T
 }
 
-/** Whether Claude is on for translation and notice writing on this server. */
+/** Whether AI is on for translation and notice writing on this server, and whose: Claude, or (demo only) Gemini. */
 export interface AiStatus {
   on: boolean
   model: string | null
+  provider: 'anthropic' | 'gemini' | null
 }
 
 /** One sentence turned into notice fields. Empty fields are left for the owner; "unsure" names what was dropped. */

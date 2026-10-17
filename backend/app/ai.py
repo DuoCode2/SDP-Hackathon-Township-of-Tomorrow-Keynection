@@ -1,6 +1,6 @@
-"""Claude, in two places on the main story.
+"""AI in two places on the main story: Claude (Anthropic), or, in the demo only, Gemini on Google's free tier.
 
-1. One sentence becomes a renovation notice: the owner says what they are doing, in any language, and Claude fills
+1. One sentence becomes a renovation notice: the owner says what they are doing, in any language, and the AI fills
    in the type of work (which decides who is told), the dates, the noisy hours and the contractor for the owner to
    check. Approvals and the CIDB tick stay the owner's own statements and are never filled in.
 2. Whatever a neighbour types (a chat message, a hello, a renovation notice) arrives in the reader's language, and a
@@ -9,8 +9,8 @@
 
 Everything here is optional. With no key, no package, no network or no answer in time, the app works exactly as it
 did before: quick replies are still pre-translated, typed words are sent as written, and the notice is filled in
-step by step. Only the words being written go to Claude, never names, homes or who is writing to whom (a notice
-carries the owner's name only when they wrote it in).
+step by step. Only the words being written go to the AI service, never names, homes or who is writing to whom (a
+notice carries the owner's name only when they wrote it in).
 """
 from __future__ import annotations
 
@@ -22,16 +22,26 @@ from collections import OrderedDict
 from datetime import date, timedelta
 from typing import Any, Literal, TypeVar
 
+import httpx
 from pydantic import BaseModel, Field
 
 try:
     import anthropic
 except ImportError:  # a laptop set up before the AI features: they stay off and nothing else changes
     anthropic = None  # type: ignore[assignment]
+try:
+    from google import genai
+    from google.genai import errors as genai_errors
+    from google.genai import types as genai_types
+except ImportError:  # set up before Gemini was an option: only Claude can answer
+    genai = None  # type: ignore[assignment]
+
+from .settings import demo_mode
 
 log = logging.getLogger("keynection.ai")
 
 DEFAULT_MODEL = "claude-opus-5-5"
+GEMINI_MODEL = "gemini-3.8-flash"  # on Google's free tier: the demo only (see provider)
 # Models that take the server-side fallback: if a safety check declines a request, the API retries it on the model
 # Anthropic recommends for that case instead of returning the refusal.
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"}
@@ -43,26 +53,46 @@ HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 T = TypeVar("T", bound=BaseModel)
 
 
-def model_name() -> str:
-    return os.environ.get("KEYNECTION_AI_MODEL", DEFAULT_MODEL)
+def provider() -> Literal["anthropic", "gemini"] | None:
+    """Who answers. Claude, when the server has a key (ANTHROPIC_API_KEY). Otherwise, in the demo only, Gemini on
+    Google's free tier (GEMINI_API_KEY): Google uses what is sent there to improve its products, so a pilot with real
+    households never sends anything to it. KEYNECTION_AI=0 turns AI off whatever the keys."""
+    if os.environ.get("KEYNECTION_AI", "1") == "0":
+        return None
+    if anthropic is not None and (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+        return "anthropic"
+    if genai is not None and os.environ.get("GEMINI_API_KEY") and demo_mode():
+        return "gemini"
+    return None
 
 
 def enabled() -> bool:
-    """On when the server has the package and a key (ANTHROPIC_API_KEY). KEYNECTION_AI=0 turns it off anyway."""
-    if anthropic is None or os.environ.get("KEYNECTION_AI", "1") == "0":
-        return False
-    return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+    return provider() is not None
+
+
+def model_name() -> str:
+    if provider() == "gemini":
+        return os.environ.get("KEYNECTION_GEMINI_MODEL", GEMINI_MODEL)
+    return os.environ.get("KEYNECTION_AI_MODEL", DEFAULT_MODEL)
 
 
 def status() -> dict[str, Any]:
-    on = enabled()
-    return {"on": on, "model": model_name() if on else None}
+    who = provider()
+    return {"on": who is not None, "model": model_name() if who else None, "provider": who}
 
 
-# ---------- the one place that talks to Claude ----------
+# ---------- the one place that talks to the AI service ----------
 
 _client: Any = None
+_gemini_client: Any = None
 _use_fallback = True  # switched off for this run if the account turns the fallback option down
+GEMINI_THINKING = {"low": "LOW", "medium": "MEDIUM", "high": "HIGH"}
+
+
+def _ask(system: str, text: str, schema: type[T], *, effort: str, max_tokens: int, timeout: float) -> T | None:
+    """The answer in the shape of schema, or None when there is none to use: the caller carries on without AI."""
+    ask = _ask_gemini if provider() == "gemini" else _ask_claude
+    return ask(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout)
 
 
 def _claude() -> Any:
@@ -83,8 +113,7 @@ def _why(e: Exception) -> str:
     return str(e)[:300]
 
 
-def _ask(system: str, text: str, schema: type[T], *, effort: str, max_tokens: int, timeout: float) -> T | None:
-    """Claude's answer in the shape of schema, or None when there is none to use: the caller carries on without AI."""
+def _ask_claude(system: str, text: str, schema: type[T], *, effort: str, max_tokens: int, timeout: float) -> T | None:
     global _use_fallback
     model = model_name()
     fallback: dict[str, Any] = {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"} \
@@ -103,7 +132,7 @@ def _ask(system: str, text: str, schema: type[T], *, effort: str, max_tokens: in
     except anthropic.BadRequestError as e:
         if fallback:  # perhaps an account without the fallback option: ask once more without it
             _use_fallback = False
-            answer = _ask(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout)
+            answer = _ask_claude(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout)
             if answer is None:  # refused without it too: the option was not the reason, so keep asking with it
                 _use_fallback = True
             else:
@@ -124,6 +153,45 @@ def _ask(system: str, text: str, schema: type[T], *, effort: str, max_tokens: in
         log.warning("Claude stopped early (%s); carrying on without AI", response.stop_reason)
         return None
     return response.parsed_output
+
+
+def _gemini() -> Any:
+    global _gemini_client
+    if _gemini_client is None:
+        # The package retries nothing unless asked to: a person is waiting, as with Claude.
+        _gemini_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    return _gemini_client
+
+
+def _ask_gemini(system: str, text: str, schema: type[T], *, effort: str, max_tokens: int, timeout: float) -> T | None:
+    try:
+        response = _gemini().models.generate_content(
+            model=model_name(),
+            contents=text,
+            config=genai_types.GenerateContentConfig(
+                system_instruction=system,
+                response_mime_type="application/json",
+                response_schema=schema,
+                max_output_tokens=max_tokens,
+                thinking_config=genai_types.ThinkingConfig(thinking_level=GEMINI_THINKING.get(effort, "LOW")),
+                http_options=genai_types.HttpOptions(timeout=int(timeout * 1000)),
+                automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),  # no tools: one request
+            ),
+        )
+    except genai_errors.APIError as e:  # a refusal, a key that doesn't work, the free tier's limit reached...
+        log.warning("Gemini answered %s (%s); carrying on without AI", e.code, str(e.message or e)[:300])
+        return None
+    except httpx.HTTPError:  # no network, or no answer in time
+        log.warning("Gemini could not be reached; carrying on without AI")
+        return None
+    except Exception:  # an answer that doesn't fit the schema, or anything else: the app carries on without AI
+        log.exception("Gemini's answer could not be read; carrying on without AI")
+        return None
+    finish = response.candidates[0].finish_reason if response.candidates else None
+    if finish != genai_types.FinishReason.STOP or not isinstance(response.parsed, schema):  # declined, or cut off
+        log.warning("Gemini stopped early (%s); carrying on without AI", finish)
+        return None
+    return response.parsed
 
 
 # ---------- allowance and memory ----------

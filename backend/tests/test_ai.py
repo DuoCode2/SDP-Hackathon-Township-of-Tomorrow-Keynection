@@ -40,7 +40,7 @@ class StandIn:
 def claude(monkeypatch):
     stand_in = StandIn()
     monkeypatch.setattr(ai, "_ask", stand_in)
-    monkeypatch.setattr(ai, "enabled", lambda: True)
+    monkeypatch.setattr(ai, "provider", lambda: "anthropic")
     return stand_in
 
 
@@ -61,7 +61,7 @@ def _draft(**overrides):
 # ---------- off by default ----------
 
 def test_ai_is_off_without_a_key_and_nothing_else_changes(client):
-    assert client.get("/api/ai").json() == {"on": False, "model": None}
+    assert client.get("/api/ai").json() == {"on": False, "model": None, "provider": None}
     r = client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "Retiling the bathroom next week"})
     assert r.status_code == 503 and r.json()["detail"]["code"] == "ai_off"
     assert client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "Good morning!"}).status_code == 201
@@ -70,7 +70,7 @@ def test_ai_is_off_without_a_key_and_nothing_else_changes(client):
 
 
 def test_status_names_the_model(client, claude):
-    assert client.get("/api/ai").json() == {"on": True, "model": "claude-opus-5-5"}
+    assert client.get("/api/ai").json() == {"on": True, "model": "claude-opus-5-5", "provider": "anthropic"}
 
 
 def test_with_ai_on_households_agree_to_the_notice_that_says_so(client, claude):
@@ -349,3 +349,94 @@ def test_no_network_a_refusal_or_a_cut_off_answer_means_no_ai(monkeypatch):
     for stop in ("refusal", "max_tokens"):
         _sdk(monkeypatch, lambda request: _reply(ANSWER, stop_reason=stop))
         assert ai.check_message("T-12", f"Hello ({stop})", "ms") is None
+
+
+# ---------- Gemini, Google's free tier: the demo only ----------
+
+def test_which_service_answers(monkeypatch):
+    for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "GEMINI_API_KEY", "KEYNECTION_AI", "KEYNECTION_GEMINI_MODEL"):
+        monkeypatch.delenv(name, raising=False)
+    assert ai.provider() is None and ai.status() == {"on": False, "model": None, "provider": None}
+    monkeypatch.setenv("GEMINI_API_KEY", "test-not-a-real-key")
+    assert ai.provider() == "gemini" and ai.model_name() == "gemini-3.8-flash"
+    monkeypatch.setenv("KEYNECTION_GEMINI_MODEL", "gemini-3.6-flash")
+    assert ai.status() == {"on": True, "model": "gemini-3.6-flash", "provider": "gemini"}
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-not-a-real-key")
+    assert ai.provider() == "anthropic" and ai.model_name() == "claude-opus-5-5"  # Claude first when it has a key
+    monkeypatch.delenv("ANTHROPIC_API_KEY")
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
+    assert ai.provider() is None  # a pilot never sends residents' words to a free tier that learns from them
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_AI", "0")
+    assert ai.provider() is None
+
+
+def _gemini_sdk(monkeypatch, handler):
+    """Point a real Gemini client at a stand-in network: nothing leaves this computer."""
+    import httpx
+    from google import genai
+    from google.genai import types
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-not-a-real-key")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    client = genai.Client(api_key="test-not-a-real-key",
+                          http_options=types.HttpOptions(httpx_client=httpx.Client(transport=httpx.MockTransport(handler))))
+    monkeypatch.setattr(ai, "_gemini_client", client)
+
+
+def _gemini_reply(answer, finish="STOP"):
+    import json
+
+    import httpx
+
+    return httpx.Response(200, json={"candidates": [{"content": {"role": "model", "parts": [{"text": json.dumps(answer)}]},
+                                                     "finishReason": finish}]})
+
+
+def test_the_request_gemini_receives(monkeypatch):
+    import json
+
+    seen = []
+    _gemini_sdk(monkeypatch, lambda request: seen.append(request) or _gemini_reply(ANSWER))
+    assert ai.check_message("T-12", "Good morning, Gemini!", "ms").translation == "Selamat pagi!"
+    assert seen[0].url.path.endswith("/models/gemini-3.8-flash:generateContent")
+    body = json.loads(seen[0].content)
+    config = body["generationConfig"]
+    assert config["responseMimeType"] == "application/json" and config["responseSchema"]["title"] == "MessageCheck"
+    assert config["thinkingConfig"] == {"thinking_level": "LOW"} and config["maxOutputTokens"] == 3000
+    assert "systemInstruction" in body and "Good morning, Gemini!" in body["contents"][0]["parts"][0]["text"]
+    assert "T-12" not in json.dumps(body)  # the words only: never the home
+
+
+def test_with_gemini_a_failure_still_means_no_ai(monkeypatch, caplog):
+    import httpx
+
+    def limit(request):
+        return httpx.Response(429, json={"error": {"code": 429, "message": "Quota exceeded for the free tier",
+                                                   "status": "RESOURCE_EXHAUSTED"}})
+
+    def offline(request):
+        raise httpx.ConnectError("offline")
+
+    _gemini_sdk(monkeypatch, limit)
+    with caplog.at_level("WARNING", logger="keynection.ai"):
+        assert ai.check_message("T-12", "Hello (limit)", "ms") is None
+    assert "Gemini answered 429" in caplog.text and "Quota exceeded" in caplog.text
+    _gemini_sdk(monkeypatch, offline)
+    assert ai.check_message("T-12", "Hello (offline)", "ms") is None
+    for finish in ("SAFETY", "MAX_TOKENS"):
+        _gemini_sdk(monkeypatch, lambda request: _gemini_reply(ANSWER, finish=finish))
+        assert ai.check_message("T-12", f"Hello ({finish})", "ms") is None
+    _gemini_sdk(monkeypatch, lambda request: _gemini_reply({"not": "the right shape"}))
+    assert ai.check_message("T-12", "Hello (wrong shape)", "ms") is None
+
+
+def test_the_demo_with_gemini_shows_the_notice_that_names_google(client, monkeypatch):
+    from app.seed import CONSENT_VERSION_AI_GEMINI
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-not-a-real-key")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert client.get("/api/ai").json() == {"on": True, "model": "gemini-3.8-flash", "provider": "gemini"}
+    token = client.post("/api/units/T-23/join-code").json()["token"]
+    assert client.post("/api/join/lookup", json={"token": token}).json()["consent_version"] == CONSENT_VERSION_AI_GEMINI

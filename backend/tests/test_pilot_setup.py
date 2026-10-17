@@ -92,6 +92,19 @@ def test_start_up_says_what_is_still_missing(pilot, monkeypatch):
     assert "https://" in checks and "KEYNECTION_SITE_PASSWORD" not in checks and "KEYNECTION_FIRST_STAFF" not in checks
 
 
+def test_a_pilot_never_uses_geminis_free_tier(pilot, monkeypatch):
+    from app import ai, main
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-not-a-real-key")
+    with pilot():
+        assert ai.status() == {"on": False, "model": None, "provider": None}
+        conn = _conn()
+        checks = " | ".join(main._pilot_checks(conn))
+        conn.close()
+    assert "GEMINI_API_KEY is not used in a pilot" in checks
+
+
 def test_staff_see_whether_the_pilot_is_healthy(pilot, monkeypatch, sign_in):
     monkeypatch.setenv("KEYNECTION_ORIGIN", "https://pilot.example.com")
     with pilot() as client:

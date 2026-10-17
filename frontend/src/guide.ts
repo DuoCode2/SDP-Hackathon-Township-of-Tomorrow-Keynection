@@ -337,26 +337,28 @@ export const PAGES: Record<TabId, PageGuide> = {
     layer: { zh: 'SDP 后台', en: 'SDP view' },
     title: { zh: '触达管道', en: 'Channels' },
     what: {
-      zh: '两支手机：左边是 Keynection 放在 SDP App 里的样子（同一个登入），右边是这一户在 WhatsApp 收到的通知（用他的语言）。',
-      en: 'Two phones: Keynection as a module inside the SDP App (same sign-in), and the WhatsApp alerts this household receives, in its own language.',
+      zh: 'Keynection 怎么到住户手上，分两步。第一步不动 SDP App：交屋礼包里的一次性加入码 → 手机浏览器打开、加到主屏幕 → WhatsApp 提醒（用他的语言）。第二步（试点之后）做成 SDP App 里的模块，用屋主原有的登入。',
+      en: 'How Keynection reaches residents, in two steps. Step one changes nothing in the SDP App: the one-time code in the welcome pack → opens in the phone’s browser, added to the Home Screen → WhatsApp alerts in their language. Step two, after the pilot, makes it a module inside the SDP App with the owner’s existing sign-in.',
     },
     features: {
       zh: [
-        'SDP App 里的「Neighbours · Keynection」入口，显示未读数和最近的聊天（版面是示意，不是 SDP 真正的 app）',
-        'WhatsApp 通知按真实资料产生：装修通知（完整内容）、新讯息提醒（不含讯息内容）、问题进度、物业公告、维修确认',
+        '第一天就能用、不动 SDP App 一行代码：礼包有码，Keynection 是网页 app，提醒走 WhatsApp',
+        'WhatsApp 通知按真实资料产生：装修通知（完整内容）、新讯息提醒（不含讯息内容）、问题进度、物业公告、维修确认；标「Scheduled」的会自己发出',
         '安静模式只挡聊天提醒，正式通知照样送达；还没加入的住户改用纸本，关掉 WhatsApp 的只在 app 里看',
         '换顶栏的住户，就能看到不同人、不同语言收到的通知：隔壁 Kumar（No. 13）收到的是淡米尔文',
+        '右边那支 SDP App 手机是第二步：加一个「Neighbours」入口，用屋主原有的登入打开 Keynection，屋主只有一个 app、SDP 只有一套数据（版面是示意，不是 SDP 真正的 app）',
       ],
       en: [
-        'A "Neighbours · Keynection" entry inside the SDP App with unread counts and recent chats (illustrative layout, not SDP’s actual app)',
-        'WhatsApp alerts built from real data: full renovation notices, new-message alerts without the content, concern updates, estate notices, repair checks',
+        'Works on day one without touching the SDP App: the code is in the welcome pack, Keynection is a web app, alerts go by WhatsApp',
+        'WhatsApp alerts built from real data: full renovation notices, new-message alerts without the content, concern updates, estate notices, repair checks; those marked Scheduled go out by themselves',
         'Quiet mode holds back chat alerts only; households not on Keynection get paper instead, and those with alerts off see everything in the app',
         'Switch household in the top bar to see what someone else receives, in their language: Kumar next door (No. 13) gets Tamil',
+        'The SDP App phone on the right is step two: a "Neighbours" entry opens Keynection with the owner’s existing sign-in, so the owner has one app and SDP one set of data (illustrative layout, not SDP’s actual app)',
       ],
     },
     why: {
-      zh: '回答评审最常问的「住户真的会用吗？」：不用装新 app，通知走大家每天都在用的 WhatsApp。',
-      en: 'Answers the judges’ usual question, "will residents actually use it?": no new app to install, and alerts arrive on the WhatsApp everyone already uses.',
+      zh: '回答评审最常问的两题：「住户真的会用吗？」——礼包有码、WhatsApp 大家天天用；「SDP 要改多少？」——第一步一行都不用改，第二步才整合进 SDP App（整合是 SDP 自己写明的 2026 年方向）。',
+      en: 'Answers the judges’ two usual questions: "will residents actually use it?" (the code is in the welcome pack and alerts arrive on the WhatsApp everyone already uses) and "how much must SDP change?" (nothing in step one; step two integrates into the SDP App, SDP’s own stated direction for 2026).',
     },
   },
   safeguards: {
@@ -525,8 +527,8 @@ export const ROUTE: RouteStep[] = [
   {
     tab: 'planner',
     text: {
-      zh: 'SDP 的规模化：新 phase 设定（上千户不到一秒算完）→ 影响估算（所有假设可调）→ 触达管道（SDP App 和 WhatsApp）',
-      en: 'Scaling for SDP: Phase setup (a thousand homes in under a second) → Impact model (every assumption editable) → Channels (SDP App and WhatsApp)',
+      zh: 'SDP 的规模化：新 phase 设定（上千户不到一秒算完）→ 影响估算（所有假设可调）→ 触达管道（第一步礼包 QR 和 WhatsApp，第二步 SDP App 模块）',
+      en: 'Scaling for SDP: Phase setup (a thousand homes in under a second) → Impact model (every assumption editable) → Channels (step one: welcome pack and WhatsApp; step two: a module in the SDP App)',
     },
   },
   {

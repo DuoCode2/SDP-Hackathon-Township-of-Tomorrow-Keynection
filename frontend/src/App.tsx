@@ -80,8 +80,11 @@ function storedShowAll(): boolean {
   }
 }
 
+// The guide opens in the browser's language: Chinese for the team, English for judges and SDP. A pick in the guide is kept.
 function storedLang(): GuideLang {
-  return remembered('guideLang') === 'en' ? 'en' : 'zh'
+  const kept = remembered('guideLang')
+  if (kept === 'en' || kept === 'zh') return kept
+  return navigator.language?.toLowerCase().startsWith('zh') ? 'zh' : 'en'
 }
 
 export default function App() {
@@ -374,7 +377,7 @@ function Shell({ pinned }: { pinned?: string }) {
             {!pinned && (
               <button className={`guide-btn ${guideOpen ? 'on' : ''}`} onClick={() => setGuideOpen((o) => !o)} aria-pressed={guideOpen}>
                 <Compass size={16} />
-                <span className="desktop-only">{lang === 'zh' ? '导览' : 'Guide'}</span>
+                <span className="desktop-only">{t('top.guide')}</span>
               </button>
             )}
           </div>
