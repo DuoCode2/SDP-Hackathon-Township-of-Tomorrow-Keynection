@@ -125,7 +125,7 @@ def test_each_home_has_a_daily_ai_allowance(client, claude, monkeypatch):
     assert client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom"}).status_code == 429
     assert client.post("/api/ai/renovation-draft", json={"unit_id": "T-11", "text": "bathroom"}).status_code == 200
     # Past the allowance a chat message still goes, as written.
-    claude.answers["MessageCheck"] = ai.MessageCheck(heated=False, calmer=None, calmer_translation=None, translation="Hai!")
+    claude.answers["MessageCheck"] = ai.MessageCheck(insult=False, heated=False, calmer=None, calmer_translation=None, translation="Hai!")
     assert client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "Hi!"}).status_code == 201
     assert _items(client, "T-11", "T-12", "message")[-1]["text"] == "Hi!"
 
@@ -133,7 +133,7 @@ def test_each_home_has_a_daily_ai_allowance(client, claude, monkeypatch):
 # ---------- typed messages arrive in the reader's language ----------
 
 def test_typed_message_arrives_in_the_readers_language(client, claude):
-    claude.answers["MessageCheck"] = ai.MessageCheck(heated=False, calmer=None, calmer_translation=None,
+    claude.answers["MessageCheck"] = ai.MessageCheck(insult=False, heated=False, calmer=None, calmer_translation=None,
                                                      translation="Selamat pagi! Boleh saya pinjam tangga?")
     sent = client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "Good morning! Could I borrow a ladder?"})
     assert sent.status_code == 201 and sent.json()["text"] == "Good morning! Could I borrow a ladder?"
@@ -149,7 +149,7 @@ def test_typed_message_arrives_in_the_readers_language(client, claude):
 
 
 def test_a_translation_that_changes_nothing_is_not_stored(client, claude):
-    claude.answers["MessageCheck"] = ai.MessageCheck(heated=False, calmer=None, calmer_translation=None, translation="Hello!")
+    claude.answers["MessageCheck"] = ai.MessageCheck(insult=False, heated=False, calmer=None, calmer_translation=None, translation="Hello!")
     client.post("/api/messages", json={"from_unit_id": "T-11", "to_unit_id": "T-12", "body": "Hello!"})
     item = _items(client, "T-12", "T-11", "message")[-1]
     assert item["text"] == "Hello!" and item["translated"] is False
@@ -157,7 +157,7 @@ def test_a_translation_that_changes_nothing_is_not_stored(client, claude):
 
 def test_heated_message_gets_a_calmer_wording_first(client, claude):
     calmer = "Hi, the drilling started at 7am today. Could the workers start after 9, please?"
-    claude.answers["MessageCheck"] = ai.MessageCheck(heated=True, calmer=calmer, calmer_translation="Hai, gerudi bermula 7 pagi tadi...",
+    claude.answers["MessageCheck"] = ai.MessageCheck(insult=False, heated=True, calmer=calmer, calmer_translation="Hai, gerudi bermula 7 pagi tadi...",
                                                      translation="Pekerja anda menggerudi pukul 7 pagi LAGI.")
     angry = "Your workers started drilling at 7am AGAIN. This is ridiculous."
     r = client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": angry})
@@ -172,7 +172,7 @@ def test_heated_message_gets_a_calmer_wording_first(client, claude):
 
 def test_sending_the_calmer_wording_needs_no_second_check(client, claude):
     calmer = "Could the workers start after 9, please?"
-    claude.answers["MessageCheck"] = ai.MessageCheck(heated=True, calmer=calmer, calmer_translation="Boleh pekerja mula selepas 9?",
+    claude.answers["MessageCheck"] = ai.MessageCheck(insult=False, heated=True, calmer=calmer, calmer_translation="Boleh pekerja mula selepas 9?",
                                                      translation="...")
     client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "Stop drilling at 7am!!!"})
     assert client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": calmer}).status_code == 201
@@ -181,12 +181,36 @@ def test_sending_the_calmer_wording_needs_no_second_check(client, claude):
 
 
 def test_insults_are_still_stopped_and_a_calmer_wording_offered(client, claude):
-    claude.answers["MessageCheck"] = ai.MessageCheck(heated=True, calmer="Please keep the noise down after 10pm.",
+    claude.answers["MessageCheck"] = ai.MessageCheck(insult=False, heated=True, calmer="Please keep the noise down after 10pm.",
                                                      calmer_translation=None, translation="...")
     for keep in (False, True):
         r = client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "Shut up, you idiot", "keep_tone": keep})
         assert r.status_code == 422 and r.json()["detail"]["code"] == "tone"
         assert r.json()["detail"]["suggestion"] == "Please keep the noise down after 10pm."
+
+
+def test_an_insult_claude_recognises_is_refused_even_when_the_word_list_misses_it(client, claude):
+    # Not on the word list, but abuse all the same: Claude says so, and the words are refused outright, with the
+    # calmer wording offered. "Send mine anyway" (keep_tone) does not apply to an insult.
+    claude.answers["MessageCheck"] = ai.MessageCheck(insult=True, heated=True, calmer="Could we talk about the noise?",
+                                                     calmer_translation="Boleh kita bincang tentang bunyi itu?", translation="...")
+    for keep in (False, True):
+        r = client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "You people are hopeless", "keep_tone": keep})
+        assert r.status_code == 422 and r.json()["detail"]["code"] == "tone"
+        assert r.json()["detail"]["suggestion"] == "Could we talk about the noise?"
+    assert _items(client, "T-11", "T-12", "message") == []  # nothing was sent
+    assert len(claude.calls) == 1  # the same words are judged once
+    assert "insult" in claude.calls[0]["system"]  # Claude is asked for that judgement, not only whether it sounds heated
+    # The calmer wording itself goes through without a second look.
+    assert client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "Could we talk about the noise?"}).status_code == 201
+    assert len(claude.calls) == 1
+
+
+def test_heated_but_not_an_insult_stays_a_suggestion(client, claude):
+    claude.answers["MessageCheck"] = ai.MessageCheck(insult=False, heated=True, calmer="Could the drilling start later?",
+                                                     calmer_translation="...", translation="...")
+    r = client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "Drilling at 7am AGAIN. Unbelievable.", "keep_tone": True})
+    assert r.status_code == 201
 
 
 def test_message_goes_as_written_when_claude_cannot_answer(client, claude):
@@ -271,7 +295,7 @@ def _reply(answer, stop_reason="end_turn"):
                                       "stop_sequence": None, "usage": {"input_tokens": 1, "output_tokens": 1}})
 
 
-ANSWER = {"heated": False, "calmer": None, "calmer_translation": None, "translation": "Selamat pagi!"}
+ANSWER = {"insult": False, "heated": False, "calmer": None, "calmer_translation": None, "translation": "Selamat pagi!"}
 
 
 def test_the_request_claude_receives(monkeypatch):

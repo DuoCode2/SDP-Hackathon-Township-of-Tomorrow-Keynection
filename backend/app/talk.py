@@ -69,12 +69,39 @@ CONCERN_CATEGORIES: dict[str, str] = {
 
 REPORT_REASONS = ("harassment", "threat", "spam", "privacy", "other")
 
-# Small, deliberately conservative list: the aim is to catch obvious insults before they are sent, not to police
-# tone. A pilot would add a proper multilingual classifier and human review (reports already go to SDP).
+# Obvious insults are refused outright, before any AI look. The aim is to catch abuse, not to police tone, so the list
+# holds words that are abuse almost wherever they appear, in the languages Malaysian neighbours actually type: English
+# and Manglish, romanised Hokkien and Cantonese, Malay, Chinese. Words that are also ordinary (die, mati, 滚, 草, 妈)
+# are matched only in the shapes that are abuse ("go die", "kau mati", "滚开", 草 on its own), so a complaint about
+# dust killing the plants, a dead light or a neighbour's mother's car still goes through (tests/test_talk.py keeps
+# both lists honest). Tamil has no entries yet: it needs a native speaker. With AI on, Claude's own judgement of abuse
+# in any language is the second net (ai.MessageCheck.insult); reports to SDP remain the third.
 _HOSTILE = [
-    r"\bidiot\w*", r"\bstupid\b", r"\bmoron\w*", r"\bshut up\b", r"\bf+u+c+k\w*", r"\bshit\w*", r"\bbastard\w*",
-    r"\bbitch\w*", r"\bkill you\b", r"\bbodoh\b", r"\bbabi\b", r"\bsial\b", r"\bcelaka\b", r"\bbangang\b", r"\bbengap\b",
-    "白痴", "笨蛋", "去死", "他妈的", "混蛋", "王八蛋",
+    # English and Manglish
+    r"\bidiot\w*", r"\bstupid\b", r"\bmoron\w*", r"\bshut up\b", r"\bbastard\w*", r"\bbitch\w*", r"\bretard\w*",
+    r"\bdumb(ass)?\b", r"\bass(hole|wipe)?s?\b", r"\bloser\b", r"\bscum\b", r"\bjerk\b", r"\bcunt\b", r"\bdickhead\b",
+    r"\bwanker\b", r"\bpsycho\b",
+    r"\bf+[u*@#]+c*k+\w*", r"\bfk(ing|in|s)?\b", r"\bmotherf\w*", r"\bshit\w*", r"\bbull\s?shit\b", r"\bwtf\b", r"\bstfu\b",
+    r"\bgtfo\b", r"\bscrew (you|u|off)\b", r"\bpiss off\b", r"\bbugger off\b", r"\bsod off\b",
+    r"\bgo (and |n )?die\b", r"\byou (can |should |will |all |better )?(go )?die\b", r"^\W*die+\W*$",
+    r"\bgo to hell\b", r"\brot in hell\b", r"\bdrop dead\b", r"\b(kill|whack|beat up|hit|punch) (you|u)\b",
+    # romanised Hokkien and Cantonese, as typed in Malaysia
+    r"\bsoh?hai\b", r"\bkan? ?ni+ ?na+\b", r"\bknn\b", r"\bkns\b", r"\bkana ?sai\b", r"\bc(i|hi|hee)\s?b(ai|ye)\b",
+    r"\bccb\b", r"\blan\s?jiao\b", r"\bdiu\b", r"\bna\s?bei\b",
+    # Malay
+    r"\bbodoh?\b", r"\bbabi\b", r"\bsial(an)?\b", r"\bcelaka\b", r"\bbangang\b", r"\bbengap\b", r"\bbangsat\b",
+    r"\bpuki\w*", r"\bkimak\b", r"\bpantat\b", r"\bbutoh\b", r"\btolol\b", r"\bdungu\b", r"\bbahlul\b", r"\bbengong\b",
+    r"\bgoblok\b", r"\bsengal\b", r"\bmampus\b", r"\b(kau|ko|engkau|awak|lu|hang|kamu) (pergi )?mati\b",
+    r"\botak udang\b", r"\bkepala (otak|hotak|bapak|butoh)\b", r"\blahanat\b", r"\blaknat\b", r"\bjahanam\b",
+    r"\bharam jadah\b", r"\bsundal\b", r"\bpelacur\b", r"\bjalang\b",
+    # Chinese: no word boundaries, so each entry must be abuse wherever it appears (妈的 only when nothing precedes it,
+    # so 我妈的车 goes through; 他妈妈 and 你妈妈 never match)
+    "白痴", "笨蛋", "去死", "找死", "死全家", "全家死", "混蛋", "王八蛋", "吃屎", "神经病", "傻逼", "傻b", "傻比", "煞笔",
+    "沙比", "脑残", "智障", "弱智", "白目", "蠢货", "蠢蛋", "蠢猪", "笨猪", "死猪", "贱人", "贱货", "婊子", "畜生", "禽兽",
+    "狗东西", "变态", "垃圾人", "脑子有病",
+    r"(?<![一-鿿])妈的", "他妈的", "你妈的", "尼玛", "妈逼", "操你", "草你", "草泥马", "艹", "肏", "屌你",
+    "靠北", "靠腰", "靠杯", "靠夭", "仆街", "扑街", "冚家", "戇鳩", "戆鸠", "痴线", "黐线", "柒头",
+    r"滚(开|蛋|出去|啦|吧|远)", "给我滚", r"^\W*草+\W*$",
 ]
 _HOSTILE_RE = re.compile("|".join(_HOSTILE), re.IGNORECASE)
 

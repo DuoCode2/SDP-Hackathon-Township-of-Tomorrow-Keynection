@@ -370,12 +370,12 @@ function Shell({ pinned }: { pinned?: string }) {
             {!split && !pinned && <CastPicker units={units} me={cur.me} onPick={setMe} />}
             {canSplit && !pinned && (
               <button className={`split-btn ${split ? 'on' : ''}`} onClick={toggleSplit} aria-pressed={split}
-                title="See both sides of the shared wall at once">
+                aria-label={t('top.bothSides')} title="See both sides of the shared wall at once">
                 <Columns2 size={16} /> <span className="desktop-only">{t('top.bothSides')}</span>
               </button>
             )}
             {!pinned && (
-              <button className={`guide-btn ${guideOpen ? 'on' : ''}`} onClick={() => setGuideOpen((o) => !o)} aria-pressed={guideOpen}>
+              <button className={`guide-btn ${guideOpen ? 'on' : ''}`} onClick={() => setGuideOpen((o) => !o)} aria-pressed={guideOpen} aria-label={t('top.guide')}>
                 <Compass size={16} />
                 <span className="desktop-only">{t('top.guide')}</span>
               </button>
@@ -598,7 +598,7 @@ function Pane({ index, pane, units, active, split, version, onChange, onFocus, o
           {tabs.map((i) => {
             const Icon = i.icon
             return (
-              <button key={i.id} role="tab" aria-selected={pane.tab === i.id} className={pane.tab === i.id ? 'on' : ''} onClick={() => tab(i.id)} title={t(`nav.${i.id}`)}>
+              <button key={i.id} role="tab" aria-selected={pane.tab === i.id} className={pane.tab === i.id ? 'on' : ''} onClick={() => tab(i.id)} aria-label={t(`nav.${i.id}`)} title={t(`nav.${i.id}`)}>
                 <Icon size={15} />
                 {i.id === 'evidence' && pending > 0 && <span className="dot" />}
               </button>

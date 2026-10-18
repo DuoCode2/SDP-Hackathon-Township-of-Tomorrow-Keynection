@@ -195,3 +195,40 @@ def test_warranty_clock_follows_hda_schedule(client):
     from datetime import date
     assert _add_months(date(2026, 3, 16), 24) == date(2028, 3, 16)
     assert _add_months(date(2024, 1, 31), 1) == date(2024, 2, 29)
+
+
+# ---------- the word list: common insults in English/Manglish, Malay and Chinese, and the complaints it must let through ----------
+
+INSULTS = [
+    # English and Manglish
+    "You are so stupid", "dam go die", "die", "Die!", "go to hell", "go and die la", "you can die", "drop dead",
+    "wtf is this", "stfu", "f*ck you", "fk u", "fking noisy", "bullshit", "you asshole", "dumbass", "you loser",
+    "what a retard", "screw you", "piss off", "I will whack you",
+    # romanised Hokkien and Cantonese, as typed in Malaysia
+    "sohai", "kanina", "kan ni na", "knn", "kns", "cibai", "lanjiao", "diu lei", "nabei",
+    # Malay
+    "bodoh", "bodo punya jiran", "sial la", "sialan", "bangsat", "pukimak", "tolol", "dungu", "mampus kau",
+    "kau pergi mati", "pergi mampus", "otak udang", "kepala otak kau", "celaka", "bangang", "babi",
+    # Chinese
+    "去死", "去死吧", "吃屎", "草", "草！", "艹", "神经病", "傻逼", "傻B", "脑残", "智障", "白目", "滚开", "滚蛋",
+    "给我滚", "妈的", "他妈的", "操你", "靠北", "仆街", "冚家铲", "死全家", "找死", "贱人", "畜生", "变态", "蠢货",
+    "白痴", "笨蛋", "混蛋", "王八蛋", "狗东西", "你妈的",
+]
+
+COMPLAINTS = [
+    "Could you please stop the noise after 6pm?", "Your contractor is useless", "My plants will die if the dust continues",
+    "Die die must finish by Friday, the contractor said", "I'm dying to see the new kitchen", "Damn, the drilling again",
+    "It was a hell of a night with the drilling", "Assess the crack first before painting", "The class starts at 8",
+    "Lampu mati sejak semalam", "Bekalan air mati lagi", "Bising gila pagi ni", "Anjing awak menyalak sepanjang malam",
+    "Sampah bertimbun depan rumah saya", "Kontraktor awak tak ikut masa",
+    "草地上的垃圾堆了三天", "除草机太吵了", "滚水管漏水", "狗屎在我门口", "我家小孩有病，可以安静一点吗", "死角那边积水",
+    "他妈妈昨天来过", "你妈妈的车挡住了我家门口", "废物处理公司几点来", "装修垃圾放哪里",
+]
+
+
+def test_the_word_list_catches_common_insults():
+    assert [t for t in INSULTS if not talk.tone_problem(t)] == []
+
+
+def test_the_word_list_lets_plain_complaints_through():
+    assert [t for t in COMPLAINTS if talk.tone_problem(t)] == []

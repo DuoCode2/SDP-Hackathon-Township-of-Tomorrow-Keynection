@@ -8,7 +8,7 @@ const PORT = process.env.KEYNECTION_E2E_PORT ?? '8031'
 
 export default defineConfig({
   testDir: '.',
-  testMatch: ['route.spec.ts', 'warranty.spec.ts', 'monkey.spec.ts'], // each starts from the fictional phase as seeded
+  testMatch: ['route.spec.ts', 'warranty.spec.ts', 'a11y.spec.ts', 'monkey.spec.ts', 'audit.spec.ts'], // each starts from the fictional phase as seeded
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

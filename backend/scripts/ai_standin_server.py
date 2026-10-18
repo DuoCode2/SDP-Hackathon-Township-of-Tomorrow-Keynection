@@ -48,9 +48,10 @@ def fake(system, text, schema, **_):
         reader = re.search(r"The reader's language: (.*)", text).group(1)
         lang = next(k for k, v in ai.LANG_FOR_AI.items() if v == reader)
         msg = re.search(r"<message>\n(.*)\n</message>", text, re.S).group(1)
-        heated = msg.count("!") >= 2 or bool(re.search(r"macam kilang|ridiculous|AGAIN", msg))
+        insult = bool(re.search(r"hopeless|pathetic|disgrace", msg, re.I))  # abuse the word list does not know
+        heated = insult or msg.count("!") >= 2 or bool(re.search(r"macam kilang|ridiculous|AGAIN", msg))
         calmer = "[stand-in calmer] Hi, the noise has been hard for us. Could we agree on quieter hours?" if heated else None
-        return ai.MessageCheck(heated=heated, calmer=calmer,
+        return ai.MessageCheck(insult=insult, heated=heated, calmer=calmer,
                                calmer_translation=f"[stand-in → {LANG_TAG[lang]}] {calmer}" if calmer else None,
                                translation=f"[stand-in → {LANG_TAG[lang]}] {msg}")
     if schema is ai.NoticeTranslations:

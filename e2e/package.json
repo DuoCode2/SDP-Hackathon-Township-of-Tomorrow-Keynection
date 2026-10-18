@@ -7,6 +7,8 @@
     "route:headed": "playwright test route.spec.ts --headed",
     "warranty": "playwright test warranty.spec.ts",
     "monkey": "playwright test monkey.spec.ts",
+    "a11y": "playwright test a11y.spec.ts",
+    "audit": "playwright test audit.spec.ts",
     "all": "playwright test",
     "report": "playwright show-report"
   },

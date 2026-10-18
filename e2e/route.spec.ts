@@ -107,11 +107,17 @@ test('the 3-minute judge route, with a screenshot per step', async ({ page }) =>
     await expect(right.getByRole('button', { name: 'Use this' })).toBeVisible()
     await shot(page, 'K10-calmer-wording')
     await right.getByRole('button', { name: 'Use this' }).click()
+    // Sent, not yet read: one tick on Siti's own message (Aiman has not opened the thread).
+    const ticks = right.locator('.msg.mine .msg-ticks').last()
+    await expect(ticks).toBeVisible()
+    await expect(ticks).not.toHaveClass(/read/)
   })
 
   await test.step('K11 Aiman reads it in English, the original one tap away', async () => {
     await left.locator('button.chat-row', { hasText: 'Siti' }).click()
     await expect(left.getByText(/\[stand-in → EN\]/).last()).toBeVisible()
+    // Aiman opened the thread, so Siti's message now shows two ticks, live, on her side.
+    await expect(right.locator('.msg.mine .msg-ticks.read').last()).toBeVisible()
     await shot(page, 'K11-translated')
     await page.locator('button.split-btn').click() // back to one pane
     await expect(right).toBeHidden()

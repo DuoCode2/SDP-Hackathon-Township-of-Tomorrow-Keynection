@@ -1,392 +1,177 @@
-# Keynection 原型
+# Keynection
 
 [![Tests](https://github.com/DuoCode2/SDP-Hackathon-Township-of-Tomorrow-Keynection/actions/workflows/ci.yml/badge.svg)](https://github.com/DuoCode2/SDP-Hackathon-Township-of-Tomorrow-Keynection/actions/workflows/ci.yml)
-（每次推送到 GitHub 自动跑 332 个后端测试和前端编译；仓库是私有的，徽章只有能打开仓库的人看得到。设定在 `.github/workflows/ci.yml`。）
 
-Sime Darby Property University Hackathon 2026 · People 赛道。**Every key comes with five neighbours：每一把钥匙都附送五户邻居。**
+> **给队员的中文摘要**：这是给评审（SDP 数码团队）和导师看的英文主页，顺序是：为什么做、3 分钟评审路线、跟现有方案差在哪、为 SDP 而做的地方、主线以外还有什么、哪些是真做哪些是模拟、怎么运行、附录目录、老实说的限制、AI 披露。团队自己的完整中文说明（设计、试点模式、安全清单、结构、待办、Git）一个字没删，搬到了 [`docs/团队说明.md`](docs/团队说明.md)。数字的来源：测试数只在 [`docs/testing-overview.md`](docs/testing-overview.md) 写一次（这一页不写测试数）；普查、纠纷案例、画面数这些以 [`docs/judging-criteria-map.md`](docs/judging-criteria-map.md) 最后一节为准。三张截图在 `docs/images/`，是浏览器自动走路线时拍的、裁掉了右边的导览面板；有 AI 文字的画面等金钥放上去再拍。
 
-主轴是**邻里连结**：从交钥匙那天起，帮屋主认识左右和对面这 5 户（来自日本搬家时向左右两户和对面三户打招呼的习惯）。交屋后的装修季是邻居变朋友还是变仇人的关键期，所以装修通知就是第一次自我介绍。万一出了裂缝漏水，公平的记录、分流和保修在背后撑着，但它们是安全网，不是主角。
+Sime Darby Property University Hackathon 2026 · People track. **Every key comes with five neighbours.**
 
-**示范预设只显示主线**：邻居、聊天、装修、照片与维修、影响估算、触达管道，正好是 3 分钟评审路线会走到的 6 页。其余功能（屋历、我、SDP 后台、新 phase 设定、风险清单、5 户以外的联系请求）收在导览底部的「显示全部功能」，评审问到长者、隐私、推广或风险时再打开；浏览器会记住这个选择。主线的页面清单在 `frontend/src/features.ts` 的 `FOCUS_TABS`。
+Keynection helps a new owner in an SDP township get to know the five homes beside and opposite them from the day they collect the keys. The renovation season that follows is when neighbours become friends or enemies, so the renovation notice doubles as the first introduction. If a crack or a leak does appear, sealed photos, a fair triage and the warranty clock are there in the background: a safety net, not the hero.
 
-项目原名 Jiran5，2026年10月10日改名为 Keynection（key 钥匙 + connection 连结）。2026年10月12日内部名称也全部改成 Keynection：设定名称是 `KEYNECTION_…`（旧的 `JIRAN_…` 仍然有效，旧服务器不用改设定）；密码页 cookie 和浏览器记住的设定会自动搬到新名字，不会把人登出，也不会忘掉选过的语言。同一天网上版搬到 keynection.onrender.com（旧网址 jiran5.onrender.com 已停用），GitHub 仓库也改名为 SDP-Hackathon-Township-of-Tomorrow-Keynection。（文中的马来文 jiran 是「邻居」的意思，不是旧名。）
+![Key day: Aiman's home screen is the five homes beside and opposite him, worked out from the site plan](docs/images/key-day-five-homes.png)
 
-所有住户、门牌、姓名和示范照片都是虚构或程序画出来的，不是 SDP 的真实数据，也没有真实住户的照片。
+**Live demo**: https://keynection.onrender.com (shared password given privately). It runs on Render's free tier, so the first open after a quiet spell takes about 40 seconds. All judges share one database; it returns to the starting point after 20 quiet minutes. Everything in it is fictional: households, unit numbers, names and photographs are invented or drawn by a program; there is no SDP data and no real resident.
 
-## 四层都能演示了
+## Why
 
-设计有**两种性格**：跟人有关的画面（Neighbours、Chats、Me）用温暖风格，米白底、珊瑚橘主色、圆角按钮、插画「家门」头像；跟纪录有关的画面（Works、照片与维修、Home log、SDP、Safeguards）用「活的蓝图」，建筑图纸、共用墙、图框和公文印章。故事是「表面温暖，底层严谨」。另外有欢迎画面（每户只自动出现一次，可以在「我」页面再叫出来）、打招呼的小动画、空画面插图，以及「五栋房子围成一圈」的品牌标志。左边导航也跟着变：温暖页面是一般 app 的选单，底部是「你的家」小卡；纪录页面是带编号和图框的图纸。
+- **New phases start at zero.** In Selangor, where most SDP townships are, 13.2% of residents had no face-to-face contact with a neighbour in a month (Malaysia 6.5%; Department of Statistics, Census 2020, *Hubungan Sosial*, Table 1). Nobody on a new street knows anyone yet.
+- **Renovation is where it goes wrong.** We collected 28 distinct neighbour-renovation incidents reported in Malaysia between 2022 and 2026: illegal extensions and structural changes, party-wall cracks, noise outside hours, debris; some went to the council or the courts. Most are landed homes; the public evidence for apartments is thinner, and we say so. Our reading of them: by the time the two homes talk, it is already a complaint. We also read all 36 public store reviews of SDP's resident apps to see what residents use today.
+- **Handover is the one moment SDP meets every owner, and it has no neighbour step.** Neither does the national renovation guideline in force since 1 April 2026, which unifies permits, hours and forms. Keynection adds that step on top of both; it replaces nothing.
 
-**颜色（统一色票）**：所有颜色都来自 `frontend/src/styles.css` 开头的一张色票，组件里不再写死颜色。
-- 品牌珊瑚橘（Logo）在每一页都一样，不会因为切换页面变色。
-- 状态色两种风格共用、意思一致：绿色＝已同意／已认识／完成，橙色＝装修中／要留意，红色＝警告／升级，蓝色＝资讯／SDP。
-- 两种风格只换底色、主按钮和「选中」颜色：温暖页选中是珊瑚色、主按钮是较深的珊瑚色；纪录页选中是青绿、主按钮是深蓝。
-- 文字颜色都达到 WCAG AA 对比度（白字放在较深的珊瑚色上，橙／红／蓝文字用较深的色阶，灰色说明文字也加深）。
-- 例外：手机示意图里的 WhatsApp 和 SDP App 用它们自己的颜色；列印的纸本通知是黑白；QR 码固定深色配白底；插画头像有自己的柔和色盘。
+Figures and sources, written once: [`docs/judging-criteria-map.md`](docs/judging-criteria-map.md), last section.
 
-**加入与触达（新增）**：
-- **交屋加入**：SDP 交屋时在欢迎礼包放一次性加入码（QR，14 天内有效、只能用一次、只存哈希）。住户扫码 → 选邻居看到的名字和语言 → 读白话隐私声明并同意 → 邻里圈马上建好。还没加入的住户（示范里是 No. 23）邻居只看到门牌，不能传讯息。
-- **物业柜台**（SDP 后台 → Front desk）：发加入码；装修通知里有未加入的住户时，自动排进「纸本通知」，可以列印（住户的语言加英文）并记录送达，送达会写进两户屋历；也可以替偏好纸本的屋主登记装修（职员名字记录在案）。
-- **简易模式**：字和按钮更大、隐藏地图和次要功能；只有住户自己看得到这个设定。示范里 Ah Hock（No. 20）开着，女儿 Mei Fong 是他的家人代办。
-- **新 phase 设定**（SDP 后台）：输入几条 lorong、每排几间、几栋公寓、几层、每层几户，用跟 app 一样的规则算出每户的邻里圈和装修通知范围；一千多户约 20 毫秒算完，不存任何资料，可下载每户清单（只有门牌）。
-- **影响估算**（SDP 后台）：最上面是主要指标「邻里连结」，用统计局 2020 年人口普查的真实数字当起点（《Banci Malaysia 2020: Kesejahteraan Penduduk (Hubungan Sosial)》表 1：雪兰莪 13.2% 的人一个月内没跟邻居面对面说过话，全国 6.5%），可以选乡镇所在的州，试点用同一题检查。下面才是成本估算，先算 SDP 一定要付的保修争议，再算邻居投诉（只适用于 SDP 物业团队有处理投诉的社区）；每个数字都标明是假设或试点目标，每个结果写出公式。
-- **触达管道**（SDP 后台）：最上面三张卡说明 Keynection 怎么到住户手上，分两步——第一步不动 SDP App：交屋礼包的一次性加入码（交钥匙那天）、WhatsApp 提醒和手机浏览器里的 Keynection（每天）；第二步（试点之后）做成 SDP App 里的模块，用屋主原有的登入。下面两支手机：左边是这一户在 WhatsApp 收到的通知（用他的语言，聊天提醒不含讯息内容），右边是第二步放进 SDP App 的样子（示意，不是 SDP 真正的 app）。2026年10月16日改成这个讲法：第一步 SDP 不用先改任何东西；整合进 SDP App 是 SDP 年报写明的 2026 年方向，所以放在第二步，不是「可有可无」。
+## The 3-minute judge route
 
-**三语介面**：顶栏的 EN / BM / 中 切换**所有住户画面**的语言：邻居、聊天、装修（时间表、屋规、承包商通行证、门卫扫码结果）、**照片与维修**（原 Evidence 分页：拍照任务、案件判定、维修验收、保修时钟）、屋历、我、欢迎画面、各个分步骤流程、导航。日期和时间也按语言显示，中文用全形括号。后端产生的文字（系统建议的理由、屋规、门卫判定、聊天里的自动通知、聊天列表预览）都会附上结构化代码，前端照读者的语言显示；英文原句照样留作纪录。通知内文里的日期和施工时段也按发送语言组句。住户自己打的字、SDP 发的公告内容照原样显示。SDP 后台固定英文（包括它共用的元件）。导览会跟着切换（导览只有中英文）。
+The route is the top of the **Guide** panel (top-right). One click per step jumps to the screen and the household. Six steps, main story only:
 
-**第四种阅读语言：淡米尔文**。介面维持英文、马来文、华文三种，但住户「收到」的内容多了淡米尔文：快捷回复、WhatsApp 通知（日期和施工时段也按读者语言组句）、纸本装修通知（淡米尔文在上、英文在下）、加入时的隐私声明（照住户选的阅读语言显示）、自我介绍和装修通知的讯息模板。示范里 Aiman 隔壁的 Kumar（No. 13）读淡米尔文。淡米尔文是 AI 协助翻译的，试点前要请母语者检查；介面其他没翻到的字会自动退回英文。
+1. **Key day.** Aiman (No. 12) has just moved in; his home screen is the five homes beside and opposite him → 👋 Wave at Siti.
+2. **The renovation notice is the introduction.** Works → Register renovation → type one sentence in *Just say it in one sentence* ("Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5", or tap an example in English, Malay or Chinese) → *Fill it in for me* → AI picks the type of work and the plan marks who is told → at *When*, the noisy hours are already planned around the neighbours' private quiet times (Siti's baby nap, Hafiz's night-shift sleep, without saying whose) → review and send. No. 23 is not on Keynection yet, so the estate office prints a paper notice.
+3. **Kumar next door (No. 13) reads Tamil.** Channels shows the same notice reaching him on WhatsApp in Tamil, down to the work Aiman described, translated by AI. Below it, two reminders that go out by themselves: photograph three days before the works, a check the day after they end.
+4. **Both sides.** Switch on *Both sides* (Aiman left, Siti right). Siti opens the notice: "Noisy hours planned around your quiet time", so she never had to ask about the nap → she waves back → types something sharp in Malay → AI offers her a calmer wording → Aiman reads it in English, the original one tap away.
+5. **If something goes wrong.** Siti: Use sample → Sample crack → the crack was there before the works, so it goes to the warranty, not to Aiman.
+6. **How SDP checks it works.** The Impact model uses the 2020 census question (share of residents with no face-to-face neighbour contact in a month), asked before and after a pilot. The command view also counts next-door pairs who know each other.
 
-**AI 只放在主线的两个地方**（2026年10月10日加入，功能冻结只为这两项开例外；设计上用 Claude，网上演示版用 Google 的 Gemini 免费版，见下面）：
-1. **一句话写装修通知**：登记装修第一步有「Just say it in one sentence」，屋主用任何语言说要做什么（例：「下礼拜一开始重铺主人房浴室，做两个星期，平日九点到五点」），AI 判断**工程类型**（这决定通知谁）、日期、吵闹时段、承包商，并说明为什么、提醒还缺什么。屋主之后照样逐步检查再发。**批准（PBT、JMB/MC）和 CIDB 勾选永远由屋主自己确认，AI 不填**；AI 回答里不合规则的（结束早于开始、时段颠倒、日期在过去）会被丢掉，交回屋主填。通知用屋主写的语言组句。
-2. **任何打的字都用对方的语言收到，太冲先劝**：聊天讯息、自我介绍、装修通知（连屋主写的工程说明）、WhatsApp 通知、纸本通知，都会按读者的语言由 AI 翻好，标着紫色的「Translated by AI」，原文点一下就看到；屋历、检举、下载资料里留的都是原文。打的字太冲时，AI 先给一个意思不变、比较平和的说法，屋主选「用这个」或「还是发我原本的」；明显的辱骂照旧发不出去。
+Without an AI key, steps 2 and 4 still work: the notice is filled in step by step and typed words go as written. The Guide's top line says whether AI is on. A 7-minute full route is in the Guide under *Show every feature* (see "Beyond the main story" below).
 
-只把正在写的文字送给 AI 服务，不送名册、门牌或谁跟谁聊（屋主自己写进去的名字门牌除外）。模型是 `claude-opus-5-5`（可用环境变量 `KEYNECTION_AI_MODEL` 换，例如要更快可换 `claude-haiku-5-5`），被安全检查拒绝时由 Anthropic 自动改用合适的备用模型。每户每天最多 40 次 AI 调用，控制费用。开了 AI，加入时的隐私声明会多一段「AI 翻译」（写明在马来西亚境外处理），同意的版本号也不同（`pilot-2026-10b-ai`）。
+## What is different
 
-**Gemini 免费版（只给演示用）**：Claude 的 API 要先买额度，所以网上演示版改用 Google 的 Gemini 免费版（环境变量 `GEMINI_API_KEY`，模型 `gemini-3.8-flash`，可用 `KEYNECTION_GEMINI_MODEL` 换），同样的两项功能、同样的规则。Google 的免费版会用送进去的内容改进它的产品，所以：只在演示模式用（演示的住户都是虚构的）；试点模式就算设了也不会用，Pilot 健康卡还会提醒删掉；隐私声明的 AI 段落换成写明 Google、请大家只打虚构内容的版本（`pilot-2026-10b-ai-gemini`）。两把钥匙都有时用 Claude。免费版有每分钟和每天的次数上限（在 Google AI Studio 看得到），超过时跟没开 AI 一样照常运作。
+Township apps and guardhouse systems already exist in Malaysia: Gamuda's GL Lifestyle+ has one big resident group and renovation forms, i-Neighbour has contractor passes, VYROX runs the guardhouse, and the national renovation guideline covers permits and hours. None of them, as far as we found, has a step where the neighbours actually meet. Keynection's five differences:
 
-**没有金钥、没装套件、断网、或 AI 没及时回应**：一切照旧。快捷回复照样预先翻好，打的字照原文送出，装修通知逐步填写，不会卡住也不会报错。导览最上面会写 AI 有没有开。代码在 `backend/app/ai.py`，测试用替身，永远不会连到真的 AI（`tests/test_ai.py`、`tests/conftest.py`）。
+1. **The five homes appear on day one, from the site plan.** No directory, no township group, no searching. Beside and opposite for a terrace; beside, above and below for an apartment. The idea borrows from Japan's moving-in greeting to the two homes beside and the three across (向こう三軒両隣).
+2. **The renovation notice is the first introduction.** Who is told follows from the type of work (wet work reaches two floors down, hacking two floors up and down) and **the owner cannot remove anyone**. A home not on Keynection yet gets the same notice on paper from the estate office.
+3. **Noisy hours are planned before anyone has to ask.** Each household keeps private quiet times (a baby's nap, sleep after a night shift). Plain rules, no AI, set the hours around them and never say whose they are. A home about to get works from both sides is warned, and the second owner is offered a later start.
+4. **Typed words arrive in the reader's language**, with a calmer wording offered when a message is heated. Always marked "Translated by AI", the original one tap away, the original kept in every record. Three interface languages (English, Malay, Chinese) and four reading languages (plus Tamil) for everything a resident receives.
+5. **A fair photo check, and a ladder instead of a hotline.** A change photographed before the works is never put down to the renovation; "caused by the renovation" needs the other side's agreement; nothing is pre-selected; only the owner closes a warranty ticket. A concern goes to the neighbour first and the estate team last, and every step is written into both home logs.
 
-**怎么打开 AI**：服务器要有环境变量 `ANTHROPIC_API_KEY`（Claude：在 Anthropic 的 Console 建立，账户要先买额度），或只给演示用的 `GEMINI_API_KEY`（Gemini 免费版：在 Google AI Studio 用 Google 账户免费建立）。金钥不要写进代码、档案或聊天群组。
-- 本机（Windows）：开始 → 搜索「编辑账户的环境变量」（英文系统是 Edit environment variables for your account）→ 新建 `ANTHROPIC_API_KEY`，值贴金钥 → 确定，然后**重新开** `start-demo.bat`（窗口会写 AI on/off）。旧电脑第一次会自动补装 AI 套件
-- Render：Dashboard → 这个服务 → Environment → Add Environment Variable：`ANTHROPIC_API_KEY`（或 `GEMINI_API_KEY`）→ Save（会自动重新部署）
+![Step 3 of the renovation notice: the noisy hours are already planned around two neighbours' quiet times, without saying whose](docs/images/when-planned-around-neighbours.png)
 
-**先算好，不用吵：吵闹时段自动避开邻居的作息**（2026年10月10日加入，不靠 AI，断网也能算）：
-- **每户设一次「安静时间」**（邻居首页最下面）：例如宝宝 13–15 点午睡、夜班后 9–11 点补眠。最多 2 段、每天合计 3 小时，原因只有自己看得到。示范里 Siti（No. 11）设了宝宝午睡，对面 Hafiz（No. 22）设了夜班补眠
-- **登记装修时自动排时段**：系统把通知范围内每户的安静时间、地方政府允许的时段（星期一到六 9–6 点）一起算，建议吵闹时段，例如「11:00–17:00，13:00–15:00 不吵」，并写明「避开了 2 户的安静时间」——不说是谁、为什么。屋主每天至少保留 4 小时能施工；排不下的那户不避开，但通知里会写明。屋主也可以选「用我自己的时段」
-- **两边同时施工**：如果收到通知的某户这几天另一边也在装修，系统提醒，并一键改到不重叠的开工日（工期不变），不透露是谁在装修
-- **通知写明结果**：邻居收到的通知（app、WhatsApp、按他的语言）写着「吵闹时段已避开你的安静时间」，或「碰到你的安静时间，可以问对方」。这个结果在发出时就定下来，之后谁改设定都不会改写
-- **时间到了自己提醒**：开工前 3 天提醒受影响的邻居拍开工前照片；完工后一天问双方有没有变化（有就去跟开工前的照片比对）。WhatsApp 示意图里标着「Scheduled」
-- **反映噪音自动对时间**：邻居提出「超时施工」时，系统自动标明当时是在约定时段内、约定的安静时段，还是时段外，不用再争论约定了什么
-- **SDP 后台**：多了「通知避开的安静时间」和「噪音不满」两个数字，试点前后对比
-- 规则在 `backend/app/quiet.py`（纯规则、可解释），测试在 `tests/test_quiet.py`
+Nobody is left out: **Easy mode** (bigger text, fewer options, visible only to that household), a **family helper** who can act for an older owner with every action carrying the helper's name, **paper notices** for homes not on the app, and **Tamil** for what residents receive.
 
-| 层 | 画面 | 做什么 |
-|---|---|---|
-| 1 认识 | Neighbours（Circle） | **像社交 app 一样用**：顶部一排邻居头像（橙圈是装修中、蓝点是还没认识），邻居卡片可以「Message」或「👋 Wave」，点头像看小档案；右上角可切到「Map」。**三层邻居**：第 1 层影响圈（共用墙、楼板、面对面）显示名字、可直接聊天；第 2 层同一条 lorong 或同一栋，只显示门牌，要先发「联系请求」写原因，对方接受才能聊；第 3 层整个社区没有名册和群组，物业公告放在 Chats 的官方帐号。公寓有楼层剖面图并标出「YOUR STACK」。「自我介绍」（在 Neighbours）和「登记装修」（在 Works 右上角）都是分步骤流程；装修按工程类型自动算出通知范围（湿作业到楼下两层、打墙上下各两层），并在图上标出每户被通知的原因 |
-| 1–2 沟通 | Chats | 置顶的「Estate Office」官方帐号（只能看，不能群回）；跟圈子里每户一对一聊天，支持 👋 Wave、表情回应（👍❤️🙏😂😮）、语音讯息（最长 1 分钟）；快捷回复自动翻成对方的语言；「提出不满」升级阶梯（邻居 → 装修户回复/处理 → SDP 物业团队），每步写进两户屋历；语气检查、检举、静默封锁；电话号码要双方同意才交换 |
-| 2 约定 | Works | 装修日历（周日斜线标示禁止施工）与"现在是否安静时段"；地方政府（PBT）准证状态；登记装修时自动通知受影响的每一户，通知同时就是自我介绍。**承包商 QR 通行证和门卫扫码已经做好（后端和测试都保留），但示范里收起来**：它管的是工人不是邻里关系，VYROX、i-Neighbour 等物业系统也已经有；要打开就把 `frontend/src/features.ts` 的 `SHOW_CONTRACTOR_PASSES` 改成 `true` |
-| 3 证据 | 照片与维修 → 案件 | 开工前照片（质量检查、指纹封存）；跟进照片自动对齐、比对动画、HUD 框标出裂缝或水渍（电脑视觉：OpenCV 对齐加"变暗区域"规则，**不是机器学习**）；按公开规则给建议，人来决定。**开工前就拍到的变化不会算到装修头上**；"装修造成"只是提出，要装修户同意才定案，不同意就请 SDP 检查员；"建筑瑕疵"是屋主自己的权利，不用邻居同意；住户不能自称检查员；选项不预先勾选建议 |
-| 4 关闭 | 照片与维修 → 保修、SDP | 判定为建筑瑕疵就自动开保修单；每张单显示《房屋发展法》附表 G/H 的时钟（交屋后 24 个月保修期、收到书面通知后 30 天内修好），并提醒屋主：法律的 30 天从 SDP 收到书面通知起算，要另外亲手或挂号信送通知；SDP 提交维修照片时，系统拿它跟开工前照片对比；**只有屋主能关闭**，驳回就重开 |
-| 屋历 | Log | 先用一段白话说明"这是什么"和"没有被偷偷修改过"，再按时间列出发生过的事（门牌而不是内部编号、代办人或职员操作会写明）；指纹、链条图和"还做不到什么"收在「显示技术细节」里。底层是每户一条 SHA-256 链：交屋、装修、通行证、照片、案件、提出／不同意／定案、维修、屋主确认都在里面。只有 app 自己的步骤能写入。**老实说明**：目前由同一台服务器保存和检查（CHAIN CHECKED），能抓到偷偷改旧纪录，但抓不到"整串重算"或删掉最新一笔；试点要加给屋主的签章收据和每天的外部时间戳 |
-| 后台 | SDP | 五个工作台：保修（30 天时钟、逾期标红）、物业（升级上来的不满：提醒或结案）、安全（被检举的讯息：私下警告或驳回，被检举的语音可以直接播放）、公告（发给一条 lorong、一栋楼或全社区的单向公告）、物业柜台（加入码、纸本通知、替屋主登记装修）；另有新 phase 设定、影响估算、触达管道三页；邻居自行解决的比例等数据；**邻里关系**卡：隔壁之间互相认识的比例、从交屋到第一次打招呼的天数、有多少户主动联系过、30 天内活跃的邻里圈（只有数字，看不到谁跟谁聊、聊什么） |
-| 我 | Me | 一句自我介绍、阅读语言、开关（接受联系请求、接受 Wave、安静模式）、封锁名单、屋历捷径；**家人代办**（屋主同意后，最多 2 位家人可以替这户操作，例如替长辈发讯息、登记装修、确认维修，每个动作都以代办人的名字记进屋历；按「以 Adam 的身份使用」开始示范，页面顶部会出现代办横幅）；**下载我的资料**（PDPA：一个 JSON 档包含这户的资料、讯息、不满、照片纪录、保修单和屋历，其他住户只显示门牌） |
-| 信任 | Safeguards | 设计时想到的 14 类风险（含 AI 翻译与建议），每项列出原型已做（Built）和试点要做（Pilot）的措施，并能跳到对应功能 |
+## Built for SDP
 
-**演示工具**：顶栏的角色卡清楚写出每个人是谁（装修户、隔壁邻居、对面、楼上、楼下）；「Both sides」开分屏，左右两边同时看 Aiman 和 Siti，中间是一道「共用墙」；右上角「导览」有中英文功能说明和可以一键跳转的演示路线。
+- **It starts where SDP already is.** The join code goes into the handover welcome pack. The estate office's front desk issues codes, prints paper notices and registers a renovation for an owner who prefers paper.
+- **Step one changes nothing in the SDP App.** A one-time code, Keynection in the phone's browser (add to Home Screen), alerts on the WhatsApp everyone already has. Step two, after a pilot, is a module inside the SDP App with the owner's existing sign-in: SDP's own stated direction towards an integrated digital platform (Integrated Annual Report 2025).
+- **Counts flow into SDP's own tools.** The command view is named after PACC, SDP's Performance Analytics and Command Centre, and shows counts only, never who talks to whom. Warranty tickets export as a punch list for Procore, SDP's defect system, and the Procore number is written back to the owner's home log.
+- **Measured with a question SDP did not invent.** The Impact model starts from the census figure for the township's state and asks the same question at handover and six months later, so a pilot compares directly with the national numbers. Every other line is labelled Assumption or Pilot target, with its formula shown.
+- **Pilot mode is built, not promised.** `KEYNECTION_DEMO_MODE=0` turns the same build into a pilot: passkey sign-in with the server deciding identity on every request, CSV import of a real phase, push notifications, PDPA retention and deletion, daily backups, a one-click Render blueprint and a guide for SDP's IT team.
 
-## 怎么运行
+![Impact model: the census question is the main measure; the cost lines below it are labelled assumptions SDP can change](docs/images/impact-model-census.png)
 
-需要 Python 3.12 以上和 Node.js 20 以上。
+For scale (17 Oct 2026): 17 screens, 103 API endpoints, 3 interface languages plus Tamil, three research reports (4, 10 and 16 Oct), and automated tests plus the front-end build on every push (layers and counts in [`docs/testing-overview.md`](docs/testing-overview.md)).
 
-### 最简单：双击一键启动
+## Beyond the main story
 
-| 档案 | 用在 | 做什么 |
-|---|---|---|
-| `start-demo.bat` | Windows，演示、彩排 | 双击就好。第一次会自动装好全部套件（要几分钟），之后每次只需约 10 秒。自动打开 http://localhost:8000 ，前后端同一个窗口、同一个端口。演示时窗口不要关，关掉就停止。如果 8000 端口已被占（通常是上一个演示窗口还开着），它会直接说明是哪个进程、怎么关，而不是报一长串错误 |
-| `start-demo.sh` | macOS / Linux | 同上，在终端执行 `./start-demo.sh` |
-| 两者加 `--lan`（或先设 `KEYNECTION_LAN=1`） | 彩排 | 同时开放给同一个 Wi-Fi 的手机，并印出手机要打开的网址（例 http://192.168.1.5:8000 ）。本机演示没有密码，只在可信的网络用；Windows 第一次会问要不要让 Python 通过防火墙 |
-| `start-dev.bat` | 改代码时 | 开两个窗口：后端（改 Python 自动重载）和前端（改画面即时更新），打开 http://localhost:5173 。要先跑过一次 `start-demo.bat` |
+The demo opens on the six screens of the judge route. The Guide's *Show every feature* switch reveals the rest, one line each here:
 
-不想自动开浏览器：先设环境变量 `KEYNECTION_NO_BROWSER=1`。所有设定名称和用途列在 `.env.example`（服务器直接读环境变量，不读这个档；有测试保证它和代码一致）。
+- **Home log**: one SHA-256 chain per home (handover, notices, passes, photos, cases, decisions, repairs, owner confirmations); only the app's own steps can write to it; "Chain checked" means the server re-computed the chain and found no silent edit.
+- **Me**: reading language, quiet mode, easy mode, blocked list, up to two family helpers, *Download my data* (PDPA: one JSON file, other residents shown as unit numbers only), close the account.
+- **Layers 2 and 3**: the same lorong or block shows unit numbers only, contact by request with a reason (three a day, no repeat after a decline); the whole phase has no directory and no group, only the read-only Estate Office account.
+- **Chats beyond text**: waves, reactions, voice notes up to a minute (deleted after 30 days), a tone check that refuses insults outright (a word list in English, Malay and Chinese, plus the AI's own judgement when it is on), report to SDP's safety team, silent block, phone numbers exchanged only when both agree.
+- **SDP command view**: five desks (warranty with the 30-day clock, estate concerns, safety reports, notices to a lorong, a block or the phase, front desk) and counts such as next-door pairs who know each other and days from handover to the first hello.
+- **Phase setup**: turn a site plan (lorongs, homes per row, blocks, floors, units per floor) into every circle and notice range with the app's own rules; a thousand homes in about 20 ms, nothing stored.
+- **Safeguards**: 14 risks (privacy and PDPA, harassment, false evidence, wrong automated judgement, slow repairs, contractor misuse, AI translation…), each measure marked Built or Pilot and linked to its screen.
+- **Under the hood**: photos re-encoded with GPS, camera and time stripped; uploads checked by content, size and pixel count; least-privilege views; security headers; the whole site behind a three-language password page online; fonts, icons and QR generation bundled, so the demo runs with no network.
+- **Switched off on purpose**: contractor QR passes and the guardhouse scan, built and tested; they manage workers, not neighbours.
 
-### 手动启动（开发者用）
+## What is real and what is simulated
 
-后端（第一次要先建虚拟环境）：
+The full table, feature by feature, is [`docs/feature-status.md`](docs/feature-status.md). In short:
+
+- **Live** (real logic and real data in the demo): the five homes from the site plan in three layers; wave, hello, one-to-one chat, quick replies pre-translated into English, Malay, Chinese and Tamil; the renovation notice with *who is told* decided by the type of work; noisy hours planned around private quiet times by plain rules; sealed pre-work photos and the follow-up comparison (OpenCV alignment and a darkening rule, **not machine learning**); triage by time order with people deciding; the warranty clock under the Housing Development Act (24 months, 30 days), closed only by the owner; one hash chain per home; the Impact model on real census figures; command-view counts; pilot mode.
+- **Live with a key**: one sentence → notice fields (approvals are never filled by AI); typed words delivered in the reader's language with a calmer wording offered when heated.
+- **Simulated, and labelled on screen**: the WhatsApp phone and the SDP App phone on the Channels page, the scheduled reminders in the demo, the CIDB registration check, the Procore ticket number in the demo, the guardhouse scan.
+- **Switched off in the demo**: contractor QR passes.
+
+## Run it
+
+Python 3.12 or newer and Node.js 20 or newer.
+
+| How | What happens |
+|---|---|
+| **Windows, one click**: double-click `start-demo.bat` | First run installs everything (a few minutes); after that about 10 seconds. Opens http://localhost:8000 with the back end and the built front end on one port. Keep the window open. |
+| **macOS / Linux**: `./start-demo.sh` | Same. |
+| **Rehearsal on phones**: add `--lan`, or set `KEYNECTION_LAN=1` | Also opens the demo to phones on the same Wi-Fi and prints the address to type. No password locally, so trusted networks only. |
+| **Development**: `start-dev.bat` | Back end with auto-reload on 8000 and the front end with hot reload on http://localhost:5173 . Run `start-demo.bat` once first. |
+
+Manual start (use `.venv/bin/python` on macOS and Linux):
 
 ```bash
-cd prototype/backend
+cd backend
 python -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt
 .venv/Scripts/python -m uvicorn app.main:app --port 8000
 ```
 
-前端（另开一个终端）：
-
 ```bash
-cd prototype/frontend
+cd frontend
 npm install
-npm run dev
+npm run dev        # http://localhost:5173
 ```
 
-打开 http://localhost:5173 。电脑上是网页版：左边是导航，右边是「导览」面板（中文/英文切换，说明这一页的功能，并列出可以一键跳转的演示路线）；窗口窄于 1240 像素时导览改成按右上角按钮滑出；窄于 900 像素（手机）时改为全屏加底部导航。服务器默认只在本机开放，同一 Wi-Fi 里的其他人连不进来。
-
-测试（332 个，2026-10-17 跑过全部通过）：
+Server tests (each test gets its own database; the AI is always a stand-in, so no test reaches Anthropic or Google):
 
 ```bash
-cd prototype/backend
+cd backend
 .venv/Scripts/python -m pytest -q
 ```
 
-测试的数字只在 `docs/testing-overview.md` 写一次（五层：自动测试、前端编译、浏览器自动走路线、人工测试计划、真机），其他地方引用那一页。人工核对照 `docs/test-plan.md`（K00–K23）；浏览器自动走完评审路线并截图在 `e2e/`（见 `e2e/README.md`）。
+Every setting is listed with its purpose in `.env.example` (the server reads environment variables, not that file; a test keeps the two in step). The ones that matter:
 
-重新生成示范照片（一般不需要）：
-
-```bash
-cd prototype/backend
-.venv/Scripts/python scripts/make_demo_photos.py
-```
-
-### 放上网（给评审一个网址）
-
-一个容器同时跑后端和打包好的网页（`Dockerfile`）。不用 Vercel：它没有能长期保存的硬盘（SQLite 和照片会消失），也不能跑语音自动删除这种背景工作。
-
-**现在放在 Render 免费版**：https://keynection.onrender.com （DuoCode 的 Render 工作区，新加坡）。旧网址 jiran5.onrender.com 已经停用：2026年10月12日删除，它从来没有发给团队以外的人。
-
-- 设定：Language 选 Docker、Branch 选 `main`、Instance Type 选 Free、Health Check Path 填 `/api/health`、Auto-Deploy 是 On Commit（推送到 `main` 就自动重新部署，约 2 分钟）
-- 环境变量 **`KEYNECTION_SITE_PASSWORD`**（演示版一定要设）：打开网址会先看到我们自己的三语密码页（中、英、马来文，只有一个密码框，任何浏览器和 app 里的内建浏览器都能用）。输对后这个浏览器记住 30 天；改密码等于让所有人重新输入。演示版没有登入（靠顶栏切换角色），不设的话任何拿到网址的人都能重置示范、上传档案。试点模式不用设，见下面「试点模式」
-- 环境变量 **`ANTHROPIC_API_KEY`**（要 AI 才设）：打开翻译和一句话写装修通知；不设也能跑，只是没有 AI（见上面「AI（Claude）」）
-- 免费版的限制：15 分钟没人用就睡着，下一次打开要等约 1 分钟（演示前几分钟先打开一次）；没有永久硬盘，睡着或重新部署后资料回到示范初始状态（评审上传的照片会消失）；只有 0.1 CPU，照片比对比本机慢几秒
-- 想要不睡、资料保留：Render 改成付费方案（约 7 美元/月）加一个挂在 `/data` 的硬盘
-
-**也可以用 Railway**（`railway.json` 已经写好）：建 service、加一个挂在 `/data` 的 Volume、设 `KEYNECTION_SITE_PASSWORD`，在 `prototype` 资料夹执行 `railway up`（直接上传本机代码，不需要连 GitHub）。Railway 的试用期过了要付费方案。
-
-`/api/health` 给主机检查用，不需要密码，回传 ok（在 Render 上还写出正在跑的分支和版本）。`KEYNECTION_DEMO_MODE` 在容器里默认是 `1`（评审要能重置示范）。网站对搜索引擎标了 noindex。密码不要写进代码或聊天群组，私下给评审。
-
-### 试点模式（给真的住户用）
-
-演示版（评审用）一切照旧。给真住户用时设 **`KEYNECTION_DEMO_MODE=0`**，就变成试点模式：
-
-- **没有密码，也没有简讯**：每个人用手机本身的「数字钥匙」（passkey，就是手机的指纹、刷脸或萤幕锁）登入，之后由服务器决定「你是谁」，每个接口都检查。改请求里的门牌号读不到、也做不了别人家的事（测试逐个接口检查）
-- **交屋**：职员在柜台发加入码（二维码，印进欢迎礼包）→ 屋主扫码、选名字和语言、同意隐私声明 → 建立数字钥匙。之后打开 Keynection 按「用我的数字钥匙登入」。界面自动用屋主选的语言
-- **换手机或手机丢了**：屋主到物业办公室，职员核对身份证后在柜台发「补发码」（一星期内用一次）。用了之后，这一户所有旧钥匙和已登入的手机全部作废
-- **从空的开始，导入真实名单**：试点资料库一开始没有任何小区（不会建出虚构的 Taman Demo）。职员在「新 phase 设定 → Import SDP's handover list」上传 SDP 的交屋名单（CSV，一户一行；Excel 选「CSV UTF-8」）。系统先逐行检查、算出每一户的邻里圈，有任何一行错就不能存：门牌代号重复、同一个位置放了两户、日期不存在、缺街名或楼层等，都标出第几行。电话、电邮、身份证这些栏位故意不导入（屋主加入时自己给）。可以再导入同一个小区来加新的屋子、改还没加入的屋子；已经加入的住户位置不会被改。卡片上有「Template」可下载范本，栏位说明也在卡片里
-- **名称跟着资料走**：小区名、街名、座号、物业办公室名都来自名单（例如「Taman Contoh Phase 2 物业办公室」），公告可以发给整个小区、某一条街或某一座
-- **欢迎礼包卡**：柜台「Welcome packs」一次印出所有还没加入的屋子（或某段交屋日期）的卡片：门牌、街名、屋主名、二维码、三语说明。每个码只能用一次，有效到该户交屋后两星期；重新印会让之前印的码失效
-- **资料不会被清空**：演示版换新版本时会重建示范资料；试点版只会「加」新的表和栏位，遇到可能丢资料的改动就停下来、什么都不改（有测试）
-- **真的通知（手机推送）**：住户在「我」页面（或邻居页最上面的提示）开启通知后，装修通知、讯息、维修进度会传到手机，没打开 app 也收得到。Android 用 Chrome 直接可以；iPhone 要先「分享 → 添加到主屏幕」（iOS 16.4 以上），再从主屏幕打开（这是苹果的规定）。职员在柜台开启，收到：被检举的讯息、转交物业的问题、新的保修单。规则：只发开启之后发生的事；聊天提醒不含内容；安静模式不发聊天提醒；晚上 10 点到早上 7 点不响（正式通知等到早上，聊天提醒只留在 app 里）；换手机补发码、登出都会让那支手机的通知停止。通知经过 Google 或 Apple 的推送服务，但内容加密，他们读不到；只接受这几家推送服务的地址，别人不能借服务器发到别处
-- **WhatsApp**：要用 SDP 自己的 WhatsApp Business 帐号，而且每种通知都要先给 Meta 审核。可以直接提交的模板清单在 `docs/whatsapp-templates.md`（四种语言，由程式从 app 的通知文字自动产生）。接上之前，同样的提醒用手机通知发送；还需要：屋主自己提供手机号码（同意 + 一次性码验证）、SDP 的帐号金钥
-- **隐私法（PDPA）承诺照做**（隐私声明版本 `pilot-2026-10b`，把保存期限写清楚了）：
-  - **保存多久**：语音 30 天；讯息、照片和纪录保存到那一户保修期（交屋后 24 个月）结束后一年，之后才产生的保存一年；两户共有的纪录照较晚的那一户；还在处理中的（没关的保修单、在物业手上的问题、还没审的检举）处理完才算；屋历跟着房子。服务器每天自动删除到期的资料（`backend/app/privacy.py`）
-  - **更正**：住户在「我」页面改邻居看到的名字（和加入时一样的检查）
-  - **关闭帐户**：住户在「我」页面输入自己的门牌确认后关闭，或屋主到柜台、职员核对身份证后代关（记在职员名下）。删除：名字、讯息、照片、家人代办、钥匙、通知、SDP 名单上的屋主名。保留到期满、只显示门牌：装修通知、问题、案件、保修单、被检举还没审的讯息。屋历跟着房子。之后这一户可以用新的加入码重新加入（例如卖了房子）
-  - **备份**：试点模式每天自动备份资料库，并同步照片和比对图，放在资料旁的 `backups` 资料夹（可用 `KEYNECTION_BACKUP_DIR` 改位置），只留 14 天，所以删掉的资料两星期内也会从备份消失。备份和资料在同一个硬盘：要另外每天把 `backups` 复制到服务器以外的地方（第 5 步）。还原：停服务器，把某一天的 `keynection-日期.db` 复制成 `app.db`，再把 `backups/photos`、`backups/compare` 复制回资料夹
-- **正式部署**：给 SDP IT 的英文指南在 `docs/pilot-deployment.md`；`render.yaml` 是 Render 一键部署（Blueprint）：开一个跟评审演示版完全分开的试点服务，新加坡、5 GB 永久硬盘、新版本要按 Deploy 才更新。主机没有命令行也能开第一位职员：设 `KEYNECTION_FIRST_STAFF="名字"`，启动时服务器纪录会出现一次性登入链接（还没人登入前，每次重启都换新的）。启动时纪录会逐条列出还缺什么（网址没设、误设共用密码、没职员、没导入小区、没备份），职员后台的「Pilot health」卡片也看得到，另外显示最近一次备份、加入户数、开了通知的手机数
-- **保修单交给 Procore**：后台「Warranty」页的「To Procore」：一键下载压缩档（缺陷清单 `punch-list.csv` + 每张单的缺陷照、开工前照、修理照 + 说明）。栏位用 Procore 缺陷清单导入的名称（Item Name、Location、Assigned To、Due Date 用 MM/DD/YYYY、Priority），期限照房屋发展法 30 天算；只写门牌不写住户名字。Procore 要求不能改它的模板，所以说明里写明：把各栏复制进自己项目下载的导入模板。下载过的会标记，下次「只下载新的」。在 Procore 建好后，把 Procore 编号填回每张单，屋主的屋历会出现「已登记在 SDP 的缺陷系统」。试点不会编造编号（演示版照旧显示模拟的 PC-编号）。要直接用 Procore 的接口自动同步，需要 SDP 提供 Procore 的公司、项目编号和接口授权
-- **职员**：另外登入，只看得到 SDP 后台三页（后台、新 phase 设定、影响估算），不能以住户身份做事，也不能用别人的名字签纪录。第一位职员在服务器上建立（网页上不能建职员）：
-
-  ```bash
-  python scripts/add_staff.py "Farah Aziz" --role estate --site https://你的网址
-  ```
-
-  它印出一次性码和链接（一星期内用一次）；用那个链接登入后建自己的钥匙。之后职员在「柜台 → Add a colleague」加同事。在容器里是 `python backend/scripts/add_staff.py ...`
-- **要设的环境变量**：`KEYNECTION_DEMO_MODE=0`；`KEYNECTION_ORIGIN=https://你的网址`（钥匙绑定这个网址，假网站用不了；不设就跟着请求里的网址）；`KEYNECTION_SITE_PASSWORD` 不要设（住户不需要共用密码）；`KEYNECTION_PUSH_CONTACT`（选填，例如 `mailto:estate@你的网域`：推送服务联络这个服务器的方式，不设就用 `KEYNECTION_ORIGIN`）
-- **本机试**：数字钥匙只在 `https` 或 `localhost` 上能用（`127.0.0.1` 不行）。Windows 可以这样开一个独立的试点资料库：`set KEYNECTION_DB_PATH=%TEMP%\keynection-pilot\app.db` 和 `set KEYNECTION_DEMO_MODE=0`，再照「手动启动」在同一个终端跑后端，前端照常，打开 http://localhost:5173
-- **还要 SDP 的**：真的开一个试点服务（决定网址、付主机费）；WhatsApp 商业帐号；若要和 Procore 自动同步，Procore 的接口授权
-
-## 3 分钟评审路线
-
-导览最上面就是这条路线，点一步会自动跳到对应画面和住户。网上演示版是所有评审共用一个资料库：演示模式下没人用 20 分钟（`KEYNECTION_DEMO_IDLE_MINUTES` 可改）就自动回到示范资料的起点；挥手「今天已打过」在演示里只算 5 分钟，打招呼、装修通知、挥手的每日上限放宽 10 倍——这样前一位评审做过的事不会挡住后一位。试点模式（`KEYNECTION_DEMO_MODE=0`）完全不受影响：不会自动重置，上限照旧。导览的语言跟浏览器走：中文浏览器显示中文，其余（评审、SDP）显示英文，右上角可以切换，切过会记住；顶栏的按钮名称跟介面语言走（Guide / Panduan / 导览）。只走主线：
-
-1. **交钥匙那天**：Aiman（No. 12）首页就是左右和对面 5 户邻居 → 对 Siti 按「👋 Wave」
-2. **装修通知就是自我介绍**：Works →「Register renovation」→ 在「Just say it in one sentence」打一句（例：Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5；或按框下的英文、马来文、华文示例句，一点就填）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 →「When」那一步系统已按邻居作息排好（避开 Siti 宝宝午睡 13–15 点、Hafiz 夜班补眠 9–11 点，不说是谁）→ 检查后发送（还没加入的 No. 23 由物业送纸本）
-3. **隔壁 Kumar（No. 13）读淡米尔文**：触达管道里看到他在 WhatsApp 收到的是淡米尔文装修通知，连 Aiman 写的工程说明也由 AI 翻好；下面还有两条会自己发出的提醒（开工前 3 天提醒拍照、完工后一天问有没有变化）
-4. 按「Both sides」（左 Aiman、右 Siti）→ Siti 打开 Aiman 的通知，看到「吵闹时段已避开你的安静时间」，宝宝午睡不用她开口 → 回 👋 → 再用马来文打一句冲的话（例：Rumah awak bising macam kilang! Tak reti hormat jiran ke?）→ AI 先给她平和的说法 → Aiman 看到英文，原文点一下就有
-
-没开 AI 时第 2、4 步照样能走：装修通知逐步填，打的字照原文送（导览最上面会写 AI 有没有开）。
-5. **万一出事**：Siti 按 Use sample → Sample crack → 系统说明裂缝开工前就有，属于保修，不是装修造成
-6. **SDP 怎么检查效果**：影响估算用 2020 年普查同一题，试点前后一比就知道；后台还会算隔壁互相认识的比例
-
-## 完整演示路线（约 7 分钟）
-
-先在导览底部按「显示全部功能」，这条路线会走到收起来的页面。
-
-彩排前先到 SDP 页底部按 Reset demo data。右上角「导览」里有同样的路线，点一步就会自动跳过去。
-
-1. **Neighbours**，Aiman（No. 12）：看顶部头像和邻居卡片 → 对 Siti 按「👋 Wave」→ 到 **Works** 右上角「Register renovation」→ 选 Extension → 图上标出谁会被通知 → 填完发送；回到 Neighbours 切「Map」，No. 12 和它的共用墙变成橙色斜线
-   - 再点 No. 15（第 2 层）→「Request to connect」→ 换成 Nurul（No. 15）接受：之前只看到「Resident of No. 12」，接受后才看到名字
-   - （公寓，可选）Sofia（A-15-3）→ Works →「Register renovation」→ 浴室 → 剖面图显示楼下两层也被通知，A-13-3 名字隐藏
-2. 按 **Both sides** 开分屏（左 Aiman、右 Siti）→ 两边都切到 **Chats**
-3. Siti：Wave back → 按快捷回复"宝宝午睡"→ 左边 Aiman 看到英文翻译
-4. Siti：**Raise a concern** → 晚上施工 → 发送；Aiman 回复；Siti 升级给 SDP 物业团队
-5. 左边切到 **SDP → Estate**：提醒 Aiman 遵守屋规 → 结案（两边对话都看得到）
-6. （可选）Siti 打一句辱骂的话，展示语气检查
-7. Siti：**照片与维修**（手机底栏叫 Photos，或首页顶端"X 天后开工，先拍照"）→ Use sample → Sample crack → 系统说明这道裂缝在开工前就拍到，不可能是装修造成，建议报保修 → 选 Building defect → Record decision（选项不会预先勾选）
-   - （可选，展示公平）改选"装修造成"→ 送给 Aiman 确认 → 换成 Aiman：证据页顶端 ANSWER NEEDED → 不同意（要写原因）→ 换回 Siti：只剩请检查员、报保修或不处理
-8. **SDP → Warranty**：看 30 天法定时钟（下方提醒要另送书面通知）→ Sample: poor patch → Siti 驳回 → Sample: proper repair → Siti Accept
-9. **Log**：不满、升级、提出／不同意／定案、保修、维修、屋主确认全部在链上，显示 CHAIN CHECKED（服务器检查；试点加外部时间戳）
-10. 最后打开 **Safeguards**：每个风险怎么处理，一页讲完
-
-## 路演时要注意的创新点（根据证据调研）
-
-- **第二层不是新东西**：CIDB 的"Hak Jiran"指南已要求通知邻居、限定施工时段；VYROX 等物业系统已有承包商时效通行证和非时段警报。第二层只当"配套"，不要当卖点。
-- **真正的差异在**：邻居一侧的开工前存证、"装修造成 vs 建筑瑕疵"的分流、维修后拿开工前照片自动核对、只有屋主能关闭、按《房屋发展法》计时、整条屋历链，以及「先邻居、后物业」的不满升级阶梯。调研没找到马来西亚有产品同时做到这些。
-- **法律依据要讲准**：附表 G（有地）和 H（分层）规定交屋后 24 个月保修期、收到书面通知后 30 天内修好；修不好屋主还可以找购屋者索偿仲裁庭（Tribunal for Homebuyer Claims）。路演前请队员再核对一次条文。
-- **准证要对得上 2026年4月1日起的全国装修指南**（房屋及地方政府部通告 2026年第3号）：登记第 4 步按工程类型说明这类工程通常是免准证、要装修准证（草图、在线申请、最多 14 天）还是要建筑图则加竣工合格证，并附通告链接；屋主选「不需要」而工程类型通常要准证时会提醒；复查页「未填写」会写「通常需要准证」。准证状态仍由屋主自己填，系统不替他决定。
-- 证据以有地房为主（21 宗对 5 宗分层），公寓"楼上装修导致楼下漏水"的公开案例很少，路演时不要夸大。
-
-## 安全与稳定（已做的）
-
-- **照片隐私**：上传照片一律重新编码，去掉 GPS、相机型号、拍摄时间和 JPEG 注释（有测试验证）
-- **上传检查**：只接受真正能解码的 JPEG/PNG/WebP（含部分手机的多帧 JPEG，即 MPO，只取第一张）；超过 12 MB 或像素过多直接拒绝；防"解压炸弹"；没带长度的分段上传也是边收边数，超过上限立即拒收
-- **存储**：照片用随机 ID 命名，ID 格式不对一律 404，防止路径穿越；对比图网址带照片 ID，不会显示到别的案件的旧图
-- **通行证**：QR 里是 32 位随机令牌，服务器只存它的 SHA-256 指纹，资料库外泄也做不出能用的通行证；令牌只在发出时显示一次；每项装修最多 3 张有效通行证；屋主可撤销
-- **最少权限**：承包商视图不含屋主电话、邻居姓名、任何照片、其他住户；有测试逐项检查
-- **权限规则**：只有装修户能发/撤通行证；只有收到通知的邻居能挂照片、提出不满；只能拿自己的照片报案；只有收件人能检举；只有提出不满的人能升级；**SDP 只能提交维修，不能关闭保修单，只有屋主能**；状态机防止重复提交或重复决定。**注意**：演示模式相信请求里自报的门牌号（为了切换角色）；试点模式由登入决定身份，这些规则才是真正的保护
-- **公平的判定**：开工前就拍到的变化不会算到装修头上；"装修造成"要装修户同意才定案，不同意之后不能来回拉锯，只能请检查员；住户不能记录"检查员判定"；跟进照片不能早于开工前照片；每一步写进双方屋历，并以"Keynection"（不是 SDP）的名义通知对方
-- **邻里隐私**：没有住户名册，圈外只看门牌；第 2 层联系要先请求、写原因、对方接受，每天 3 次、被拒不能再发；非演示模式下住户清单完全不含名字；物业只看得到邻居主动升级的不满，私下处理中的看不到
-- **装修通知范围**：按工程类型计算，装修户不能删掉任何人；装修期最长一年、日期必须真实存在；装修连结只在完工后 30 天内开放聊天；结构工程没有批准（有地房的 PBT 准证、公寓的 JMB/MC）后端也会拒收；准证和 CIDB 不再预先填好
-- **沟通安全**：语气检查挡掉明显辱骂；文字、快捷回复、语音共用每位邻居每天 30 则的上限；语音档要真的是音档（检查档头），被拒时不留档案；打招呼也遵守封锁和安静模式、做语气和联系方式检查、每天最多 3 次（装修通知可以写承包商电话，符合 CIDB Hak Jiran 指南）；封锁是静默的；警告只有发送者看得到；电话号码双方同意才交换
-- **AI 的界线**：只送正在写的文字；翻译一律标明、原文一点就有，纪录留原文；平和说法只是建议，辱骂仍然挡下；装修通知的批准和 CIDB 不让 AI 填，不合规则的回答丢回给屋主；结构化输出（固定栏位）而不是自由文字；用户的话当成资料，不当指令；每户每天调用上限；没有回应就照旧，不会卡住（有测试）
-- **屋历**：只有 app 自己的步骤能写入（拿掉了可以任意写入的通用端点）；写入前先拿资料库写锁，加上唯一索引，同时写入也不会分叉
-- **输入限制**：讯息、装修内容、时段、备注都有长度和格式限制；结束日期和时段不能颠倒
-- **CORS** 只允许本机前端；回应加上 nosniff、禁止嵌入、noindex 等安全标头
-- **放上网时整站加密码**：设了 `KEYNECTION_SITE_PASSWORD` 后，所有页面、图片、接口都要先过我们自己的三语密码页（比对用固定时间比较，输错稍微延迟），只有给主机检查用的 `/api/health` 例外；本机不设就和原来一样。浏览器只保存密码的加密指纹（HttpOnly，网页程序读不到；HTTPS 下标 Secure），不是密码本身；改密码就全部失效。网页标了「每次都问服务器」，旧的缓存不能绕过密码；登入过期时 app 自动跳回密码页，不会停在空白画面（有测试和浏览器验证）
-- **演示与职员功能**：设 `KEYNECTION_DEMO_MODE=0` 时，重置、示范照片、模拟扫码时间完全关闭；所有 SDP 后台功能（物业、审核、公告、保修队列、提交维修、后台数据、WhatsApp 预览、加入码、柜台）要职员登入才能用；都在检查请求内容之前就拒绝
-- **数字钥匙登入（试点模式）**：用手机的通行密钥（passkey），服务器只存公钥；钥匙绑定网址，假网站拿不到；一次性码（职员第一次登入、补发码）只存指纹、用一次、一星期过期；登入凭证放在网页程序读不到的 cookie（HttpOnly），30 天；室内照片只有自家、职员和同一案件的另一方看得到（有测试和浏览器验证）
-- **不依赖外网**：字体、图标、QR 生成都打包在本地，演示现场断网也能跑
-- **不卡**：照片对比约 0.2 秒；启动时预热 OpenCV；拖动滑杆、数字动画都不重新渲染整页；前端打包约 640 KB（gzip 后约 200 KB，大部分是多语字串和插画），还没做分包
-- **版本锁定**：后端依赖版本全部固定；资料表结构变了会自动重建示范资料
-
-## 还不是正式产品的地方（路演时要老实说）
-
-- **登入只在试点模式**：演示模式（评审用）仍然靠顶栏切换角色，相信请求里写的门牌号，所以网上演示版只能放示范资料，不能放真实住户资料。试点模式已经有数字钥匙登入；还没做：家人代办用自己的钥匙、职员细分权限（例如只看保修）、给住户看的登入纪录
-- **屋历还不是独立证据**：同一台服务器保存又检查，能抓到偷偷改旧纪录，抓不到整串重算或删掉最新一笔。试点要给屋主每笔的签章收据、每天把指纹盖外部时间戳，并能导出符合《证据法》第 90A 条的证书
-- **照片只能证明"上传时间"，不能证明"拍摄时间"**：旧照片可以冒充开工前照片。试点要改成只能用 app 内相机拍，并让装修户确认开工前照片
-- **分流规则只看时间先后**，不懂工程；时间只能排除可能性，不能证明原因，最终要靠检查员
-- **只拍一张共用墙不够**：实际受影响的还有天花板、地板、围墙、排水；试点要按工程类型给拍照清单
-- **检举者其实推得出来**：只有收件人能检举，所以发送者知道是谁。试点要重新设计
-- **加入码就等于身份**：欢迎礼包里的码谁拿到谁就能以这一户加入（加入后才建钥匙），所以礼包要亲手交给屋主；**承包商 QR 码可以转借**（同一个码可多人同时用）
-- **演示模式默认开启**（评审要能切换角色、重置）：给真住户用一定要设 `KEYNECTION_DEMO_MODE=0`
-- **公寓的装修批准**：分层法规第 27 条要求公寓任何装修都要管理机构批准。目前只强制结构工程；非结构工程要不要强制，团队要决定（强制的话，未批准的装修就不会通知邻居）
-- **法定通知**：保修时钟从开单起算，但法律的 30 天从 SDP 收到书面通知（亲手或挂号信）起算。画面会提醒屋主另送通知；试点可以自动产生通知信，或请 SDP 书面同意 app 开单算数
-- **PDPA**：到期删除、更正名字、关闭帐户、14 天备份已经照隐私声明做（见「试点模式」）。还要：WhatsApp（Meta）是跨境处理，接上时要写进声明；邻里关系数据、儿童资料要做资料保护影响评估（DPIA）；淡米尔文的新声明要请母语者看过
-- 快捷回复是预先翻译好的；自己打的字要开了 AI 才会翻译。AI 翻译和「太冲」的判断都可能出错（尤其是马来西亚式的混合语言），所以永远标明是 AI、原文一点就有、建议只是建议；马来文和淡米尔文的翻译质量要请母语者抽查
-- AI 送到 Anthropic（马来西亚境外）处理：隐私声明有写，但试点要签资料处理协议，或改用 SDP 自己云端供应商上的 Claude，并做资料保护影响评估
-- 网上演示版用 Gemini 免费版：Google 会用送进去的内容改进产品，所以只能放虚构资料（程式已限制只在演示模式用，声明也写明）
-- 示范网上版每户每天 40 次 AI 调用的上限记在服务器记忆体里，重启就归零；正式版要放进资料库
-- 还没接翻译的：「提出不满」的备注、SDP 物业公告（照原文显示）
-- 安静时间是住户自己说的，系统没法核实；所以有上限（每户 2 段、每天 3 小时），屋主每天至少保留 4 小时，而且只是「尽量避开」
-- 第 4 步显示的国家指南类别是按四种工程类型概括的（通告附表原文以面积是否超过 6.5 平方米、是否动到结构来分），只是提示，不是法律意见；各地方政府落实指南的进度和表格可能不同，试点前要向乡镇所在的地方政府核对
-- 地方政府允许的施工时段各地不同（MBPJ、MBSA、MPKj 等），原型统一用星期一到六 9–6 点；公共假期还不认得。试点要按乡镇所在的地方政府设定
-- 「两边同时施工」的提醒会让屋主知道附近另有工程的结束日期（不知道是哪一户）；示范接受这一点，试点可以只说「建议晚一点开工」
-- 自动提醒只显示在 WhatsApp 示意图里（WhatsApp 本来就是模拟的），正式版要接 WhatsApp Business 的模板讯息
-- AI 用 `claude-opus-5-5`，质量最好但每则聊天要等几秒；放上真金钥后要实测，太慢就把 `KEYNECTION_AI_MODEL` 换成 `claude-haiku-5-5`
-- 语音讯息 30 天后自动删除，后端每小时检查一次（启动和打开聊天时也会检查）；被检举、还没审核的会保留给物业团队，但最多 90 天
-- 家人代办在演示里是一键切换；正式版代办人要用自己的数字钥匙登入
-- 示范资料的日期都从「今天」算：交屋日是 14 天前、物业公告是接下来几天、登记装修默认下星期开工，所以哪天彩排或评审都不会出现过期日期
-- 自我介绍和代办人名字不能放电话号码、电邮或链接（避免绕过「双方同意才交换号码」）；代办人名字不能像 SDP、物业或警察
-- 「下载我的资料」和后台播放检举语音会把整户资料或录音交出去，所以试点模式下只给登入的本户（下载）和登入的职员（检举语音）
-- 选了 BM 或中文时，SDP 后台页面顶部会说明「正式纪录统一用英文」；快捷回复按钮停留时会显示对方收到的翻译
-- SDP 物业发的公告是人写的，只有原文；要多语，得由物业写三种语言或接翻译服务
-- 演示时顶栏的语言切换只换介面；快捷回复和通知照每户在「我」页面设定的阅读语言（例如 Siti 是马来文）。正式版这两个应该合并成一个设定
-- 加入码、物业柜台、纸本通知这些职员工具，试点模式下要职员登入才能用
-- 加入后，邻居看到的是住户自己选的名字；SDP 销售纪录上的名字只用来预先填好加入表格，不会给邻居看
-- 影响估算的数字全部是假设；新 phase 设定还不处理半独立式、店屋和不规则地段（由物业人工确认）
-- 语气检查的底线（一定挡下的辱骂）只是一份简单词表；AI 的「太冲先劝」只是建议，试点还需要人工审核
-- 「24 小时后才能升级」在演示模式下关掉了，方便现场展示（`KEYNECTION_DEMO_MODE=0` 时生效）
-- 演示版里 WhatsApp、CIDB 注册检查、Procore 编号、门卫扫码都是模拟的；试点版的 Procore 编号由 SDP 职员填真的，WhatsApp 等 SDP 的帐号，CIDB 检查和门卫扫码仍未接真系统
-- 演示时通行证令牌暂存在浏览器分页里（关分页就清掉）；正式版会通过 WhatsApp 链接只发给承包商
-- 真实墙面通常很素，自动对齐需要画面里有墙角、插座、开关等固定物；对不齐时系统会请用户重拍，不会乱判
-- 变化检测只找"变暗"的区域（裂缝、水渍、污痕），不判断原因；强烈的阴影可能被误标成裂缝，变亮的变化（例如墙面泛白）会漏掉。路演请说"电脑视觉比对"，不要说"AI 扫描"
-
-## 交件附录与测试证据
-
-2026年10月17日加的，给评审（SDP 数码团队）看的附录，英文主体、开头附中文摘要，都在 `docs/`。顺序就是附录的顺序：
-
-| 档案 | 一句话 |
+| Setting | Effect |
 |---|---|
-| [`docs/judging-criteria-map.md`](docs/judging-criteria-map.md) | 评审六项标准 × 权重 × 原型哪一页回答 × 评审路线第几步 × 证据档案 × 还缺什么；也是路演讲稿的骨架 |
-| [`docs/feature-status.md`](docs/feature-status.md) | 每个功能是真做、有金钥才开、模拟（画面上怎么标）、试点才开、收起来、还是没做 |
-| [`docs/technical-summary.md`](docs/technical-summary.md) | 架构一张图、四个状态机（不满阶梯、案件决定、保修单、联系请求）、权限表、资料去向、前十条已知限制和试点怎么补 |
-| [`docs/key-decisions.md`](docs/key-decisions.md) | 17 条关键决定：决定、理由、放弃了什么 |
-| [`docs/testing-overview.md`](docs/testing-overview.md) | 测试金字塔五层；332 个测试按「保护什么」分组；老实列出还没测到的 |
-| [`docs/test-plan.md`](docs/test-plan.md) | 人工测试计划：K00–K15 评审路线、K16–K21 安全边界、K22–K23 没开 AI 与共用演示重置；编号和真机核对表一致 |
-| [`docs/glossary.md`](docs/glossary.md) | 统一用语，中英对照：投影片、访谈、导览、画面都照这一页 |
+| `ANTHROPIC_API_KEY` | Turns on the two AI features with Claude, the design choice. Without it, with no network, or when the AI does not answer in time, the same screens work by hand. |
+| `GEMINI_API_KEY` | The same two features on Google's Gemini free tier, **demo mode only**: the free tier may use inputs to improve Google's products, so pilot mode ignores it. |
+| `KEYNECTION_SITE_PASSWORD` | Puts the whole site behind a three-language password page (the online demo has it set). |
+| `KEYNECTION_DEMO_MODE=0` | **Pilot mode**, described under "Built for SDP". Guide for SDP's IT team: [`docs/pilot-deployment.md`](docs/pilot-deployment.md); one-click Render blueprint: `render.yaml`. |
 
-证据档案在团队资料夹（不在这个仓库里）：`evidence/dosm_neighbour_interaction_2020.md`（普查）、`evidence/neighbour_renovation_disputes_summary.md`（纠纷案例）、`evidence/sdp_app_reviews_summary.md`（App 评论）、`evidence/device-check/`（真机核对表，队员用手机填）、`evidence/route-screenshots/`（`e2e/` 自动走路线产生的 17 张截图）。
+Deployment is one container (`Dockerfile`) serving the back end and the built front end; `/api/health` is the host's check and needs no password.
 
-## 结构
+## Submission appendix
+
+Written for SDP's digital team, in English with a Chinese summary at the top of each page, in this order:
+
+| File | One line |
+|---|---|
+| [`docs/judging-criteria-map.md`](docs/judging-criteria-map.md) | The six criteria × weights × which screen answers each × which route step × evidence × what is still missing; all figures, written once |
+| [`docs/feature-status.md`](docs/feature-status.md) | Every feature: live, live with a key, simulated (and how the screen says so), pilot-only, switched off, not built |
+| [`docs/technical-summary.md`](docs/technical-summary.md) | Architecture, four state machines, who may see and do what, where data goes, top ten limitations |
+| [`docs/key-decisions.md`](docs/key-decisions.md) | 17 decisions: the choice, the reason, what was given up |
+| [`docs/testing-overview.md`](docs/testing-overview.md) | Five test layers and the numbers (written once, here) |
+| [`docs/test-plan.md`](docs/test-plan.md) | The manual plan: K00–K15 judge route, K16–K21 boundaries, K22–K23 AI off and shared-demo reset |
+| [`docs/glossary.md`](docs/glossary.md) | One name per thing, English and Chinese |
+
+Evidence files (census table, dispute cases, app reviews, real-device check, route screenshots) live in the team folder, not in this repository. The route screenshots, and the three above, are produced by [`e2e/`](e2e/README.md).
+
+## What it is not yet
+
+The honest list judges should hear from us first. The top ten with the pilot fix for each are in [`docs/technical-summary.md`](docs/technical-summary.md), section 5; the full list is in the team notes.
+
+- **Demo mode trusts the unit number in a request**, so judges can switch roles. Only pilot mode signs people in, so the online demo holds fictional data only.
+- **The home log is checked by the server that keeps it.** It catches a silent edit to an old entry, not a full recompute or dropping the newest one. Pilot: signed receipts to the owner and a daily outside timestamp.
+- **A photo proves upload time, not capture time.** Pilot: in-app camera only, and the renovating owner confirms the pre-work photo.
+- **Triage looks at time order only.** Time can rule causes out, not prove them; an inspector decides.
+- **Tamil is AI-assisted translation** not yet reviewed by a native speaker. AI translation and the calmer wording can be wrong, especially with mixed Malaysian usage, so they are always labelled and the original is one tap away.
+- **Real alerts are not yet proven on a deployed pilot.** WhatsApp needs SDP's own WhatsApp Business account and Meta-approved templates (ready in [`docs/whatsapp-templates.md`](docs/whatsapp-templates.md)); until then the same reminders go as push notifications, verified in a local browser and by tests, not yet on a pilot server.
+
+## Repository layout
 
 ```
-.github/workflows/ci.yml 每次推送自动跑后端测试和前端编译（见 docs/testing-overview.md）
-docs/                    给 SDP IT 的部署指南、WhatsApp 模板；交件附录七份（见上一节）
-e2e/                     浏览器自动走完评审路线并截图（Playwright，独立端口 8031、替身 AI；见 e2e/README.md）
-start-demo.bat / .sh     一键演示（同一个端口 8000）
-start-dev.bat            开发模式（8000 + 5173）
-Dockerfile               放上网用：建好网页，再用同一个端口跑后端
-railway.json             Railway 的建置与健康检查设定
-backend/
-  app/ledger.py          屋历哈希链：计算与验证
-  app/vision.py          照片安全处理、质量检查、前后对齐与变化检测
-  app/triage.py          建议规则（只给建议，不下结论）
-  app/seed.py            虚构的示意 phase（排屋 12 户、公寓 11–16 楼 24 户，含每户语言；交屋日和公告日期从今天算）
-  app/neighbours.py      三层邻居、按工程类型的通知范围
-  app/planner.py         新 phase 设定：从布局算出每户邻里圈和通知范围（只读、有上限）
-  app/talk.py            快捷回复的三语翻译、语气检查、不满类别、联系方式与冒充检查、WhatsApp 通知模板
-  app/quiet.py           安静时间：按邻居作息排吵闹时段、两边同时施工、通知是否避开、反映时间对照约定（纯规则）
-  app/ai.py              Claude：一句话变成装修通知栏位、按读者语言翻译、太冲时给平和说法；没有金钥或没回应就照旧
-  app/demo_photos/       程序画出来的示范照片（含好/差两种维修）
-  app/db.py              SQLite 资料表与写入屋历
-  app/main.py            FastAPI 接口与安全设置（四层、聊天、不满、审核、保修时钟都在这里）
-  scripts/make_demo_photos.py
-  scripts/ai_standin_server.py  验证用：用替身 AI 开服务器（端口由参数决定），不用金钥就能在浏览器看 AI 画面，答案都标 [stand-in]；`.claude/launch.json` 的 keynection-ai-standin 就是用它
-  tests/                 332 个测试（test_quiet.py 按邻居作息排时段、屋主保留至少 4 小时、只在法定时段内排、安静时间保密且有上限、通知写明是否避开且发出后不改写、两边同时施工与建议开工日、自动提醒的时间、噪音反映对照约定、后台数字；test_ai.py 一句话写通知、不合规则的回答被丢掉、按读者语言翻译讯息和通知（WhatsApp、纸本也是）、太冲先劝、辱骂仍挡、AI 没回应照旧、每户每天上限、只送文字不送名字，全部用替身不连真的 AI，另外走官方套件但把网络换掉，检查送出的格式、备用选项被拒时自动改问、断网和被拒都照旧；test_keynection.py 新名字、淡米尔文的快捷回复与通知、按读者语言写日期和施工时段；test_site_gate.py 网上版三语密码页、记住 30 天、改密码全部失效、页面不被缓存绕过、健康检查不用密码、noindex；test_codes.py 屋规、门卫判定、聊天自动通知与列表预览都附代码；test_decisions.py 谁能决定什么：提出、同意、不同意、检查员；test_staff_gating.py 关掉演示模式时后台全部关闭、不能任意写屋历；test_hello_safety.py 打招呼的封锁、安静模式、语气、联系方式、次数，装修日期与批准、装修连结期限；test_triage.py 时间判断与理由代码；test_ledger.py 同时写入不分叉；test_talk.py 聊天、不满、审核、时钟、物业只看升级的不满；test_rings.py 三层邻居、通知范围、联系请求、公告；test_social.py Wave、表情、语音、个人资料、官方帐号；test_care.py 语音 30 天删除、家人代办、下载我的资料、邻里关系数据、联系方式与冒充检查、以今天计算的示范日期；test_join.py 交屋加入、纸本通知、物业代登记、简易模式隐私、WhatsApp 通知、新 phase 设定）
-frontend/src/
-  App.tsx                外框：导航（跟着页面性格变）、图框、语言切换、角色卡、Both sides 分屏、代办横幅、手机版底栏
-  i18n.tsx               住户页面的英文、马来文、中文字典与语言切换
-  helper.tsx             家人代办的状态（谁正在替哪一户操作）
-  guide.ts               导览面板的中英文内容（每页功能说明、演示路线）
-  ui.tsx                 共用元件（卡片、徽章、环形仪表、数字动画、底部弹窗等）
-  components/ErrorBoundary.tsx  白屏保险：某一页渲染出错时显示三语「这一页出了点问题」和「重新载入」，纪录都在服务器不会丢（不是功能，是保险）
-  components/Compare.tsx 前后对比滑杆、扫描动画、HUD 框
-  components/Guide.tsx   导览面板
-  components/PlanMap.tsx 平面图与楼层剖面图（三层邻居、共用墙、楼板、施工斜线、通知范围预览）
-  screens/IntroWizard.tsx、RenovationWizard.tsx  自我介绍与登记装修的分步骤流程
-  screens/MeView.tsx     个人页与隐私设定（家人代办、简易模式、WhatsApp 通知、下载我的资料）
-  screens/JoinView.tsx   交屋加入：加入码、名字与语言、隐私声明同意
-  screens/PlannerView.tsx、ImpactView.tsx、ChannelsView.tsx  新 phase 设定、影响估算、触达管道
-  components/FrontDesk.tsx、PaperNotice.tsx  物业柜台与列印用的纸本通知
-  components/QuietTimes.tsx  「你的安静时间」卡片（只有自己看得到）
-  components/Cast.tsx    演示角色卡
-  components/ConcernCard.tsx    不满卡片与升级阶梯
-  components/WarrantyClock.tsx  《房屋发展法》保修时钟
-  screens/               Circle、Chats、Works、Evidence、Case、Repair、Log、SDP、Safeguards
-  messages.ts            讯息模板
+backend/app/        FastAPI + SQLite. neighbours.py (three layers, who is told), quiet.py (noisy hours),
+                    ai.py (Claude / Gemini, stand-in in tests), vision.py (OpenCV), triage.py, ledger.py (hash chain),
+                    talk.py (quick replies, tone, notice templates), planner.py, phase_import.py, auth.py (passkeys),
+                    push.py, privacy.py, backup.py, seed.py (the fictional phase), main.py (endpoints, security headers)
+backend/tests/      pytest, AI always a stand-in
+frontend/src/       React + TypeScript. App.tsx, i18n.tsx (EN / BM / 中), guide.ts (both routes), screens/, components/
+e2e/                Playwright walks in a real browser: the judge route with a screenshot per step, and more (e2e/README.md)
+docs/               the appendix above, the pilot guide, WhatsApp templates, images/, and the team's full notes (Chinese)
+.github/workflows/  tests and the front-end build on every push
+Dockerfile · render.yaml · railway.json · start-demo.bat / .sh · start-dev.bat · .env.example
 ```
 
-## 接下来可以做的
+## AI use and provenance
 
-**2026年10月10日起功能冻结**：只做减法、修错，以及访谈发现的问题。主办方说"什么都想解决，最后什么都解决不了"；原型里大部分功能是同一个方案从不同角度回答评审的问题（安全、包容、推广、成本），所以保留，但路演只讲主线。
+This code was written with the help of Claude (Anthropic), declared under clause 13 of the competition terms. At run time the prototype uses Claude by design and Google's Gemini free tier on the online demo; both appear in the AI-use disclosure and in the privacy notice residents accept. Only the text being written is sent to an AI service, never the directory, unit numbers or who talks to whom. This is a fresh codebase for the hackathon; it contains no code from any team member's earlier projects.
 
-- [x] 淡米尔文讯息模板（快捷回复、WhatsApp 通知、纸本通知、隐私声明、自我介绍模板）
-- [ ] 请以淡米尔语为母语的人检查淡米尔文；介面也补上淡米尔文
-- [x] AI 两项（一句话写装修通知；打的字用对方语言收到、太冲先劝），功能冻结只为这两项开例外
-- [x] 先算好，不用吵：吵闹时段按邻居作息自动排、两边同时施工提醒、自动提醒、噪音反映对照约定（功能冻结的第二个例外，2026年10月10日用户决定）
-- [ ] 放上真的 `ANTHROPIC_API_KEY` 后，用真 AI 走一次评审路线，看翻译和「太冲」判断的实际表现
-- ~~后台补上平均解决天数~~（功能冻结，不做）
-- ~~承包商和门卫各自的画面~~（通行证已收起，不做）
-- [x] 英文提案初稿（Innovation Canvas，在 Claude Docs 里，队友一起改）
-- [ ] 路演稿与 3 分钟演示视频
+## Team notes
 
-**试点准备**（2026年10月10日用户决定：要做到 SDP 明天就能直接用；演示版不受影响）
-
-- [x] 第 1 步：数字钥匙登入（住户和职员分开）、服务器决定身份、每个接口检查、换手机补发码
-- [x] 第 2 步：导入真实 phase（CSV），试点不再建示范小区，一次印好整个 phase 的加入码；试点资料不会因为升级被清空
-- [x] 第 3 步：真的通知（手机推送，住户和职员；WhatsApp 模板清单已备好，等 SDP 的商业帐号）
-- [x] 第 4 步：PDPA 承诺（到期删除、更正名字、关闭帐户、每天备份留 14 天；隐私声明写清楚保存期限）
-- [x] 第 5 步：正式部署（Render 一键部署设定、给 SDP IT 的部署指南、主机没命令行也能开第一位职员、启动自我检查、职员看得到的试点健康卡片）
-- [x] 第 6 步：保修单交给 SDP 的缺陷系统（Procore）：一键下载缺陷清单和照片、填回 Procore 编号、试点不编造编号；屋历也认得试点新增的纪录（数字钥匙、补发码、关闭帐户、Procore 登记）
-
-## 比赛规则相关
-
-- **AI 披露**：这份代码由 Claude（Anthropic 的 AI）协助编写。依比赛条款第 13 条，提交时要在 AI 使用披露里写明。原型本身运行时也用 AI（翻译、太冲先劝、一句话写装修通知）：设计上用 Claude，网上演示版用 Google 的 Gemini 免费版，披露里两个都要写。之后队员用到的 AI 工具也要记进 AI 使用日志。
-- **知识产权**：参赛作品归主办方所有，所以这是全新的代码库，不要放进任何队员原有项目的代码。
-- **仓库要设成私有**（Private），避免被其他参赛队看到。
-
-## Git
-
-这个资料夹已经是本机 git 仓库（分支 `main`），还没有连到任何线上仓库。`.gitignore` 已排除虚拟环境、node_modules、打包结果和演示资料库，只会提交源代码和示范照片。
-
-放上 GitHub 时：先在 GitHub 建一个 **Private** 仓库（不要勾"加 README"），然后：
-
-```bash
-git remote add origin https://github.com/<你们的帐号>/<仓库名>.git
-git push -u origin main
-```
-
-每位队员第一次提交前，先在这个资料夹设好自己的名字和邮箱：
-
-```bash
-git config user.name "你的名字"
-git config user.email "你的邮箱"
-```
+The full Chinese write-up (design, pilot mode, security list, every known limitation, structure, to-do, git) is [`docs/团队说明.md`](docs/团队说明.md).

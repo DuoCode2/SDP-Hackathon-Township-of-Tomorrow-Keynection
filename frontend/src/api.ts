@@ -903,7 +903,8 @@ export const api = {
   officialRead: (unitId: string) => request(`/api/units/${unitId}/official/read`, { method: 'POST' }),
   conversations: (unitId: string) => request<Conversation[]>(`/api/units/${unitId}/conversations`),
   thread: (unitId: string, otherId: string) => request<Thread>(`/api/units/${unitId}/conversations/${otherId}`),
-  markRead: (unitId: string, otherId: string) => request(`/api/units/${unitId}/conversations/${otherId}/read`, { method: 'POST' }),
+  /** Marks the other side's messages read; `marked` is how many were newly read (0 when nothing changed). */
+  markRead: (unitId: string, otherId: string) => request<{ ok: boolean; marked: number }>(`/api/units/${unitId}/conversations/${otherId}/read`, { method: 'POST' }),
   aiStatus: () => request<AiStatus>('/api/ai'),
   authMe: () => request<AuthMe>('/api/auth/me'),
   signinOptions: () => request<KeyCeremony<PublicKeyCredentialRequestOptionsJSON>>('/api/auth/signin/options', { method: 'POST' }),

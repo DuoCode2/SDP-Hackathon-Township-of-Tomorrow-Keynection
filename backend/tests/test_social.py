@@ -153,3 +153,17 @@ def test_estate_office_account_is_read_only_with_unread_count(client):
     assert client.get("/api/units/A-14-3/official").json()["unread"] == 0
     client.post("/api/notices", json={"audience": "block:A", "title": "Lift servicing", "body": "Lift B off on Monday."})
     assert client.get("/api/units/A-14-3/official").json()["unread"] == 1
+
+
+def test_marking_a_thread_read_says_how_many_messages_it_marked(client):
+    """The sender's screen shows one tick until the other side opens the thread, then two. Opening the thread marks
+    the messages read and says how many it marked, so the sender's screen is refreshed once (when something was
+    actually read) and not on every open."""
+    assert client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "Hi Siti"}).status_code == 201
+    mine = [m for m in client.get("/api/units/T-12/conversations/T-11").json()["items"] if m.get("type") == "message"]
+    assert mine[-1]["read_at"] is None  # sent, not read
+    first = client.post("/api/units/T-11/conversations/T-12/read").json()
+    assert first == {"ok": True, "marked": 1}
+    assert client.post("/api/units/T-11/conversations/T-12/read").json() == {"ok": True, "marked": 0}  # nothing new
+    mine = [m for m in client.get("/api/units/T-12/conversations/T-11").json()["items"] if m.get("type") == "message"]
+    assert mine[-1]["read_at"] is not None  # two ticks on Aiman's side

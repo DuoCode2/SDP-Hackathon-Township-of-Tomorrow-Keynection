@@ -1469,17 +1469,19 @@ def thread(unit_id: str, other_id: str, conn: sqlite3.Connection = Depends(get_c
 
 
 @app.post("/api/units/{unit_id}/conversations/{other_id}/read")
-def mark_read(unit_id: str, other_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, bool]:
+def mark_read(unit_id: str, other_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Opening a thread marks what the other side sent as read. `marked` says how many messages that was, so the
+    sender's screen (one tick → two) is refreshed only when something was actually read, never on every open."""
     _require_neighbours(conn, unit_id, other_id)
-    conn.execute(
+    marked = conn.execute(
         "UPDATE messages SET read_at = ? WHERE to_unit_id = ? AND read_at IS NULL"
         " AND (from_unit_id = ? OR (kind = 'system' AND thread_with = ?))",
         (db.now(), unit_id, other_id, other_id),
-    )
+    ).rowcount
     conn.execute("UPDATE waves SET seen_at = ? WHERE to_unit_id = ? AND from_unit_id = ? AND seen_at IS NULL",
                  (db.now(), unit_id, other_id))
     conn.commit()
-    return {"ok": True}
+    return {"ok": True, "marked": marked}
 
 
 @app.post("/api/messages", status_code=201)
@@ -1499,7 +1501,8 @@ def send_message(body: MessageIn, conn: sqlite3.Connection = Depends(get_conn)) 
         # One look by Claude: the reader's translation, and a calmer wording if it sounds heated.
         check = ai.check_message(body.from_unit_id, text, reader_lang) if ai.enabled() else None
         calmer = {"suggestion": check.calmer} if check and check.heated and check.calmer else {}
-        if talk.tone_problem(text):  # insults are never sent, whatever Claude says
+        # Insults are never sent: the word list first, then Claude's own judgement of abuse in any language.
+        if talk.tone_problem(text) or (check is not None and check.insult):
             raise HTTPException(422, {"code": "tone", "message": TONE_MESSAGE, **calmer})
         if calmer and not body.keep_tone:
             raise HTTPException(422, {"code": "calmer", "message": CALMER_MESSAGE, **calmer})

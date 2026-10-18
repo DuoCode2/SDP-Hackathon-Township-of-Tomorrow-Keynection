@@ -78,7 +78,7 @@ Also: reports `open → warned | dismissed`; paper notices `to_print → printed
 | **Estate team (staff)** | Escalated concerns, notices it sent, the front desk, counts | Remind, close an escalated concern, send notices, issue join codes, print and log paper notices, register a renovation on paper | Read private chats; close a warranty ticket; see non-escalated concerns |
 | **Warranty / safety staff** | Tickets; reported messages (and a reported voice note) | Submit a repair; warn a sender or dismiss a report; export to Procore | Close a ticket; see who reported |
 | **Contractor pass (switched off)** | Works dates and hours | Show the QR at the guardhouse | See the owner's phone, neighbours' names, photos |
-| **AI service** | The text being written (and a name or unit only if the writer typed it) | Return structured fields: notice draft, translation, calmer wording | See the directory, who writes to whom, or decide anything |
+| **AI service** | The text being written (and a name or unit only if the writer typed it) | Return structured fields: notice draft, translation, calmer wording, whether a message is abuse | See the directory or who writes to whom; its one decision, that a message is abuse, stops that message and nothing else |
 
 In the demo the household's identity is the unit number in the request (so judges can switch roles); in a pilot it is the passkey session, checked on every household endpoint (`test_signin.py`).
 
@@ -104,7 +104,7 @@ In the demo the household's identity is the unit number in the request (so judge
 | 4 | Triage looks at time order only | It can rule a cause out, not prove one | An SDP inspector role records the finding |
 | 5 | One shared-wall photo is not enough | Ceilings, floors, fences and drains are affected too | A photo checklist per type of work |
 | 6 | The council's working hours vary by local authority; public holidays are not known | The prototype uses Mon–Sat 9–6 everywhere | Set per township; a holiday calendar |
-| 7 | AI translation and the "heated" judgement can be wrong, especially in mixed Malaysian speech | Every translation is marked, the original is one tap away, the calmer wording is only a suggestion | A native speaker's review; a data-processing agreement or Claude on SDP's own cloud |
+| 7 | AI translation and the "heated" judgement can be wrong, especially in mixed Malaysian speech | Every translation is marked, the original is one tap away, the calmer wording is only a suggestion; only an insult is refused outright, and the word list catches the obvious ones with no AI at all | A native speaker's review; a data-processing agreement or Claude on SDP's own cloud |
 | 8 | WhatsApp, the CIDB check, the demo's Procore number and the guardhouse scan are simulated | Labelled on screen | SDP's WhatsApp Business account; CIDB's registry; Procore API access |
 | 9 | Tamil was written with AI help | The fourth reading language needs a human check | A native speaker before the pilot |
 | 10 | Push notifications are built but unverified on a real phone | Needs a deployed pilot with its own address | First week of the pilot |

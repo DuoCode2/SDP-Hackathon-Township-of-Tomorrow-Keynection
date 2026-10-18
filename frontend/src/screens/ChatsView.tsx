@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  ArrowLeft, BadgeCheck, Ban, Building2, CalendarCheck, CalendarX, Car, CircleHelp, Flag, Hammer, Hand, HardHat, House, Languages, Lock, Megaphone,
+  ArrowLeft, BadgeCheck, Ban, Building2, CalendarCheck, CalendarX, Car, Check, CheckCheck, CircleHelp, Flag, Hammer, Hand, HardHat, House, Languages, Lock, Megaphone,
   MessageSquareWarning, Mic, MicOff, MoreHorizontal, Pause, Phone, PhoneCall, Play, SendHorizontal, ShieldCheck, Smile, Sparkles, Trash2,
   TriangleAlert, Volume2, X,
 } from 'lucide-react'
@@ -230,7 +230,9 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
     api.thread(me.id, other).then((x) => {
       if (!live) return
       setT(x)
-      api.markRead(me.id, other).then(onRead).catch(() => {})
+      // Something was just read: tell the app, so the sender's pane (in the split view) turns its tick into two.
+      // A second pass marks nothing, so this never loops.
+      api.markRead(me.id, other).then((r) => { onRead(); if (r.marked > 0) onChange() }).catch(() => {})
     })
     return () => {
       live = false
@@ -308,7 +310,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
           <b>{n.resident_name} <i>· {n.label}</i></b>
           <small><Languages size={11} /> {tr('thread.reads', { lang: langName(tr, n.lang) })} · {tr(`rel.${n.relation}`)}</small>
         </div>
-        <button className="icon-btn wave-btn" onClick={waveAt} disabled={wavedToday || t.blocked} title={wavedToday ? tr('thread.wavedToday') : tr('thread.waveAt', { name: n.resident_name })}>👋</button>
+        <button className="icon-btn wave-btn" onClick={waveAt} disabled={wavedToday || t.blocked} aria-label={wavedToday ? tr('thread.wavedToday') : tr('btn.wave')} title={wavedToday ? tr('thread.wavedToday') : tr('thread.waveAt', { name: n.resident_name })}>👋</button>
         {t.contact === 'mutual' ? (
           <span className="contact-ok"><PhoneCall size={13} /> {tr('thread.numbersShared')}</span>
         ) : t.contact === 'requested_by_me' ? (
@@ -379,6 +381,11 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
                     )}
                     {item.sent_by && <span className="msg-by">{tr('thread.sentBy', { who: byWho(tr, item.sent_by) })}</span>}
                     <span>{dates.time(new Date(item.created_at))}</span>
+                    {mine && (
+                      <span className={`msg-ticks ${item.read_at ? 'read' : ''}`} role="img" aria-label={tr(item.read_at ? 'msg.read' : 'msg.sent')} title={tr(item.read_at ? 'msg.read' : 'msg.sent')}>
+                        {item.read_at ? <CheckCheck size={12} /> : <Check size={12} />}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {counts.length > 0 && (

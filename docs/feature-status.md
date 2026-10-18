@@ -16,13 +16,13 @@
 | Feature | Status | On screen | To go live in a pilot |
 |---|---|---|---|
 | Five homes beside and opposite, from the site plan (terrace and apartment), three layers | Live | Neighbours, Map | — |
-| 👋 Wave, hello (Introduce yourself), one-to-one chat, reactions, voice notes | Live | Neighbours, Chats | — |
+| 👋 Wave, hello (Introduce yourself), one-to-one chat with sent/read ticks, reactions, voice notes | Live | Neighbours, Chats | — |
 | Quick replies pre-translated into English, Malay, Chinese, Tamil | Live | Chats | Native speaker's review of Tamil |
 | Renovation notice: type of work → who is told (not the owner's choice) → hours → approvals → review | Live | Works → Register renovation | — |
 | Noisy hours planned around neighbours' private quiet times; two-sided works warning | Live (plain rules, no AI) | Step 3 "When"; Neighbours → Your quiet times | — |
 | One sentence → notice fields (type of work, dates, hours, contractor), approvals never filled by AI | Live with a key | Step 1 "Just say it in one sentence" | A key on the server; a data-processing agreement for a pilot |
 | Typed words arrive in the reader's language; calmer wording offered when heated | Live with a key | Chats, notices; "Translated by AI" | Same |
-| Obvious insults refused (word list) | Live | Chats | — |
+| Insults refused outright, no "send anyway": a word list in English, Malay and Chinese, and with a key the AI's own judgement of abuse in any language | Live; the AI part with a key | Chats | Same |
 | Pre-work photo sealed (fingerprint, metadata stripped); follow-up aligned and compared; change boxed | Live (computer vision: OpenCV alignment and a darkening rule, not machine learning) | Photos & repairs | In-app camera only, so a gallery photo can't pass as new |
 | Triage suggestion by time order; decision by people, nothing pre-selected | Live | Photos & repairs → case | A real inspector role |
 | Warranty ticket with the HDA clock (24 months, 30 days); only the owner closes | Live | Photos & repairs; SDP → Warranty | Written-notice step agreed with SDP |
