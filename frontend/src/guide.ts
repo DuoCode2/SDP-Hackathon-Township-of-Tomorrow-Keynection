@@ -26,6 +26,10 @@ export const UI: Record<string, Text> = {
     zh: '只走主线：交钥匙 → 认识左右和对面 5 户 → 装修通知就是自我介绍 → 万一出事有公平记录 → SDP 怎么检查效果',
     en: 'The main story only: keys → meet the five homes beside and opposite → the renovation notice is the introduction → a fair record if something goes wrong → how SDP checks it works',
   },
+  whoseScreen: {
+    zh: '顶栏右边的「演示角色」卡可以换成任何一户，看对方收到什么、用什么语言。SDP 后台要先打开下面的「显示全部功能」，然后是菜单第 07 项。',
+    en: 'The "Demo cast" card at the right of the top bar switches to any household, to see what they receive and in which language. For SDP’s command view, switch on "Show every feature" below; it is then menu item 07.',
+  },
   sharedDemo: {
     zh: '这是大家共用的演示：没人用 20 分钟后会自动回到起点。如果某一步显示「今天已做过」，到 SDP 页底按「Reset demo data」。',
     en: 'This demo is shared: after 20 quiet minutes it starts over by itself. If a step says it was already done today, press "Reset demo data" at the bottom of the SDP page.',

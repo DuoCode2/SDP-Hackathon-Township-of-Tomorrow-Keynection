@@ -52,6 +52,7 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, show
 
           <div className="section-label">{UI.judgeRoute[lang]}</div>
           <p className="guide-hint">{UI.judgeHint[lang]}</p>
+          <p className="guide-hint">{UI.whoseScreen[lang]}</p>
           <p className="guide-hint">{UI.sharedDemo[lang]}</p>
           <p className="guide-hint">{UI.previewNote[lang]}</p>
           {ai && (
