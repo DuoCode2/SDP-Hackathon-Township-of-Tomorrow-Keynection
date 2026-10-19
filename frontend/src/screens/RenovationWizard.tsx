@@ -55,7 +55,7 @@ const WORKS: { id: WorksType; icon: typeof Bath }[] = [
 ]
 
 /** Register a renovation. Who gets the notice is worked out from the plan, not chosen by the owner. */
-export default function RenovationWizard({ open, onClose, me, units, names, onSent, estate }: {
+export default function RenovationWizard({ open, onClose, me, units, names, onSent, estate, preset }: {
   open: boolean
   onClose: () => void
   me: UnitInfo
@@ -64,6 +64,8 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   onSent: () => void
   /** Set when the estate office registers the renovation for an owner who signed the paper form. */
   estate?: { staff: string }
+  /** Demo quick example: start filled in with the bathroom story (the English example), on the When step. */
+  preset?: 'bathroom'
 }) {
   const t = useT()
   const dates = useDates()
@@ -175,6 +177,14 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
     setFilled(null)
     setAiNote(t('ai.reno.example'))
   }
+
+  // The quick example: the same local preset as the English example, then straight to the planned hours. No AI either way.
+  useEffect(() => {
+    if (open && preset === 'bathroom') {
+      applyPreset(EXAMPLES[0].preset)
+      setStep(2)
+    }
+  }, [open, preset])
 
   /** The owner's one sentence fills in the steps; whatever AI left empty keeps what was there. Nothing is sent. */
   async function fillIn(text?: string) {

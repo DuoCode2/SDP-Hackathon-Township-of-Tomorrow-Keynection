@@ -732,6 +732,7 @@ const D: Record<string, Entry> = {
   'wk.pill.noisy': ['Noisy work allowed now', 'Kerja bising dibenarkan sekarang', '现在允许吵闹施工'],
   'wk.pill.quiet': ['No noisy work now', 'Tiada kerja bising sekarang', '现在不能吵闹施工'],
   'wk.register': ['Register renovation', 'Daftar ubah suai', '登记装修'],
+  'wk.quickExample': ['Quick example', 'Contoh pantas', '快速示例'],
   'wk.tab.schedule': ['Schedule', 'Jadual', '时间表'], 'wk.tab.passes': ['Contractor passes', 'Pas kontraktor', '承包商通行证'],
   'wk.next4': ['Next 4 weeks', '4 minggu akan datang', '未来 4 星期'],
   'wk.next4.sub': ['Sundays are shaded: no renovation work allowed', 'Hari Ahad berlorek: tiada kerja ubah suai dibenarkan', '灰色是星期日：不能施工'],
