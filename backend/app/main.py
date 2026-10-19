@@ -2985,12 +2985,19 @@ def home_history(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> 
     return {"unit_id": unit_id, "events": events, "chain_ok": ok, "first_bad_index": bad_index}
 
 
+class DemoResetIn(BaseModel):
+    confirm: bool = False  # the button asks first; a bare POST (a stray click, a crawler) wipes nothing
+
+
 @app.post("/api/demo/reset")
-def reset_demo(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
+def reset_demo(body: DemoResetIn | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
     """Wipe and re-seed the fictional demo data (for rehearsals). Disabled when KEYNECTION_DEMO_MODE=0."""
     if not demo_mode():
         raise HTTPException(403, "demo mode is off")
-    _reset_demo_data(conn)
+    if not (body and body.confirm):
+        raise HTTPException(400, "Send {\"confirm\": true} to reset the demo data.")
+    with _idle_lock:  # one rebuild at a time: two judges pressing it, or this and the quiet-spell one
+        _reset_demo_data(conn)
     return {"status": "reset"}
 
 

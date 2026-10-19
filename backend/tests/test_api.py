@@ -49,7 +49,9 @@ def test_home_history_starts_with_handover_and_records_renovation(client):
 
 def test_reset_wipes_demo_activity(client):
     client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi"})
-    assert client.post("/api/demo/reset").status_code == 200
+    assert client.post("/api/demo/reset").status_code == 400  # a bare POST wipes nothing: the button asks first
+    assert client.post("/api/demo/reset", json={"confirm": False}).status_code == 400
+    assert client.post("/api/demo/reset", json={"confirm": True}).status_code == 200
     d = client.get("/api/dashboard").json()
     assert d["intros_sent"] == 0 and d["households"] == 36 and d["home_histories_verified"] == 36
 

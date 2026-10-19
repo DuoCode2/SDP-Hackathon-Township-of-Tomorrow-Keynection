@@ -206,7 +206,7 @@ def test_image_urls_differ_when_case_numbers_restart_after_reset(client):
             "reporter_unit_id": "T-11", "baseline_photo_id": b["id"], "followup_photo_id": f["id"]}).json()
 
     first = make_case("wall_before", "wall_after_crack")
-    client.post("/api/demo/reset")
+    client.post("/api/demo/reset", json={"confirm": True})
     second = make_case("ceiling_before", "ceiling_after_stain")
     assert first["id"] == second["id"] == 1
     assert first["images"]["overlay"] != second["images"]["overlay"]
@@ -215,6 +215,6 @@ def test_image_urls_differ_when_case_numbers_restart_after_reset(client):
 def test_reset_removes_photos_and_cases(client):
     intro_id = _renovation_by_12(client)
     _demo(client, "T-11", "wall_before", "baseline", intro_id)
-    client.post("/api/demo/reset")
+    client.post("/api/demo/reset", json={"confirm": True})
     d = client.get("/api/dashboard").json()
     assert d["baseline_photos"] == 0 and d["incidents"] == 0 and d["intros_sent"] == 0

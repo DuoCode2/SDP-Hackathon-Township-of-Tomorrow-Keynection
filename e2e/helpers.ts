@@ -51,6 +51,6 @@ export function watchErrors(page: Page): string[] {
 
 /** Back to the fictional phase as seeded, so a spec never depends on what another spec did. */
 export async function resetDemo(page: Page) {
-  const r = await page.request.post('/api/demo/reset')
+  const r = await page.request.post('/api/demo/reset', { data: { confirm: true } })
   expect(r.ok(), 'POST /api/demo/reset').toBeTruthy()
 }

@@ -943,7 +943,7 @@ export const api = {
     request<Concern>(`/api/concerns/${id}/estate`, json('POST', { action, note })),
   reports: () => request<ModerationReport[]>('/api/moderation/reports'),
   reviewReport: (id: number, outcome: 'warned' | 'dismissed') => request(`/api/reports/${id}/review`, json('POST', { outcome })),
-  resetDemo: () => request('/api/demo/reset', { method: 'POST' }),
+  resetDemo: () => request('/api/demo/reset', json('POST', { confirm: true })),  // the screen asks first
   issueJoinCode: (unitId: string) => request<{ token: string; expires_at: string }>(`/api/units/${unitId}/join-code`, { method: 'POST' }),
   joinLookup: (token: string) => request<JoinInfo>('/api/join/lookup', json('POST', { token })),
   join: (body: { token: string; display_name: string; lang: Lang; consent: boolean; whatsapp_alerts: boolean; easy_mode: boolean }) =>

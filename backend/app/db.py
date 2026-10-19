@@ -347,9 +347,13 @@ def now() -> str:
 
 def connect(path: str) -> sqlite3.Connection:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path, check_same_thread=False)
+    conn = sqlite3.connect(path, timeout=15, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    # Readers don't wait for a writer, and a writer waits its turn instead of failing with "database is locked"
+    # (two judges in the shared demo at once). backup.py copies with SQLite's online backup, which reads the WAL too.
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 15000")
     return conn
 
 
