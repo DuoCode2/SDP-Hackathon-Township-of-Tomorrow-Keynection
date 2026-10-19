@@ -57,9 +57,8 @@ test('every button on the judge route has a name, on a desktop and on a phone', 
   found.push(...(await unnamed(page, 'renovation form, step 1')))
   await page.keyboard.press('Escape')
 
-  await judgeStep(page, 4) // Siti's chats
-  await page.locator('main').locator('button.chat-row', { hasText: 'Aiman' }).click()
-  await expect(page.locator('textarea.compose-input')).toBeVisible()
+  await judgeStep(page, 4) // both sides, Siti's pane already on Aiman's thread
+  await expect(page.getByLabel('Pane 2').locator('textarea.compose-input')).toBeVisible()
   found.push(...(await unnamed(page, 'chat thread desktop')))
   await closeGuide(page)
   await page.setViewportSize(PHONE)
@@ -67,8 +66,7 @@ test('every button on the judge route has a name, on a desktop and on a phone', 
   found.push(...(await unnamed(page, 'chat thread phone')))
 
   await page.setViewportSize(DESKTOP)
-  await page.locator('button.split-btn').click()
-  await expect(page.getByLabel('Pane 2')).toBeVisible()
+  await expect(page.getByLabel('Pane 2')).toBeVisible() // step 4 opened the split view itself
   found.push(...(await unnamed(page, 'split view')))
   await page.locator('button.split-btn').click()
 
