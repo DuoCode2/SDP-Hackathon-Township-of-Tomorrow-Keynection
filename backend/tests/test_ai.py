@@ -382,7 +382,7 @@ def test_which_service_answers(monkeypatch):
         monkeypatch.delenv(name, raising=False)
     assert ai.provider() is None and ai.status() == {"on": False, "model": None, "provider": None}
     monkeypatch.setenv("GEMINI_API_KEY", "test-not-a-real-key")
-    assert ai.provider() == "gemini" and ai.model_name() == "gemini-3.8-flash"
+    assert ai.provider() == "gemini" and ai.model_name() == "gemini-3.5-flash"
     monkeypatch.setenv("KEYNECTION_GEMINI_MODEL", "gemini-3.6-flash")
     assert ai.status() == {"on": True, "model": "gemini-3.6-flash", "provider": "gemini"}
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-not-a-real-key")
@@ -424,7 +424,7 @@ def test_the_request_gemini_receives(monkeypatch):
     seen = []
     _gemini_sdk(monkeypatch, lambda request: seen.append(request) or _gemini_reply(ANSWER))
     assert ai.check_message("T-12", "Good morning, Gemini!", "ms").translation == "Selamat pagi!"
-    assert seen[0].url.path.endswith("/models/gemini-3.8-flash:generateContent")
+    assert seen[0].url.path.endswith("/models/gemini-3.5-flash:generateContent")
     body = json.loads(seen[0].content)
     config = body["generationConfig"]
     assert config["responseMimeType"] == "application/json" and config["responseSchema"]["title"] == "MessageCheck"
@@ -456,11 +456,42 @@ def test_with_gemini_a_failure_still_means_no_ai(monkeypatch, caplog):
     assert ai.check_message("T-12", "Hello (wrong shape)", "ms") is None
 
 
+def test_with_gemini_a_busy_moment_is_tried_once_more(monkeypatch, caplog):
+    """The free tier answers 503 ("high demand") now and then and is fine a moment later: one more try, then as before."""
+    import httpx
+
+    monkeypatch.setattr(ai, "GEMINI_RETRY_WAIT", 0)
+    seen = []
+
+    def busy_once(request):
+        seen.append(request)
+        if len(seen) == 1:
+            return httpx.Response(503, json={"error": {"code": 503, "status": "UNAVAILABLE",
+                                                       "message": "This model is currently experiencing high demand."}})
+        return _gemini_reply(ANSWER)
+
+    _gemini_sdk(monkeypatch, busy_once)
+    with caplog.at_level("WARNING", logger="keynection.ai"):
+        assert ai.check_message("T-12", "Morning! Is the lane clear today?", "ms").translation == "Selamat pagi!"
+    assert len(seen) == 2 and "trying once more" in caplog.text
+
+
+def test_with_gemini_two_busy_answers_mean_no_ai(monkeypatch):
+    import httpx
+
+    monkeypatch.setattr(ai, "GEMINI_RETRY_WAIT", 0)
+    seen = []
+    _gemini_sdk(monkeypatch, lambda request: seen.append(request) or httpx.Response(503, json={"error": {
+        "code": 503, "status": "UNAVAILABLE", "message": "This model is currently experiencing high demand."}}))
+    assert ai.check_message("T-12", "Morning! Is the lane still blocked?", "ms") is None
+    assert len(seen) == 2  # one retry, not a loop: a person is waiting
+
+
 def test_the_demo_with_gemini_shows_the_notice_that_names_google(client, monkeypatch):
     from app.seed import CONSENT_VERSION_AI_GEMINI
 
     monkeypatch.setenv("GEMINI_API_KEY", "test-not-a-real-key")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    assert client.get("/api/ai").json() == {"on": True, "model": "gemini-3.8-flash", "provider": "gemini"}
+    assert client.get("/api/ai").json() == {"on": True, "model": "gemini-3.5-flash", "provider": "gemini"}
     token = client.post("/api/units/T-23/join-code").json()["token"]
     assert client.post("/api/join/lookup", json={"token": token}).json()["consent_version"] == CONSENT_VERSION_AI_GEMINI

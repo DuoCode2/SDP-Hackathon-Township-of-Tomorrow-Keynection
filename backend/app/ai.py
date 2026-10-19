@@ -19,6 +19,7 @@ import logging
 import os
 import re
 import threading
+import time
 from collections import OrderedDict
 from datetime import date, timedelta
 from typing import Any, Literal, TypeVar
@@ -42,12 +43,14 @@ from .settings import demo_mode
 log = logging.getLogger("keynection.ai")
 
 DEFAULT_MODEL = "claude-opus-5-5"
-GEMINI_MODEL = "gemini-3.8-flash"  # on Google's free tier: the demo only (see provider)
+GEMINI_MODEL = "gemini-3.5-flash"  # on Google's free tier: the demo only (see provider). Measured 19 Oct 2026: 3.5-flash answers
+# the chat check in about 2 s; 3.7 and 3.8-flash took 23-43 s, past the 15 s a chat message waits, so the AI was skipped.
 # Models that take the server-side fallback: if a safety check declines a request, the API retries it on the model
 # Anthropic recommends for that case instead of returning the refusal.
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"}
 CALLS_PER_HOME_PER_DAY = 40  # keeps a public demo's bill small; past it, everything still works without AI
 CACHE_SIZE = 500
+GEMINI_RETRY_WAIT = 2.0  # seconds before the one retry after a 503: the free tier under load usually clears in a moment
 Lang = Literal["en", "ms", "zh", "ta"]
 LANG_FOR_AI = {"en": "English", "ms": "Malay (Bahasa Melayu)", "zh": "Simplified Chinese", "ta": "Tamil"}
 HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
@@ -165,29 +168,35 @@ def _gemini() -> Any:
 
 
 def _ask_gemini(system: str, text: str, schema: type[T], *, effort: str, max_tokens: int, timeout: float) -> T | None:
-    try:
-        response = _gemini().models.generate_content(
-            model=model_name(),
-            contents=text,
-            config=genai_types.GenerateContentConfig(
-                system_instruction=system,
-                response_mime_type="application/json",
-                response_schema=schema,
-                max_output_tokens=max_tokens,
-                thinking_config=genai_types.ThinkingConfig(thinking_level=GEMINI_THINKING.get(effort, "LOW")),
-                http_options=genai_types.HttpOptions(timeout=int(timeout * 1000)),
-                automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),  # no tools: one request
-            ),
-        )
-    except genai_errors.APIError as e:  # a refusal, a key that doesn't work, the free tier's limit reached...
-        log.warning("Gemini answered %s (%s); carrying on without AI", e.code, str(e.message or e)[:300])
-        return None
-    except httpx.HTTPError:  # no network, or no answer in time
-        log.warning("Gemini could not be reached; carrying on without AI")
-        return None
-    except Exception:  # an answer that doesn't fit the schema, or anything else: the app carries on without AI
-        log.exception("Gemini's answer could not be read; carrying on without AI")
-        return None
+    for attempt in (1, 2):  # a 503 ("high demand") is tried once more; anything else ends it
+        try:
+            response = _gemini().models.generate_content(
+                model=model_name(),
+                contents=text,
+                config=genai_types.GenerateContentConfig(
+                    system_instruction=system,
+                    response_mime_type="application/json",
+                    response_schema=schema,
+                    max_output_tokens=max_tokens,
+                    thinking_config=genai_types.ThinkingConfig(thinking_level=GEMINI_THINKING.get(effort, "LOW")),
+                    http_options=genai_types.HttpOptions(timeout=int(timeout * 1000)),
+                    automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),  # no tools: one request
+                ),
+            )
+            break
+        except genai_errors.APIError as e:  # a refusal, a key that doesn't work, the free tier's limit reached...
+            if e.code == 503 and attempt == 1:  # seen on the free tier on 19 Oct 2026; gone a moment later
+                log.warning("Gemini answered 503 (%s); trying once more in %gs", str(e.message or e)[:120], GEMINI_RETRY_WAIT)
+                time.sleep(GEMINI_RETRY_WAIT)
+                continue
+            log.warning("Gemini answered %s (%s); carrying on without AI", e.code, str(e.message or e)[:300])
+            return None
+        except httpx.HTTPError:  # no network, or no answer in time
+            log.warning("Gemini could not be reached; carrying on without AI")
+            return None
+        except Exception:  # an answer that doesn't fit the schema, or anything else: the app carries on without AI
+            log.exception("Gemini's answer could not be read; carrying on without AI")
+            return None
     finish = response.candidates[0].finish_reason if response.candidates else None
     if finish != genai_types.FinishReason.STOP or not isinstance(response.parsed, schema):  # declined, or cut off
         log.warning("Gemini stopped early (%s); carrying on without AI", finish)

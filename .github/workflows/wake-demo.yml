@@ -1,0 +1,44 @@
+# Keeps the online demo awake while the judges are looking, so their first open is not a 40-second wait.
+# Render's free tier sleeps after 15 quiet minutes. This pings /api/health (needs no password) every
+# 14 minutes, but only on the judging days listed in DAYS (Malaysian dates). On any other day the job
+# ends in a second and spends almost nothing. GitHub may run a schedule a few minutes late when it is
+# busy; if that lets the site doze, the next ping wakes it, so a judge still rarely meets a cold start.
+# To pause it: GitHub → Actions → "Keep the demo awake" → "..." → Disable workflow.
+# To try it now: the same page → "Run workflow" (the day check is skipped for a manual run).
+name: Keep the demo awake
+
+on:
+  schedule:
+    - cron: "*/14 * * * *"   # GitHub schedules run in UTC; the day check below uses Malaysian time
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  wake:
+    name: Ping the demo on judging days
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      URL: https://keynection.onrender.com/api/health
+      # Judging days (Malaysian time): 23–28 Oct (the entries are read), 14 Nov (Top 10 pitch day)
+      DAYS: "2026-10-23 2026-10-24 2026-10-25 2026-10-26 2026-10-27 2026-10-28 2026-11-14"
+    steps:
+      - name: Is today a judging day? (Malaysian time)
+        id: day
+        run: |
+          today=$(TZ=Asia/Kuala_Lumpur date +%F)
+          case " $DAYS " in
+            *" $today "*) echo "on=true"  >> "$GITHUB_OUTPUT"; echo "$today is a judging day: pinging" ;;
+            *)            echo "on=false" >> "$GITHUB_OUTPUT"; echo "$today is not a judging day: nothing to do" ;;
+          esac
+      - name: Ping until the demo answers
+        if: steps.day.outputs.on == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "$URL" || true)
+            echo "try $i: HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "::warning::the demo did not answer 200 after 6 tries; it may still be waking up"
