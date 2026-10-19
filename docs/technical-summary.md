@@ -30,12 +30,13 @@ Every transition is checked on the server (who may take it, in which state) and 
 **Concern ladder** (`concerns.status`)
 
 ```
- open ──(renovating owner replies)──▶ acknowledged ──(raiser: sorted)──▶ resolved
-  │                                        │
-  └──(raiser, after 24 h in a pilot)──▶ escalated ──(estate: remind ×n)──▶ escalated
+ open ──(renovating owner replies)──▶ acknowledged ──(renovating owner: it's sorted)──▶ resolved
+  │                                        │                                                │
+  └──(raiser, after 24 h in a pilot)──▶ escalated ◀──(raiser: still happening, any time)────┘
+                                           ├──(estate: remind ×n)──▶ escalated
                                            └──(estate: close)──▶ closed_by_estate
 ```
-The estate team sees a concern only once it is `escalated`; the private chat stays private.
+Only the renovating owner marks a concern sorted (from `open` or `acknowledged`); only the neighbour who raised it can escalate, and may still do so from `resolved` if the problem comes back. The estate team sees a concern only once it is `escalated`; the private chat stays private.
 
 **Case decision** (`incidents.status`)
 
@@ -71,7 +72,7 @@ Also: reports `open → warned | dismissed`; paper notices `to_print → printed
 
 | Actor | Sees | Does | Never |
 |---|---|---|---|
-| **Household (owner)** | Its five homes by name; layer 2 by unit; its own chats, photos, cases, tickets, home log | Wave, hello, chat, register a renovation, set quiet times, seal photos, decide a case, close its own ticket, raise and escalate its own concern, block, report, download its data, close its account | Remove a home from a notice; record an inspector's finding; close another home's ticket; see who talked to whom |
+| **Household (owner)** | Its five homes by name; layer 2 by unit; its own chats, photos, cases, tickets, home log | Wave, hello, chat, register a renovation, set quiet times, seal photos, decide a case, close its own ticket, raise and escalate its own concern, reply to or mark sorted a concern about its own renovation, block, report, download its data, close its account | Remove a home from a notice; record an inspector's finding; close another home's ticket; mark sorted a concern it raised; see who talked to whom |
 | **Family helper** | What the household sees | The same actions, each logged under the helper's name | Act for another household; use a name that looks like SDP, the estate or the police |
 | **Neighbour in the circle** | The notice sent to it (hours, whether its quiet time was avoided), the sender's name | Reply, wave, raise a concern, seal its own photos | See the renovating owner's other chats or whose quiet times were used |
 | **Layer-2 home** | Unit numbers | Send a contact request with a reason (3/day) | See a name before acceptance; message directly |
