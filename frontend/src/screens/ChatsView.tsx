@@ -10,7 +10,7 @@ import {
 } from '../api'
 import { byWho, noisyHours, refusal, subjectText, useDates, useT, type Translate } from '../i18n'
 import { useHelper } from '../helper'
-import { useAi, usePlace } from '../features'
+import { useAi, usePilot, usePlace } from '../features'
 import { LANG_TAG } from '../components/Cast'
 import ConcernCard from '../components/ConcernCard'
 import { Avatar, Empty, Sheet, Skeleton, Stamp, useCelebrate, useToast } from '../ui'
@@ -202,6 +202,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   const celebrate = useCelebrate()
   const helper = useHelper(me.id)
   const ai = useAi()
+  const pilot = usePilot()
   const [t, setT] = useState<Thread | null>(null)
   const [text, setText] = useState('')
   const [tone, setTone] = useState<string | null>(null)
@@ -443,6 +444,8 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
               <button key={q.key} className="quick" disabled={sending} onClick={() => send({ quick_key: q.key })} title={q.arrives ? tr('thread.arrives', { name: n.resident_name, text: q.arrives }) : langName(tr, n.lang)}>{q.text}</button>
             ))}
           </div>
+          {/* Demo only: one tap puts the judge route's sharp Malay line in the box; sending it runs the usual calmer check. */}
+          {!pilot && <button type="button" className="btn btn-sm demo-link" style={{ alignSelf: 'flex-start' }} onClick={() => { setText('Rumah awak bising macam kilang! Tak reti hormat jiran ke?'); setTone(null); setCalmer(null) }}>{tr('thread.tryHeated')}</button>}
           {rec.state === 'recording' ? (
             <div className="compose-row recording">
               <button className="icon-btn" onClick={rec.cancel} aria-label="Cancel recording"><X size={16} /></button>

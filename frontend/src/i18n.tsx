@@ -293,6 +293,7 @@ const D: Record<string, Entry> = {
   'tone.title': ['Tone check', 'Semakan nada', '语气提醒'],
   'tone.body': ['This may come across as hostile. Try calmer words or a quick reply: messages stay on record and can be reported.', 'Ini mungkin kedengaran kasar. Cuba kata-kata yang lebih tenang atau balasan pantas: mesej direkodkan dan boleh dilaporkan.', '这样说可能会让人觉得有敌意。试试平和一点的说法或快捷回复：讯息会留下纪录，也可能被检举。'],
   'thread.concern': ['Raise a concern', 'Luahkan kebimbangan', '反映问题'], 'thread.placeholder': ['Message {name}…', 'Mesej kepada {name}…', '发讯息给 {name}…'],
+  'thread.tryHeated': ['Try a sharp message (demo)', 'Cuba mesej yang tajam (demo)', '试一句冲的话（demo）'],
   'thread.record': ['Record a voice message', 'Rakam mesej suara', '录语音讯息'], 'thread.recordTitle': ['Voice message (up to 1 minute)', 'Mesej suara (sehingga 1 minit)', '语音讯息（最长 1 分钟）'],
   'thread.recording': ['Recording… tap send when done', 'Merakam… ketik hantar apabila selesai', '录音中…完成后按发送'],
   'thread.foot': ['Quick replies arrive in {lang}. Typed and voice messages are sent as they are.', 'Balasan pantas sampai dalam {lang}. Mesej taip dan suara dihantar seperti asal.', '快捷回复会以{lang}送达；打字和语音照原样发送。'],
