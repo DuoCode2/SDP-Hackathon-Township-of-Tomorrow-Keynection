@@ -1610,7 +1610,7 @@ button.ring-row:hover { background: var(--surface-2); }
 
 /* ---------- easy mode: bigger, calmer, fewer choices (private to the household) ---------- */
 .screen-wrap.easy { zoom: 1.14; }
-.easy .hide-easy, .easy .stories, .easy .ring2-label, .easy .ring2-note, .easy .nearby-grid, .easy .msg-tools,
+.easy .hide-easy, .easy .stories, .easy .ring2-label, .easy .ring2-note, .easy .nearby-grid,
 .easy .chat-privacy, .easy .compose-foot, .easy .demo-link { display: none !important; }
 .easy .btn { min-height: 44px; font-size: 14.5px; }
 .easy .quick { padding: 10px 14px; font-size: 14px; }
@@ -1720,3 +1720,9 @@ button.ring-row:hover { background: var(--surface-2); }
 .hours-bar .quiet { background: repeating-linear-gradient(45deg, var(--ok-bg) 0 4px, var(--ok-mid) 4px 7px); }
 .hours-bar .hours-axis { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .wizard-body small.warn { color: var(--red); font-weight: 650; }
+
+/* === route/polish === */
+/* Touch screens have no hover: the react and report tools beside a bubble stay visible. */
+@media (hover: none) { .msg-tools { opacity: 1; } }
+/* Easy mode keeps only the report flag beside a bubble. */
+.easy .msg-tool:not(.report) { display: none !important; }
