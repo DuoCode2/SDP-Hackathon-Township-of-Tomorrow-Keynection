@@ -52,7 +52,7 @@ const NAV = [
 
 type NavItem = (typeof NAV)[number]['items'][number] & { group: string; no: string }
 const ALL: NavItem[] = NAV.flatMap((g) => g.items.map((i) => ({ ...i, group: g.group }))).map((i, n) => ({ ...i, no: String(n + 1).padStart(2, '0') }))
-const WIDE = '(min-width: 1600px)'
+const WIDE = '(min-width: 1312px)'
 const SPLIT_OK = '(min-width: 1100px)'
 const UI_LANGS: { code: UiLang; tag: string; name: string }[] = [
   { code: 'en', tag: 'EN', name: 'English' }, { code: 'ms', tag: 'BM', name: 'Bahasa Melayu' }, { code: 'zh', tag: '中', name: '中文' },

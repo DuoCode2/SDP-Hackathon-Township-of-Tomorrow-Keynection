@@ -1131,7 +1131,7 @@ button.ring-row:hover { background: var(--surface-2); }
 .route-judge { margin-bottom: 6px; }
 .route-judge .route-n { color: var(--accent-text); border-color: var(--accent-line); background: var(--surface); }
 
-@media (max-width: 1599.98px) {
+@media (max-width: 1311.98px) {
   .guide {
     display: flex; position: fixed; top: 0; right: 0; bottom: 0; z-index: 80; width: min(400px, 100vw);
     transform: translateX(100%); visibility: hidden; transition: transform 280ms var(--ease), visibility 0s linear 280ms;
@@ -1204,10 +1204,10 @@ button.ring-row:hover { background: var(--surface-2); }
   .sheet-grip { display: none; }
   .toasts { left: auto; right: 28px; bottom: 28px; width: 380px; }
 }
-@media (min-width: 1600px) {
-  .app.guide-on { grid-template-columns: 252px minmax(0, 1fr) 380px; }
+@media (min-width: 1312px) {
+  .app.guide-on { grid-template-columns: 252px minmax(0, 1fr) 300px; }
   .guide.open { display: flex; height: 100dvh; }
-  body:has(.app.guide-on) .toasts { right: 408px; }
+  body:has(.app.guide-on) .toasts { right: 328px; }
 }
 
 /* layout by the space a screen actually has (a pane in split view is narrower than the window) */
@@ -1726,3 +1726,6 @@ button.ring-row:hover { background: var(--surface-2); }
 @media (hover: none) { .msg-tools { opacity: 1; } }
 /* Easy mode keeps only the report flag beside a bubble. */
 .easy .msg-tool:not(.report) { display: none !important; }
+/* The guide's notes for judges fold away under the route steps. */
+.guide-notes summary { cursor: pointer; font-size: 12px; font-weight: 700; color: var(--text-2); }
+.guide-notes summary ~ p { margin-top: 8px; }

@@ -51,16 +51,19 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, show
           <p className="guide-about">{UI.about[lang]}</p>
 
           <div className="section-label">{UI.judgeRoute[lang]}</div>
-          <p className="guide-hint">{UI.judgeHint[lang]}</p>
-          <p className="guide-hint">{UI.whoseScreen[lang]}</p>
-          <p className="guide-hint">{UI.sharedDemo[lang]}</p>
-          <p className="guide-hint">{UI.previewNote[lang]}</p>
           {ai && (
             <p className={`guide-ai ${ai.on ? 'on' : ''}`}>
               <Sparkles size={13} /> {ai.on ? `${UI.aiOn[lang]} (${ai.model})` : UI.aiOff[lang]}
             </p>
           )}
           {steps(JUDGE_ROUTE, true)}
+          <details className="guide-notes">
+            <summary>{UI.notesForJudges[lang]}</summary>
+            <p className="guide-hint">{UI.judgeHint[lang]}</p>
+            <p className="guide-hint">{UI.whoseScreen[lang]}</p>
+            <p className="guide-hint">{UI.sharedDemo[lang]}</p>
+            <p className="guide-hint">{UI.previewNote[lang]}</p>
+          </details>
 
           <div className="section-label">{UI.thisPage[lang]}</div>
           <div className="guide-card">

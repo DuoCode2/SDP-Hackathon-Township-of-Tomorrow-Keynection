@@ -38,6 +38,7 @@ export const UI: Record<string, Text> = {
     zh: '标着「预览」「示意」或「示范编号」的都是示意：WhatsApp 和 SDP App 的手机画面不会真的发出，也不是 SDP 真正的 app；演示版的 Procore 编号是造的。其余画面上的每一步都真的写进了资料库。',
     en: 'Anything labelled "preview", "illustration" or "demo number" is a mock-up: the WhatsApp and SDP App phones send nothing and are not SDP’s real app, and the demo’s Procore numbers are invented. Every other step on screen really is written to the database.',
   },
+  notesForJudges: { zh: '给评委的说明', en: 'Notes for judges' },
   about: {
     zh: 'Keynection：每一把钥匙都附送五户邻居。从交钥匙那天起，帮屋主认识左右和对面这 5 户；装修季是邻居变朋友还是变仇人的关键期，所以装修通知就是第一次自我介绍。万一出了裂缝漏水，公平的记录、分流和保修在背后撑着。',
     en: 'Keynection: every key comes with five neighbours. From the day they get their keys, owners meet the five homes beside and opposite them. Renovation season decides whether neighbours become friends or enemies, so the renovation notice doubles as the first introduction. If a crack or leak appears, a fair record, triage and the warranty back it up.',
