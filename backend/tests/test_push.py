@@ -97,10 +97,25 @@ def _turn_on(client, phone: Phone):
     return r.json()
 
 
+@pytest.fixture(autouse=True)
+def daytime(monkeypatch):
+    """Nothing rings between 22:00 and 07:00 in Malaysia (dispatch_alerts), so on the real clock a run at night, as
+    CI's run at 22:08 on 18 Oct was, sees nothing sent. The server's clock is moved to noon of the same Malaysian day
+    and keeps ticking; _dispatch sends at that clock. test_nothing_rings_at_night sets its own."""
+    from app import db
+
+    real = datetime.now(timezone.utc)
+    noon = real.astimezone(timezone(timedelta(hours=8))).replace(hour=12, minute=0, second=0, microsecond=0)
+    shift = noon - real
+    monkeypatch.setattr(db, "now", lambda: (datetime.now(timezone.utc) + shift).isoformat(timespec="seconds"))
+
+
 def _dispatch(now: datetime | None = None) -> int:
+    """Send what is due, at the server's clock unless a moment is given."""
+    from app import db
     from app.main import dispatch_alerts
 
-    return dispatch_alerts(now)
+    return dispatch_alerts(now or datetime.fromisoformat(db.now()))
 
 
 # ---------- turning notifications on ----------
