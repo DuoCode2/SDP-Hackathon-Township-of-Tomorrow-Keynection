@@ -203,7 +203,7 @@ const D: Record<string, Entry> = {
   'reno.describe': ['Describe the work', 'Terangkan kerja', '工程说明'],
   'ai.reno.title': ['Just say it in one sentence', 'Cakap dalam satu ayat sahaja', '一句话说清楚就好'],
   'ai.reno.hint': ['In any language. AI fills in the steps for you to check.', 'Dalam apa-apa bahasa. AI mengisi langkah-langkah untuk anda semak.', '用什么语言都行，AI 帮你填好每一步，你再检查。'],
-  'ai.reno.placeholder': ['e.g. Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 5', 'cth. Tukar jubin bilik air utama mulai Isnin depan selama dua minggu, ABC Renovation, hari bekerja 9 hingga 5', '例：下礼拜一开始重铺主人房浴室瓷砖，做两个星期，ABC Renovation 负责，平日九点到五点'],
+  'ai.reno.placeholder': ['e.g. Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 6', 'cth. Tukar jubin bilik air utama mulai Isnin depan selama dua minggu, ABC Renovation, hari bekerja 9 hingga 6', '例：下礼拜一开始重铺主人房浴室瓷砖，做两个星期，ABC Renovation 负责，平日九点到六点'],
   'ai.reno.fill': ['Fill it in for me', 'Isikan untuk saya', '帮我填好'],
   'ai.reno.try': ['Or try one of these:', 'Atau cuba salah satu:', '或者试试这几句：'],
   'ai.reno.working': ['Reading what you wrote…', 'Sedang membaca…', '正在理解你写的…'],

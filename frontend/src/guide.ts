@@ -420,8 +420,8 @@ export const JUDGE_ROUTE: RouteStep[] = [
   {
     tab: 'works', unit: 'T-12',
     text: {
-      zh: '装修通知就是自我介绍：Works →「Register renovation」→ 在「一句话说清楚」打「Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5」（中文、马来文也行）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 →「时间」那一步系统已按邻居作息排好：避开 Siti 宝宝午睡（13–15 点）和对面 Hafiz 夜班后补眠（9–11 点），但不说是谁 → 检查后发送（还没加入的 No. 23 由物业送纸本）',
-      en: 'The renovation notice is the introduction: Works → Register renovation → in "Just say it in one sentence" type "Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5" (Malay or Chinese work too) → Fill it in for me → AI picks the type of work and the plan marks who is told → at "When" the hours are already planned around the neighbours: clear of Siti’s baby nap (1–3pm) and Hafiz’s sleep after night shifts (9–11am), without saying whose → check and send (No. 23, not on the app yet, gets it on paper)',
+      zh: '装修通知就是自我介绍：Works →「Register renovation」→ 在「一句话说清楚」打「Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6」（中文、马来文也行）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 →「时间」那一步系统已按邻居作息排好：避开 Siti 宝宝午睡（13–15 点）和对面 Hafiz 夜班后补眠（9–11 点），但不说是谁 → 检查后发送（还没加入的 No. 23 由物业送纸本）',
+      en: 'The renovation notice is the introduction: Works → Register renovation → in "Just say it in one sentence" type "Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6" (Malay or Chinese work too) → Fill it in for me → AI picks the type of work and the plan marks who is told → at "When" the hours are already planned around the neighbours: clear of Siti’s baby nap (1–3pm) and Hafiz’s sleep after night shifts (9–11am), without saying whose → check and send (No. 23, not on the app yet, gets it on paper)',
     },
   },
   {
