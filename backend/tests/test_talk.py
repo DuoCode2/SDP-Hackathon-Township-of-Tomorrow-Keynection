@@ -58,6 +58,20 @@ def test_every_quick_reply_exists_in_every_language():
         assert set(texts) == set(talk.LANGS), key
 
 
+def test_nap_quick_reply_thanks_rather_than_asks():
+    # Siti's notice from Aiman already says "Noisy hours planned around your quiet time" (her seeded nap, 13:00-15:00),
+    # so the canned reply under it must thank him for those hours, not ask him to avoid them again.
+    from app.seed import QUIET_TIMES
+
+    assert QUIET_TIMES["Siti"][0]["start"] == "13:00" and QUIET_TIMES["Siti"][0]["end"] == "15:00"
+    assert "1–3pm" in talk.quick_text("quiet_nap", "en") and "1–3 petang" in talk.quick_text("quiet_nap", "ms")
+    thanks = {"en": "Thanks", "ms": "Terima kasih", "zh": "谢谢", "ta": "நன்றி"}
+    asks = {"en": "Could", "ms": "Boleh", "zh": "可以", "ta": "முடியுமா"}
+    for lang in talk.LANGS:
+        text = talk.quick_text("quiet_nap", lang)
+        assert thanks[lang] in text and asks[lang] not in text and "?" not in text and "？" not in text, lang
+
+
 def test_tone_check_stops_obvious_insults(client):
     r = _send(client, "T-11", "T-12", body="You are so stupid, stop the noise")
     assert r.status_code == 422 and r.json()["detail"]["code"] == "tone"

@@ -32,11 +32,13 @@ QUICK_REPLIES: dict[str, dict[str, str]] = {
         "zh": "收到，没问题。",
         "ta": "சரி, எந்தப் பிரச்சினையும் இல்லை.",
     },
+    # A thank-you, not a request: the notice has usually already planned its noisy hours around this nap (seed.py
+    # QUIET_TIMES), and the same reply is offered in every thread, so it must read well either way.
     "quiet_nap": {
-        "en": "Could the noisiest work avoid 1–3pm? Our baby naps then. Thank you!",
-        "ms": "Boleh elakkan kerja paling bising antara 1–3 petang? Bayi kami tidur waktu itu. Terima kasih!",
-        "zh": "最吵的工作可以避开下午1点到3点吗？我们的宝宝那时午睡。谢谢！",
-        "ta": "அதிக சத்தமான வேலையை மதியம் 1–3 மணிக்குத் தவிர்க்க முடியுமா? அப்போது எங்கள் குழந்தை தூங்கும். நன்றி!",
+        "en": "Our baby naps 1–3pm. Thanks for keeping the noisiest work outside those hours!",
+        "ms": "Bayi kami tidur antara 1–3 petang. Terima kasih kerana mengelakkan kerja paling bising pada waktu itu!",
+        "zh": "我们的宝宝下午1点到3点午睡。谢谢你把最吵的工作避开那段时间！",
+        "ta": "எங்கள் குழந்தை மதியம் 1–3 மணிக்குத் தூங்கும். அதிக சத்தமான வேலையை அந்த நேரத்தில் தவிர்த்ததற்கு நன்றி!",
     },
     "parking": {
         "en": "Could the contractor's lorry avoid blocking our gate? Thanks!",
