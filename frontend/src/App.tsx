@@ -43,8 +43,8 @@ const NAV = [
     items: [
       { id: 'sdp', icon: LayoutDashboard, dock: false },
       { id: 'planner', icon: Grid3x3, dock: false },
-      { id: 'impact', icon: Calculator, dock: false },
-      { id: 'channels', icon: Smartphone, dock: false },
+      { id: 'impact', icon: Calculator, dock: true },
+      { id: 'channels', icon: Smartphone, dock: true },
     ],
   },
   { group: 'trust', items: [{ id: 'safeguards', icon: ShieldHalf, dock: false }] },
