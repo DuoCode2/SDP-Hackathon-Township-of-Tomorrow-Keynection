@@ -456,9 +456,10 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
               {t.their_renovations.length > 0 && (
                 <button className="btn btn-sm concern-btn" onClick={() => setConcernOpen(true)}><MessageSquareWarning size={14} /> {tr('thread.concern')}</button>
               )}
-              <textarea className="compose-input" rows={1} maxLength={500} placeholder={tr('thread.placeholder', { name: n.resident_name })} value={text}
+              {/* Read-only (not disabled) while a send is in flight: nothing can be typed or re-sent, but focus stays in the box. */}
+              <textarea className="compose-input" rows={1} maxLength={500} placeholder={tr('thread.placeholder', { name: n.resident_name })} value={text} readOnly={sending}
                 onChange={(e) => { setText(e.target.value); setTone(null); setCalmer(null) }}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && text.trim()) { e.preventDefault(); send({ body: text }) } }} />
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && text.trim() && !sending) { e.preventDefault(); send({ body: text }) } }} />
               {text.trim() ? (
                 <button className="send-btn" disabled={sending} onClick={() => send({ body: text })} aria-label="Send"><SendHorizontal size={17} /></button>
               ) : (
