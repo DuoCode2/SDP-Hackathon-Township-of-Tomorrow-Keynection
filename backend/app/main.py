@@ -2437,7 +2437,8 @@ CASE_OUTCOME = {
 def decide(incident_id: int, body: DecisionIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     """Who may decide what. A building-defect claim, "no action" or "ask an inspector" is the homeowner's own
     call. Blaming the renovation is a claim against the neighbour: it stays a proposal until the renovating owner
-    agrees, or they accept it themselves. Nobody on a resident's phone can record an SDP inspector's finding."""
+    agrees, disagrees or asks an inspector (their answer, so only once blamed), or they accept it themselves.
+    Nobody on a resident's phone can record an SDP inspector's finding."""
     row = conn.execute("SELECT * FROM incidents WHERE id = ?", (incident_id,)).fetchone()
     if row is None:
         raise HTTPException(404, "incident not found")
@@ -2459,6 +2460,10 @@ def decide(incident_id: int, body: DecisionIn, conn: sqlite3.Connection = Depend
         raise HTTPException(400, "No renovation is linked to this case.")
     if role == "renovating_owner" and decision in ("warranty", "no_action"):
         raise HTTPException(403, "Only the owner of the home can decide this about their own home.")
+    # Asking an inspector is the renovating owner's answer to being blamed, not a way to close a case the
+    # neighbour has not decided on yet. Until the neighbour proposes, the case is the neighbour's to decide.
+    if role == "renovating_owner" and decision == "inspect" and row["status"] not in ("proposed", "disputed"):
+        raise HTTPException(403, "You can ask an SDP inspector once your neighbour says the renovation caused it.")
 
     case = f"Case #{incident_id:03d}"
     me = _unit_row(conn, body.unit_id)

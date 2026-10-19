@@ -44,9 +44,10 @@ The estate team sees a concern only once it is `escalated`; the private chat sta
        ├─(reporter: ask an SDP inspector)──────────────▶ decided  (inspector asked; residents can't record a finding)
        ├─(reporter: nothing to do)─────────────────────▶ decided
        └─(reporter: caused by the renovation)──▶ proposed ─┬─(other side agrees)──▶ decided
+                                                           ├─(other side asks an SDP inspector)──▶ decided
                                                            └─(other side disagrees)──▶ disputed → only inspector / warranty / nothing remain
 ```
-A change photographed before the works can never be proposed as "caused by the renovation"; nothing is pre-selected.
+A change photographed before the works can never be proposed as "caused by the renovation"; nothing is pre-selected. The renovating owner can accept responsibility at any time, but can ask an inspector only once blamed (`proposed` or `disputed`): before that the case is the reporter's to decide.
 
 **Warranty ticket** (`warranty_tickets.status`)
 

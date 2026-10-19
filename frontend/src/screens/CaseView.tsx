@@ -162,7 +162,9 @@ function choicesFor(t: Translate, c: Incident, role: Role): { id: Choice; title:
   }
   const accept = { id: 'renovation' as const, title: t(c.status === 'proposed' ? 'ch.acceptAgree' : 'ch.accept'), detail: t('ch.accept.d'), icon: <Hammer size={18} /> }
   const dispute = { id: 'dispute' as const, title: t('ch.dispute'), detail: t('ch.dispute.d'), icon: <MessageSquareX size={18} /> }
-  return c.status === 'proposed' ? [accept, dispute, inspect] : [accept, inspect]
+  // Asking an inspector is the owner's answer to being blamed, so it is offered only once the neighbour has said so.
+  if (c.status === 'proposed') return [accept, dispute, inspect]
+  return c.status === 'disputed' ? [accept, inspect] : [accept]
 }
 
 function DecisionForm({ me, incident, role, onDecided }: {
