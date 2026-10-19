@@ -615,10 +615,17 @@ PHOTO_ERRORS = {
 def _store_photo(conn: sqlite3.Connection, unit_id: str, raw: bytes, kind: str, subject: str,
                  renovation_intro_id: int | None) -> dict[str, Any]:
     _unit_row(conn, unit_id)
-    if renovation_intro_id is not None and conn.execute(
-        "SELECT 1 FROM intro_recipients WHERE intro_id = ? AND unit_id = ?", (renovation_intro_id, unit_id)
-    ).fetchone() is None:
-        raise HTTPException(403, "Only neighbours notified of this renovation can attach photos to it.")
+    if renovation_intro_id is not None:
+        linked = conn.execute(
+            "SELECT i.renovation FROM intro_recipients r JOIN intros i ON i.id = r.intro_id"
+            " WHERE r.intro_id = ? AND r.unit_id = ?", (renovation_intro_id, unit_id)
+        ).fetchone()
+        if linked is None:
+            raise HTTPException(403, "Only neighbours notified of this renovation can attach photos to it.")
+        # A hello lands in the inbox the same way a notice does, but a photo is evidence against someone's
+        # works: it can only hang off a renovation notice, never off a plain hello.
+        if linked["renovation"] is None:
+            raise HTTPException(422, "Photos can only be attached to a renovation notice, not to a hello.")
     try:
         photo = vision.ingest(raw)
     except vision.PhotoError as exc:
@@ -2380,6 +2387,10 @@ def report_incident(body: IncidentIn, conn: sqlite3.Connection = Depends(get_con
         raise HTTPException(400, "Compare a pre-work photo with a follow-up photo.")
     if followup["created_at"] < baseline["created_at"]:
         raise HTTPException(400, "The follow-up photo must be taken after the pre-work photo.")
+    # The case's renovation (and so who answers for it) comes from the pre-work photo. A follow-up either
+    # carries no renovation or the same one; it can't point the case at someone else's works.
+    if followup["renovation_intro_id"] not in (None, baseline["renovation_intro_id"]):
+        raise HTTPException(400, "The follow-up photo is linked to a different renovation than the pre-work photo.")
 
     folder = data_dir("photos")
     comp = vision.compare((folder / f"{baseline['id']}.jpg").read_bytes(), (folder / f"{followup['id']}.jpg").read_bytes())
