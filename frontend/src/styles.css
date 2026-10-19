@@ -1710,3 +1710,13 @@ button.ring-row:hover { background: var(--surface-2); }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .content { scroll-behavior: auto; }
 }
+
+/* === route/step4-and-impact === */
+/* The When step: planned noisy hours on the 09:00–18:00 day, quiet breaks striped; hours outside the rule in red. */
+.hours-bar { display: flex; flex-direction: column; gap: 6px; }
+.hours-bar .hours-track { position: relative; height: 22px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line-2); overflow: hidden; }
+.hours-bar .noisy, .hours-bar .quiet { position: absolute; top: 0; bottom: 0; }
+.hours-bar .noisy { background: var(--works); }
+.hours-bar .quiet { background: repeating-linear-gradient(45deg, var(--ok-bg) 0 4px, var(--ok-mid) 4px 7px); }
+.hours-bar .hours-axis { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.wizard-body small.warn { color: var(--red); font-weight: 650; }

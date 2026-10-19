@@ -125,6 +125,9 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
     }
   }, [open, me.id, works, reno.start, reno.end, reno.noisy_from, reno.noisy_to])
   const planned = usePlan && plan && plan.homes_with_quiet_times > 0 ? plan : null
+  // The owner's own hours must sit inside the house rule (09:00–18:00), checked before Next; planned hours always do.
+  const from = reno.noisy_from ?? '', to = reno.noisy_to ?? ''
+  const hoursOk = !!planned || (from >= '09:00' && to <= '18:00' && from < to)
 
   const timed = planned ? { noisy_from: planned.noisy_from, noisy_to: planned.noisy_to, quiet_breaks: planned.quiet_breaks }
     : { noisy_from: reno.noisy_from, noisy_to: reno.noisy_to, quiet_breaks: [] }
@@ -154,19 +157,19 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   // notice list on the next step changes with it. Without AI the same button applies the preset beside it, on this
   // device, so the example still fills in the steps. Nothing is sent either way.
   const EXAMPLES: { label: string; text: string; preset: Preset }[] = [
-    { label: 'English', text: 'Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 5',
+    { label: 'English', text: 'Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 6',
       preset: { works: 'wet', scope: 'Retile the master bathroom', lang: 'en', start: nextMonday, days: 14, contractor: 'ABC Renovation' } },
-    { label: 'Bahasa Melayu', text: 'Nak pecah jubin dapur dan gerudi dinding mulai Isnin depan selama tiga minggu, Kontraktor Maju, Isnin hingga Jumaat 9 pagi hingga 5 petang',
+    { label: 'Bahasa Melayu', text: 'Nak pecah jubin dapur dan gerudi dinding mulai Isnin depan selama tiga minggu, Kontraktor Maju, Isnin hingga Jumaat 9 pagi hingga 6 petang',
       preset: { works: 'hacking', scope: 'Pecah jubin dapur dan gerudi dinding', lang: 'ms', start: nextMonday, days: 21, contractor: 'Kontraktor Maju' } },
-    { label: '中文', text: '下个月初开始油漆和做木工，大概一个星期，承包商是兴隆装修，平日早上九点到下午五点',
+    { label: '中文', text: '下个月初开始油漆和做木工，大概一个星期，承包商是兴隆装修，平日早上九点到下午六点',
       preset: { works: 'light', scope: '油漆和做木工', lang: 'zh', start: firstOfNextMonth, days: 7, contractor: '兴隆装修' } },
   ]
 
-  /** Without AI, an example fills in the steps from its preset: weekdays 9 to 5, the owner's language. Nothing is sent. */
+  /** Without AI, an example fills in the steps from its preset: weekdays 9 to 6, the owner's language. Nothing is sent. */
   function applyPreset(p: Preset) {
     const start = p.start()
     setWorks(p.works)
-    setReno((r) => ({ ...r, scope: p.scope, start, end: addDays(start, p.days - 1), noisy_from: '09:00', noisy_to: '17:00', weekdays_only: true, contractor: p.contractor }))
+    setReno((r) => ({ ...r, scope: p.scope, start, end: addDays(start, p.days - 1), noisy_from: '09:00', noisy_to: '18:00', weekdays_only: true, contractor: p.contractor }))
     setLang(p.lang)
     setDraft(null)
     setFilled(null)
@@ -321,17 +324,22 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
             <label className="field">{t('reno.start')}<input type="date" value={reno.start} onChange={set('start')} /></label>
             <label className="field">{t('reno.end')}<input type="date" value={reno.end} min={reno.start} onChange={set('end')} /></label>
           </div>
-          {/* The house rule's hours (LEGAL_FROM/LEGAL_TO in quiet.py): the server refuses a notice outside them. */}
-          <div className="grid-2">
-            <label className="field">{t('reno.noisyFrom')}<input type="time" value={reno.noisy_from} min="09:00" max="18:00" onChange={set('noisy_from')} /></label>
-            <label className="field">{t('reno.noisyTo')}<input type="time" value={reno.noisy_to} min="09:00" max="18:00" onChange={set('noisy_to')} /></label>
-          </div>
-          <small>{t('reno.hoursRule')}</small>
+          {/* The house rule's hours (LEGAL_FROM/LEGAL_TO in quiet.py): the server refuses a notice outside them.
+              Planned hours replace the owner's own inputs, so only one set of hours is on screen. */}
+          {planned ? (
+            <HoursBar plan={planned} legend={t('plan.avoids', { hours: noisyHours(t, { ...reno, ...planned }), n: planned.avoided })} />
+          ) : (
+            <div className="grid-2">
+              <label className="field">{t('reno.noisyFrom')}<input type="time" value={reno.noisy_from} min="09:00" max="18:00" onChange={set('noisy_from')} /></label>
+              <label className="field">{t('reno.noisyTo')}<input type="time" value={reno.noisy_to} min="09:00" max="18:00" onChange={set('noisy_to')} /></label>
+            </div>
+          )}
+          <small className={hoursOk ? undefined : 'warn'}>{t('reno.hoursRule')}</small>
           <label className="switch-row"><input type="checkbox" checked={!!reno.weekdays_only} onChange={set('weekdays_only')} /> {t('reno.weekends')}</label>
           {plan && plan.homes_with_quiet_times > 0 && (
             <div className="qplan-card">
               <div className="qplan-head"><CalendarClock size={15} /> <b>{t('plan.title')}</b></div>
-              <p>{t('plan.avoids', { hours: noisyHours(t, { ...reno, ...plan }), n: plan.avoided })}</p>
+              {!usePlan && <p>{t('plan.avoids', { hours: noisyHours(t, { ...reno, ...plan }), n: plan.avoided })}</p>}
               {plan.not_avoided > 0 && <p className="warn">{t('plan.notAvoided', { n: plan.not_avoided, h: 4 })}</p>}
               <Segmented value={usePlan ? 'plan' : 'own'} onChange={(v) => { setUsePlan(v === 'plan'); setDraft(null) }}
                 options={[{ id: 'plan', label: t('plan.use') }, { id: 'own', label: t('plan.own') }]} />
@@ -423,11 +431,34 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
         <button className="btn" onClick={step === 0 ? close : () => setStep(step - 1)}>{t(step === 0 ? 'btn.cancel' : 'btn.back')}</button>
         <span className="muted small">{t('reno.step', { n: step + 1, m: STEPS.length })}</span>
         {step < STEPS.length - 1 ? (
-          <button className="btn btn-primary" disabled={(step === 3 && blocked) || !reno.scope.trim()} onClick={() => setStep(step + 1)}>{t('btn.next')}</button>
+          <button className="btn btn-primary" disabled={(step === 3 && blocked) || (step === 2 && !hoursOk) || !reno.scope.trim()} onClick={() => setStep(step + 1)}>{t('btn.next')}</button>
         ) : (
           <button className="btn btn-primary" disabled={sending || blocked} onClick={send}><Send size={15} /> {sending ? t('btn.sending') : t('reno.send')}</button>
         )}
       </div>
     </Sheet>
+  )
+}
+
+// The house rule's working day, 09:00–18:00, in minutes.
+const DAY_FROM = 9 * 60
+const DAY_TO = 18 * 60
+const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
+const place = (from: string, to: string) => ({
+  left: `${((minutes(from) - DAY_FROM) / (DAY_TO - DAY_FROM)) * 100}%`,
+  width: `${((minutes(to) - minutes(from)) / (DAY_TO - DAY_FROM)) * 100}%`,
+})
+
+/** The planned hours on the 09:00–18:00 day: noisy work solid, quiet breaks striped, the plan's sentence below. */
+function HoursBar({ plan, legend }: { plan: QuietPlan; legend: string }) {
+  return (
+    <div className="hours-bar">
+      <div className="hours-track" role="img" aria-label={legend}>
+        <span className="noisy" style={place(plan.noisy_from, plan.noisy_to)} title={`${plan.noisy_from}–${plan.noisy_to}`} />
+        {plan.quiet_breaks.map((b) => <span key={b.start} className="quiet" style={place(b.start, b.end)} title={`${b.start}–${b.end}`} />)}
+      </div>
+      <div className="hours-axis"><span>09:00</span><span>18:00</span></div>
+      <small>{legend}</small>
+    </div>
   )
 }

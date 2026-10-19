@@ -6,7 +6,7 @@ import { dismissWelcome, judgeStep, resetDemo, shot, watchErrors } from './helpe
 // text a judge reads (button labels, headings), on purpose: a renamed button fails the walk.
 // The server is the AI stand-in (serve.mjs): AI screens show, every AI answer is marked [stand-in].
 
-const SENTENCE = 'Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 5'
+const SENTENCE = 'Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 6'
 const SHARP_MALAY = 'Rumah awak bising macam kilang! Tak reti hormat jiran ke?'
 const TAMIL = /[஀-௿]/
 
@@ -60,7 +60,9 @@ test('the 3-minute judge route, with a screenshot per step', async ({ page }) =>
 
   await test.step('K05 When: hours planned around the neighbours', async () => {
     await next(sheet)
-    await expect(sheet.locator('.qplan-card')).toContainText(/quiet times of 2 home/)
+    // One set of hours: the planned ones, drawn on the day, with no time inputs beside them.
+    await expect(sheet.locator('.hours-bar')).toContainText(/quiet times of 2 home/)
+    await expect(sheet.locator('input[type="time"]')).toHaveCount(0)
     await shot(page, 'K05-when')
   })
 

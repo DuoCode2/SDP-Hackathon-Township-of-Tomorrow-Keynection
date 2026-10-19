@@ -775,7 +775,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       const body = await res.json()
       if (typeof body.detail === 'string') message = body.detail
       else if (body.detail?.code) throw new ApiError(res.status, body.detail.message, body.detail.code, body.detail.suggestion)
-      else message = Array.isArray(body.detail) ? (body.detail[0]?.msg ?? message) : JSON.stringify(body.detail)
+      // pydantic prefixes a validator's own sentence with "Value error, "; the reader only needs the sentence.
+      else message = Array.isArray(body.detail) ? (body.detail[0]?.msg?.replace(/^Value error, /, '') ?? message) : JSON.stringify(body.detail)
     } catch (e) {
       if (e instanceof ApiError) throw e
       /* non-JSON error body */
