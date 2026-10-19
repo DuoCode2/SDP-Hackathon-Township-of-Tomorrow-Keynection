@@ -9,6 +9,7 @@
     "monkey": "playwright test monkey.spec.ts",
     "a11y": "playwright test a11y.spec.ts",
     "audit": "playwright test audit.spec.ts",
+    "bothsides": "playwright test bothsides.spec.ts",
     "all": "playwright test",
     "report": "playwright show-report"
   },

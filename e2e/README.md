@@ -11,8 +11,9 @@ npm install                                    # once
 npx playwright install chromium                # once, about 300 MB
 npm run route                                  # the judge route, K01–K14, a screenshot per step
 npm run warranty                               # K16: only the owner closes a ticket; "demo number" in three languages
+npm run bothsides                              # a case open in one pane follows the other pane's decision (Siti asks, Aiman agrees)
 npm run monkey                                 # 250 random clicks; MONKEY_CLICKS and MONKEY_SEED to change or repeat
-npm run all                                    # all three (about 3 minutes)
+npm run all                                    # every spec (about 3 minutes)
 npm run route:headed                           # watch the route happen
 npm run report                                 # the HTML report, with a trace on failure
 ```
