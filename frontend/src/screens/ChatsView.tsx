@@ -17,11 +17,15 @@ import { Avatar, Empty, Sheet, Skeleton, Stamp, useCelebrate, useToast } from '.
 
 const langName = (t: Translate, code: string) => t(`lang.${code}`)
 
-/** An automatic notice in the reader's language. Notices from before codes existed show their English record. */
-function systemText(t: Translate, m: Pick<ChatMessage, 'code' | 'values' | 'text'>): string {
+/** An automatic notice in the reader's language. Notices from before codes existed show their English record.
+ *  A case notice names the home by unit; its name comes from names (the households the reader sees now), so a home
+ *  that closed its account, or one not in names, shows as its unit only. */
+function systemText(t: Translate, m: Pick<ChatMessage, 'code' | 'values' | 'text'>, names: Record<string, string> = {}): string {
   if (!m.code) return m.text
   const v = m.values ?? {}
-  const who = v.name ? t('who', { name: v.name, label: v.label ?? '' }) + (v.helper ? t('sys.helper', { name: byWho(t, v.helper) }) : '') : ''
+  const name = (v.unit && names[v.unit]) || v.name  // older notices carried the name itself
+  const home = name && name !== v.label ? t('who', { name, label: v.label ?? '' }) : v.label  // a closed account's name is its unit
+  const who = home ? home + (v.helper ? t('sys.helper', { name: byWho(t, v.helper) }) : '') : ''
   return t(`sys.${m.code}`, {
     ...v,
     who: v.both ? t('sys.bothOwners') : who,
@@ -36,14 +40,14 @@ function systemText(t: Translate, m: Pick<ChatMessage, 'code' | 'values' | 'text
 const ESTATE_AUTHOR = 'SDP Estate Team'
 
 /** The last item of a chat, for the chat list, in the reader's language. */
-function previewText(t: Translate, p: Preview | null): string | null {
+function previewText(t: Translate, p: Preview | null, names: Record<string, string>): string | null {
   if (!p) return null
   switch (p.kind) {
     case 'renovation': return t('pv.renovation')
     case 'wave': return t('pv.wave')
     case 'voice': return t('pv.voice', { n: p.duration })
     case 'concern': return t('pv.concern', { what: t(`cat.${p.category}`) })
-    case 'system': return systemText(t, p)
+    case 'system': return systemText(t, p, names)
     case 'text': return p.text
   }
 }
@@ -120,7 +124,7 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
                 {c.last_at && <small>{dates.time(new Date(c.last_at))}</small>}
               </span>
               <span className="chat-row-rel">{t(`rel.${c.relation}`)}{c.relation === 'left' || c.relation === 'right' ? ` · ${t('share.wallShort')}` : c.relation === 'above' || c.relation === 'below' ? ` · ${t('share.slab')}` : ''}</span>
-              <span className="chat-row-last">{c.blocked ? t('chats.blocked') : previewText(t, c.last_preview) ?? c.last ?? t('chats.sayHello')}</span>
+              <span className="chat-row-last">{c.blocked ? t('chats.blocked') : previewText(t, c.last_preview, { [c.id]: c.resident_name }) ?? c.last ?? t('chats.sayHello')}</span>
             </span>
             <span className="chat-row-flags">
               {c.unread > 0 && <span className="unread">{c.unread}</span>}
@@ -348,7 +352,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
             return wrap(
               <div className="sys-msg">
                 <Stamp tone="ink" tilt={0}>{item.author === ESTATE_AUTHOR ? tr('author.estate') : item.author ?? 'Keynection'}</Stamp>
-                <p>{systemText(tr, item)}</p>
+                <p>{systemText(tr, item, { [n.id]: n.resident_name })}</p>
                 <small>{dates.time(new Date(item.created_at))}</small>
               </div>,
             )

@@ -212,6 +212,60 @@ def test_a_household_closes_its_own_account(client, sign_in):
     assert names["T-11"] == "No. 11"  # neighbours now see the unit only
 
 
+def test_closed_account_name_gone_from_neighbour_thread(client, sign_in):
+    """A case notice stays in the renovating neighbour's thread; once the reporting household closes its account,
+    nothing there names it, including a notice from before notices named homes by unit."""
+    client.cookies.clear()
+    sign_in(client, "T-12")
+    intro = client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi", "renovation": RENO}).json()["id"]
+    client.cookies.clear()
+    sign_in(client, "T-11")
+    photo = lambda kind, **link: client.post("/api/units/T-11/photos", data={"kind": kind, "subject": "Shared wall", **link},  # noqa: E731
+                                             files={"file": ("wall.jpg", _jpeg(), "image/jpeg")}).json()["id"]
+    case = client.post("/api/incidents", json={"reporter_unit_id": "T-11", "baseline_photo_id": photo("baseline", renovation_intro_id=str(intro)),
+                                               "followup_photo_id": photo("followup")}).json()
+    assert client.post(f"/api/incidents/{case['id']}/decision", json={"unit_id": "T-11", "decision": "renovation"}).status_code == 200
+    conn = _db()
+    name = conn.execute("SELECT resident_name FROM units WHERE id = 'T-11'").fetchone()[0]
+    # Old data: the same notice as it was written before, with the name in the values and in the English record.
+    conn.execute("INSERT INTO messages (from_unit_id, to_unit_id, thread_with, kind, body, lang, author, private, sys_code, sys_values, created_at)"
+                 " VALUES (NULL, 'T-12', 'T-11', 'system', ?, 'en', 'Keynection', 0, 'case_proposed', ?, ?)",
+                 (f"Case #009: {name} (No. 11) believes the change on “Shared wall” was caused by your renovation.",
+                  json.dumps({"case": "009", "name": name, "label": "No. 11", "helper": "", "subject": "Shared wall"}),
+                  datetime.now(timezone.utc).isoformat()))
+    conn.commit()
+    conn.close()
+
+    def notices() -> list[dict]:
+        client.cookies.clear()
+        sign_in(client, "T-12")
+        items = client.get("/api/units/T-12/conversations/T-11").json()["items"]
+        return [i for i in items if i.get("code") == "case_proposed"]
+
+    new = next(n for n in notices() if n["values"]["case"] != "009")
+    assert new["values"]["unit"] == "T-11" and "name" not in new["values"] and name not in new["text"]
+    client.cookies.clear()
+    sign_in(client, "T-11")
+    assert client.post("/api/units/T-11/close", json={"confirm": "No. 11"}).status_code == 200
+    conn = _db()
+    rows = conn.execute("SELECT body, sys_values FROM messages WHERE kind = 'system' AND to_unit_id = 'T-12'"
+                        " AND thread_with = 'T-11' AND sys_code = 'case_proposed'").fetchall()
+    conn.close()
+    assert len(rows) == 2
+    for body, values in rows:
+        assert name not in body and name not in values and json.loads(values)["unit"] == "T-11", (body, values)
+    # The thread opens again once the home joins again (say it was sold): still no trace of the name.
+    client.cookies.clear()
+    sign_in(client, "staff:Farah")
+    token = client.post("/api/units/T-11/join-code").json()["token"]
+    client.cookies.clear()
+    assert client.post("/api/join", json={"token": token, "display_name": "New Owner", "lang": "en", "consent": True}).status_code == 200
+    after = notices()
+    assert len(after) == 2
+    for n in after:
+        assert name not in n["text"] and name not in json.dumps(n["values"]), n
+
+
 def test_a_home_whose_account_closed_can_join_again(client, sign_in):
     client.cookies.clear()
     sign_in(client, "T-11")

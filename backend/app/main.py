@@ -2484,9 +2484,11 @@ def decide(incident_id: int, body: DecisionIn, conn: sqlite3.Connection = Depend
 
     case = f"Case #{incident_id:03d}"
     me = _unit_row(conn, body.unit_id)
-    who = f"{me['resident_name']} ({me['label']})" + (f", by {acted_by}" if acted_by else "")
+    # The notice stays in the neighbour's thread, so it names this home by its unit, never by the resident's name:
+    # the reader's screen looks the name up, and after this household closes its account it reads "No. 11".
+    who = me["label"] + (f", by {acted_by}" if acted_by else "")
     # The same notice as values, so each household reads it in its own language.
-    values = {"case": f"{incident_id:03d}", "name": me["resident_name"], "label": me["label"], "helper": acted_by or ""}
+    values = {"case": f"{incident_id:03d}", "unit": me["id"], "label": me["label"], "helper": acted_by or ""}
     my_note = "decision_note" if role == "reporter" else "response_note"
     if decision == "dispute":
         if role != "renovating_owner":

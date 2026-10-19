@@ -87,4 +87,4 @@ def test_case_notices_carry_the_case_and_who(client):
     client.post(f"/api/incidents/{case['id']}/decision", json={"unit_id": "T-11", "decision": "renovation"})
     items = client.get("/api/units/T-12/conversations/T-11").json()["items"]
     notice = next(i for i in items if i.get("code") == "case_proposed")
-    assert notice["values"] == {"case": "001", "name": "Siti", "label": "No. 11", "helper": "", "subject": "Shared wall with No. 12"}
+    assert notice["values"] == {"case": "001", "unit": "T-11", "label": "No. 11", "helper": "", "subject": "Shared wall with No. 12"}
