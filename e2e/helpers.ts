@@ -26,7 +26,8 @@ export async function judgeStep(page: Page, n: number) {
   await expect(step).toHaveClass(/here/)
 }
 
-/** The welcome card greets each household once, in a sheet over the Neighbours screen; close it (after a photo). */
+/** The welcome card: a sheet over Neighbours, once per pilot household; the demo never opens it by itself. Close it
+ *  if it is there (after a photo). */
 export async function dismissWelcome(page: Page, shotName?: string) {
   // The sheet appears once the directory has loaded, a moment after the screen; give it that moment.
   const welcome = page.getByRole('dialog').filter({ hasText: /meet your neighbours/i })

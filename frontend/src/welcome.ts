@@ -1,0 +1,37 @@
+import { forget, remember, remembered } from './storage'
+
+// In a pilot the welcome greets each household once: seen is remembered per household on this device, and joining
+// brings it back. The demo never opens it by itself, so a judge lands on the five homes. In both modes the Me page
+// shows it again. (A private window remembers nothing, so in a pilot it shows once per page load there.)
+const seenThisLoad = new Set<string>()
+const asked = new Set<string>()  // homes that asked for it on the Me page
+
+function seenHomes(): string[] {
+  try {
+    return JSON.parse(remembered('welcome.seen') ?? '[]') as string[]
+  } catch {
+    return []
+  }
+}
+
+function welcomeSeen(unitId: string): boolean {
+  return seenThisLoad.has(unitId) || seenHomes().includes(unitId)
+}
+
+/** Whether Neighbours opens on the welcome: a pilot household that hasn't seen it, or a home that asked for it. */
+export function welcomeDue(unitId: string, pilot: boolean): boolean {
+  return asked.has(unitId) || (pilot && !welcomeSeen(unitId))
+}
+
+export function markWelcomeSeen(unitId: string) {
+  seenThisLoad.add(unitId)
+  asked.delete(unitId)
+  remember('welcome.seen', JSON.stringify([...new Set([...seenHomes(), unitId])]))  // a private window: this load only
+}
+
+/** Forget who has seen the welcome (after joining or a demo reset). Given a home, it opens for that home next, demo too. */
+export function replayWelcome(unitId?: string) {
+  seenThisLoad.clear()
+  forget('welcome.seen')
+  if (unitId) asked.add(unitId)
+}
