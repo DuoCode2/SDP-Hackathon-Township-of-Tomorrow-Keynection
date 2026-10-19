@@ -25,7 +25,8 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, show
         const here = s.tab === tab && (!s.unit || s.unit === me)
         return (
           <li key={i}>
-            <button className={here ? 'here' : ''} onClick={() => onGo(s.tab, s.unit, { split: s.split, peer: s.peer })}>
+            <button className={here ? 'here' : ''} onClick={() => onGo(s.tab, s.unit, { split: s.split, peer: s.peer })}
+              aria-label={`${lang === 'zh' ? `第 ${i + 1} 步` : `Step ${i + 1}`}: ${s.text[lang]}`}>
               <span className="route-n">{i + 1}</span>
               <span>{s.text[lang]}</span>
             </button>

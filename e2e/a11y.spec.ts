@@ -3,15 +3,16 @@ import { dismissWelcome, judgeStep, resetDemo } from './helpers'
 
 // Every button on the judge route has a name a screen reader can say: an aria-label, visible text, or an image's alt.
 // A title alone does not count (not every reader announces it). Checked on a desktop and at phone width, where the
-// top bar hides its labels and only icons remain; also inside the renovation form, a chat thread and the split view.
+// top bar hides its labels and only icons remain; also inside the renovation form, a chat thread and the split view,
+// and for the tabs themselves: the sidebar on a desktop, the dock on a phone.
 
 const DESKTOP = { width: 1920, height: 1080 }
 const PHONE = { width: 390, height: 844 }
 
-async function unnamed(page: Page, where: string): Promise<string[]> {
-  const found = await page.evaluate(() => {
+async function unnamed(page: Page, where: string, selector = 'button'): Promise<string[]> {
+  const found = await page.evaluate((selector) => {
     const out: string[] = []
-    for (const el of Array.from(document.querySelectorAll('button'))) {
+    for (const el of Array.from(document.querySelectorAll<HTMLButtonElement>(selector))) {
       const style = getComputedStyle(el)
       const visible = (el.offsetParent !== null || style.position === 'fixed') && style.visibility !== 'hidden'
       if (!visible) continue
@@ -20,7 +21,7 @@ async function unnamed(page: Page, where: string): Promise<string[]> {
       if (!name) out.push(`<button class="${el.className}"> ${el.outerHTML.replace(/\s+/g, ' ').slice(0, 90)}`)
     }
     return out
-  })
+  }, selector)
   return found.map((f) => `${where}: ${f}`)
 }
 
@@ -36,6 +37,14 @@ test('every button on the judge route has a name, on a desktop and on a phone', 
   await expect(page.locator('article.person-card').first()).toBeVisible()
   await dismissWelcome(page)
   const found: string[] = []
+
+  // The tabs: the sidebar on a desktop, the dock on a phone. All six main-story tabs are there, each with a name.
+  for (const [size, where] of [[DESKTOP, 'sidebar'], [PHONE, 'dock']] as const) {
+    await page.setViewportSize(size)
+    await page.waitForTimeout(400)
+    expect(await page.locator('nav button:visible').count(), `${where}: tab buttons`).toBeGreaterThanOrEqual(6)
+    found.push(...(await unnamed(page, where, 'nav button')))
+  }
 
   // Each screen is reached through the Guide on the desktop, then looked at again at phone width (state is kept).
   for (let step = 1; step <= 6; step++) {

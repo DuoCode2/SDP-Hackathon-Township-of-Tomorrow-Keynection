@@ -300,18 +300,21 @@ function Shell({ pinned }: { pinned?: string }) {
   const navButton = (i: NavItem, compact: boolean) => {
     const Icon = i.icon
     const on = i.id === cur.tab
+    const label = t(compact ? `nav.${i.id}.short` : `nav.${i.id}`)  // read out as the tab's name, not "01 … sub-line"
+    const repair = i.id === 'evidence' && pending > 0
     return (
-      <button key={i.id} className={on ? 'active' : ''} onClick={() => setTab(i.id)} aria-current={on ? 'page' : undefined}>
+      <button key={i.id} className={on ? 'active' : ''} onClick={() => setTab(i.id)} aria-current={on ? 'page' : undefined}
+        aria-label={repair ? `${label} · Repair waiting for you` : label}>
         {compact ? <Icon size={19} strokeWidth={on ? 2.4 : 1.9} /> : <span className="nav-no">{i.no}</span>}
         {!compact && <Icon size={17} strokeWidth={on ? 2.3 : 1.9} className="nav-lead" />}
-        {compact ? t(`nav.${i.id}.short`) : (
+        {compact ? label : (
           <span className="nav-text">
-            <b>{t(`nav.${i.id}`)}</b>
+            <b>{label}</b>
             <small>{t(`nav.${i.id}.sub`)}</small>
           </span>
         )}
         {!compact && <Icon size={16} strokeWidth={on ? 2.3 : 1.8} className="nav-icon" />}
-        {i.id === 'evidence' && pending > 0 && <span className="dot" aria-label="Repair waiting for you" />}
+        {repair && <span className="dot" aria-label="Repair waiting for you" />}
       </button>
     )
   }
