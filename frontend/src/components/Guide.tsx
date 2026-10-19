@@ -9,7 +9,7 @@ interface Props {
   open: boolean
   onLang: (lang: GuideLang) => void
   onClose: () => void
-  onGo: (tab: TabId, unit?: string) => void
+  onGo: (tab: TabId, unit?: string, opts?: { split?: boolean; peer?: string }) => void
   showAll: boolean
   onShowAll: (on: boolean) => void
 }
@@ -25,7 +25,7 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, show
         const here = s.tab === tab && (!s.unit || s.unit === me)
         return (
           <li key={i}>
-            <button className={here ? 'here' : ''} onClick={() => onGo(s.tab, s.unit)}>
+            <button className={here ? 'here' : ''} onClick={() => onGo(s.tab, s.unit, { split: s.split, peer: s.peer })}>
               <span className="route-n">{i + 1}</span>
               <span>{s.text[lang]}</span>
             </button>

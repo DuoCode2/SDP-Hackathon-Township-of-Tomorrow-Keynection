@@ -86,15 +86,15 @@ test('the 3-minute judge route, with a screenshot per step', async ({ page }) =>
   const right = page.getByLabel('Pane 2')
 
   await test.step('K08 Both sides of the shared wall', async () => {
-    await judgeStep(page, 4)
-    await page.locator('button.split-btn').click()
+    await judgeStep(page, 4) // one click: the Guide opens both panes itself
     await expect(left).toBeVisible()
     await expect(right).toBeVisible()
     await shot(page, 'K08-both-sides')
   })
 
   await test.step('K09 Siti reads the notice: planned around her quiet time', async () => {
-    await right.locator('button.chat-row', { hasText: 'Aiman' }).click()
+    // Already open on Aiman's thread, no row to tap.
+    await expect(right.locator('.thread-head')).toContainText('Aiman')
     await expect(right.getByText('Noisy hours planned around your quiet time')).toBeVisible()
     await shot(page, 'K09-notice-quiet-time')
   })
@@ -107,16 +107,14 @@ test('the 3-minute judge route, with a screenshot per step', async ({ page }) =>
     await expect(right.getByRole('button', { name: 'Use this' })).toBeVisible()
     await shot(page, 'K10-calmer-wording')
     await right.getByRole('button', { name: 'Use this' }).click()
-    // Sent, not yet read: one tick on Siti's own message (Aiman has not opened the thread).
-    const ticks = right.locator('.msg.mine .msg-ticks').last()
-    await expect(ticks).toBeVisible()
-    await expect(ticks).not.toHaveClass(/read/)
+    await expect(right.locator('.msg.mine .msg-ticks').last()).toBeVisible()
   })
 
   await test.step('K11 Aiman reads it in English, the original one tap away', async () => {
-    await left.locator('button.chat-row', { hasText: 'Siti' }).click()
+    // Aiman's pane is already open on Siti's thread, so no row to tap.
+    await expect(left.locator('.thread-head')).toContainText('Siti')
     await expect(left.getByText(/\[stand-in → EN\]/).last()).toBeVisible()
-    // Aiman opened the thread, so Siti's message now shows two ticks, live, on her side.
+    // Aiman has the thread open, so Siti's message shows two ticks, live, on her side.
     await expect(right.locator('.msg.mine .msg-ticks.read').last()).toBeVisible()
     await shot(page, 'K11-translated')
     await page.locator('button.split-btn').click() // back to one pane

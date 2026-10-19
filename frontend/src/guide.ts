@@ -402,6 +402,9 @@ export const PAGES: Record<TabId, PageGuide> = {
 export interface RouteStep {
   tab: TabId
   unit?: string
+  // Both sides of the shared wall at once (Aiman left, Siti right), and the thread to open on the focused side.
+  split?: boolean
+  peer?: string
   text: Text
 }
 
@@ -429,10 +432,10 @@ export const JUDGE_ROUTE: RouteStep[] = [
     },
   },
   {
-    tab: 'chats', unit: 'T-11',
+    tab: 'chats', unit: 'T-11', split: true, peer: 'T-12',
     text: {
-      zh: '按顶栏「Both sides」（左 Aiman、右 Siti）→ Siti 打开 Aiman 的通知，看到「吵闹时段已避开你的安静时间」，宝宝午睡不用她开口 → 回 👋 → 再用马来文打一句冲的话（例：「Rumah awak bising macam kilang! Tak reti hormat jiran ke?」）→ AI 先给她平和的说法 → Aiman 看到的是英文，原文点一下就有',
-      en: 'Turn on "Both sides" (Aiman left, Siti right) → Siti opens Aiman’s notice: "Noisy hours planned around your quiet time", so she never had to ask about the baby’s nap → she waves back → then types something sharp in Malay ("Rumah awak bising macam kilang! Tak reti hormat jiran ke?") → AI offers her a calmer wording → Aiman reads it in English, the original one tap away',
+      zh: 'Siti 打开 Aiman 的通知，看到「吵闹时段已避开你的安静时间」，宝宝午睡不用她开口 → 回 👋 → 再用马来文打一句冲的话（例：「Rumah awak bising macam kilang! Tak reti hormat jiran ke?」）→ AI 先给她平和的说法 → Aiman 看到的是英文，原文点一下就有',
+      en: 'Siti opens Aiman’s notice: "Noisy hours planned around your quiet time", so she never had to ask about the baby’s nap → she waves back → then types something sharp in Malay ("Rumah awak bising macam kilang! Tak reti hormat jiran ke?") → AI offers her a calmer wording → Aiman reads it in English, the original one tap away',
     },
   },
   {
@@ -474,10 +477,10 @@ export const ROUTE: RouteStep[] = [
     },
   },
   {
-    tab: 'chats', unit: 'T-11',
+    tab: 'chats', unit: 'T-11', split: true, peer: 'T-12',
     text: {
-      zh: '按顶栏「Both sides」开分屏（左 Aiman、右 Siti）→ Siti 在 Chats 回 👋、按表情 ❤️、按快捷回复「宝宝午睡」→ 左边 Aiman 看到英文翻译；也可以按麦克风录语音',
-      en: 'Turn on "Both sides" (Aiman left, Siti right) → Siti waves back, reacts ❤️ and taps the baby-nap quick reply → Aiman sees it in English; the mic records a voice note',
+      zh: 'Siti 在 Chats 回 👋、按表情 ❤️、按快捷回复「宝宝午睡」→ 左边 Aiman 看到英文翻译；也可以按麦克风录语音',
+      en: 'Siti waves back, reacts ❤️ and taps the baby-nap quick reply → Aiman sees it in English; the mic records a voice note',
     },
   },
   {

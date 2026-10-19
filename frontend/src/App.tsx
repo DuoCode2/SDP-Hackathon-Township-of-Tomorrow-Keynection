@@ -275,11 +275,18 @@ function Shell({ pinned }: { pinned?: string }) {
   }
 
   // Guide steps: in split view, drive the pane that already shows that household.
-  const go = (next: TabId, unit?: string) => {
-    const target = split && unit ? panes.findIndex((p) => p.me === unit) : -1
-    const i = target >= 0 ? target : focus
-    update(i, { tab: next, peer: undefined, ...(unit ? { me: unit } : {}) })
-    setActive(i)
+  // A step that wants both sides opens them itself, Aiman left and Siti right, each already on the other's thread;
+  // a screen too narrow for two panes shows Siti alone, still on that thread.
+  const go = (next: TabId, unit?: string, opts?: { split?: boolean; peer?: string }) => {
+    if (opts?.split && window.matchMedia(SPLIT_OK).matches) {
+      setPanes([{ me: 'T-12', tab: next, peer: 'T-11' }, { me: 'T-11', tab: next, peer: 'T-12' }])
+      setActive(1)
+    } else {
+      const target = split && unit ? panes.findIndex((p) => p.me === unit) : -1
+      const i = target >= 0 ? target : focus
+      update(i, { tab: next, peer: opts?.peer, ...(unit ? { me: unit } : {}) })
+      setActive(i)
+    }
     if (!window.matchMedia(WIDE).matches) setGuideOpen(false)
   }
 
