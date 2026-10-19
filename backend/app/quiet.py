@@ -11,6 +11,7 @@ from datetime import date, datetime
 from typing import Any
 
 LEGAL_FROM, LEGAL_TO = "09:00", "18:00"  # noisy renovation work, Monday to Saturday (the estate's house rules)
+HOUSE_RULE_HOURS = f"Noisy work is allowed {LEGAL_FROM}–{LEGAL_TO}, Monday to Saturday"  # what an owner asking for more is told
 MIN_NOISY_MINUTES = 4 * 60  # the renovating owner always keeps at least this much noisy work a day
 MAX_QUIET_WINDOWS = 2  # per household
 MAX_QUIET_MINUTES = 3 * 60  # per household per day, so nobody can block a renovation by asking for quiet all day

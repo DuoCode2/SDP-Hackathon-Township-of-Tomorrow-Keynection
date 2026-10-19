@@ -288,10 +288,12 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
             <label className="field">{t('reno.start')}<input type="date" value={reno.start} onChange={set('start')} /></label>
             <label className="field">{t('reno.end')}<input type="date" value={reno.end} min={reno.start} onChange={set('end')} /></label>
           </div>
+          {/* The house rule's hours (LEGAL_FROM/LEGAL_TO in quiet.py): the server refuses a notice outside them. */}
           <div className="grid-2">
-            <label className="field">{t('reno.noisyFrom')}<input type="time" value={reno.noisy_from} onChange={set('noisy_from')} /></label>
-            <label className="field">{t('reno.noisyTo')}<input type="time" value={reno.noisy_to} onChange={set('noisy_to')} /></label>
+            <label className="field">{t('reno.noisyFrom')}<input type="time" value={reno.noisy_from} min="09:00" max="18:00" onChange={set('noisy_from')} /></label>
+            <label className="field">{t('reno.noisyTo')}<input type="time" value={reno.noisy_to} min="09:00" max="18:00" onChange={set('noisy_to')} /></label>
           </div>
+          <small>{t('reno.hoursRule')}</small>
           <label className="switch-row"><input type="checkbox" checked={!!reno.weekdays_only} onChange={set('weekdays_only')} /> {t('reno.weekends')}</label>
           {plan && plan.homes_with_quiet_times > 0 && (
             <div className="qplan-card">

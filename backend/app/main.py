@@ -732,6 +732,10 @@ class Renovation(BaseModel):
             raise ValueError(f"a renovation notice can cover at most {MAX_RENOVATION_DAYS} days; send a new one after that")
         if self.noisy_to <= self.noisy_from:
             raise ValueError("noisy hours end before they start")
+        # The estate's house rule: noisy work only inside the hours it allows. Which days is the owner's own choice
+        # (weekdays_only). HH:MM strings compare in time order because HHMM keeps them zero-padded, 24-hour.
+        if self.noisy_from < quiet.LEGAL_FROM or self.noisy_to > quiet.LEGAL_TO:
+            raise ValueError(quiet.HOUSE_RULE_HOURS)
         breaks = sorted((b.start, b.end) for b in self.quiet_breaks)
         if any(not self.noisy_from < a < b < self.noisy_to for a, b in breaks):
             raise ValueError("a quiet break must sit inside the noisy hours")
@@ -995,6 +999,8 @@ def quiet_plan(unit_id: str, start: str = Query(..., pattern=DATE), end: str = Q
         raise HTTPException(422, "start and end must be real calendar dates") from None
     if last < first or noisy_to <= noisy_from:
         raise HTTPException(422, "The dates or the noisy hours are the wrong way round.")
+    if noisy_from < quiet.LEGAL_FROM or noisy_to > quiet.LEGAL_TO:  # the house rule, the same check the notice gets
+        raise HTTPException(422, quiet.HOUSE_RULE_HOURS)
     me, _, phase_units = _phase(conn, unit_id)
     zone = [n.unit_id for n in impact_zone(_to_unit(me), phase_units, works_type)]
     plan = quiet.plan(noisy_from, noisy_to, [_quiet_times(conn, u) for u in zone])
