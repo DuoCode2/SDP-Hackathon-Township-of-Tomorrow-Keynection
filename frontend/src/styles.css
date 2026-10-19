@@ -1729,3 +1729,5 @@ button.ring-row:hover { background: var(--surface-2); }
 /* The guide's notes for judges fold away under the route steps. */
 .guide-notes summary { cursor: pointer; font-size: 12px; font-weight: 700; color: var(--text-2); }
 .guide-notes summary ~ p { margin-top: 8px; }
+/* "Introduce yourself" is a text link now: the banner keeps its words without a box, so the Wave buttons lead. */
+.say-hi, .face-warm .say-hi { background: none; border-color: transparent; }

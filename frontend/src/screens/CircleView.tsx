@@ -169,7 +169,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
             <div className="say-hi">
               <span className="say-hi-hand" aria-hidden>👋</span>
               <div className="grow"><b>{t('sayhi.title', { n: unknown })}</b><small>{t('sayhi.sub')}</small></div>
-              <button className="btn btn-sm btn-primary" onClick={() => setIntroOpen(true)}>{t('btn.introduce')}</button>
+              <button className="link" onClick={() => setIntroOpen(true)}>{t('btn.introduce')}</button>
             </div>
           )}
 
@@ -202,8 +202,9 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
                   {works.has(n.id) ? <><Hammer size={12} /> {t('status.renovating')}</> : t(n.known ? 'status.known' : 'status.notMet')}
                 </div>
                 <div className="btn-row">
-                  <button className="btn btn-sm btn-primary" onClick={() => onOpenChat(n.id)}><MessagesSquare size={14} /> {t('btn.message')}</button>
-                  <button className="btn btn-sm" disabled={n.waved_today || n.allow_waves === false} onClick={() => wave(n)}
+                  {/* Not met yet: a wave is the easy first step, so it leads; once known, a message does. */}
+                  <button className={`btn btn-sm ${n.known ? 'btn-primary' : ''}`} onClick={() => onOpenChat(n.id)}><MessagesSquare size={14} /> {t('btn.message')}</button>
+                  <button className={`btn btn-sm ${n.known ? '' : 'btn-primary'}`} disabled={n.waved_today || n.allow_waves === false} onClick={() => wave(n)}
                     title={n.allow_waves === false ? t('wave.off') : undefined}>
                     👋 {t(n.waved_today ? 'btn.waved' : 'btn.wave')}
                   </button>
