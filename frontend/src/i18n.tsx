@@ -210,6 +210,11 @@ const D: Record<string, Entry> = {
   'ai.reno.done': ['Filled in by AI. Check each step before you send.', 'Diisi oleh AI. Semak setiap langkah sebelum menghantar.', 'AI 已帮你填好，发送前请逐步检查。'],
   'ai.reno.yours': ['Approvals and the CIDB tick stay yours to confirm in step 4.', 'Kelulusan dan tanda CIDB tetap anda sahkan sendiri di langkah 4.', '批准和 CIDB 仍由你在第 4 步亲自确认。'],
   'ai.reno.missing': ['Neighbours may also want to know:', 'Jiran mungkin juga mahu tahu:', '邻居可能还想知道：'],
+  // Without AI the box keeps the three examples; each fills in a ready-made notice on this device.
+  'ai.reno.offTitle': ['Try an example', 'Cuba satu contoh', '试试一个例子'],
+  'ai.reno.offHint': ['AI isn’t switched on here, so each example fills in a ready-made notice for you to check. Or pick the type of work below.', 'AI tidak dihidupkan di sini, jadi setiap contoh mengisi notis sedia ada untuk anda semak. Atau pilih jenis kerja di bawah.', '这里没开 AI，每个例子会填入一份现成的通知让你检查。也可以直接在下面选工程类型。'],
+  'ai.reno.offTry': ['Pick one:', 'Pilih satu:', '选一个：'],
+  'ai.reno.example': ['Example filled in. Check each step before you send.', 'Contoh telah diisi. Semak setiap langkah sebelum menghantar.', '例子已填好，发送前请逐步检查。'],
   'ai.unsure.dates': ['The dates didn’t add up, so they are left for you.', 'Tarikh tidak munasabah, jadi dibiarkan untuk anda isi.', '日期对不上，留给你自己填。'],
   'ai.unsure.hours': ['The noisy hours didn’t add up, so they are left for you.', 'Waktu bising tidak munasabah, jadi dibiarkan untuk anda isi.', '吵闹时段对不上，留给你自己填。'],
   'ai.off': ['AI isn’t switched on here. The steps below work the same.', 'AI tidak dihidupkan di sini. Langkah di bawah berfungsi seperti biasa.', '这里没开 AI，下面的步骤照常可用。'],

@@ -28,6 +28,21 @@ function addDays(iso: string, n: number): string {
 }
 const daysBetween = (a: string, b: string) => Math.round((new Date(`${b}T00:00:00`).getTime() - new Date(`${a}T00:00:00`).getTime()) / 86_400_000)
 
+/** The coming Monday (a week away when today is Monday), as YYYY-MM-DD. */
+function nextMonday(): string {
+  return daysFromToday((8 - new Date().getDay()) % 7 || 7)
+}
+
+/** The first day of next month, as YYYY-MM-DD. */
+function firstOfNextMonth(): string {
+  const d = new Date()
+  return ymd(new Date(d.getFullYear(), d.getMonth() + 1, 1))
+}
+
+// What an example fills in when AI is off: the kind of work, a short description in that language, dates worked out
+// from today, and the contractor named in the sentence.
+type Preset = { works: WorksType; scope: string; lang: Lang; start: () => string; days: number; contractor: string }
+
 const STEPS = ['reno.steps.type', 'reno.steps.who', 'reno.steps.when', 'reno.steps.approvals', 'reno.steps.review']
 
 // Title and detail come from the dictionary (works.<id>, works.<id>.d). The scope is the owner's own words, sent as typed.
@@ -56,7 +71,8 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   const helper = useHelper(me.id)
   const strata = me.kind === 'apartment'
   const [step, setStep] = useState(0)
-  const [works, setWorks] = useState<WorksType>(strata ? 'wet' : 'structural')
+  // Every home starts on wet work: the first card, and the only kind that never needs an approval before Next.
+  const [works, setWorks] = useState<WorksType>('wet')
   const [zone, setZone] = useState<ImpactItem[] | null>(null)
   const [lang, setLang] = useState<Lang>(me.lang)
   const [draft, setDraft] = useState<string | null>(null)
@@ -71,7 +87,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   const [plan, setPlan] = useState<QuietPlan | null>(null)
   const [usePlan, setUsePlan] = useState(true)
   const [reno, setReno] = useState<Renovation>({
-    scope: t(`works.${strata ? 'wet' : 'structural'}.scope`),
+    scope: t('works.wet.scope'),
     start: daysFromToday(7),
     end: daysFromToday(21),
     noisy_hours: '',
@@ -134,15 +150,30 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   }
   const blocked = works === 'structural' && (strata ? reno.management_approval !== 'approved' : reno.council_permit !== 'approved')
 
-  /** The owner's one sentence fills in the steps; whatever AI left empty keeps what was there. Nothing is sent. */
   // One sentence in each language a judge can try without typing; each is a different kind of work, so the
-  // notice list on the next step changes with it.
-  const EXAMPLES = [
-    { label: 'English', text: 'Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 5' },
-    { label: 'Bahasa Melayu', text: 'Nak pecah jubin dapur dan gerudi dinding mulai Isnin depan selama tiga minggu, Kontraktor Maju, Isnin hingga Jumaat 9 pagi hingga 5 petang' },
-    { label: '中文', text: '下个月初开始油漆和做木工，大概一个星期，承包商是兴隆装修，平日早上九点到下午五点' },
+  // notice list on the next step changes with it. Without AI the same button applies the preset beside it, on this
+  // device, so the example still fills in the steps. Nothing is sent either way.
+  const EXAMPLES: { label: string; text: string; preset: Preset }[] = [
+    { label: 'English', text: 'Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 5',
+      preset: { works: 'wet', scope: 'Retile the master bathroom', lang: 'en', start: nextMonday, days: 14, contractor: 'ABC Renovation' } },
+    { label: 'Bahasa Melayu', text: 'Nak pecah jubin dapur dan gerudi dinding mulai Isnin depan selama tiga minggu, Kontraktor Maju, Isnin hingga Jumaat 9 pagi hingga 5 petang',
+      preset: { works: 'hacking', scope: 'Pecah jubin dapur dan gerudi dinding', lang: 'ms', start: nextMonday, days: 21, contractor: 'Kontraktor Maju' } },
+    { label: '中文', text: '下个月初开始油漆和做木工，大概一个星期，承包商是兴隆装修，平日早上九点到下午五点',
+      preset: { works: 'light', scope: '油漆和做木工', lang: 'zh', start: firstOfNextMonth, days: 7, contractor: '兴隆装修' } },
   ]
 
+  /** Without AI, an example fills in the steps from its preset: weekdays 9 to 5, the owner's language. Nothing is sent. */
+  function applyPreset(p: Preset) {
+    const start = p.start()
+    setWorks(p.works)
+    setReno((r) => ({ ...r, scope: p.scope, start, end: addDays(start, p.days - 1), noisy_from: '09:00', noisy_to: '17:00', weekdays_only: true, contractor: p.contractor }))
+    setLang(p.lang)
+    setDraft(null)
+    setFilled(null)
+    setAiNote(t('ai.reno.example'))
+  }
+
+  /** The owner's one sentence fills in the steps; whatever AI left empty keeps what was there. Nothing is sent. */
   async function fillIn(text?: string) {
     const what = (text ?? said).trim()
     if (text !== undefined) setSaid(text)
@@ -209,21 +240,23 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
 
       {step === 0 && (
         <div className="wizard-body">
-          {ai?.on && (
+          {ai && (
             <div className="ai-box">
-              <div className="ai-box-head"><Sparkles size={15} /> <b>{t('ai.reno.title')}</b></div>
-              <small className="muted">{t('ai.reno.hint')}</small>
-              <div className="ai-box-row">
-                <textarea rows={2} maxLength={500} value={said} onChange={(e) => setSaid(e.target.value)} placeholder={t('ai.reno.placeholder')}
-                  aria-label={t('ai.reno.title')} />
-                <button className="btn btn-primary" disabled={!said.trim() || reading} onClick={() => fillIn()}>
-                  <Sparkles size={14} /> {reading ? t('ai.reno.working') : t('ai.reno.fill')}
-                </button>
-              </div>
+              <div className="ai-box-head"><Sparkles size={15} /> <b>{t(ai.on ? 'ai.reno.title' : 'ai.reno.offTitle')}</b></div>
+              <small className="muted">{t(ai.on ? 'ai.reno.hint' : 'ai.reno.offHint')}</small>
+              {ai.on && (
+                <div className="ai-box-row">
+                  <textarea rows={2} maxLength={500} value={said} onChange={(e) => setSaid(e.target.value)} placeholder={t('ai.reno.placeholder')}
+                    aria-label={t('ai.reno.title')} />
+                  <button className="btn btn-primary" disabled={!said.trim() || reading} onClick={() => fillIn()}>
+                    <Sparkles size={14} /> {reading ? t('ai.reno.working') : t('ai.reno.fill')}
+                  </button>
+                </div>
+              )}
               <div className="ai-examples">
-                <small className="muted">{t('ai.reno.try')}</small>
+                <small className="muted">{t(ai.on ? 'ai.reno.try' : 'ai.reno.offTry')}</small>
                 {EXAMPLES.map((x) => (
-                  <button key={x.label} type="button" className="btn btn-sm" disabled={reading} onClick={() => fillIn(x.text)}>{x.label}</button>
+                  <button key={x.label} type="button" className="btn btn-sm" disabled={reading} onClick={() => (ai.on ? fillIn(x.text) : applyPreset(x.preset))}>{x.label}</button>
                 ))}
               </div>
               {aiNote && <div className="ai-note">{aiNote}</div>}

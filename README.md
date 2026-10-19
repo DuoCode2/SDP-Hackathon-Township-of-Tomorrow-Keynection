@@ -31,7 +31,7 @@ The route is the top of the **Guide** panel (top-right). One click per step jump
 5. **If something goes wrong.** Siti: Use sample → Sample crack → the crack was there before the works, so it goes to the warranty, not to Aiman.
 6. **How SDP checks it works.** The Impact model uses the 2020 census question (share of residents with no face-to-face neighbour contact in a month), asked before and after a pilot. The command view also counts next-door pairs who know each other.
 
-Without an AI key, steps 2 and 4 still work: the notice is filled in step by step and typed words go as written. The Guide's top line says whether AI is on. A 7-minute full route is in the Guide under *Show every feature* (see "Beyond the main story" below).
+Without an AI key, steps 2 and 4 still work: the three examples fill the notice in from a ready-made preset (the bathroom story is the English one; by hand, keep the first card, *Bathroom, kitchen or plumbing*, and fill in the steps), and typed words go as written. The Guide's top line says whether AI is on. A 7-minute full route is in the Guide under *Show every feature* (see "Beyond the main story" below).
 
 ## What is different
 

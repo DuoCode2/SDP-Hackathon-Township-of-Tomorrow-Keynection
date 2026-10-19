@@ -45,8 +45,8 @@ export const UI: Record<string, Text> = {
   fictional: { zh: '所有住户、门牌和照片都是虚构的示范资料。', en: 'All residents, units and photos are fictional demo data.' },
   aiOn: { zh: 'AI 已开启：打字自动翻译、太冲先劝、一句话写装修通知', en: 'AI on: typed words translated, heated ones calmed, the notice written from one sentence' },
   aiOff: {
-    zh: 'AI 没开（服务器没有 AI 金钥）：路线照样能走，只是打的字照原文送、装修通知要逐步填',
-    en: 'AI off (no AI key on the server): the route still works; typed words go as written and the notice is filled in step by step',
+    zh: 'AI 没开（服务器没有 AI 金钥）：路线照样能走。打的字照原文送；装修通知的三句示例仍可按，会填入现成的内容（浴室那句按「English」），或保留第一张「浴室、厨房或水管」卡自己逐步填',
+    en: 'AI off (no AI key on the server): the route still works. Typed words go as written; the three renovation examples still fill the notice in from a ready-made preset (the bathroom story is the "English" one), or keep the first card, "Bathroom, kitchen or plumbing", and fill in the steps yourself',
   },
   showAll: { zh: '显示全部功能', en: 'Show every feature' },
   showAllHint: {

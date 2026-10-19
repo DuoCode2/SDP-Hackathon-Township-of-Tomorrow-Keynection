@@ -40,7 +40,6 @@ test('primary buttons and stamps per screen (read-only audit)', async ({ page })
   await page.getByRole('button', { name: 'Register renovation' }).first().click()
   const sheet = page.getByRole('dialog')
   await expect(sheet).toBeVisible()
-  await sheet.locator('.works-card').first().click() // wet work: a terrace defaults to structural, which needs a permit before Next
   for (let i = 1; i <= 5; i++) {
     rows.push(await look(page, `Register renovation, step ${i}`))
     if (i < 5) await sheet.getByRole('button', { name: /^Next$/ }).click()

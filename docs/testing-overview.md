@@ -48,6 +48,7 @@ Three tests were written after our own security review, each named for the probl
 - `monkey.spec.ts` makes 250 random clicks and keystrokes across every screen (seed printed, repeatable with `MONKEY_SEED`) and fails on any uncaught error, 5xx answer or the error boundary appearing; the app's own refusals (a second wave today, an insult, a cap) are allowed.
 - `a11y.spec.ts` checks that every button on the route has a name a screen reader can say (an aria-label, visible text or an image's alt; a title alone does not count), on a desktop and at phone width where the top bar keeps only icons, and inside the renovation form, a chat thread and the split view.
 - `audit.spec.ts` is read-only: it counts the solid primary buttons and the rubber stamps on each screen and prints a table for a person to judge (one primary button per screen is the rule; the result is in `reports/主按钮与印章检查_2026-10-17.md`).
+- `ai-off.spec.ts` walks K22's renovation notice with the page told AI is off: a terrace starts on the first card (wet work), the box is titled "Try an example", and the Malay example fills in a ready-made preset on the device with no AI call, so Send notice is reached without touching an approval.
 
 First run 17 Oct 2026: all three passing, no browser console errors. They read the text on screen (button labels, headings) rather than test hooks, so a renamed button fails a walk on purpose.
 
