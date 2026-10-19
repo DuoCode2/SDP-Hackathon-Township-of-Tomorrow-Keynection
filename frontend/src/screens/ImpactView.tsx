@@ -23,7 +23,7 @@ type Input = { key: string; label: string; unit: string; value: number; min: num
 
 const INPUTS: Input[] = [
   { key: 'homes', label: 'Homes in the phase', unit: 'homes', value: 1000, min: 10, max: 5000, step: 10, note: 'From Phase setup, or type your own' },
-  { key: 'cut', label: 'Cut in "no contact with a neighbour"', unit: '%', value: 50, min: 0, max: 100, step: 5, note: 'Pilot target, checked with the census question at handover and six months later' },
+  { key: 'cut', label: 'Cut in "no contact with a neighbour"', unit: '%', value: 50, min: 0, max: 100, step: 5, note: 'Pilot target, to be replaced by the survey result; checked with the census question at handover and six months later' },
   { key: 'disputes', label: 'Defect claims where the cause is disputed, per 100 homes', unit: 'claims', value: 3, min: 0, max: 50, step: 1, note: 'Assumption: “my neighbour’s works or a building defect?”' },
   { key: 'disputeHours', label: 'Staff time per disputed claim', unit: 'hours', value: 8, min: 0, max: 80, step: 1, note: 'Assumption' },
   { key: 'photoShare', label: 'Disputes settled quickly thanks to pre-work photos', unit: '%', value: 50, min: 0, max: 100, step: 1, note: 'Assumption: measured in the pilot' },
@@ -101,7 +101,7 @@ export default function ImpactView() {
         <Line label="Households with no neighbour contact today" value={num(noContactToday)} formula="homes × census share (people 15+ applied to households)" />
         <Line label="After the pilot target" value={num(noContactAfter)} formula="today × (1 − target cut)" />
         <Line label="Households newly in touch with a neighbour" value={num(noContactToday - noContactAfter)} formula="today − after" strong />
-        <p className="small muted census-note">Checked with the census’s own question at handover and six months later, so the pilot is comparable with the national figures. The command view also counts next-door pairs who know each other and days from handover to the first hello.</p>
+        <p className="small muted census-note">Checked with the census’s own question at handover and six months later, so the pilot is comparable with the national figures. The command view also counts next-door pairs who know each other and days from handover to the first hello. Compared against a control: a sister phase handed over the same quarter without Keynection, or the same phase at 6 and 12 months.</p>
       </Card>
 
       <div className="cols">
@@ -125,9 +125,11 @@ export default function ImpactView() {
         </div>
 
         <div className="col sticky">
+          {/* Connection on top: the census-question result, then the two rates the command view measures live (not fetched here). */}
           <div className="kpi-mini">
-            <div><b>{num(hoursSaved)} h</b><span>staff time saved over two years (assumptions)</span></div>
-            <div><b>{rm(net)}</b><span>net saving after WhatsApp costs (assumptions)</span></div>
+            <div style={{ gridColumn: '1 / -1' }}><b>{num(noContactToday - noContactAfter)}</b><span>households newly in touch (census question)</span></div>
+            <div><b>—</b><span>next-door pairs who know each other · measured live in the command view</span></div>
+            <div><b>—</b><span>days from keys to the first hello · measured live</span></div>
           </div>
           <Card>
             <CardHead icon={<Scale size={16} />} title="Disputed defect claims" sub="SDP’s own cost during the 24-month warranty" />
@@ -140,6 +142,13 @@ export default function ImpactView() {
             <Line label="Complaints without Keynection" value={num(complaints)} formula="renovations × complaint share" />
             <Line label="Settled between neighbours" value={num(complaints * p('settled'))} formula="complaints × settled share" />
             <Compare a={hoursToday} b={hoursWith} />
+          </Card>
+          <Card>
+            <CardHead icon={<Calculator size={16} />} title="What SDP could save (assumptions)" />
+            <div className="kpi-mini">
+              <div><b>{num(hoursSaved)} h</b><span>staff time saved over two years (assumptions)</span></div>
+              <div><b>{rm(net)}</b><span>net saving after WhatsApp costs (assumptions)</span></div>
+            </div>
           </Card>
           <Card>
             <CardHead icon={<Wallet size={16} />} title="Money" />
