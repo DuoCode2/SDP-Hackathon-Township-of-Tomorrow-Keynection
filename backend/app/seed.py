@@ -12,11 +12,13 @@ HANDOVER_DAYS_AGO = 14
 # the notice has one more paragraph (what residents type is translated by Claude, outside Malaysia): its own version.
 # 10b: how long each kind of data is kept, said exactly; backups; closing the account in the app.
 # 10c (the AI versions only): the AI paragraph now says that a message the AI judges to be abuse is refused.
+# 10d (the AI versions only): the AI paragraph also says what the assistant sends: the household's own records and
+#   its neighbours' unit numbers, never their names or what they wrote.
 CONSENT_VERSION = "pilot-2026-10b"
-CONSENT_VERSION_AI = "pilot-2026-10c-ai"
+CONSENT_VERSION_AI = "pilot-2026-10d-ai"
 # The demo with Gemini instead: the paragraph names Google, says its free tier may use what is sent to improve
 # Google's products, and asks for made-up details only. Never shown in a pilot (ai.provider).
-CONSENT_VERSION_AI_GEMINI = "pilot-2026-10c-ai-gemini"
+CONSENT_VERSION_AI_GEMINI = "pilot-2026-10d-ai-gemini"
 
 # Households that have not joined Keynection yet. Until they do, neighbours see their unit number only, never a name,
 # and renovation notices reach them on paper through the estate office.

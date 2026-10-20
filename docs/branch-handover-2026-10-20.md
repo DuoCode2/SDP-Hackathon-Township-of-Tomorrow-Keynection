@@ -118,7 +118,7 @@ main (47486e7)
 - `docs/test-plan.md` 若引用 `K01a-welcome-card` 截图：demo 不再自动弹 Welcome，改为从 Me 页「Show the welcome again」拍。
 - `docs/key-decisions.md` 第 3 行「AI 只放两处」→ 三处（助手是例外，且永不替用户发送）；decision 17 的 read-ticks 一行和实际不符（e35eade 加了 read ticks）。
 - `docs/feature-status.md` 加三行：助手（live with key；关键词退路 live）、开场（live，demo only）、排屋后排（live）；「WhatsApp 发送」仍 Not built。
-- 隐私声明版本：`seed.py` 的 `CONSENT_VERSION_AI = "pilot-2026-10c-ai"` 对应文字多了助手一句，按惯例应升 10d（我们没动 seed 的这一行）。
+- ~~隐私声明版本升 10d~~：已在合并 PR 里做（`pilot-2026-10d-ai` / `pilot-2026-10d-ai-gemini`）。
 - technical-summary 安全头：DENY → SAMEORIGIN。
 
 ## 5. 发现但没修的问题（按优先级）
