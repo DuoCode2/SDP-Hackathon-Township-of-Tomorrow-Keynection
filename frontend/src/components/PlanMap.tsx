@@ -33,7 +33,7 @@ function sharedEdge(a: Box, b: Box): Edge | null {
   return null
 }
 
-export default function PlanMap({ units, me, circle, ring2 = [], names, works = [], selected = null, onSelect, view, impact }: {
+export default function PlanMap({ units, me, circle, ring2 = [], names, works = [], selected = null, onSelect, view, impact, intro = false }: {
   units: UnitInfo[]
   me: UnitInfo
   circle: { id: string; relation: Relation }[]
@@ -47,6 +47,8 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
   view: 'terrace' | 'apartment'
   /** Renovation preview: the homes that would be notified. */
   impact?: string[]
+  /** Key-day opening: the plan draws itself, then the circle lights up one home at a time (styles.css, plan-intro). */
+  intro?: boolean
 }) {
   const shown = units.filter((u) => u.kind === view)
   const circleIds = new Set(circle.map((c) => c.id))
@@ -84,7 +86,7 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
   return (
     <>
     <div className="plan-scroll" ref={scroller}>
-    <svg className={`plan ${previewing ? 'previewing' : ''}`} viewBox="0 0 720 400" role="group" aria-label={view === 'terrace' ? 'Plan of Jalan Demo 1' : 'Section through Block A'}>
+    <svg className={`plan ${previewing ? 'previewing' : ''} ${intro ? 'plan-intro' : ''}`} viewBox="0 0 720 400" role="group" aria-label={view === 'terrace' ? 'Plan of Jalan Demo 1' : 'Section through Block A'}>
       <defs>
         <pattern id="hatch-works" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <line x1="0" y1="0" x2="0" y2="7" style={{ stroke: 'var(--works)' }} strokeWidth="2" opacity="0.45" />
@@ -107,6 +109,7 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
         return (
           <g key={u.id} className={`home ${cls(u)} ${selected === u.id ? 'selected' : ''} ${onSelect ? '' : 'static'}`}
             role={onSelect ? 'button' : undefined} tabIndex={onSelect ? 0 : undefined}
+            style={circleIds.has(u.id) ? ({ '--i': circle.findIndex((c) => c.id === u.id) } as React.CSSProperties) : undefined}
             aria-label={`${u.label}${names[u.id] ? `, ${names[u.id]}` : ''}${worksAt.has(u.id) ? ', renovating' : ''}`}
             onClick={() => onSelect?.(u.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onSelect?.(u.id)}>
             <rect className="home-fill" x={b.x} y={b.y} width={b.w} height={b.h} />

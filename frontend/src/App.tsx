@@ -25,6 +25,7 @@ import PlannerView from './screens/PlannerView'
 import ImpactView from './screens/ImpactView'
 import ChannelsView from './screens/ChannelsView'
 import SignInView from './screens/SignInView'
+import OpeningView from './screens/OpeningView'
 
 // Labels come from the dictionary: nav.<id>, nav.<id>.sub, nav.<id>.short.
 const NAV = [
@@ -191,6 +192,8 @@ function Shell({ pinned }: { pinned?: string }) {
   const [lang, setLang] = useState<GuideLang>(storedLang)
   const [canSplit, setCanSplit] = useState(() => window.matchMedia(SPLIT_OK).matches)
   const [showAll, setShowAll] = useState(storedShowAll)
+  // Demo only: the key-day opening, once per browser (a pilot household has the real join page).
+  const [opening, setOpening] = useState(() => !pinned && remembered('opening.done') === null)
   // Pilot: the signed-in household's own screens, all of them. Demo: the main story, or every feature.
   const visible = (id: TabId) => (pinned ? RESIDENT_TABS.includes(id) : showAll || FOCUS_TABS.includes(id))
   // Numbered in the order shown, so the main story reads 01–06 and the sheet count matches what is on screen.
@@ -321,6 +324,11 @@ function Shell({ pinned }: { pinned?: string }) {
   }
 
   const groupTitle = (g: string) => t(`group.${g}`)
+
+  if (opening) {
+    return <OpeningView units={units} onPick={(id) => setPanes([{ me: id, tab: 'circle' }])}
+      onDone={() => { remember('opening.done', '1'); setOpening(false) }} />
+  }
 
   return (
     <div className={`app ${faceOf(cur.tab)} ${guideOpen ? 'guide-on' : ''}`}>

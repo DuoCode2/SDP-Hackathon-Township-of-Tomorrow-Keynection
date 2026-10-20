@@ -49,8 +49,11 @@ export function watchErrors(page: Page): string[] {
   return errors
 }
 
-/** Back to the fictional phase as seeded, so a spec never depends on what another spec did. */
-export async function resetDemo(page: Page) {
+/** Back to the fictional phase as seeded, so a spec never depends on what another spec did. Every spec starts here,
+ *  so this also marks the key-day opening as seen (storage.ts keeps it as keynection.opening.done): the specs start
+ *  on the app itself. opening.spec.ts asks for the opening instead. */
+export async function resetDemo(page: Page, { opening = false } = {}) {
+  if (!opening) await page.addInitScript(() => localStorage.setItem('keynection.opening.done', '1'))
   const r = await page.request.post('/api/demo/reset', { data: { confirm: true } })
   expect(r.ok(), 'POST /api/demo/reset').toBeTruthy()
 }

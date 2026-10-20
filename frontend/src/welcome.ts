@@ -29,9 +29,11 @@ export function markWelcomeSeen(unitId: string) {
   remember('welcome.seen', JSON.stringify([...new Set([...seenHomes(), unitId])]))  // a private window: this load only
 }
 
-/** Forget who has seen the welcome (after joining or a demo reset). Given a home, it opens for that home next, demo too. */
+/** Forget who has seen the welcome (after joining or a demo reset). Given a home, it opens for that home next, demo too.
+ *  The demo's key-day opening comes back as well, on the next page load. */
 export function replayWelcome(unitId?: string) {
   seenThisLoad.clear()
   forget('welcome.seen')
+  forget('opening.done')
   if (unitId) asked.add(unitId)
 }

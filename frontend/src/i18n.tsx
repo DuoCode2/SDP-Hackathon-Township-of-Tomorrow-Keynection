@@ -164,6 +164,18 @@ const D: Record<string, Entry> = {
   'welcome.eyebrow': ['Welcome home', 'Selamat pulang', '欢迎回家'],
   'welcome.title': ['Hi {name}, meet your neighbours', 'Hai {name}, kenali jiran anda', '{name}，来认识你的邻居吧'],
   'welcome.body': ['{label} · keys received {date}. These {n} homes share a wall, a slab or a road with yours. A hello now makes everything easier later.', '{label} · kunci diterima {date}. {n} rumah ini berkongsi dinding, lantai atau jalan dengan rumah anda. Bertegur sapa sekarang memudahkan segalanya kemudian.', '{label} · {date} 交屋。这 {n} 户跟你共用墙、楼板或面对面。现在打个招呼，以后什么事都好商量。'],
+  // The demo's key-day opening: the welcome-pack card, who you are, the homes around you lighting up.
+  'open.label': ['Key day', 'Hari kunci', '交钥匙那天'], 'open.skip': ['Skip', 'Langkau', '跳过'],
+  'open.cardTitle': ['Your keys came with this card', 'Kunci anda datang bersama kad ini', '钥匙附带了这张卡'],
+  'open.cardBody': ['Scan the code, choose a name and a language, and meet the homes around you.', 'Imbas kod, pilih nama dan bahasa, dan kenali rumah di sekeliling anda.', '扫码，选个名字和语言，认识你周围的人家。'],
+  'open.scan': ['Scan the code', 'Imbas kod', '扫码'],
+  'open.cardNote': ['Illustration: a real card carries a one-time code for one home.', 'Ilustrasi: kad sebenar ada kod sekali guna untuk satu rumah.', '示意图：真的卡片上是给一户人家的一次性码。'],
+  'open.who': ['Who are you?', 'Siapa anda?', '你是谁？'],
+  'open.whoSub': ['Pick a household to see Keynection through their eyes. You can switch any time at the top.', 'Pilih satu isi rumah untuk melihat Keynection dari sudut mereka. Anda boleh tukar bila-bila masa di atas.', '选一户人家，用他们的眼睛看 Keynection。随时可以在顶部切换。'],
+  'open.startHere': ['Start here', 'Mula di sini', '从这里开始'],
+  'open.hi': ['Hi {name}, these {n} homes share a wall or a road with yours', 'Hai {name}, {n} rumah ini berkongsi dinding atau jalan dengan rumah anda', '{name} 你好，这 {n} 户跟你家共用墙或同一条路'],
+  'open.hiApartment': ['Hi {name}, these {n} homes share a wall, a floor or a ceiling with yours', 'Hai {name}, {n} rumah ini berkongsi dinding, lantai atau siling dengan rumah anda', '{name} 你好，这 {n} 户跟你家共用墙、地板或天花板'],
+  'open.wave': ['👋 Wave at {name}', '👋 Lambai kepada {name}', '👋 跟 {name} 打招呼'],
   'welcome.later': ['Look around first', 'Lihat-lihat dahulu', '先看看'], 'welcome.hello': ['Say hello to them', 'Tegur mereka', '跟他们打招呼'],
   'welcome.privacy': ['Only these neighbours see your first name. Your phone number stays private.', 'Hanya jiran ini nampak nama pertama anda. Nombor telefon anda kekal rahsia.', '只有这些邻居看得到你的名字，你的电话号码保密。'],
 
