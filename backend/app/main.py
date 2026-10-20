@@ -2,6 +2,7 @@ import asyncio
 import base64
 import contextvars
 import csv
+import gzip
 import hashlib
 import hmac
 import io
@@ -32,7 +33,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from . import ai, auth, db, ledger, quiet, talk, vision
 from .neighbours import Unit, impact_reason, impact_zone, inverse_relation, neighbour_circle, street_or_block
-from . import backup, knowledge, phase_import, privacy, push
+from . import backup, knowledge, phase_import, privacy, push, stt
 from .planner import MAX_HOMES, home_count, plan_phase
 from .seed import CONSENT_VERSION, CONSENT_VERSION_AI, CONSENT_VERSION_AI_GEMINI
 from .settings import demo_mode, setting
@@ -213,6 +214,9 @@ def _pilot_checks(conn: sqlite3.Connection) -> list[str]:
     if os.environ.get("GEMINI_API_KEY"):
         out.append("GEMINI_API_KEY is not used in a pilot: Google's free tier uses what is sent to improve its products."
                    " Remove it; for AI with real households, set ANTHROPIC_API_KEY.")
+    if setting("STT_KEY"):
+        out.append("KEYNECTION_STT_KEY is not used in a pilot until the privacy notice names Deepgram, which turns"
+                   " speech into text for it. Remove it; residents' own browsers still listen.")
     if not conn.execute("SELECT COUNT(*) FROM staff WHERE revoked_at IS NULL").fetchone()[0]:
         out.append("No staff member yet: set KEYNECTION_FIRST_STAFF to their name and restart (or run scripts/add_staff.py).")
     if conn.execute("SELECT 1 FROM phases WHERE id = 'demo'").fetchone():
@@ -1025,8 +1029,9 @@ class RenovationTextIn(BaseModel):
 
 @app.get("/api/ai")
 def ai_status() -> dict[str, Any]:
-    """Whether Claude is on for translation and notice writing, so the app can say so, and fall back when it isn't."""
-    return ai.status()
+    """Whether Claude is on for translation and notice writing, so the app can say so, and fall back when it isn't;
+    and whether this server can turn speech into text for a browser that cannot (stt)."""
+    return {**ai.status(), "stt": stt.enabled()}
 
 
 @app.post("/api/ai/renovation-draft")
@@ -1167,6 +1172,36 @@ def assistant(body: AssistantIn, conn: sqlite3.Connection = Depends(get_conn)) -
         joined = {n["label"].casefold(): n for n in _circle(conn, me["id"]) if n["joined"]}
         hello = [joined[h.casefold()] for h in plan["hello_to"] if h.casefold() in joined]
     return {**plan, "hello_to": [n["label"] for n in hello], "hello_ids": [n["id"] for n in hello], "by_ai": by_ai}
+
+
+@app.post("/api/assistant/transcribe")
+def assistant_transcribe(unit_id: str = Form(..., pattern=UNIT_ID), lang: str | None = Form(None, max_length=5),
+                         duration: float = Form(..., gt=0, le=stt.MAX_SECONDS), file: UploadFile = File(...),
+                         conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
+    """What was said to the assistant, as text, for a browser that cannot listen by itself. The recording is passed
+    on and dropped, never kept; the words go back to the chat, where the resident still presses nothing for them to
+    reach anyone (the assistant only gets things ready)."""
+    me = _unit_row(conn, unit_id)
+    if not stt.enabled():
+        # Not 503: the app reads 502–504 as "the server can't be reached" and would say so.
+        raise HTTPException(501, {"code": "stt_off", "message": "Listening isn't available here. Typing works just the same."})
+    kind = (file.content_type or "").split(";")[0].strip()
+    ext = VOICE_TYPES.get(kind)
+    if ext is None:
+        raise HTTPException(415, "Please send an audio recording.")
+    raw = file.file.read(stt.MAX_BYTES + 1)
+    if len(raw) > stt.MAX_BYTES:
+        raise HTTPException(413, f"Say it in up to {stt.MAX_SECONDS} seconds.")
+    if len(raw) < 64:
+        raise HTTPException(400, "That recording is empty.")
+    if not _looks_like_audio(raw, ext):
+        raise HTTPException(415, "Please send an audio recording.")
+    if not stt.spend(me["id"]):
+        raise HTTPException(429, "That's all the listening for today. Typing works just the same.")
+    text = stt.transcribe(raw, kind, lang)
+    if text is None:
+        raise HTTPException(424, {"code": "stt_busy", "message": "Didn't catch that. Try again, or type it."})
+    return {"text": text[:500]}
 
 
 @app.post("/api/intros", status_code=201)
@@ -3399,7 +3434,7 @@ def join(body: JoinIn, request: Request, response: Response, conn: sqlite3.Conne
 PUBLIC_ENDPOINTS = {"health", "ai_status", "join_lookup", "join", "auth_me", "auth_signin_options", "auth_signin",
                     "auth_signout", "auth_redeem_code", "gate_scan", "contractor_view"}
 DEMO_ENDPOINTS = {"reset_demo", "demo_photos", "use_demo_photo", "submit_demo_repair"}
-SIGNED_IN_ENDPOINTS = {"units", "phases", "photo_file", "incident_image", "warranty_image", "auth_passkey_options",
+SIGNED_IN_ENDPOINTS = {"units", "phases", "photo_file", "wake_file", "incident_image", "warranty_image", "auth_passkey_options",
                        "auth_add_passkey", "push_key", "push_status", "push_subscribe", "push_unsubscribe", "push_test"}  # anyone signed in; the photo endpoints check whose photo it is
 STAFF_ENDPOINTS = {"warranty_export", "warranty_procore", "pilot_status", "estate_close_account", "phase_import_preview", "phase_import_save", "issue_join_sheet", "estate_concerns", "estate_action", "moderation_reports", "reported_voice", "review_report",
                    "all_notices", "post_notice", "warranty_queue", "submit_repair", "dashboard", "issue_join_code",
@@ -4035,5 +4070,32 @@ def planner_preview(body: PlannerIn) -> dict[str, Any]:
 # ---------- built web app (demo mode: one process, one port) ----------
 # Mounted last so every /api route above takes precedence. Present only after `npm run build`.
 STATIC_DIR = Path(setting("STATIC_DIR") or Path(__file__).resolve().parents[2] / "frontend" / "dist")
+
+# The wake word's engine (frontend/wake-engine/README.md): about 19 MB as WebAssembly and model, 8 MB gzipped. Only the
+# gzipped copies are kept, and go as they are to any browser that accepts gzip (all of them), so the download is
+# 8 MB, once; nothing else here compresses. Served from the built app, or straight from the sources while
+# developing (Vite passes /wake through to this server).
+WAKE_DIRS = (STATIC_DIR / "wake", Path(__file__).resolve().parents[2] / "frontend" / "public" / "wake")
+WAKE_TYPES = {".js": "text/javascript", ".wasm": "application/wasm", ".data": "application/octet-stream"}
+WAKE_NAME = re.compile(r"^[a-z0-9-]+\.(js|wasm|data)$")
+
+
+@app.get("/wake/{name}")
+def wake_file(name: str, request: Request) -> Response:
+    if not WAKE_NAME.match(name):
+        raise HTTPException(404, "Not found")
+    folder = next((d for d in WAKE_DIRS if (d / name).is_file() or (d / f"{name}.gz").is_file()), None)
+    if folder is None:
+        raise HTTPException(404, "Not found")
+    media = WAKE_TYPES[Path(name).suffix]
+    cache = {"Cache-Control": "public, max-age=86400", "Vary": "Accept-Encoding"}
+    packed = folder / f"{name}.gz"
+    if not packed.is_file():
+        return FileResponse(folder / name, media_type=media, headers=cache)
+    if "gzip" in request.headers.get("accept-encoding", "").lower():
+        return FileResponse(packed, media_type=media, headers={**cache, "Content-Encoding": "gzip"})
+    return Response(gzip.decompress(packed.read_bytes()), media_type=media, headers=cache)
+
+
 if STATIC_DIR.is_dir():
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="web")

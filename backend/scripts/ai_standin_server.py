@@ -3,12 +3,13 @@ browser without a key. Every stand-in answer is marked [stand-in] so it can't be
 import os
 import re
 import sys
+import tempfile
 from datetime import date, timedelta
 from pathlib import Path
 
 BACKEND = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(BACKEND))
-os.environ.setdefault("KEYNECTION_DB_PATH", str(Path(os.environ["TEMP"]) / "keynection-ai-standin" / "app.db"))
+os.environ.setdefault("KEYNECTION_DB_PATH", str(Path(tempfile.gettempdir()) / "keynection-ai-standin" / "app.db"))  # TEMP is Windows-only
 
 from app import ai  # noqa: E402
 
@@ -68,6 +69,15 @@ ai._ask = fake
 ai.provider = lambda: "anthropic"  # status() reads the provider, so the guide says AI is on
 ai.enabled = lambda: True
 ai.model_name = lambda: "stand-in (no key)"
+
+# Speech to text for browsers that cannot listen: a stand-in too, unless the walk is run against the real gateway
+# (KEYNECTION_E2E_REAL=1 with KEYNECTION_STT_KEY set, see e2e/README.md). The stand-in only answers a real recording.
+from app import stt  # noqa: E402
+
+if os.environ.get("KEYNECTION_E2E_REAL") != "1":
+    stt.enabled = lambda: True
+    stt.transcribe = lambda audio, kind, lang: (f"[stand-in] what is my renovation status ({kind}, {len(audio) // 1000} KB)"
+                                                if len(audio) > 2000 else None)
 
 import uvicorn  # noqa: E402
 
