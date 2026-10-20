@@ -24,7 +24,7 @@ from typing import Any, Literal
 from urllib.parse import parse_qs, urlparse
 
 import httpx
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -1147,7 +1147,7 @@ def assistant(body: AssistantIn, conn: sqlite3.Connection = Depends(get_conn)) -
 
 
 @app.post("/api/intros", status_code=201)
-def send_intro(body: IntroIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+def send_intro(body: IntroIn, later: BackgroundTasks, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     _require_joined(conn, body.from_unit_id)
     # A hello or notice reaches several homes at once, so it gets at least the checks a chat message gets.
     if talk.tone_problem(body.message):
@@ -1165,11 +1165,11 @@ def send_intro(body: IntroIn, conn: sqlite3.Connection = Depends(get_conn)) -> d
         raise HTTPException(429, f"At most {limit} {'renovation notices' if body.renovation else 'hellos'} a day. Try again tomorrow.")
     sent_by = _delegate_name(conn, body.from_unit_id, body.delegate_id)
     return _register_intro(conn, body.from_unit_id, body.message, body.lang,
-                           body.renovation.model_dump() if body.renovation else None, body.to_unit_ids, sent_by)
+                           body.renovation.model_dump() if body.renovation else None, body.to_unit_ids, sent_by, later)
 
 
 def _register_intro(conn: sqlite3.Connection, from_unit_id: str, message: str, lang: str, renovation: dict[str, Any] | None,
-                    to_unit_ids: list[str] | None, sent_by: str | None) -> dict[str, Any]:
+                    to_unit_ids: list[str] | None, sent_by: str | None, later: BackgroundTasks) -> dict[str, Any]:
     me, rows, phase_units = _phase(conn, from_unit_id)
     if renovation and renovation["works_type"] == "structural":
         # The same rule the app shows: structural work waits for its approval (JMB/MC in strata, the council otherwise).
@@ -1198,17 +1198,16 @@ def _register_intro(conn: sqlite3.Connection, from_unit_id: str, message: str, l
         shown = [n["id"] for n in circle]
         # Someone who blocked the sender never gets it, and the sender isn't told (that would reveal the block).
         circle = [n for n in circle if not _blocked(conn, n["id"], from_unit_id)]
-    # Each neighbour reads it in their own language (paper notices too). Asked before anything is written, so no
-    # lock is held while Claude answers; with no answer the notice goes as written.
-    readers = {rows[n["id"]]["lang"] for n in circle} - {lang}
-    translations = ai.translate_notice(from_unit_id, message, renovation["scope"] if renovation else None, readers) \
-        if readers and ai.enabled() else {}
     cur = conn.execute(
-        "INSERT INTO intros (from_unit_id, message, lang, renovation, sent_by, translations, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (from_unit_id, message, lang, json.dumps(renovation) if renovation else None, sent_by,
-         json.dumps(translations, ensure_ascii=False) if translations else None, db.now()),
+        "INSERT INTO intros (from_unit_id, message, lang, renovation, sent_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (from_unit_id, message, lang, json.dumps(renovation) if renovation else None, sent_by, db.now()),
     )
     intro_id = cur.lastrowid
+    # Each neighbour reads it in their own language (paper notices too), translated after the sender has their answer
+    # so nobody waits for the AI; until then, and with no answer at all, it reads as written.
+    readers = {rows[n["id"]]["lang"] for n in circle} - {lang}
+    if readers and ai.enabled():
+        later.add_task(_translate_intro, intro_id, from_unit_id, message, renovation["scope"] if renovation else None, readers)
     paper = []
     kept = {"avoided": 0, "overlap": 0}
     for n in circle:
@@ -1228,6 +1227,23 @@ def _register_intro(conn: sqlite3.Connection, from_unit_id: str, message: str, l
                          **({"paper_notice_for": paper} if paper else {}), **({"acted_by": sent_by} if sent_by else {})})
     conn.commit()
     return {"id": intro_id, "recipients": shown, "paper_notices": paper}
+
+
+def _translate_intro(intro_id: int, from_unit_id: str, message: str, scope: str | None, readers: set[str]) -> None:
+    """After the answer has gone back: the hello or notice in each reader's language, written onto it. Every screen
+    reads the translation when it shows the notice, so it appears there as soon as it is written."""
+    translations = ai.translate_notice(from_unit_id, message, scope, readers)
+    if not translations:
+        return
+    conn = db.connect(db_path())
+    try:  # matched on the words too: a demo reset meanwhile may have given this number to another notice
+        conn.execute("UPDATE intros SET translations = ? WHERE id = ? AND from_unit_id = ? AND message = ?",
+                     (json.dumps(translations, ensure_ascii=False), intro_id, from_unit_id, message))
+        conn.commit()
+    except sqlite3.Error:
+        log.warning("notice %s: its translation could not be saved", intro_id)
+    finally:
+        conn.close()
 
 
 @app.get("/api/units/{unit_id}/inbox")
@@ -3672,7 +3688,8 @@ def paper_delivered(notice_id: int, body: StaffIn, conn: sqlite3.Connection = De
 
 
 @app.post("/api/estate/renovations", status_code=201)
-def estate_register_renovation(body: EstateRenovationIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+def estate_register_renovation(body: EstateRenovationIn, later: BackgroundTasks,
+                               conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     """An owner who isn't comfortable online fills in the paper form; the estate office registers it for them.
     Same rules as in the app: everyone the work can affect is told, and the staff member's name goes on record."""
     _require_sign_in_or_demo()
@@ -3681,7 +3698,7 @@ def estate_register_renovation(body: EstateRenovationIn, conn: sqlite3.Connectio
     _check_shared_text(body.staff_name)
     _require_joined(conn, body.unit_id, "Help the owner join first: their consent is needed before Keynection holds their renovation.")
     staff = f"Estate office ({body.staff_name.strip()})"
-    return _register_intro(conn, body.unit_id, body.message, body.lang, body.renovation.model_dump(), None, staff)
+    return _register_intro(conn, body.unit_id, body.message, body.lang, body.renovation.model_dump(), None, staff, later)
 
 
 # ---------- what reaches a household on WhatsApp ----------

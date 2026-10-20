@@ -111,6 +111,25 @@ def test_answers_that_break_the_notice_rules_are_dropped_not_trusted(client, cla
     assert d["unsure"] == ["dates", "hours"] and len(d["scope"]) == 120 and d["contractor"] is None
 
 
+def test_the_description_says_only_what_the_work_is(client, claude):
+    # Dates, hours and the contractor have their own fields: repeated in the description, every notice says them twice.
+    for said, kept in (("Retiling the master bathroom, weekdays only, for two weeks", "Retiling the master bathroom"),
+                       ("重铺浴室瓷砖，两个星期，平日 09:00–18:00", "重铺浴室瓷砖"),
+                       ("Retile the master bathroom, ABC Renovation", "Retile the master bathroom, ABC Renovation")):
+        claude.answers["RenovationDraft"] = _draft(scope=said)
+        assert client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom"}).json()["scope"] == kept
+    assert "no dates, length, days, hours or contractor" in claude.calls[-1]["system"]
+
+
+def test_the_why_only_names_neighbours_the_home_has(client, claude):
+    claude.answers["RenovationDraft"] = _draft()
+    client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "Retiling the bathroom"})
+    assert "a terrace house: nothing above or below it" in claude.calls[-1]["text"]
+    assert "a terrace house has no home above or below it" in claude.calls[-1]["system"]
+    client.post("/api/ai/renovation-draft", json={"unit_id": "A-15-3", "text": "Retiling the bathroom"})
+    assert "homes above and below it" in claude.calls[-1]["text"]
+
+
 def test_no_answer_means_fill_in_the_steps_yourself(client, claude):
     claude.answers["RenovationDraft"] = None
     r = client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom next week"})
@@ -206,6 +225,13 @@ def test_an_insult_claude_recognises_is_refused_even_when_the_word_list_misses_i
     assert len(claude.calls) == 1
 
 
+def test_a_calmer_wording_keeps_every_fact_and_question_and_adds_nothing():
+    # Seen with the real AI: "Tak reti hormat jiran ke?" dropped, and "sejak tadi" (for a while now) added.
+    assert "calmer must keep every fact and every question of the original" in ai.CHAT_SYSTEM
+    assert "never add a time, an amount or a reason the original did not have" in ai.CHAT_SYSTEM
+    assert "If it cannot do both, calmer is null" in ai.CHAT_SYSTEM
+
+
 def test_heated_but_not_an_insult_stays_a_suggestion(client, claude):
     claude.answers["MessageCheck"] = ai.MessageCheck(insult=False, heated=True, calmer="Could the drilling start later?",
                                                      calmer_translation="...", translation="...")
@@ -258,6 +284,25 @@ def test_renovation_notice_reaches_each_neighbour_in_their_language(client, clau
         assert p["message"] == f"[{p['lang']}] notice" if p["lang"] != "en" else p["message"] == "Hi, we're extending the kitchen."
 
 
+def test_the_notice_is_saved_and_answered_before_it_is_translated(client, claude, tmp_path):
+    import sqlite3
+
+    seen = []
+
+    def translate(text):  # what the database holds at the moment the AI is asked
+        db = sqlite3.connect(tmp_path / "test.db")
+        seen.append(db.execute("SELECT message, translations FROM intros ORDER BY id DESC LIMIT 1").fetchone())
+        db.close()
+        return _translations(text)
+
+    claude.answers["NoticeTranslations"] = translate
+    sent = client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi, we're extending the kitchen.", "lang": "en",
+                                            "renovation": RENO})
+    assert sent.status_code == 201
+    assert seen == [("Hi, we're extending the kitchen.", None)]  # already saved, not yet translated
+    assert _items(client, "T-13", "T-12", "intro")[-1]["text"] == "[ta] notice"  # written back once it came
+
+
 def test_notice_goes_as_written_when_claude_cannot_answer(client, claude):
     claude.answers["NoticeTranslations"] = None
     assert client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi, we're extending the kitchen.", "lang": "en",
@@ -305,7 +350,7 @@ def test_the_request_claude_receives(monkeypatch):
     _sdk(monkeypatch, lambda request: seen.append(request) or _reply(ANSWER))
     assert ai.check_message("T-12", "Good morning!", "ms").translation == "Selamat pagi!"
     body = json.loads(seen[0].content)
-    assert body["model"] == "claude-opus-5-5" and body["output_config"]["effort"] == "low"
+    assert body["model"] == "claude-opus-5-5" and body["output_config"]["effort"] == "low" and body["max_tokens"] == 800
     assert body["output_config"]["format"]["type"] == "json_schema"  # answers come back in fixed fields
     # If a safety check declines, the API retries on the model Anthropic recommends.
     assert body["fallbacks"] == "default" and seen[0].headers["anthropic-beta"] == "server-side-fallback-2026-07-01"
@@ -360,6 +405,24 @@ def test_other_answers_from_the_api_are_logged_with_their_reason(monkeypatch, ca
     with caplog.at_level("WARNING", logger="keynection.ai"):
         assert ai.check_message("T-12", "Good afternoon!", "ms") is None
     assert "Claude answered 402" in caplog.text and "Add credit to continue" in caplog.text
+
+
+def test_a_late_answer_is_dropped_at_the_deadline_and_every_answer_is_logged(monkeypatch, caplog):
+    import time
+
+    def slow(request):
+        time.sleep(1.5)
+        return _reply(ANSWER)
+
+    _sdk(monkeypatch, slow)
+    started = time.monotonic()
+    with caplog.at_level("WARNING", logger="keynection.ai"):
+        assert ai._ask_claude(ai.CHAT_SYSTEM, "Good evening", ai.MessageCheck, effort="low", max_tokens=800, timeout=0.3) is None
+    assert time.monotonic() - started < 1.0 and "took longer than 0.3s" in caplog.text
+    _sdk(monkeypatch, lambda request: _reply(ANSWER))
+    with caplog.at_level("INFO", logger="keynection.ai"):
+        assert ai.check_message("T-12", "Good morning, neighbour!", "ms") is not None
+    assert "Claude MessageCheck:" in caplog.text and "1 tokens in, 1 out" in caplog.text
 
 
 def test_no_network_a_refusal_or_a_cut_off_answer_means_no_ai(monkeypatch):
@@ -428,7 +491,7 @@ def test_the_request_gemini_receives(monkeypatch):
     body = json.loads(seen[0].content)
     config = body["generationConfig"]
     assert config["responseMimeType"] == "application/json" and config["responseSchema"]["title"] == "MessageCheck"
-    assert config["thinkingConfig"] == {"thinking_level": "LOW"} and config["maxOutputTokens"] == 3000
+    assert config["thinkingConfig"] == {"thinking_level": "LOW"} and config["maxOutputTokens"] == 800
     assert "systemInstruction" in body and "Good morning, Gemini!" in body["contents"][0]["parts"][0]["text"]
     assert "T-12" not in json.dumps(body)  # the words only: never the home
 
