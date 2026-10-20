@@ -517,7 +517,8 @@ def plan_request(home: str, text: str, today: date, context: str, *, home_kind: 
         return None
     asked = f"Today in Malaysia: {today:%A} {today.isoformat()}\n{context}\n\n<request>\n{text}\n</request>"
     system = f"{ASSISTANT_SYSTEM}\n\n{knowledge}" if knowledge else ASSISTANT_SYSTEM
-    p = _ask(system, asked, AssistantPlan, effort="low", max_tokens=1500, timeout=12)
+    # 20 s: the first call after the server starts has taken about 15 s (12 s was too tight and fell back to key words)
+    p = _ask(system, asked, AssistantPlan, effort="low", max_tokens=1500, timeout=20)
     if p is None:
         return None
     window = p.quiet_window

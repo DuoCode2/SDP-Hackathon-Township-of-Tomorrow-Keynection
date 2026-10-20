@@ -3,7 +3,7 @@ import { Mic, Send, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { api, type AssistantPlan, type Directory, type QuietTimes, type RenovationDraft, type UnitInfo } from '../api'
 import type { TabId } from '../guide'
 import { noisyHours, useDates, useLang } from '../i18n'
-import { usePilot } from '../features'
+import { useAi, usePilot } from '../features'
 import { Sheet, useCelebrate, useToast } from '../ui'
 import RenovationWizard from '../screens/RenovationWizard'
 import IntroWizard from '../screens/IntroWizard'
@@ -46,6 +46,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
   const toast = useToast()
   const celebrate = useCelebrate()
   const pilot = usePilot()
+  const ai = useAi()
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [heard, setHeard] = useState<string | null>(null)  // null: not listening
@@ -203,7 +204,10 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
           {answer && plan && (
             <div className="assistant-answer" aria-live="polite">
               <p className="assistant-reply">{plan.reply}</p>
-              {!plan.by_ai && <small className="muted">{t('assistant.keywords')}</small>}
+              {/* Key words only: AI is off here, or it is on and didn't answer in time (then the same words can be asked again) */}
+              {!plan.by_ai && (ai?.on
+                ? <button type="button" className="link assistant-retry" disabled={busy} onClick={() => void ask(answer.said)}>{t('assistant.retry')}</button>
+                : <small className="muted">{t('assistant.keywords')}</small>)}
               {plan.intent === 'register_renovation' && (
                 <div className="assistant-card">
                   <b>{t(r ? 'assistant.reno.title' : 'assistant.reno.empty')}</b>
