@@ -113,6 +113,13 @@ const D: Record<string, Entry> = {
 
   'plan.swipe': ['Swipe sideways to see the whole plan', 'Leret ke sisi untuk melihat keseluruhan pelan', '左右滑动看整张平面图'],
   'plan.behind': ['Told when works reach the back', 'Dimaklumkan bila kerja sampai ke belakang', '工程碰到后面时会通知'], 'plan.backLane': ['BACK LANE', 'LORONG BELAKANG', '后巷'],
+  // The plan's legend while a renovation is previewed: each colour is the rule that decides who is told.
+  'plan.legend': ['What the colours mean', 'Maksud warna', '颜色的意思'],
+  'plan.legend.told': ['Told before works start', 'Dimaklumkan sebelum kerja bermula', '开工前会收到通知'],
+  'plan.legend.wet': ['Water runs down: two floors below', 'Air mengalir ke bawah: dua tingkat di bawah', '水往下流：楼下两层'],
+  'plan.legend.hacking': ['Vibration: two floors up and down', 'Gegaran: dua tingkat ke atas dan ke bawah', '震动：上下各两层'],
+  'plan.legend.structural': ['Structure: the whole zone, approval first', 'Struktur: seluruh zon, kelulusan dahulu', '结构：整个影响区，先批准'],
+  'plan.legend.back': ['Back fence and drain: the home behind', 'Pagar dan longkang belakang: rumah di belakang', '后围墙和排水沟：后面那户'],
   'hours.weekdays': ['Weekdays {from}–{to}, no weekends', 'Hari bekerja {from}–{to}, tiada hujung minggu', '平日 {from}–{to}，周末不施工'],
   'hours.monSat': ['Mon–Sat {from}–{to}', 'Isnin–Sabtu {from}–{to}', '星期一至六 {from}–{to}'],
   'hours.quiet': ['quiet {from}–{to}', 'senyap {from}–{to}', '{from}–{to} 不吵'],

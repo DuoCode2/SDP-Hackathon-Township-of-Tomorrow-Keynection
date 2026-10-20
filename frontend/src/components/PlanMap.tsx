@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { Relation, UnitInfo } from '../api'
+import type { Relation, UnitInfo, WorksType } from '../api'
 import { useT } from '../i18n'
 
 // The phase drawn the way SDP's own plans are: house footprints, party walls and floor slabs.
@@ -15,6 +15,8 @@ const ROW_Y: Record<string, number> = { north: 52, south: 232, lane: 342 }
 const TERRACE_H = 512, BLOCK_H = 400
 const AX0 = 150, AW = 120, AH = 50, AY0 = 46
 const TOP_FLOOR = 16, FLOORS = 6
+// The block in an oblique projection: each floor's side and the roof recede up and to the right by this much.
+const DX = 26, DY = -13
 
 const box = (u: UnitInfo): Box =>
   u.kind === 'terrace'
@@ -35,7 +37,7 @@ function sharedEdge(a: Box, b: Box): Edge | null {
   return null
 }
 
-export default function PlanMap({ units, me, circle, ring2 = [], names, works = [], selected = null, onSelect, view, impact, intro = false }: {
+export default function PlanMap({ units, me, circle, ring2 = [], names, works = [], selected = null, onSelect, view, impact, intro = false, worksType, explain }: {
   units: UnitInfo[]
   me: UnitInfo
   circle: { id: string; relation: Relation }[]
@@ -51,6 +53,10 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
   impact?: string[]
   /** Key-day opening: the plan draws itself, then the circle lights up one home at a time (styles.css, plan-intro). */
   intro?: boolean
+  /** Renovation preview: the type of work, so the plan shows the rule that decides who is told. */
+  worksType?: WorksType
+  /** Renovation preview: what a tap on a home explains (its relation, and why it is told). */
+  explain?: Record<string, string>
 }) {
   const shown = units.filter((u) => u.kind === view)
   const circleIds = new Set(circle.map((c) => c.id))
@@ -61,6 +67,26 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
   // The home behind yours: not in the circle, so it is shown apart, with when it would be told.
   const behindId = me.kind === 'terrace' && me.back_row ? shown.find((u) => u.row === me.back_row && u.pos === me.pos)?.id : undefined
   const previewing = impact !== undefined
+  const rule = previewing ? worksType : undefined
+  // Each effect shows a rule. Wet: water runs down the stack. Hacking: vibration two floors up and down. Structural:
+  // the whole zone. Terrace: works that reach the back fence and drain tell the home behind.
+  const stack = mine && me.kind === 'apartment' ? shown.filter((u) => u.pos === me.pos && impactIds.has(u.id)) : []
+  const wetPath = rule === 'wet' ? stack.filter((u) => (u.floor ?? 0) < (me.floor ?? 0)) : []
+  const shaken = rule === 'hacking' ? stack : []
+  const behindTold = !!behindId && impactIds.has(behindId)
+  const behindBox = behindId ? box(shown.find((u) => u.id === behindId)!) : null
+  // Where each home comes in: terrace homes draw outwards from yours, block floors rise from the bottom, and the
+  // homes that matter light up one after another.
+  const order = (u: UnitInfo): React.CSSProperties => {
+    const lit = previewing ? (impact ?? []).indexOf(u.id) : circle.findIndex((c) => c.id === u.id)
+    return {
+      ...(lit >= 0 ? { '--i': lit } : {}),
+      ...(u.kind === 'terrace'
+        ? { '--d': Math.abs(u.pos - (me.kind === 'terrace' ? me.pos : 0)) + (u.row === me.row ? 0 : 1) }
+        : { '--f': (u.floor ?? TOP_FLOOR) - (TOP_FLOOR - FLOORS + 1) }),
+    } as React.CSSProperties
+  }
+  const entry = intro ? 'plan-intro' : view === 'terrace' ? 'draw' : 'rise'
 
   const walls = mine
     ? shown
@@ -89,8 +115,18 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
 
   return (
     <>
+    <div className="plan-wrap">
+    {rule && (
+      <div className="plan-legend" aria-label={t('plan.legend')}>
+        <span><i className="lg-told" />{t('plan.legend.told')}</span>
+        {view === 'apartment' && rule === 'wet' && <span><i className="lg-wet" />{t('plan.legend.wet')}</span>}
+        {view === 'apartment' && rule === 'hacking' && <span><i className="lg-vibe" />{t('plan.legend.hacking')}</span>}
+        {rule === 'structural' && <span><i className="lg-structural" />{t('plan.legend.structural')}</span>}
+        {behindTold && <span><i className="lg-back" />{t('plan.legend.back')}</span>}
+      </div>
+    )}
     <div className="plan-scroll" ref={scroller}>
-    <svg className={`plan ${previewing ? 'previewing' : ''} ${intro ? 'plan-intro' : ''}`} viewBox={`0 0 720 ${view === 'terrace' ? TERRACE_H : BLOCK_H}`} role="group" aria-label={view === 'terrace' ? 'Plan of Jalan Demo 1' : 'Section through Block A'}>
+    <svg className={`plan ${previewing ? 'previewing' : ''} ${entry} ${view === 'apartment' ? 'axo' : ''} ${rule ? `works-${rule}` : ''}`} viewBox={`0 0 720 ${view === 'terrace' ? TERRACE_H : BLOCK_H}`} role="group" aria-label={view === 'terrace' ? 'Plan of Jalan Demo 1' : 'Section through Block A'}>
       <defs>
         <pattern id="hatch-works" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <line x1="0" y1="0" x2="0" y2="7" style={{ stroke: 'var(--works)' }} strokeWidth="2" opacity="0.45" />
@@ -111,9 +147,8 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
       {shown.map((u) => {
         const b = box(u)
         return (
-          <g key={u.id} className={`home ${cls(u)} ${selected === u.id ? 'selected' : ''} ${onSelect ? '' : 'static'}`}
-            role={onSelect ? 'button' : undefined} tabIndex={onSelect ? 0 : undefined}
-            style={circleIds.has(u.id) ? ({ '--i': circle.findIndex((c) => c.id === u.id) } as React.CSSProperties) : undefined}
+          <g key={u.id} className={`home ${cls(u)} ${selected === u.id ? 'selected' : ''} ${onSelect ? '' : 'static'} ${wetPath.includes(u) ? 'wet-path' : ''} ${shaken.includes(u) ? 'shaken' : ''}`}
+            role={onSelect ? 'button' : undefined} tabIndex={onSelect ? 0 : undefined} style={order(u)}
             aria-label={`${u.label}${names[u.id] ? `, ${names[u.id]}` : ''}${worksAt.has(u.id) ? ', renovating' : ''}`}
             onClick={() => onSelect?.(u.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onSelect?.(u.id)}>
             <rect className="home-fill" x={b.x} y={b.y} width={b.w} height={b.h} />
@@ -123,6 +158,22 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
       })}
 
       {links.map((l) => <line key={l.id} className={`plan-link ${previewing ? 'notify' : ''}`} x1={l.a.x} y1={l.a.y} x2={l.b.x} y2={l.b.y} />)}
+
+      {/* wet: the water's way down the stack, two floors */}
+      {mine && wetPath.length > 0 && (
+        <path className="drip" d={`M${centre(mine).x} ${mine.y + mine.h - 6} V${Math.max(...wetPath.map((u) => box(u).y + box(u).h)) - 8}`} />
+      )}
+      {/* hacking: vibration through the frame, marked beside each unit it reaches */}
+      {shaken.map((u) => {
+        const b = box(u)
+        return [b.x - 9, b.x + b.w + 3].map((x) => (
+          <path key={`${u.id}-${x}`} className="vibe" d={`M${x} ${b.y + 10} l6 6 l-6 6 l6 6 l-6 6`} />
+        ))
+      })}
+      {/* terrace: works that reach the back fence and drain, which the home behind shares */}
+      {mine && behindTold && behindBox && (
+        <rect className="back-reach" x={mine.x + 6} y={mine.y + mine.h} width={mine.w - 12} height={behindBox.y - mine.y - mine.h} />
+      )}
 
       {/* party walls and slabs between every pair of neighbours */}
       {shown.map((u) => {
@@ -157,7 +208,7 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
         const short = u.kind === 'terrace' ? u.label.replace('No. ', '') : `${u.floor}-${u.pos}`
         const tall = b.h > 60
         return (
-          <g key={u.id} className={`home-label ${isMe ? 'me' : ''}`} pointerEvents="none">
+          <g key={u.id} className={`home-label ${isMe ? 'me' : ''}`} pointerEvents="none" style={order(u)}>
             <text x={c.x} y={tall ? c.y - 3 : c.y - 1} className="home-no">{short}</text>
             {u.id === behindId && !previewing ? (
               <text x={c.x} y={c.y + 13} className="home-name behind-note">
@@ -173,8 +224,12 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
         const b = box(shown.find((u) => u.id === selected)!)
         return <rect className="select-ring" x={b.x - 5} y={b.y - 5} width={b.w + 10} height={b.h + 10} rx="4" pointerEvents="none" />
       })()}
+      {/* your home: one pulse when the plan opens */}
+      {mine && <rect className="me-glow" x={mine.x - 2} y={mine.y - 2} width={mine.w + 4} height={mine.h + 4} rx="3" pointerEvents="none" />}
     </svg>
     </div>
+    </div>
+    {explain && selected && explain[selected] && <div className="plan-explain" role="status">{explain[selected]}</div>}
     <div className="plan-hint">{t('plan.swipe')}</div>
     </>
   )
@@ -221,11 +276,19 @@ function BlockFrame({ stackPos }: { stackPos: number | null }) {
     <g className="frame" pointerEvents="none">
       {stackPos && (
         <>
-          <rect className="stack" x={AX0 + (stackPos - 1) * AW - 6} y={AY0 - 14} width={AW + 12} height={FLOORS * AH + 22} rx="6" />
-          <text className="stack-label" x={AX0 + (stackPos - 0.5) * AW} y={AY0 - 18}>YOUR STACK</text>
+          <rect className="stack" x={AX0 + (stackPos - 1) * AW - 6} y={AY0 - 20} width={AW + 12} height={FLOORS * AH + 28} rx="6" />
+          <text className="stack-label" x={AX0 + (stackPos - 0.5) * AW} y={AY0 - 24}>YOUR STACK</text>
         </>
       )}
-      <line className="party" x1={AX0 - 12} y1={AY0 - 6} x2={right + 12} y2={AY0 - 6} />
+      {/* the block in depth: the side of every floor, each rising with its floor, and the roof on top */}
+      {Array.from({ length: FLOORS }, (_, i) => (
+        <polygon key={i} className="axo-side" style={{ '--f': FLOORS - 1 - i } as React.CSSProperties}
+          points={`${right},${AY0 + i * AH} ${right + DX},${AY0 + i * AH + DY} ${right + DX},${AY0 + (i + 1) * AH + DY} ${right},${AY0 + (i + 1) * AH}`} />
+      ))}
+      <g className="axo-roof" style={{ '--f': FLOORS - 1 } as React.CSSProperties}>
+        <polygon className="axo-top" points={`${AX0},${AY0} ${AX0 + DX},${AY0 + DY} ${right + DX},${AY0 + DY} ${right},${AY0}`} />
+        {[1, 2, 3].map((p) => <line key={p} className="axo-edge" x1={AX0 + p * AW} y1={AY0} x2={AX0 + p * AW + DX} y2={AY0 + DY} />)}
+      </g>
       {Array.from({ length: FLOORS }, (_, i) => (
         <text key={i} className="level" x={AX0 - 22} y={AY0 + i * AH + AH / 2 + 4}>L{TOP_FLOOR - i}</text>
       ))}

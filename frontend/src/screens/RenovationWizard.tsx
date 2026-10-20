@@ -78,6 +78,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   // Every home starts on wet work: the first card, and the only kind that never needs an approval before Next.
   const [works, setWorks] = useState<WorksType>('wet')
   const [zone, setZone] = useState<ImpactItem[] | null>(null)
+  const [tapped, setTapped] = useState<string | null>(null)  // a home tapped on the plan: why it is told
   const [lang, setLang] = useState<Lang>(me.lang)
   const [draft, setDraft] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
@@ -333,7 +334,9 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
       {step === 1 && (
         <div className="wizard-body two">
           <div className="plan-frame">
-            <PlanMap units={units} me={me} circle={[]} names={names} view={me.kind} impact={zone?.map((z) => z.id) ?? []} />
+            <PlanMap units={units} me={me} circle={[]} names={names} view={me.kind} impact={zone?.map((z) => z.id) ?? []} worksType={works}
+              selected={tapped} onSelect={setTapped}
+              explain={Object.fromEntries((zone ?? []).map((z) => [z.id, `${z.label} · ${t(`rel.${z.relation}`)}: ${t(`reason.${z.reason_key}`)}`]))} />
           </div>
           <div className="stack">
             <div className="wizard-lead">{t('reno.lead')}</div>

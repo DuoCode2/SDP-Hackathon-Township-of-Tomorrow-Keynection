@@ -1811,3 +1811,43 @@ button.ring-row:hover { background: var(--surface-2); }
 .plan .lane-text { font-size: 8px; fill: var(--muted); }
 .plan .home.behind-home .home-fill { fill: var(--surface-2); stroke: color-mix(in srgb, var(--ink) 45%, transparent); stroke-dasharray: 4 3; }
 .plan .behind-note { font-size: 8px; fill: var(--muted); }
+/* The plan comes in once, in under 2.5 s, and every effect shows a rule. Terrace: the rows draw outwards from your
+   home (0.9 s), the road fades in, then the homes that matter light up. Block: the floors rise from the bottom, your
+   unit pulses once, then its circle lights up. Reduced motion shows the end state at once (the global rule above). */
+.plan-wrap { position: relative; }
+.plan.draw .home-fill { stroke-dasharray: 400; stroke-dashoffset: 400; animation: draw 600ms var(--ease) calc(var(--d, 0) * 60ms) both; }
+.plan.draw .home.circle .home-fill, .plan.draw .home.notified .home-fill { animation: draw 600ms var(--ease) calc(var(--d, 0) * 60ms) both, light 360ms calc(0.7s + var(--i, 0) * 110ms) both; }
+.plan.draw .road, .plan.draw .road-centre, .plan.draw .road-name, .plan.draw .back-lane, .plan.draw .drain { animation: fade 400ms 0.3s both; }
+.plan.draw .home-label, .plan.draw .party, .plan.draw .shared { animation: fade 300ms 0.5s both; }
+.plan.draw .plan-link, .plan.rise .plan-link { animation: fade 300ms 1.1s both, flow 1.6s linear infinite; }
+.plan.rise .home, .plan.rise .home-label, .plan.rise .axo-side, .plan.rise .axo-roof { animation: floor-in 320ms var(--ease) calc(var(--f, 0) * 60ms) both; }
+.plan.rise .home.circle .home-fill, .plan.rise .home.notified .home-fill { animation: light 360ms calc(0.65s + var(--i, 0) * 120ms) both; }
+.plan.rise .party, .plan.rise .shared, .plan.rise .level { animation: fade 300ms 0.4s both; }
+.plan .me-glow { fill: none; stroke: var(--accent); stroke-width: 3; opacity: 0; transform-box: fill-box; transform-origin: center; animation: ping 1s ease-out 0.5s 1 forwards; }
+@keyframes floor-in { from { opacity: 0; transform: translateY(14px); } }
+/* The block in depth. */
+.plan .axo-side { fill: var(--well-2); stroke: var(--ink); stroke-width: 1; stroke-opacity: 0.5; }
+.plan .axo-top { fill: var(--surface-2); stroke: var(--ink); stroke-width: 1; stroke-opacity: 0.5; }
+.plan .axo-edge { stroke: var(--ink); stroke-width: 0.8; opacity: 0.35; }
+/* Wet: the water's way down the stack; the units it passes turn blue. */
+.plan .drip { fill: none; stroke: var(--blue); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 3 8; animation: fade 300ms 0.8s both, flow 0.8s linear 0.8s 2; }
+.plan.works-wet .home.wet-path .home-fill { fill: var(--blue-bg); stroke: var(--blue); }
+/* Hacking: vibration marks beside the units two floors up and down, and the units shake a little. */
+.plan .vibe { fill: none; stroke: var(--works); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; animation: fade 200ms 0.9s both, buzz 240ms linear 1.1s 4; }
+.plan.works-hacking .home.shaken { transform-box: fill-box; animation: floor-in 320ms var(--ease) calc(var(--f, 0) * 60ms) both, shake 110ms linear 1.1s 4; }
+@keyframes buzz { 50% { opacity: 0.25; } }
+@keyframes shake { 25% { transform: translateX(-1.5px); } 75% { transform: translateX(1.5px); } }
+/* Structural: the whole zone outlined in red. */
+.plan.works-structural .home.notified .home-fill { stroke: var(--red); stroke-width: 2.6; }
+/* Terrace: works that reach the back fence and drain, shared with the home behind. */
+.plan .back-reach { fill: var(--works-bg); fill-opacity: 0.5; stroke: var(--works); stroke-width: 1.2; stroke-dasharray: 3 2; animation: fade 400ms 0.9s both; }
+/* What the colours mean, top right; and what a tapped home is told and why, under the plan. */
+.plan-legend { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px 12px; margin-bottom: 6px; font-size: 11px; line-height: 1.3; color: var(--text-2); animation: fade 300ms 0.8s both; }
+.plan-legend span { display: flex; align-items: center; gap: 6px; }
+.plan-legend i { width: 12px; height: 8px; flex: none; border-radius: 2px; }
+.plan-legend .lg-told { background: var(--works-bg); border: 1.5px solid var(--works); }
+.plan-legend .lg-wet { background: var(--blue-bg); border: 1.5px solid var(--blue); }
+.plan-legend .lg-vibe { border-left: 2px solid var(--works); border-right: 2px solid var(--works); }
+.plan-legend .lg-structural { border: 2px solid var(--red); }
+.plan-legend .lg-back { background: var(--works-bg); border-top: 2px solid var(--works); }
+.plan-explain { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line-2); font-size: 13px; animation: pop 200ms var(--ease) both; }
