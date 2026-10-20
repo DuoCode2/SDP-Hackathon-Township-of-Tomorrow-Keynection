@@ -1777,7 +1777,10 @@ button.ring-row:hover { background: var(--surface-2); }
 .opening-cast em { font-style: normal; font-size: 12.5px; color: var(--muted); }
 .start-here { position: absolute; top: -9px; right: 12px; padding: 2px 8px; border-radius: 999px; background: var(--brand-strong); color: #fff; font-size: 11px; font-weight: 700; }
 .opening-plan { width: 100%; min-height: 220px; }
-.opening-hi { display: flex; flex-direction: column; align-items: center; gap: 12px; animation: fade 300ms 2s both; }
+/* On a 768 px high laptop the plan and the buttons fit without scrolling: the plan takes at most 60% of the height,
+   and the line and buttons stay at the bottom of the screen. */
+.opening-plan .plan { max-height: 60vh; }
+.opening-hi { position: sticky; bottom: 0; width: 100%; padding: 10px 0 4px; background: var(--bg); display: flex; flex-direction: column; align-items: center; gap: 12px; animation: fade 300ms 2s both; }
 .opening-hi b { font-size: 19px; letter-spacing: -0.01em; }
 .opening-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 /* The plan draws itself in 1.2 s, the road fades in, then the circle lights up one home every 120 ms: about 2.3 s. */

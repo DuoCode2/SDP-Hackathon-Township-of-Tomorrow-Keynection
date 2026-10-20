@@ -27,6 +27,10 @@ test('key day: the card, who you are, five homes light up, and a wave lands on N
   const hi = opening(page).getByText('Hi Aiman, these 5 homes share a wall or a road with yours')
   await expect(opening(page).locator('svg.plan.plan-intro')).toBeVisible()
   await expect(hi).toBeVisible({ timeout: 4000 })
+  // A 1024 x 768 laptop: the line and both buttons are on screen without scrolling.
+  await page.setViewportSize({ width: 1024, height: 768 })
+  for (const name of ['👋 Wave at Siti', 'Look around first']) await expect(opening(page).getByRole('button', { name })).toBeInViewport()
+  await expect(hi).toBeInViewport()
   await opening(page).getByRole('button', { name: '👋 Wave at Siti' }).click()
 
   await expect(opening(page)).toBeHidden()
