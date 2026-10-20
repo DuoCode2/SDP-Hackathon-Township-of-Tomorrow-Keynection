@@ -450,7 +450,8 @@ async def guard(request: Request, call_next):
                             samesite="lax", secure=secure, path="/")
         response.delete_cookie(OLD_SITE_COOKIE, path="/")
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
-    response.headers.setdefault("X-Frame-Options", "DENY")
+    # Only Keynection may frame its own pages (Channels shows the app inside the SDP App phone); no other site can.
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("X-Robots-Tag", "noindex, nofollow")  # a prototype: keep it out of search results
     if response.headers.get("content-type", "").startswith("text/html"):

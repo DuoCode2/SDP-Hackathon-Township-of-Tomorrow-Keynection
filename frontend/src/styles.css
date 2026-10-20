@@ -1789,3 +1789,17 @@ button.ring-row:hover { background: var(--surface-2); }
 .plan-intro .plan-link { animation: fade 300ms 1.8s both; }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 @keyframes light { from { fill: #fff; } }
+/* Channels: the WhatsApp list scrolls inside the phone, its buttons open the screen they name; the SDP App phone runs
+   Keynection itself (?embed=1), with a way back to the app's home. */
+.phone .wa-body { min-height: 0; }
+.wa-buttons button { padding: 6px; border: 0; border-radius: 8px; background: #fff; text-align: center; font: inherit; font-size: 12px; font-weight: 600; color: #1f7ea8; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06); cursor: pointer; }
+.wa-buttons button:hover:not(:disabled), .wa-buttons button:focus-visible { background: #eef6fb; }
+.sdp-app button.app-tile { width: auto; font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+.sdp-app button.app-tile:disabled { cursor: default; }
+.sdp-app.inside { padding-bottom: 0; gap: 0; }
+.sdp-app.inside > .phone-app { margin: 0; }
+.phone-back { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: 0; background: none; font: inherit; font-size: 11px; font-weight: 700; color: #1f7ea8; cursor: pointer; }
+.phone-app { flex: 1; min-height: 0; width: 100%; border: 0; background: var(--bg); }
+/* Keynection inside the SDP App: the household's own screens only, laid out for the phone. */
+.app.embed .sidebar, .app.embed .topbar { display: none !important; }
+@media (min-width: 900px) { .app.embed { grid-template-columns: minmax(0, 1fr); } }
