@@ -421,8 +421,8 @@ export const JUDGE_ROUTE: RouteStep[] = [
   {
     tab: 'works', unit: 'T-12',
     text: {
-      zh: '装修通知就是自我介绍：Works →「Register renovation」→ 在「一句话说清楚」打「Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6」（中文、马来文也行）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 →「时间」那一步系统已按邻居作息排好：避开 Siti 宝宝午睡（13–15 点）和对面 Hafiz 夜班后补眠（9–11 点），但不说是谁 → 检查后发送（还没加入的 No. 23 由物业送纸本）',
-      en: 'The renovation notice is the introduction: Works → Register renovation → in "Just say it in one sentence" type "Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6" (Malay or Chinese work too) → Fill it in for me → AI picks the type of work and the plan marks who is told → at "When" the hours are already planned around the neighbours: clear of Siti’s baby nap (1–3pm) and Hafiz’s sleep after night shifts (9–11am), without saying whose → check and send (No. 23, not on the app yet, gets it on paper)',
+      zh: '快捷方式：按右下角的麦克风，直接说「Retiling the master bathroom from next Monday…」→ 单子填好停在复核页。一步步来：装修通知就是自我介绍：Works →「Register renovation」→ 在「一句话说清楚」打「Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6」（中文、马来文也行）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 →「时间」那一步系统已按邻居作息排好：避开 Siti 宝宝午睡（13–15 点）和对面 Hafiz 夜班后补眠（9–11 点），但不说是谁 → 检查后发送（还没加入的 No. 23 由物业送纸本）',
+      en: 'Shortcut: press the mic at the bottom right and just say "Retiling the master bathroom from next Monday…" → the notice is filled in and waits on Review. Step by step: the renovation notice is the introduction: Works → Register renovation → in "Just say it in one sentence" type "Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6" (Malay or Chinese work too) → Fill it in for me → AI picks the type of work and the plan marks who is told → at "When" the hours are already planned around the neighbours: clear of Siti’s baby nap (1–3pm) and Hafiz’s sleep after night shifts (9–11am), without saying whose → check and send (No. 23, not on the app yet, gets it on paper)',
     },
   },
   {
@@ -468,6 +468,13 @@ export const ROUTE: RouteStep[] = [
     text: {
       zh: 'Aiman：Works 右上角「Register renovation」→ 用一句话说要做什么让 AI 填（或自己选 Extension）→ 图上标出谁会被通知 → 填完发送',
       en: 'Aiman: Works → Register renovation → say it in one sentence for AI to fill in (or pick Extension yourself) → the plan marks who is told → send',
+    },
+  },
+  {
+    tab: 'works', unit: 'T-12',
+    text: {
+      zh: '（助手，可选）Aiman 按右下角的麦克风（或打字）问「我的装修通知怎样了」→ 日期和通知了几户由服务器算，不是 AI 编的；说「宝宝一点到三点午睡」→ 直接加一个安静时段，可撤销；说一句装修的话 → 通知填好停在复核页，自己按发送才会发出',
+      en: '(Assistant, optional) Aiman presses the mic at the bottom right (or types) and asks "How is my renovation notice doing?" → the dates and homes told are counted by the server, not the AI; "Baby naps 1 to 3" adds a quiet time, with Undo; a renovation sentence fills in the notice and waits on Review until he sends it',
     },
   },
   {

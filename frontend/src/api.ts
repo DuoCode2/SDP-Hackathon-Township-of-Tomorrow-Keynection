@@ -725,6 +725,22 @@ export interface RenovationDraft {
   unsure: ('dates' | 'hours')[]
 }
 
+/** The assistant's reading of one sentence: what to get ready for the household to check. It never sends anything. */
+export interface AssistantPlan {
+  intent: 'register_renovation' | 'say_hello' | 'set_quiet_time' | 'check_status' | 'go_to_page' | 'unknown'
+  language: Lang
+  reply: string
+  page: 'circle' | 'chats' | 'works' | 'evidence' | 'impact' | 'channels' | 'me' | null
+  quiet_window: (TimeWindow & { why: QuietReason }) | null
+  hello_to: string[]
+  hello_ids: string[]
+  status_topic: 'warranty' | 'renovation' | 'case' | 'notices' | null
+  missing: string[]
+  /** Filled in by the same draft as the notice's one-sentence box; null without AI. */
+  renovation: RenovationDraft | null
+  by_ai: boolean
+}
+
 // Whether the server answered the last request. Screens show a loading skeleton until their data arrives,
 // so without this a dropped connection would look like endless loading.
 let reachable = true
@@ -926,6 +942,8 @@ export const api = {
     request<QuietPlan>(`/api/units/${unitId}/quiet-plan?${new URLSearchParams(r)}`),
   renovationDraft: (unitId: string, text: string) =>
     request<RenovationDraft>('/api/ai/renovation-draft', json('POST', { unit_id: unitId, text })),
+  assistant: (unitId: string, text: string, page: string, lang: string) =>
+    request<AssistantPlan>('/api/assistant', json('POST', { unit_id: unitId, text, page, lang })),
   sendMessage: (from: string, to: string, msg: { body?: string; quick_key?: string; keep_tone?: boolean }, delegateId?: number) =>
     request<ChatMessage>('/api/messages', json('POST', { from_unit_id: from, to_unit_id: to, ...msg, delegate_id: delegateId ?? null })),
   reportMessage: (messageId: number, unitId: string, reason: string) =>

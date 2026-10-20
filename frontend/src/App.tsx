@@ -8,6 +8,7 @@ import type { GuideLang, TabId } from './guide'
 import { EnglishOnly, LangProvider, langChosen, useDates, useLang, type UiLang } from './i18n'
 import { HelperProvider, useActing, useHelper } from './helper'
 import Guide from './components/Guide'
+import Assistant from './components/Assistant'
 import CastPicker, { roleOf } from './components/Cast'
 import { Logo } from './components/Art'
 import { FOCUS_TABS, PilotProvider, PlaceProvider, ShowAllProvider, usePilot, usePlace, type Pilot, type Place } from './features'
@@ -425,6 +426,8 @@ function Shell({ pinned }: { pinned?: string }) {
 
       {!pinned && <Guide tab={cur.tab} me={cur.me} lang={lang} open={guideOpen} onLang={pickLang} onClose={() => setGuideOpen(false)} onGo={go}
         showAll={showAll} onShowAll={pickShowAll} />}
+      {/* The household's assistant, for whoever is in the focused pane: it gets things ready, the household sends. */}
+      {curUnit?.joined && <Assistant me={curUnit} units={units} tab={cur.tab} onGo={(tab) => go(tab)} onChanged={changed} />}
       <div id="sheet-root" />
     </div>
   )

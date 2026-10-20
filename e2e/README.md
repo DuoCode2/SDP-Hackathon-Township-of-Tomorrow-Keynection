@@ -14,6 +14,7 @@ npm run warranty                               # K16: only the owner closes a ti
 npm run bothsides                              # a case open in one pane follows the other pane's decision (Siti asks, Aiman agrees)
 npm run monkey                                 # 250 random clicks; MONKEY_CLICKS and MONKEY_SEED to change or repeat
 npm run ai-off                                 # K22: the notice without AI, examples fill a preset
+npm run assistant                              # the assistant by key words: a sentence opens the notice, nothing is sent
 npm run all                                    # every spec (about 3 minutes)
 npm run route:headed                           # watch the route happen
 npm run report                                 # the HTML report, with a trace on failure

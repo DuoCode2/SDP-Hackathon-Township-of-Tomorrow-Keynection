@@ -1707,7 +1707,8 @@ button.ring-row:hover { background: var(--surface-2); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
+  /* Every animation jumps straight to its end state, so what it reveals is still shown. */
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   .content { scroll-behavior: auto; }
 }
 
@@ -1731,3 +1732,25 @@ button.ring-row:hover { background: var(--surface-2); }
 .guide-notes summary ~ p { margin-top: 8px; }
 /* "Introduce yourself" is a text link now: the banner keeps its words without a box, so the Wave buttons lead. */
 .say-hi, .face-warm .say-hi { background: none; border-color: transparent; }
+
+/* === feat/assistant === */
+/* The assistant: a round button at the bottom right (above the dock on a phone, 64px in easy mode, left of a docked
+   guide), and a panel with a big hold-to-talk button over a text box that is always there. */
+.assistant-fab { position: fixed; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 40; width: 52px; height: 52px; border-radius: 50%; border: 0; display: grid; place-items: center; color: #fff; background: var(--brand-grad); box-shadow: var(--shadow-2); cursor: pointer; }
+.assistant-fab.big { width: 64px; height: 64px; }
+.assistant-fab:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; }
+@media (min-width: 900px) { .assistant-fab { right: 24px; bottom: 24px; } }
+@media (min-width: 1312px) { .app.guide-on .assistant-fab { right: 324px; } }
+.assistant { display: flex; flex-direction: column; gap: 12px; }
+.assistant-head { display: flex; align-items: center; gap: 8px; }
+.assistant-mic { position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 76px; border-radius: 16px; border: 1.5px dashed var(--line-2); background: var(--surface-2); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; }
+.assistant-mic.on { color: #fff; background: var(--brand-grad); border-color: transparent; }
+.assistant-mic.on::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 2px solid var(--brand); animation: ping 1.2s var(--ease) infinite; pointer-events: none; }
+.assistant-heard { margin: 0; font-style: italic; color: var(--text-2); }
+.assistant-type { display: flex; gap: 8px; align-items: center; }
+.assistant-answer { display: flex; flex-direction: column; gap: 8px; animation: pop 200ms var(--ease) both; }
+.assistant-reply { margin: 0; padding: 10px 12px; border-radius: 14px 14px 14px 4px; background: var(--surface-2); border: 1px solid var(--line-2); }
+.assistant-card { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--surface); }
+.assistant-card.row { flex-direction: row; align-items: center; }
+.assistant-card .btn { align-self: flex-start; }
+.assistant .ai-examples .btn { flex: 0 1 auto; max-width: 100%; white-space: normal; text-align: left; }

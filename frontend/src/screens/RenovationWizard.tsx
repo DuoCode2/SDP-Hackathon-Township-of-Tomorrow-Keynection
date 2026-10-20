@@ -55,7 +55,7 @@ const WORKS: { id: WorksType; icon: typeof Bath }[] = [
 ]
 
 /** Register a renovation. Who gets the notice is worked out from the plan, not chosen by the owner. */
-export default function RenovationWizard({ open, onClose, me, units, names, onSent, estate, preset }: {
+export default function RenovationWizard({ open, onClose, me, units, names, onSent, estate, preset, fromAssistant }: {
   open: boolean
   onClose: () => void
   me: UnitInfo
@@ -66,6 +66,8 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   estate?: { staff: string }
   /** Demo quick example: start filled in with the bathroom story (the English example), on the When step. */
   preset?: 'bathroom'
+  /** The assistant's reading of one sentence: the fields AI filled in (null without AI), and the sentence itself. */
+  fromAssistant?: { said: string; renovation: RenovationDraft | null }
 }) {
   const t = useT()
   const dates = useDates()
@@ -186,6 +188,42 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
     }
   }, [open, preset])
 
+  /** What AI read from the owner's sentence, onto the steps; whatever it left empty keeps what was there. */
+  function applyDraft(d: RenovationDraft) {
+    setWorks(d.works_type)
+    setReno((r) => {
+      const start = d.start ?? r.start
+      const end = d.end ?? r.end
+      return {
+        ...r, scope: d.scope ?? t(`works.${d.works_type}.scope`), start, end: end < start ? start : end,
+        noisy_from: d.noisy_from ?? r.noisy_from, noisy_to: d.noisy_to ?? r.noisy_to,
+        weekdays_only: d.weekdays_only ?? r.weekdays_only, contractor: d.contractor ?? r.contractor,
+      }
+    })
+    setLang(d.language)  // the notice is written in the language the owner used; each neighbour gets their own
+    setDraft(null)
+    setFilled(d)
+  }
+
+  // From the assistant: a sentence AI read lands on the review, or on the step that still needs the owner (approvals
+  // for structural work, hours outside the house rule). Without AI the sentence waits on the first step. Nothing is sent.
+  useEffect(() => {
+    if (!open || !fromAssistant) return
+    const d = fromAssistant.renovation
+    setSaid(fromAssistant.said)
+    if (!d) {
+      setStep(0)
+      return
+    }
+    applyDraft(d)
+    const outside = (d.noisy_from ?? '09:00') < '09:00' || (d.noisy_to ?? '18:00') > '18:00'
+    setStep(d.works_type === 'structural' ? 3 : outside ? 2 : 4)
+  }, [open, fromAssistant])
+  // With AI off there is no sentence box, so the sentence becomes the description (known once the AI status is in).
+  useEffect(() => {
+    if (open && fromAssistant && !fromAssistant.renovation && ai && !ai.on) setReno((r) => ({ ...r, scope: fromAssistant.said.slice(0, 120) }))
+  }, [open, fromAssistant, ai])
+
   /** The owner's one sentence fills in the steps; whatever AI left empty keeps what was there. Nothing is sent. */
   async function fillIn(text?: string) {
     const what = (text ?? said).trim()
@@ -194,20 +232,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
     setAiNote(null)
     setFilled(null)
     try {
-      const d = await api.renovationDraft(me.id, what)
-      setWorks(d.works_type)
-      setReno((r) => {
-        const start = d.start ?? r.start
-        const end = d.end ?? r.end
-        return {
-          ...r, scope: d.scope ?? t(`works.${d.works_type}.scope`), start, end: end < start ? start : end,
-          noisy_from: d.noisy_from ?? r.noisy_from, noisy_to: d.noisy_to ?? r.noisy_to,
-          weekdays_only: d.weekdays_only ?? r.weekdays_only, contractor: d.contractor ?? r.contractor,
-        }
-      })
-      setLang(d.language)  // the notice is written in the language the owner used; each neighbour gets their own
-      setDraft(null)
-      setFilled(d)
+      applyDraft(await api.renovationDraft(me.id, what))
     } catch (e) {
       const code = e instanceof ApiError ? e.code : undefined
       setAiNote(code === 'ai_off' ? t('ai.off') : code === 'ai_busy' || !(e instanceof Error) ? t('ai.busy') : e.message)

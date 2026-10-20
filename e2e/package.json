@@ -11,6 +11,7 @@
     "audit": "playwright test audit.spec.ts",
     "bothsides": "playwright test bothsides.spec.ts",
     "ai-off": "playwright test ai-off.spec.ts",
+    "assistant": "playwright test assistant.spec.ts",
     "all": "playwright test",
     "report": "playwright show-report"
   },
