@@ -727,7 +727,7 @@ export interface RenovationDraft {
 
 /** The assistant's reading of one sentence: what to get ready for the household to check. It never sends anything. */
 export interface AssistantPlan {
-  intent: 'register_renovation' | 'say_hello' | 'set_quiet_time' | 'check_status' | 'go_to_page' | 'unknown'
+  intent: 'register_renovation' | 'say_hello' | 'set_quiet_time' | 'check_status' | 'go_to_page' | 'answer' | 'unknown'
   language: Lang
   reply: string
   page: 'circle' | 'chats' | 'works' | 'evidence' | 'impact' | 'channels' | 'me' | null

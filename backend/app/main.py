@@ -32,7 +32,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from . import ai, auth, db, ledger, quiet, talk, vision
 from .neighbours import Unit, impact_reason, impact_zone, inverse_relation, neighbour_circle, street_or_block
-from . import backup, phase_import, privacy, push
+from . import backup, knowledge, phase_import, privacy, push
 from .planner import MAX_HOMES, home_count, plan_phase
 from .seed import CONSENT_VERSION, CONSENT_VERSION_AI, CONSENT_VERSION_AI_GEMINI
 from .settings import demo_mode, setting
@@ -1129,8 +1129,11 @@ def assistant(body: AssistantIn, conn: sqlite3.Connection = Depends(get_conn)) -
     in, a hello with its homes ticked, a quiet time, a status, a page. Nothing reaches a neighbour from here."""
     me = _unit_row(conn, body.unit_id)
     text, status = body.text.strip(), _status_lines(conn, me)
+    # Questions are answered only from this: the house rules for this kind of home, then the guideline and the ladder.
+    rules = house_rules_for(me["kind"])[0] + [quiet.HOUSE_RULE_HOURS, f"Contractors enter {GATE_OPEN}–{GATE_CLOSE}, Monday to Saturday"]
     plan = ai.plan_request(me["id"], text, date.fromisoformat(_today()), _assistant_context(conn, me, body, status),
-                           home_kind=me["kind"], max_days=MAX_RENOVATION_DAYS) if ai.enabled() else None
+                           home_kind=me["kind"], max_days=MAX_RENOVATION_DAYS,
+                           knowledge=knowledge.for_assistant(rules)) if ai.enabled() else None
     by_ai = plan is not None
     plan = plan or _route_without_ai(text)
     if plan["intent"] == "go_to_page" and plan["page"] not in ASSISTANT_PAGES:

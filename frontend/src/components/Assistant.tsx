@@ -38,7 +38,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
   me: UnitInfo
   units: UnitInfo[]
   tab: TabId
-  onGo: (tab: TabId) => void
+  onGo: (tab: TabId, peer?: string) => void
   onChanged: () => void
 }) {
   const { t, lang } = useLang()
@@ -232,6 +232,10 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
                   {!quiet.undone && <button className="btn btn-sm" onClick={undoQuiet}>{t('assistant.undo')}</button>}
                 </div>
               ) : <button className="btn" onClick={() => { onGo(plan.page ?? 'circle'); close() }}>{t('assistant.go')}</button>)}
+              {/* An answer from the rules only; anything else is for the estate office (ChatsView's channel). */}
+              {plan.intent === 'answer' && (
+                <button className="link" onClick={() => { onGo('chats', '__estate'); close() }}>{t('assistant.estate')}</button>
+              )}
               {plan.intent === 'check_status' && plan.page && (
                 <button className="btn" onClick={() => { onGo(plan.page!); close() }}>{t('assistant.go')}</button>
               )}

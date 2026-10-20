@@ -427,7 +427,7 @@ function Shell({ pinned }: { pinned?: string }) {
       {!pinned && <Guide tab={cur.tab} me={cur.me} lang={lang} open={guideOpen} onLang={pickLang} onClose={() => setGuideOpen(false)} onGo={go}
         showAll={showAll} onShowAll={pickShowAll} />}
       {/* The household's assistant, for whoever is in the focused pane: it gets things ready, the household sends. */}
-      {curUnit?.joined && <Assistant me={curUnit} units={units} tab={cur.tab} onGo={(tab) => go(tab)} onChanged={changed} />}
+      {curUnit?.joined && <Assistant me={curUnit} units={units} tab={cur.tab} onGo={(tab, peer) => go(tab, undefined, { peer })} onChanged={changed} />}
       <div id="sheet-root" />
     </div>
   )

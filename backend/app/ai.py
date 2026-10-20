@@ -467,17 +467,22 @@ homes around them (such as "No. 11"); empty when they mean everyone.
 - set_quiet_time: their own home needs quiet at a time of day. quiet_window: start and end as HH:MM in 24-hour time, \
 and why (baby, night_shift, work_from_home, elderly or other).
   "The baby naps from 1 to 3 every afternoon" / "我上夜班，早上九点到十一点要睡觉"
-- check_status: where something of theirs stands. status_topic: warranty (a defect reported to SDP), renovation \
-(their own renovation notice), case (a crack or leak reported between neighbours), notices (renovation notices from \
-neighbours).
+- check_status: where something of theirs stands (this, not answer, for their own ticket, notice or case). \
+status_topic: warranty (a defect reported to SDP), renovation (their own renovation notice), case (a crack or leak \
+reported between neighbours), notices (renovation notices from neighbours).
   "Tiket jaminan saya sampai mana?" / "My case with next door got answer already or not?"
+- answer: a question about the house rules, permits, concerns, cases or the warranty. Answer in reply, in at most 80 \
+words, only from the rules and records given below. When the answer depends on the kind of work, say briefly what \
+each kind needs rather than sending them away. Send them to the estate office front desk only for what the rules do \
+not cover (fees, a council's own extra rules). Never guess a rule, a fee or a number.
+  "Can I renovate on Sunday?" / "装修要申请什么准证？"
 - go_to_page: open a part of the app. page: circle (neighbours), chats (messages), works (renovations), evidence \
 (photos and repairs), impact, channels (WhatsApp and the SDP App), me (settings and privacy).
   "Open my messages" / "Buka gambar dan pembaikan"
 - unknown: anything else, or when you cannot tell which. Do not guess: unknown is a good answer.
 
-reply: one sentence of at most 30 words, in the resident's language: what you got ready for them to check, or what \
-is still missing. A quiet time is added at once (they can undo it) and a page opens at once: say so, without asking \
+reply: one sentence of at most 30 words (an answer: at most 80), in the resident's language: what you got ready for \
+them to check, or what is still missing. A quiet time is added at once (they can undo it) and a page opens at once: say so, without asking \
 them to confirm. For a renovation, do not put dates, hours or the contractor in reply: the form is filled in \
 separately and shows them. Never say that anything was sent. missing: short notes in their language on what they did not say \
 that the form will need. Work out times and dates from what is given below. Use only the facts given about this \
@@ -493,9 +498,9 @@ class QuietWindow(BaseModel):
 
 
 class AssistantPlan(BaseModel):
-    intent: Literal["register_renovation", "say_hello", "set_quiet_time", "check_status", "go_to_page", "unknown"]
+    intent: Literal["register_renovation", "say_hello", "set_quiet_time", "check_status", "go_to_page", "answer", "unknown"]
     language: Lang = Field(description="The language the resident used (for a mix, the main one)")
-    reply: str = Field(description="One sentence, at most 30 words, in the resident's language")
+    reply: str = Field(description="One sentence, at most 30 words (an answer: at most 80), in the resident's language")
     page: Literal["circle", "chats", "works", "evidence", "impact", "channels", "me"] | None
     quiet_window: QuietWindow | None
     hello_to: list[str] = Field(description='Homes to greet, as labelled in the list given (such as "No. 11")')
@@ -503,19 +508,23 @@ class AssistantPlan(BaseModel):
     missing: list[str] = Field(description="Short notes in the resident's language on what they did not say")
 
 
-def plan_request(home: str, text: str, today: date, context: str, *, home_kind: str, max_days: int) -> dict[str, Any] | None:
+def plan_request(home: str, text: str, today: date, context: str, *, home_kind: str, max_days: int,
+                 knowledge: str = "") -> dict[str, Any] | None:
     """What the resident asked for, ready for them to check; None when there is no answer to use. A renovation is
-    then filled in by draft_renovation, the same as the notice's own one-sentence box, so it is never done twice."""
+    then filled in by draft_renovation, the same as the notice's own one-sentence box, so it is never done twice.
+    knowledge: the rules a question may be answered from (knowledge.py), after the instructions."""
     if not spend(home):
         return None
     asked = f"Today in Malaysia: {today:%A} {today.isoformat()}\n{context}\n\n<request>\n{text}\n</request>"
-    p = _ask(ASSISTANT_SYSTEM, asked, AssistantPlan, effort="low", max_tokens=1500, timeout=12)
+    system = f"{ASSISTANT_SYSTEM}\n\n{knowledge}" if knowledge else ASSISTANT_SYSTEM
+    p = _ask(system, asked, AssistantPlan, effort="low", max_tokens=1500, timeout=12)
     if p is None:
         return None
     window = p.quiet_window
     if window and not (HHMM.match(window.start) and HHMM.match(window.end) and window.start < window.end):
         window = None
-    plan = {"intent": p.intent, "language": p.language, "reply": p.reply.strip()[:300], "page": p.page,
+    reply = p.reply.strip()[:700 if p.intent == "answer" else 300]
+    plan = {"intent": p.intent, "language": p.language, "reply": reply, "page": p.page,
             "quiet_window": window.model_dump() if window and p.intent == "set_quiet_time" else None,
             "hello_to": [h.strip()[:20] for h in p.hello_to if h.strip()][:8] if p.intent == "say_hello" else [],
             "status_topic": p.status_topic if p.intent == "check_status" else None,

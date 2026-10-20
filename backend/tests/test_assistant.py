@@ -150,3 +150,17 @@ def test_a_quiet_time_that_does_not_read_as_times_is_dropped_and_a_page_must_be_
     assert _ask(client, "baby naps 3 to 1")["quiet_window"] is None
     claude.answers["AssistantPlan"] = _plan("go_to_page", page=None)
     assert _ask(client, "open that thing")["intent"] == "unknown"
+
+
+def test_a_question_is_answered_only_from_the_rules_given_and_shown_as_written(client, claude):
+    said = "No: the house rules allow no work on Sundays or public holidays. Noisy work is allowed 09:00–18:00, Monday to Saturday."
+    claude.answers["AssistantPlan"] = _plan("answer", reply=said)
+    d = _ask(client, "Can I renovate on Sunday?")
+    assert d["intent"] == "answer" and d["reply"] == said and d["by_ai"] is True
+    # knowledge.py's three parts follow the instructions: this home's house rules, the guideline, the ladder.
+    system = claude.calls[-1]["system"]
+    assert "No work on Sundays and public holidays" in system and "Noisy work is allowed 09:00–18:00" in system
+    assert "OSC 3.0 Plus" in system and "within 30 days of the owner's written notice" in system
+    assert "Protect the lift" not in system  # a terrace has no lift
+    _ask(client, "Boleh saya buat kerja hari Ahad?", unit="A-15-3")
+    assert "Protect the lift" in claude.calls[-1]["system"]

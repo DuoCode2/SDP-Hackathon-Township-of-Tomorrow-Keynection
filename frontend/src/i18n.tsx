@@ -242,6 +242,7 @@ const D: Record<string, Entry> = {
   'assistant.quiet.undone': ['Taken off again: {hours}', 'Dibuang semula: {hours}', '已撤销：{hours}'],
   'assistant.undo': ['Undo', 'Buat asal', '撤销'],
   'assistant.go': ['Open', 'Buka', '打开'],
+  'assistant.estate': ['Estate office channel', 'Saluran pejabat estet', '物业公告频道'],
   'reno.lead': ['These homes get the notice, a reminder to photograph their side before work starts, and a way to raise a concern.', 'Rumah ini akan menerima notis, peringatan untuk mengambil foto bahagian mereka sebelum kerja bermula, dan cara untuk meluahkan kebimbangan.', '这些住户会收到通知、开工前拍照的提醒，以及反映问题的管道。'],
   'reno.working': ['Working it out…', 'Sedang dikira…', '计算中…'], 'reno.hidden': ['Resident (name hidden)', 'Penghuni (nama dirahsiakan)', '住户（名字隐藏）'],
   'reno.none': ['No neighbouring homes for this type of work.', 'Tiada rumah jiran untuk jenis kerja ini.', '这类工程没有需要通知的邻居。'],
