@@ -3,6 +3,9 @@
 #   2. the front-end build (TypeScript strict; a type error fails it)
 # Same Python and Node majors as the team's laptops and the Dockerfile. It cannot stop Render deploying a
 # broken push to main (Render deploys on commit), but it says within minutes that one went wrong.
+# Machines: when the repository variable USE_DEPOT is 'true' the jobs run on Depot's
+# Linux runners (depot-ubuntu-24.04, 2 CPU / 8 GB, about the size of GitHub's standard runner); otherwise on
+# GitHub's ubuntu-latest. To go back to GitHub, delete the variable; no code change needed.
 name: Tests
 
 on:
@@ -17,7 +20,7 @@ concurrency:
 jobs:
   backend:
     name: Server tests (pytest)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.USE_DEPOT == 'true' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     timeout-minutes: 20
     defaults:
       run:
@@ -34,7 +37,7 @@ jobs:
 
   frontend:
     name: Web app build (TypeScript strict)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.USE_DEPOT == 'true' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     timeout-minutes: 10
     defaults:
       run:
