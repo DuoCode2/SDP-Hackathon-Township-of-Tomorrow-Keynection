@@ -54,6 +54,7 @@ const RISKS: Risk[] = [
     icon: <Sparkles size={18} />, title: 'AI translation and suggestions', risk: 'A machine puts words in a neighbour’s mouth, gets a renovation wrong, or sends residents’ messages abroad.',
     measures: [
       { text: 'Only the words being written go to the AI service (Claude by Anthropic; the online demo may use Google’s Gemini), never the directory or who is writing to whom; a name or unit number goes only if the writer typed it in', built: true },
+      { text: 'The assistant is the one exception: a household’s question goes with its own records (its notices, warranty tickets and case status) and its neighbours’ unit numbers, never their names or what they wrote. It gets things ready to check and never sends anything to a neighbour', built: true },
       { text: 'Gemini’s free tier, whose inputs Google may use to improve its products, serves the demo’s made-up households only: a pilot never sends residents’ words to it', built: true },
       { text: 'Every translation is marked “Translated by AI” with the original one tap away; the home log and reports keep the original words', built: true },
       { text: 'A calmer wording is only a suggestion: the sender chooses which words go. An insult is refused outright, with no “send anyway”: a word list in English, Malay and Chinese catches the obvious ones, and with AI on, the AI’s own judgement of abuse in any language catches the rest', built: true },

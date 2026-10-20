@@ -170,7 +170,7 @@ Dockerfile · render.yaml · railway.json · start-demo.bat / .sh · start-dev.b
 
 ## AI use and provenance
 
-This code was written with the help of Claude (Anthropic), declared under clause 13 of the competition terms. At run time the prototype uses Claude by design and Google's Gemini free tier on the online demo; both appear in the AI-use disclosure and in the privacy notice residents accept. Only the text being written is sent to an AI service, never the directory, unit numbers or who talks to whom. This is a fresh codebase for the hackathon; it contains no code from any team member's earlier projects.
+This code was written with the help of Claude (Anthropic), declared under clause 13 of the competition terms. At run time the prototype uses Claude by design and Google's Gemini free tier on the online demo; both appear in the AI-use disclosure and in the privacy notice residents accept. Only the text being written is sent to an AI service, never the directory, unit numbers or who talks to whom. The one exception is the assistant (one sentence, said or typed, becomes a notice, a hello, a quiet time, a status or a page, ready for the household to check): with the request go the household’s own records (notices, warranty tickets, case status) and its neighbours’ unit numbers, never their names or what they wrote. This is a fresh codebase for the hackathon; it contains no code from any team member's earlier projects.
 
 ## Team notes
 

@@ -80,7 +80,7 @@ Also: reports `open → warned | dismissed`; paper notices `to_print → printed
 | **Estate team (staff)** | Escalated concerns, notices it sent, the front desk, counts | Remind, close an escalated concern, send notices, issue join codes, print and log paper notices, register a renovation on paper | Read private chats; close a warranty ticket; see non-escalated concerns |
 | **Warranty / safety staff** | Tickets; reported messages (and a reported voice note) | Submit a repair; warn a sender or dismiss a report; export to Procore | Close a ticket; see who reported |
 | **Contractor pass (switched off)** | Works dates and hours | Show the QR at the guardhouse | See the owner's phone, neighbours' names, photos |
-| **AI service** | The text being written (and a name or unit only if the writer typed it) | Return structured fields: notice draft, translation, calmer wording, whether a message is abuse | See the directory or who writes to whom; its one decision, that a message is abuse, stops that message and nothing else |
+| **AI service** | The text being written (and a name or unit only if the writer typed it); for the assistant, also the household’s own records and its neighbours’ unit numbers | Return structured fields: notice draft, translation, calmer wording, whether a message is abuse, what an assistant request asks for | See the directory or who writes to whom; its one decision, that a message is abuse, stops that message and nothing else |
 
 In the demo the household's identity is the unit number in the request (so judges can switch roles); in a pilot it is the passkey session, checked on every household endpoint (`test_signin.py`).
 
@@ -89,6 +89,7 @@ In the demo the household's identity is the unit number in the request (so judge
 | Data | Stored | Leaves the server? | Kept |
 |---|---|---|---|
 | Names neighbours see, reading language, bio | SQLite | No | Until the household closes its account |
+| Assistant requests | Not stored | The sentence, the household’s own records (notices, warranty tickets, case status) and its neighbours’ unit numbers, to the AI service, when AI is on; never neighbours’ names or what they wrote | Not kept |
 | Messages, voice notes | SQLite / files | Only the typed text, to the AI service, when AI is on | Voice 30 days; messages one year after the home's DLP ends (or one year after they were made, if later) |
 | Photos | Files, re-encoded (no GPS, camera model, capture time) | No | Same as messages; photos inside a home are seen only by that home, staff and the other side of its case |
 | Home log | SQLite, hash chain | No (a pilot adds an outside timestamp) | Stays with the unit |
