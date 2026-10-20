@@ -164,3 +164,23 @@ def test_a_question_is_answered_only_from_the_rules_given_and_shown_as_written(c
     assert "Protect the lift" not in system  # a terrace has no lift
     _ask(client, "Boleh saya buat kerja hari Ahad?", unit="A-15-3")
     assert "Protect the lift" in claude.calls[-1]["system"]
+
+
+def test_the_chat_so_far_goes_with_the_request_so_a_follow_up_is_understood(client, claude):
+    claude.answers["AssistantPlan"] = _plan("answer", reply="Monday to Saturday, 09:00-18:00.")
+    turns = [{"who": "resident" if i % 2 == 0 else "assistant", "text": f"turn {i}"} for i in range(8)]
+    r = client.post("/api/assistant", json={"unit_id": "T-12", "text": "and on Saturday?", "history": turns})
+    assert r.status_code == 200 and r.json()["intent"] == "answer"
+    asked = claude.calls[-1]["text"]
+    # The last six turns, oldest first, then the new message; the chat is the resident's own words and the replies.
+    assert "<conversation>\nResident: turn 2\nAssistant: turn 3" in asked and "turn 1" not in asked
+    assert asked.index("Assistant: turn 7") < asked.index("<request>\nand on Saturday?\n</request>")
+    assert "Where things are in Keynection" in claude.calls[-1]["system"]  # "how do I..." has a guide to answer from
+    bad = client.post("/api/assistant", json={"unit_id": "T-12", "text": "hi", "history": [{"who": "neighbour", "text": "x"}]})
+    assert bad.status_code == 422
+
+
+@pytest.mark.parametrize("said, intent", [("hi", "answer"), ("Terima kasih!", "answer"), ("hello neighbours", "say_hello"),
+                                          ("Hi, my warranty status?", "check_status")])
+def test_without_ai_a_greeting_to_the_assistant_is_not_a_hello_to_the_neighbours(client, said, intent):
+    assert _ask(client, said)["intent"] == intent
