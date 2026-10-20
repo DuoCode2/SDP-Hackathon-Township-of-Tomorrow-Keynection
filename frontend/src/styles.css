@@ -1854,3 +1854,18 @@ button.ring-row:hover { background: var(--surface-2); }
 .plan-legend .lg-structural { border: 2px solid var(--red); }
 .plan-legend .lg-back { background: var(--works-bg); border-top: 2px solid var(--works); }
 .plan-explain { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line-2); font-size: 13px; animation: pop 200ms var(--ease) both; }
+
+/* === pr/merge-batches-1-4: the Guide floats over two panes below 1600 px === */
+/* Docked beside a split view on a 1366 laptop, it left each pane too narrow; there it behaves as the drawer does on a narrow screen. */
+@media (min-width: 1312px) and (max-width: 1599.98px) {
+  .app.guide-float.guide-on { grid-template-columns: 252px minmax(0, 1fr); }
+  .app.guide-float .guide {
+    display: flex; position: fixed; top: 0; right: 0; bottom: 0; z-index: 80; width: min(400px, 100vw); height: auto;
+    transform: translateX(100%); visibility: hidden; transition: transform 280ms var(--ease), visibility 0s linear 280ms;
+    box-shadow: -30px 0 60px -30px color-mix(in srgb, var(--ink) 40%, transparent);
+  }
+  .app.guide-float .guide.open { transform: none; visibility: visible; transition: transform 280ms var(--ease); }
+  .app.guide-float .guide-scrim { display: block; position: fixed; inset: 0; z-index: 79; background: color-mix(in srgb, var(--ink) 28%, transparent); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); animation: fade 200ms both; }
+  body:has(.app.guide-float) .toasts { right: 28px; }
+  .app.guide-float.guide-on .assistant-fab { right: 24px; }
+}

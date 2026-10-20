@@ -56,6 +56,8 @@ type NavItem = (typeof NAV)[number]['items'][number] & { group: string; no: stri
 const ALL: NavItem[] = NAV.flatMap((g) => g.items.map((i) => ({ ...i, group: g.group }))).map((i, n) => ({ ...i, no: String(n + 1).padStart(2, '0') }))
 const WIDE = '(min-width: 1312px)'
 const SPLIT_OK = '(min-width: 1100px)'
+// Two panes and a docked Guide fit side by side only from here; below it the Guide floats over two panes instead.
+const ROOMY = '(min-width: 1600px)'
 const UI_LANGS: { code: UiLang; tag: string; name: string }[] = [
   { code: 'en', tag: 'EN', name: 'English' }, { code: 'ms', tag: 'BM', name: 'Bahasa Melayu' }, { code: 'zh', tag: '中', name: '中文' },
 ]
@@ -193,6 +195,7 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
   const [guideOpen, setGuideOpen] = useState(() => !pinned && !embed && window.matchMedia(WIDE).matches)
   const [lang, setLang] = useState<GuideLang>(storedLang)
   const [canSplit, setCanSplit] = useState(() => window.matchMedia(SPLIT_OK).matches)
+  const [roomy, setRoomy] = useState(() => window.matchMedia(ROOMY).matches)
   const [showAll, setShowAll] = useState(storedShowAll)
   // Demo only: the key-day opening, once per browser (a pilot household has the real join page).
   const [opening, setOpening] = useState(() => !pinned && !embed && remembered('opening.done') === null)
@@ -224,9 +227,17 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
 
   useEffect(() => {
     const mq = window.matchMedia(SPLIT_OK)
-    const on = () => setCanSplit(mq.matches)
+    const wide = window.matchMedia(ROOMY)
+    const on = () => {
+      setCanSplit(mq.matches)
+      setRoomy(wide.matches)
+    }
     mq.addEventListener('change', on)
-    return () => mq.removeEventListener('change', on)
+    wide.addEventListener('change', on)
+    return () => {
+      mq.removeEventListener('change', on)
+      wide.removeEventListener('change', on)
+    }
   }, [])
 
   const pickShowAll = (on: boolean) => {
@@ -243,6 +254,8 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
   }, [showAll, pinned])
 
   const split = panes.length === 2 && canSplit
+  // On a 1366 laptop a docked Guide left each of the two panes too narrow: there it floats over them like a drawer.
+  const guideFloats = split && !roomy
   const shown = split ? panes : [panes[Math.min(active, panes.length - 1)]]
   const focus = split ? active : Math.min(active, panes.length - 1)
   const cur = panes[focus]
@@ -267,6 +280,7 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
     const right = cur.me === 'T-11' ? cur : { me: cur.me === 'T-12' ? 'T-11' : 'T-12', tab: cur.tab }
     setPanes([left, right])
     setActive(cur.me === 'T-11' ? 1 : 0)
+    if (!window.matchMedia(ROOMY).matches) setGuideOpen(false)
   }
 
   const pickLang = (l: GuideLang) => {
@@ -284,7 +298,8 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
   // A step that wants both sides opens them itself, Aiman left and Siti right, each already on the other's thread;
   // a screen too narrow for two panes shows Siti alone, still on that thread.
   const go = (next: TabId, unit?: string, opts?: { split?: boolean; peer?: string }) => {
-    if (opts?.split && window.matchMedia(SPLIT_OK).matches) {
+    const splitting = !!opts?.split && window.matchMedia(SPLIT_OK).matches
+    if (splitting) {
       setPanes([{ me: 'T-12', tab: next, peer: 'T-11' }, { me: 'T-11', tab: next, peer: 'T-12' }])
       setActive(1)
     } else {
@@ -293,7 +308,8 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
       update(i, { tab: next, peer: opts?.peer, ...(unit ? { me: unit } : {}) })
       setActive(i)
     }
-    if (!window.matchMedia(WIDE).matches) setGuideOpen(false)
+    // The Guide gets out of the way after a step wherever it covers the screen: a narrow window, or two panes below 1600 px.
+    if (!window.matchMedia(WIDE).matches || ((splitting || split) && !window.matchMedia(ROOMY).matches)) setGuideOpen(false)
   }
 
   const page = shownNav.find((i) => i.id === cur.tab) ?? shownNav[0]
@@ -333,7 +349,7 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
   }
 
   return (
-    <div className={`app ${faceOf(cur.tab)} ${guideOpen ? 'guide-on' : ''} ${embed ? 'embed' : ''}`}>
+    <div className={`app ${faceOf(cur.tab)} ${guideOpen ? 'guide-on' : ''} ${guideFloats ? 'guide-float' : ''} ${embed ? 'embed' : ''}`}>
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark"><Logo size={24} /></div>
