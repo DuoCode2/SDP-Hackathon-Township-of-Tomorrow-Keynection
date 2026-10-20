@@ -1040,6 +1040,112 @@ def renovation_draft(body: RenovationTextIn, conn: sqlite3.Connection = Depends(
     return draft
 
 
+class AssistantIn(BaseModel):
+    unit_id: str = Field(..., pattern=UNIT_ID)
+    text: str = Field(..., min_length=1, max_length=500)
+    page: str | None = Field(None, max_length=20)  # the screen the resident is on
+    lang: str | None = Field(None, max_length=5)  # the language they read the app in
+
+
+# Without AI (off, used up for today, or no answer in time) a few key words decide, and the screens ask for the rest.
+# Status words come first, so "my renovation status" is a question, not a new notice.
+ASSISTANT_WORDS = [
+    ("check_status", re.compile(r"warranty|jaminan|保修|status", re.I)),
+    ("register_renovation", re.compile(r"renovat|ubah ?suai|装修|翻新|瓷砖|jubin|tile|retil", re.I)),
+    ("say_hello", re.compile(r"hello|\bhai\b|\bhi\b|你好|打招呼|sapa", re.I)),
+    ("set_quiet_time", re.compile(r"quiet|senyap|安静|午睡|\bnap\b|tidur", re.I)),
+]
+ASSISTANT_REPLY = {
+    "register_renovation": "Opening the renovation notice: check each step, then send it yourself.",
+    "say_hello": "Opening a hello: pick who it goes to, then send it yourself.",
+    "set_quiet_time": "Add the quiet time your home needs under Your quiet times, on the Neighbours page.",
+    "unknown": "Sorry, I didn't catch that. Try one of the examples, or open a page yourself.",
+}
+STATUS_PAGE = {"warranty": "evidence", "case": "evidence", "renovation": "works", "notices": "chats"}
+ASSISTANT_PAGES = {"circle", "chats", "works", "evidence", "impact", "channels", "me"}
+
+
+def _route_without_ai(text: str) -> dict[str, Any]:
+    intent = next((name for name, words in ASSISTANT_WORDS if words.search(text)), "unknown")
+    topic = None
+    if intent == "check_status":
+        topic = "warranty" if re.search(r"warranty|jaminan|保修", text, re.I) else "renovation" if re.search(r"renovat|装修", text, re.I) else None
+    return {"intent": intent, "language": "en", "reply": ASSISTANT_REPLY.get(intent, ""),
+            "page": "circle" if intent == "set_quiet_time" else None, "quiet_window": None, "hello_to": [],
+            "status_topic": topic, "missing": [], "renovation": None}
+
+
+def _status_lines(conn: sqlite3.Connection, me: sqlite3.Row) -> dict[str, str]:
+    """Where this household's own things stand, one line per topic. Counted here, never by the AI, so the numbers
+    are always right; neighbours appear by their unit number only."""
+    unit_id, today = me["id"], _today()
+    span = lambda r: f"{talk.date_text(r['start'], 'en')} – {talk.date_text(r['end'], 'en')}"  # noqa: E731
+    tickets = []
+    for r in conn.execute("SELECT * FROM warranty_tickets WHERE unit_id = ? ORDER BY id DESC LIMIT 3", (unit_id,)):
+        clock = _warranty_clock(me, r)
+        left = "" if r["status"] == "closed" else (f" · {-clock['days_left']} days overdue" if clock["overdue"]
+                                                  else f" · {clock['days_left']} days left")
+        tickets.append(f"#{r['id']} · {STATUS_NAME[r['status']].lower()}{left}")
+    mine = [(json.loads(r["renovation"]), r["told"]) for r in conn.execute(
+        "SELECT i.renovation, (SELECT COUNT(*) FROM intro_recipients x WHERE x.intro_id = i.id) AS told FROM intros i"
+        " WHERE i.from_unit_id = ? AND i.renovation IS NOT NULL ORDER BY i.id DESC", (unit_id,))]
+    mine = [f"“{reno['scope']}” {span(reno)}, {told} homes told" for reno, told in mine if reno["end"] >= today][:2]
+    waiting = []
+    for c in conn.execute("SELECT n.status, n.reporter_unit_id, i.from_unit_id AS renovator FROM incidents n"
+                          " LEFT JOIN intros i ON i.id = n.renovation_intro_id"
+                          " WHERE (n.reporter_unit_id = ? OR i.from_unit_id = ?) AND n.status != 'decided'", (unit_id, unit_id)):
+        turn = c["renovator"] if c["status"] == "proposed" else c["reporter_unit_id"]  # whose move it is now
+        waiting.append("you" if turn == unit_id else _unit_row(conn, turn)["label"])
+    near = [f"{r['label']} {span(json.loads(r['renovation']))}" for r in conn.execute(
+        "SELECT i.renovation, u.label FROM intro_recipients x JOIN intros i ON i.id = x.intro_id"
+        " JOIN units u ON u.id = i.from_unit_id WHERE x.unit_id = ? AND i.renovation IS NOT NULL ORDER BY i.id DESC", (unit_id,))
+            if json.loads(r["renovation"])["end"] >= today][:3]
+    return {
+        "warranty": f"Warranty {'; '.join(tickets)}." if tickets else "No warranty tickets.",
+        "renovation": f"Your renovation {'; '.join(mine)}." if mine else "No renovation notice from your home is running.",
+        "case": f"{len(waiting)} open case{'s' if len(waiting) > 1 else ''}, waiting for {', '.join(dict.fromkeys(waiting))}."
+                if waiting else "No open cases.",
+        "notices": f"Renovation near you: {'; '.join(near)}." if near else "No renovation notices near you right now.",
+    }
+
+
+def _assistant_context(conn: sqlite3.Connection, me: sqlite3.Row, body: AssistantIn, status: dict[str, str]) -> str:
+    """All the assistant is told about the household: its own records and the unit numbers around it. Never a
+    neighbour's name or anything a neighbour wrote."""
+    home = "an apartment in a strata building" if me["kind"] == "apartment" else "a terrace house"
+    lines = [f"The household: {home}, {me['label']}", f"House rule: {quiet.HOUSE_RULE_HOURS}",
+             "Homes around them: " + ", ".join(n["label"] for n in _circle(conn, me["id"])),
+             f"Their records: {status['warranty']} {status['renovation']} {status['case']}"]
+    if body.page in ASSISTANT_PAGES:
+        lines.append(f"Their screen now: {body.page}")
+    if body.lang in ai.LANG_FOR_AI:
+        lines.append(f"They read the app in: {ai.LANG_FOR_AI[body.lang]}")
+    return "\n".join(lines)
+
+
+@app.post("/api/assistant")
+def assistant(body: AssistantIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """One sentence, said or typed, becomes something ready for the household to check: a renovation notice filled
+    in, a hello with its homes ticked, a quiet time, a status, a page. Nothing reaches a neighbour from here."""
+    me = _unit_row(conn, body.unit_id)
+    text, status = body.text.strip(), _status_lines(conn, me)
+    plan = ai.plan_request(me["id"], text, date.fromisoformat(_today()), _assistant_context(conn, me, body, status),
+                           home_kind=me["kind"], max_days=MAX_RENOVATION_DAYS) if ai.enabled() else None
+    by_ai = plan is not None
+    plan = plan or _route_without_ai(text)
+    if plan["intent"] == "go_to_page" and plan["page"] not in ASSISTANT_PAGES:
+        plan = {**_route_without_ai(""), "language": plan["language"]}  # no page named: say so rather than guess
+    if plan["intent"] == "check_status":  # the server's own count, not the AI's words
+        topic = plan["status_topic"]
+        plan["reply"] = status[topic] if topic else " ".join(status.values())
+        plan["page"] = STATUS_PAGE.get(topic or "")
+    hello = []
+    if plan["intent"] == "say_hello":  # only homes in the circle that joined, as a hello itself allows
+        joined = {n["label"].casefold(): n for n in _circle(conn, me["id"]) if n["joined"]}
+        hello = [joined[h.casefold()] for h in plan["hello_to"] if h.casefold() in joined]
+    return {**plan, "hello_to": [n["label"] for n in hello], "hello_ids": [n["id"] for n in hello], "by_ai": by_ai}
+
+
 @app.post("/api/intros", status_code=201)
 def send_intro(body: IntroIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     _require_joined(conn, body.from_unit_id)
