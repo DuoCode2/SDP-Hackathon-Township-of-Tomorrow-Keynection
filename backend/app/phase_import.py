@@ -10,6 +10,8 @@ while any line is wrong. The circles come from the layout columns, with the same
   street      terrace: the road the house is on
   row         terrace: one row of houses. Leave it empty when a street has houses on one side only
   facing_row  terrace: the row across the road. Number both rows from the same end, so facing houses share a position
+  back_row    terrace: the row behind, sharing the back fence; same pos numbering. Told about wet, hacking and
+              structural works, but not part of the circle
   pos         position along the row or along the floor, from 1. A gap keeps homes apart (semi-D pairs: 1, 2, 4, 5)
   block, floor  apartment
   owner       the name on SDP's sales record: pre-fills the join form and the welcome-pack card, never shown to neighbours
@@ -43,6 +45,7 @@ ALIASES = {
     "street": ("street", "road", "jalan"),
     "row": ("row",),
     "facing_row": ("facing_row", "facing", "opposite_row"),
+    "back_row": ("back_row", "behind", "back"),
     "pos": ("pos", "position"),
     "block": ("block", "tower"),
     "floor": ("floor", "level"),
@@ -58,7 +61,7 @@ KINDS = {"terrace": "terrace", "landed": "terrace", "link": "terrace", "semi-d":
 LANGS = {"en": "en", "english": "en", "ms": "ms", "bm": "ms", "malay": "ms", "bahasa melayu": "ms", "zh": "zh",
          "chinese": "zh", "mandarin": "zh", "中文": "zh", "华文": "zh", "ta": "ta", "tamil": "ta", "தமிழ்": "ta"}
 CONTACT = re.compile(r"phone|mobile|tel|mail|^ic|nric|passport|contact|^hp$")
-LAYOUT = ("kind", "label", "street", "row", "facing_row", "block", "floor", "pos")
+LAYOUT = ("kind", "label", "street", "row", "facing_row", "back_row", "block", "floor", "pos")
 
 
 @dataclass
@@ -76,9 +79,10 @@ class Home:
     owner: str | None
     handover: str
     lang: str
+    back_row: str | None = None
 
     def unit(self) -> Unit:
-        return Unit(id=self.id, kind=self.kind, label=self.label, row=self.row, facing_row=self.facing_row,
+        return Unit(id=self.id, kind=self.kind, label=self.label, row=self.row, facing_row=self.facing_row, back_row=self.back_row,
                     block=self.block, floor=self.floor, pos=self.pos)
 
 
@@ -191,12 +195,13 @@ def _home(report: Report, line: int, row: list[str], columns: dict[str, int]) ->
     if pos is None or not 1 <= pos <= 9999:
         problems.append(f"Position '{get('pos')}' must be a whole number from 1.")
     street, row_id, facing, block, floor = get("street") or None, get("row") or None, get("facing_row") or None, None, None
+    back = get("back_row") or None
     if kind == "terrace":
         if not street:
             problems.append("A terrace house needs its street.")
         row_id = row_id or street
     elif kind == "apartment":
-        street = row_id = facing = None
+        street = row_id = facing = back = None
         block = get("block") or None
         if not block:
             problems.append("An apartment needs its block.")
@@ -221,7 +226,7 @@ def _home(report: Report, line: int, row: list[str], columns: dict[str, int]) ->
     if lang is None:
         report.warn(line, f"Language '{spoken}' isn't one Keynection speaks yet: English is used, and the owner chooses when joining.")
         lang = "en"
-    return Home(line, code, label, kind, street, row_id, facing, block, floor, pos, owner, handover, lang)
+    return Home(line, code, label, kind, street, row_id, facing, block, floor, pos, owner, handover, lang, back)
 
 
 def _whole(text: str) -> int | None:
@@ -266,23 +271,24 @@ def check(conn: sqlite3.Connection, report: Report, phase_id: str | None) -> Non
             report.error(h.line, f"Unit {h.id} is already in {row['phase_name']}. Use SDP's full unit code.")
         elif row["joined_at"] is not None:
             now = {"kind": row["kind"], "label": row["label"], "street": row["street"], "row": row["terrace_row"],
-                   "facing_row": row["facing_row"], "block": row["block"], "floor": row["floor"], "pos": row["pos"]}
+                   "facing_row": row["facing_row"], "back_row": row["back_row"], "block": row["block"], "floor": row["floor"],
+                   "pos": row["pos"]}
             if any(getattr(h, k) != now[k] for k in LAYOUT):
                 report.error(h.line, f"{row['label']} has joined Keynection, so its place and label stay as they are "
                                      "(its neighbours already know it). Leave this line as it was, or ask the Keynection team.")
             else:
                 report.unchanged.append(h.id)  # the household's own name and language are theirs now
         else:
-            before = (row["kind"], row["label"], row["street"], row["terrace_row"], row["facing_row"], row["block"],
+            before = (row["kind"], row["label"], row["street"], row["terrace_row"], row["facing_row"], row["back_row"], row["block"],
                       row["floor"], row["pos"], row["record_name"], row["handover_date"], row["lang"])
-            after = (h.kind, h.label, h.street, h.row, h.facing_row, h.block, h.floor, h.pos, h.owner, h.handover, h.lang)
+            after = (h.kind, h.label, h.street, h.row, h.facing_row, h.back_row, h.block, h.floor, h.pos, h.owner, h.handover, h.lang)
             (report.updated if before != after else report.unchanged).append(h.id)
     # The phase as it would be: homes already in it that the list leaves out stay where they are.
     in_list = {h.id for h in homes}
     others = [r for r in held.values() if r["phase_id"] == phase_id and r["id"] not in in_list]
     report.kept = len(others)
     units = [Unit(id=r["id"], kind=r["kind"], label=r["label"], row=r["terrace_row"], facing_row=r["facing_row"],
-                  block=r["block"], floor=r["floor"], pos=r["pos"]) for r in others] + [h.unit() for h in homes]
+                  back_row=r["back_row"], block=r["block"], floor=r["floor"], pos=r["pos"]) for r in others] + [h.unit() for h in homes]
     if len(units) > MAX_HOMES:
         report.error(0, f"A phase can have up to {MAX_HOMES} homes; this one would have {len(units)}.")
     where, label_line = {}, {}
@@ -303,6 +309,8 @@ def check(conn: sqlite3.Connection, report: Report, phase_id: str | None) -> Non
     for h in homes:
         if h.kind == "terrace" and h.facing_row and h.facing_row not in rows:
             report.warn(h.line, f"Facing row '{h.facing_row}' isn't in the list, so no houses across the road are counted.")
+        if h.kind == "terrace" and h.back_row and h.back_row not in rows:
+            report.warn(h.line, f"Back row '{h.back_row}' isn't in the list, so no house behind is told about works.")
     index = slot_index(units)
     label_of = {u.id: u.label for u in units}
     for u in units:
@@ -349,9 +357,9 @@ def apply(conn: sqlite3.Connection, report: Report, phase_id: str, name: str, st
         for unit_id in report.added:
             h = homes[unit_id]
             conn.execute(
-                "INSERT INTO units (id, phase_id, kind, label, resident_name, street, terrace_row, facing_row, block, floor, pos,"
-                " lang, handover_date, record_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (h.id, phase_id, h.kind, h.label, h.label, h.street, h.row, h.facing_row, h.block, h.floor, h.pos,
+                "INSERT INTO units (id, phase_id, kind, label, resident_name, street, terrace_row, facing_row, back_row, block, floor,"
+                " pos, lang, handover_date, record_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (h.id, phase_id, h.kind, h.label, h.label, h.street, h.row, h.facing_row, h.back_row, h.block, h.floor, h.pos,
                  h.lang, h.handover, h.owner))
             conn.execute("INSERT INTO profiles (unit_id) VALUES (?)", (h.id,))
             db.append_event(conn, h.id, "handover", {"note": "Vacant possession, from SDP's handover list",
@@ -360,9 +368,9 @@ def apply(conn: sqlite3.Connection, report: Report, phase_id: str, name: str, st
             h = homes[unit_id]
             before = conn.execute("SELECT handover_date FROM units WHERE id = ?", (unit_id,)).fetchone()[0]
             conn.execute(
-                "UPDATE units SET kind = ?, label = ?, resident_name = ?, street = ?, terrace_row = ?, facing_row = ?, block = ?,"
-                " floor = ?, pos = ?, lang = ?, handover_date = ?, record_name = ? WHERE id = ? AND joined_at IS NULL",
-                (h.kind, h.label, h.label, h.street, h.row, h.facing_row, h.block, h.floor, h.pos, h.lang, h.handover,
+                "UPDATE units SET kind = ?, label = ?, resident_name = ?, street = ?, terrace_row = ?, facing_row = ?, back_row = ?,"
+                " block = ?, floor = ?, pos = ?, lang = ?, handover_date = ?, record_name = ? WHERE id = ? AND joined_at IS NULL",
+                (h.kind, h.label, h.label, h.street, h.row, h.facing_row, h.back_row, h.block, h.floor, h.pos, h.lang, h.handover,
                  h.owner, unit_id))
             if before != h.handover:
                 db.append_event(conn, unit_id, "handover", {"note": "Handover date corrected from SDP's handover list",

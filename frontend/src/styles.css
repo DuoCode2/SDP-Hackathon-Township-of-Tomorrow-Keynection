@@ -1803,3 +1803,11 @@ button.ring-row:hover { background: var(--surface-2); }
 /* Keynection inside the SDP App: the household's own screens only, laid out for the phone. */
 .app.embed .sidebar, .app.embed .topbar { display: none !important; }
 @media (min-width: 900px) { .app.embed { grid-template-columns: minmax(0, 1fr); } }
+
+/* === feat/plan-geometry === */
+/* The back lane between row A and row C, its drain, and the home behind yours: grey, told only when works reach the back. */
+.plan .back-lane { fill: var(--well-2); }
+.plan .drain { stroke: var(--blue); stroke-width: 1.2; stroke-dasharray: 2 3; opacity: 0.6; }
+.plan .lane-text { font-size: 8px; fill: var(--muted); }
+.plan .home.behind-home .home-fill { fill: var(--surface-2); stroke: color-mix(in srgb, var(--ink) 45%, transparent); stroke-dasharray: 4 3; }
+.plan .behind-note { font-size: 8px; fill: var(--muted); }

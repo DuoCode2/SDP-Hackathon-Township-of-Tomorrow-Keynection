@@ -45,6 +45,7 @@ const D: Record<string, Entry> = {
   'rel.across-left': ['Across the road', 'Seberang jalan', '对面'], 'rel.across-right': ['Across the road', 'Seberang jalan', '对面'],
   'rel.across': ['Directly across', 'Betul-betul di seberang', '正对面'], 'rel.above': ['Upstairs', 'Tingkat atas', '楼上'], 'rel.below': ['Downstairs', 'Tingkat bawah', '楼下'],
   'rel.above-2': ['Two floors up', 'Dua tingkat di atas', '楼上两层'], 'rel.below-2': ['Two floors down', 'Dua tingkat di bawah', '楼下两层'], 'rel.contact': ['Connected by request', 'Berhubung melalui permintaan', '通过请求联系'],
+  'rel.behind': ['Behind you · shares your back fence', 'Di belakang anda · berkongsi pagar belakang', '在你家后面 · 共用后围墙'],
   'share.wall': ['Shares your wall', 'Berkongsi dinding', '跟你共用墙'], 'share.above': ['Lives above you', 'Tinggal di atas anda', '住你楼上'], 'share.below': ['Lives below you', 'Tinggal di bawah anda', '住你楼下'],
   'share.slab': ['shared slab', 'lantai berkongsi', '共用楼板'], 'share.wallShort': ['shared wall', 'dinding berkongsi', '共用墙'],
   'hint.same_row': ['Same row', 'Barisan sama', '同一排'], 'hint.across_road': ['Across the road', 'Seberang jalan', '对面'],
@@ -111,6 +112,7 @@ const D: Record<string, Entry> = {
   'celebrate.connected': ['Connected with {label}', 'Berhubung dengan {label}', '已跟 {label} 建立联系'],
 
   'plan.swipe': ['Swipe sideways to see the whole plan', 'Leret ke sisi untuk melihat keseluruhan pelan', '左右滑动看整张平面图'],
+  'plan.behind': ['Told when works reach the back', 'Dimaklumkan bila kerja sampai ke belakang', '工程碰到后面时会通知'], 'plan.backLane': ['BACK LANE', 'LORONG BELAKANG', '后巷'],
   'hours.weekdays': ['Weekdays {from}–{to}, no weekends', 'Hari bekerja {from}–{to}, tiada hujung minggu', '平日 {from}–{to}，周末不施工'],
   'hours.monSat': ['Mon–Sat {from}–{to}', 'Isnin–Sabtu {from}–{to}', '星期一至六 {from}–{to}'],
   'hours.quiet': ['quiet {from}–{to}', 'senyap {from}–{to}', '{from}–{to} 不吵'],
@@ -293,6 +295,10 @@ const D: Record<string, Entry> = {
   'reason.below_wet': ['Directly below: leak risk', 'Betul-betul di bawah: risiko bocor', '正楼下：漏水风险'], 'reason.below-2_wet': ['Two floors below: leaks can travel', 'Dua tingkat di bawah: kebocoran boleh merebak', '楼下两层：漏水可能蔓延'],
   'reason.above': ['Directly above: noise and vibration', 'Betul-betul di atas: bising dan gegaran', '正楼上：噪音和震动'], 'reason.above-2': ['Two floors up: noise travels through the frame', 'Dua tingkat di atas: bunyi merebak melalui struktur', '楼上两层：噪音经结构传上去'],
   'reason.below': ['Directly below: noise, vibration and leaks', 'Betul-betul di bawah: bising, gegaran dan kebocoran', '正楼下：噪音、震动和漏水'], 'reason.below-2': ['Two floors below: noise travels through the frame', 'Dua tingkat di bawah: bunyi merebak melalui struktur', '楼下两层：噪音经结构传下去'],
+  // The home behind: told about works that reach the back fence or the back drain, though not in the circle.
+  'reason.behind_structural': ['Shares your back fence: an extension reaches it', 'Berkongsi pagar belakang: sambungan rumah sampai ke situ', '共用后围墙：加建会碰到它'],
+  'reason.behind_wet': ['The back drain runs along both homes', 'Longkang belakang melalui kedua-dua rumah', '后排水沟经过两家'],
+  'reason.behind_hacking': ['Vibration crosses the back wall', 'Gegaran merentasi dinding belakang', '震动会传过后墙'],
 
   // chats
   'chats.eyebrow': ['Chats', 'Sembang', '聊天'], 'chats.title': ['Neighbours', 'Jiran', '邻居'],

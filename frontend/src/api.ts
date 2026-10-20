@@ -2,7 +2,7 @@ import type {
   AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON,
 } from '@simplewebauthn/browser'
 
-export type Relation = 'left' | 'right' | 'across-left' | 'across' | 'across-right' | 'above' | 'below' | 'above-2' | 'below-2' | 'contact'
+export type Relation = 'left' | 'right' | 'across-left' | 'across' | 'across-right' | 'above' | 'below' | 'above-2' | 'below-2' | 'behind' | 'contact'
 export type WorksType = 'wet' | 'hacking' | 'structural' | 'light'
 
 export interface UnitInfo {
@@ -15,6 +15,8 @@ export interface UnitInfo {
   resident_name: string
   row: string | null
   facing_row: string | null
+  /** Terrace: the row behind, across the back fence (told about wet, hacking and structural works; not in the circle). */
+  back_row?: string | null
   block: string | null
   floor: number | null
   pos: number

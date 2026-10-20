@@ -54,7 +54,9 @@ test('the 3-minute judge route, with a screenshot per step', async ({ page }) =>
     await next(sheet)
     await expect(sheet.locator('ol.zone-list > li').first()).toBeVisible()
     await expect(sheet.locator('ol.zone-list')).toContainText('Not on Keynection yet') // No. 23 goes on paper
-    expect(await sheet.locator('ol.zone-list > li').count()).toBeGreaterThanOrEqual(5)
+    // Wet work: the five homes of the circle, and No. 32 behind (the back drain runs along both homes).
+    await expect(sheet.locator('ol.zone-list > li')).toHaveCount(6)
+    await expect(sheet.locator('ol.zone-list > li', { hasText: 'No. 32' })).toContainText('Behind you · shares your back fence')
     await shot(page, 'K04-who-is-told')
   })
 

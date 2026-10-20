@@ -20,7 +20,7 @@ CONSENT_VERSION_AI_GEMINI = "pilot-2026-10c-ai-gemini"
 
 # Households that have not joined Keynection yet. Until they do, neighbours see their unit number only, never a name,
 # and renovation notices reach them on paper through the estate office.
-NOT_JOINED = {"T-23"}
+NOT_JOINED = {"T-23", "T-34"}
 # Households that use easy mode (bigger text, fewer options). Private to the household itself.
 EASY_MODE = {"T-20"}
 # Family helpers already set up at handover: (unit, helper name, relationship).
@@ -67,6 +67,7 @@ def demo_notices() -> list[tuple[str, str, str]]:
 
 _SOUTH_NAMES = ["Farid", "Siti", "Aiman", "Kumar", "Wei Jie", "Nurul"]
 _NORTH_NAMES = ["Ah Hock", "Priya", "Hafiz", "Mei Ling", "Daniel", "Aisyah"]
+_LANE_NAMES = ["Ravi", "Azura", "Boon Keat", "Salmah", "Vimala", "Iskandar"]
 _APT_NAMES = {
     11: ["Faizal", "Mei Xin", "Ganesh", "Amira"],
     12: ["Ismail", "Hui Min", "Lakshmi", "Danish"],
@@ -84,6 +85,7 @@ _LANG = {
     "Arjun": "en", "Yong": "zh", "Hana": "ms", "Rajesh": "en", "Sofia": "en", "Chong": "zh",
     "Faizal": "ms", "Mei Xin": "zh", "Ganesh": "en", "Amira": "ms", "Ismail": "ms", "Hui Min": "zh",
     "Lakshmi": "en", "Danish": "ms", "Nadia": "ms", "Wei Ming": "zh", "Thinesh": "en", "Farah": "ms",
+    "Ravi": "en", "Azura": "ms", "Boon Keat": "zh", "Salmah": "ms", "Vimala": "ta", "Iskandar": "ms",
 }
 
 
@@ -111,15 +113,23 @@ QUIET_TIMES = {
 
 def demo_units() -> list[dict]:
     units = []
-    # South row: houses 10-15, facing north row houses 20-25 (house 12 faces 22).
+    # South row: houses 10-15, facing north row houses 20-25 (house 12 faces 22), backing onto the lane row 30-35
+    # across the back fence (house 12 backs onto 32).
     for pos in range(6):
         units.append({
             "id": f"T-{10 + pos}", "phase_id": "demo", "kind": "terrace", "label": f"No. {10 + pos}", "street": "Jalan Demo 1",
-            "resident_name": _SOUTH_NAMES[pos], "row": "south", "facing_row": "north", "pos": pos,
+            "resident_name": _SOUTH_NAMES[pos], "row": "south", "facing_row": "north", "back_row": "lane", "pos": pos,
         })
         units.append({
             "id": f"T-{20 + pos}", "phase_id": "demo", "kind": "terrace", "label": f"No. {20 + pos}", "street": "Jalan Demo 1",
             "resident_name": _NORTH_NAMES[pos], "row": "north", "facing_row": "south", "pos": pos,
+        })
+    # The lane row: houses 30-35 on Jalan Demo 2, back to back with the south row. Not in anyone's circle on Jalan Demo 1,
+    # but told when works there reach the back (wet, hacking, structural).
+    for pos in range(6):
+        units.append({
+            "id": f"T-{30 + pos}", "phase_id": "demo", "kind": "terrace", "label": f"No. {30 + pos}", "street": "Jalan Demo 2",
+            "resident_name": _LANE_NAMES[pos], "row": "lane", "back_row": "south", "pos": pos,
         })
     # Block A: floors 11-16 shown (the lower floors are left out of the demo), units 1-4 per floor.
     for floor, names in _APT_NAMES.items():

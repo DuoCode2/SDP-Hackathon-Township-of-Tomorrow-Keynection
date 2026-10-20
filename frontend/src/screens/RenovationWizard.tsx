@@ -342,7 +342,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
               {zone?.map((z) => (
                 <li key={z.id}>
                   <b>{z.label}</b>
-                  <span>{z.joined === false ? t('nj.status') : z.resident_name ?? t('reno.hidden')}</span>
+                  <span>{z.joined === false ? t('nj.status') : z.relation === 'behind' ? t('rel.behind') : z.resident_name ?? t('reno.hidden')}</span>
                   <small>{t(`reason.${z.reason_key}`)}{z.joined === false ? ` · ${t('nj.paper')}` : ''}</small>
                 </li>
               ))}

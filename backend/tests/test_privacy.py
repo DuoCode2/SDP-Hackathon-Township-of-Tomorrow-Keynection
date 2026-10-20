@@ -329,7 +329,7 @@ def test_backups_are_kept_14_days_and_follow_deletions(tmp_path):
     copies = sorted(folder.glob("keynection-*.db"))
     assert made in copies and len(copies) == 14  # today's and the 13 before it
     with sqlite3.connect(made) as copy:
-        assert copy.execute("SELECT COUNT(*) FROM units").fetchone()[0] == 36  # a working database
+        assert copy.execute("SELECT COUNT(*) FROM units").fetchone()[0] == 42  # a working database
     assert sorted(p.name for p in (folder / "photos").iterdir()) == ["a.jpg", "b.jpg"]
     (photos / "a.jpg").unlink()  # a photo deleted (closed account, or its time was up)
     backup.backup_now(str(source), folder, {"photos": photos}, now=old + timedelta(days=1))

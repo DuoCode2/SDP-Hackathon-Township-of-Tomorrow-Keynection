@@ -172,4 +172,4 @@ def test_phase_setup_is_capped(client):
 def test_dashboard_counts_joined_households_and_paper_notices(client):
     client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Works soon", "lang": "en", "renovation": RENO})
     d = client.get("/api/dashboard").json()
-    assert d["households_joined"] == 35 and d["paper_notices_pending"] == 1
+    assert d["households_joined"] == 40 and d["paper_notices_pending"] == 1

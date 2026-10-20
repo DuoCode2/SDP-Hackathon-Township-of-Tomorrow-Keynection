@@ -175,6 +175,21 @@ def test_saving_creates_the_phase_with_every_home_and_its_handover_record(staff)
     assert first["type"] == "handover" and "2026-09-01" in first["payload"]  # every home log starts with the handover
 
 
+def test_a_row_behind_is_read_from_the_list_and_stays_out_of_the_circle(staff):
+    # Two rows back to back across a fence ("back" is read as back_row); the house behind is told about works that
+    # reach the back (neighbours.py), but the circle is still only the homes beside and across the road.
+    text = "\n".join(["unit,label,type,street,row,back,pos,handover",
+                      "F-1,No. 1 Jln A,terrace,Jalan A,front,rear,1,2026-09-01", "F-2,No. 2 Jln A,terrace,Jalan A,front,rear,2,2026-09-01",
+                      "R-1,No. 1 Jln B,terrace,Jalan B,rear,front,1,2026-09-01", "R-2,No. 2 Jln B,terrace,Jalan B,rear,front,2,2026-09-01",
+                      "S-1,No. 1 Jln C,terrace,Jalan C,solo,lane,1,2026-09-01"]) + "\n"
+    r = _preview(staff, text).json()
+    assert r["errors"] == [] and any(w["line"] == 6 and "Back row 'lane'" in w["message"] for w in r["warnings"])
+    assert {s["label"]: s["circle"] for s in r["sample"]}["No. 1 Jln A"] == ["No. 2 Jln A"]
+    phase = _import(staff, text).json()["phase"]
+    homes = {u["id"]: u for u in staff.get("/api/units", params={"phase_id": phase["id"]}).json()}
+    assert homes["F-1"]["back_row"] == "rear" and homes["R-2"]["back_row"] == "front"
+
+
 def test_importing_again_adds_new_homes_and_never_moves_a_household_that_joined(staff):
     phase_id = _import(staff).json()["phase"]["id"]
     _join(staff, "C21-02")

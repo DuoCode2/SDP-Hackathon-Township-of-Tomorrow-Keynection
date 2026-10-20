@@ -21,6 +21,7 @@ export const RELATION_LABEL: Record<Relation, string> = {
   below: 'downstairs',
   'above-2': 'two floors up',
   'below-2': 'two floors down',
+  behind: 'behind, across the back fence',
   contact: 'connected by request',
 }
 

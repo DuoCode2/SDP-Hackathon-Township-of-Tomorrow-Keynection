@@ -10,7 +10,9 @@ type Box = { x: number; y: number; w: number; h: number }
 type Edge = { x1: number; y1: number; x2: number; y2: number }
 
 const X0 = 60, W = 100, D = 86
-const ROW_Y: Record<string, number> = { north: 52, south: 232 }
+// The lane row (No. 30–35) backs onto the south row across a back lane: told about works that reach the back.
+const ROW_Y: Record<string, number> = { north: 52, south: 232, lane: 342 }
+const TERRACE_H = 512, BLOCK_H = 400
 const AX0 = 150, AW = 120, AH = 50, AY0 = 46
 const TOP_FLOOR = 16, FLOORS = 6
 
@@ -56,6 +58,8 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
   const impactIds = new Set(impact ?? [])
   const worksAt = new Set(works)
   const mine = me.kind === view ? box(me) : null
+  // The home behind yours: not in the circle, so it is shown apart, with when it would be told.
+  const behindId = me.kind === 'terrace' && me.back_row ? shown.find((u) => u.row === me.back_row && u.pos === me.pos)?.id : undefined
   const previewing = impact !== undefined
 
   const walls = mine
@@ -70,7 +74,7 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
   const cls = (u: UnitInfo) => {
     if (u.id === me.id) return 'me'
     if (previewing) return impactIds.has(u.id) ? 'notified' : 'muted-home'
-    return circleIds.has(u.id) ? 'circle' : ring2Ids.has(u.id) ? 'ring2' : ''
+    return circleIds.has(u.id) ? 'circle' : u.id === behindId ? 'behind-home' : ring2Ids.has(u.id) ? 'ring2' : ''
   }
 
   // On a phone the plan keeps a readable size and scrolls sideways (see .plan-scroll); start with your home in view.
@@ -86,7 +90,7 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
   return (
     <>
     <div className="plan-scroll" ref={scroller}>
-    <svg className={`plan ${previewing ? 'previewing' : ''} ${intro ? 'plan-intro' : ''}`} viewBox="0 0 720 400" role="group" aria-label={view === 'terrace' ? 'Plan of Jalan Demo 1' : 'Section through Block A'}>
+    <svg className={`plan ${previewing ? 'previewing' : ''} ${intro ? 'plan-intro' : ''}`} viewBox={`0 0 720 ${view === 'terrace' ? TERRACE_H : BLOCK_H}`} role="group" aria-label={view === 'terrace' ? 'Plan of Jalan Demo 1' : 'Section through Block A'}>
       <defs>
         <pattern id="hatch-works" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <line x1="0" y1="0" x2="0" y2="7" style={{ stroke: 'var(--works)' }} strokeWidth="2" opacity="0.45" />
@@ -102,7 +106,7 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
         </linearGradient>
       </defs>
 
-      {view === 'terrace' ? <TerraceFrame /> : <BlockFrame stackPos={me.kind === 'apartment' ? me.pos : null} />}
+      {view === 'terrace' ? <TerraceFrame backLane={t('plan.backLane')} /> : <BlockFrame stackPos={me.kind === 'apartment' ? me.pos : null} />}
 
       {shown.map((u) => {
         const b = box(u)
@@ -155,7 +159,11 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
         return (
           <g key={u.id} className={`home-label ${isMe ? 'me' : ''}`} pointerEvents="none">
             <text x={c.x} y={tall ? c.y - 3 : c.y - 1} className="home-no">{short}</text>
-            <text x={c.x} y={tall ? c.y + 15 : c.y + 13} className="home-name">{isMe ? 'YOU' : names[u.id] ?? ''}</text>
+            {u.id === behindId && !previewing ? (
+              <text x={c.x} y={c.y + 13} className="home-name behind-note">
+                {twoLines(t('plan.behind')).map((line, i) => <tspan key={i} x={c.x} dy={i ? 10 : 0}>{line}</tspan>)}
+              </text>
+            ) : <text x={c.x} y={tall ? c.y + 15 : c.y + 13} className="home-name">{isMe ? 'YOU' : names[u.id] ?? ''}</text>}
             {worksAt.has(u.id) && !previewing && <text x={b.x + b.w - 6} y={b.y + 12} className="home-tag">WORKS</text>}
           </g>
         )
@@ -172,7 +180,15 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
   )
 }
 
-function TerraceFrame() {
+/** A short note over two lines, split at the space nearest the middle. */
+function twoLines(text: string): string[] {
+  const spaces = [...text.matchAll(/ /g)].map((m) => m.index ?? 0)
+  if (!spaces.length) return [text]
+  const cut = spaces.reduce((a, b) => (Math.abs(b - text.length / 2) < Math.abs(a - text.length / 2) ? b : a))
+  return [text.slice(0, cut), text.slice(cut + 1)]
+}
+
+function TerraceFrame({ backLane }: { backLane: string }) {
   const right = X0 + 6 * W
   return (
     <g className="frame" pointerEvents="none">
@@ -185,9 +201,15 @@ function TerraceFrame() {
       <line className="road-centre" x1="24" y1="185" x2="696" y2="185" />
       <text className="road-name" x="360" y="190">JALAN DEMO 1</text>
       <line className="setback" x1={X0} y1="222" x2={right} y2="222" />
-      <text className="dim-text" x={(X0 + right) / 2} y="342">TERRACE ROW A · NO. 10–15</text>
+      {/* behind row A: the back lane and its drain, then row C, which faces Jalan Demo 2 */}
+      <rect className="back-lane" x="20" y="322" width="680" height="16" />
+      <line className="drain" x1="24" y1="335" x2="696" y2="335" />
+      <text className="dim-text lane-text" x={(X0 + right) / 2} y="333">ROW A · NO. 10–15 ▲ · {backLane} · ▼ ROW C · NO. 30–35</text>
+      <line className="setback" x1={X0} y1="436" x2={right} y2="436" />
+      <rect className="road" x="20" y="444" width="680" height="34" />
+      <text className="road-name" x="360" y="465">JALAN DEMO 2</text>
       <NorthArrow />
-      <ScaleBar label="PLAN · 1:400" />
+      <ScaleBar label="PLAN · 1:400" y={TERRACE_H - 20} />
     </g>
   )
 }
@@ -209,7 +231,7 @@ function BlockFrame({ stackPos }: { stackPos: number | null }) {
       ))}
       <path className="break" d={`M${AX0 - 12} ${bottom + 14} l40 0 l8 -9 l8 18 l8 -9 l${4 * AW - 40} 0`} />
       <text className="dim-text" x={(AX0 + right) / 2} y={bottom + 36}>LEVELS 1–10 NOT SHOWN</text>
-      <ScaleBar label="SECTION · 1:300" />
+      <ScaleBar label="SECTION · 1:300" y={BLOCK_H - 20} />
     </g>
   )
 }
@@ -224,9 +246,9 @@ function NorthArrow() {
   )
 }
 
-function ScaleBar({ label }: { label: string }) {
+function ScaleBar({ label, y }: { label: string; y: number }) {
   return (
-    <g className="scale" transform="translate(40 380)">
+    <g className="scale" transform={`translate(40 ${y})`}>
       <rect x="0" y="0" width="30" height="5" className="on" />
       <rect x="30" y="0" width="30" height="5" />
       <rect x="60" y="0" width="30" height="5" className="on" />

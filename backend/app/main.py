@@ -527,12 +527,13 @@ def _unit_row(conn: sqlite3.Connection, unit_id: str) -> sqlite3.Row:
 
 def _to_unit(row: sqlite3.Row) -> Unit:
     return Unit(id=row["id"], kind=row["kind"], label=row["label"], row=row["terrace_row"],
-                facing_row=row["facing_row"], block=row["block"], floor=row["floor"], pos=row["pos"])
+                facing_row=row["facing_row"], back_row=row["back_row"], block=row["block"], floor=row["floor"], pos=row["pos"])
 
 
 def _unit_json(row: sqlite3.Row) -> dict[str, Any]:
     return {"id": row["id"], "phase_id": row["phase_id"], "kind": row["kind"], "label": row["label"], "street": row["street"],
             "resident_name": row["resident_name"], "row": row["terrace_row"], "facing_row": row["facing_row"],
+            "back_row": row["back_row"],
             "block": row["block"], "floor": row["floor"], "pos": row["pos"], "lang": row["lang"],
             "handover_date": row["handover_date"], "joined": row["joined_at"] is not None}
 
@@ -941,7 +942,9 @@ def impact(unit_id: str, works_type: Literal["wet", "hacking", "structural", "li
     circle = {n.unit_id for n in neighbour_circle(_to_unit(me), phase_units)}
     return [{**(_unit_json(rows[n.unit_id]) if n.unit_id in circle else _unit_public(rows[n.unit_id])),
              "relation": n.relation, "reason": impact_reason(n.relation, works_type),
-             "reason_key": n.relation + ("_wet" if works_type == "wet" and n.relation.startswith("below") else "")}
+             # the home behind has its own reason for each kind of work that reaches the back
+             "reason_key": n.relation + ("_wet" if works_type == "wet" and n.relation.startswith("below")
+                                         else f"_{works_type}" if n.relation == "behind" else "")}
             for n in impact_zone(_to_unit(me), phase_units, works_type)]
 
 
