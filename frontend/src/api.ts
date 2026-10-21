@@ -727,6 +727,12 @@ export interface RenovationDraft {
   unsure: ('dates' | 'hours')[]
 }
 
+/** One earlier message of the assistant chat, sent with the next question so a follow-up is understood. */
+export interface AssistantTurn {
+  who: 'resident' | 'assistant'
+  text: string
+}
+
 /** The assistant's reading of one sentence: what to get ready for the household to check. It never sends anything. */
 export interface AssistantPlan {
   intent: 'register_renovation' | 'say_hello' | 'set_quiet_time' | 'check_status' | 'go_to_page' | 'answer' | 'unknown'
@@ -944,8 +950,8 @@ export const api = {
     request<QuietPlan>(`/api/units/${unitId}/quiet-plan?${new URLSearchParams(r)}`),
   renovationDraft: (unitId: string, text: string) =>
     request<RenovationDraft>('/api/ai/renovation-draft', json('POST', { unit_id: unitId, text })),
-  assistant: (unitId: string, text: string, page: string, lang: string) =>
-    request<AssistantPlan>('/api/assistant', json('POST', { unit_id: unitId, text, page, lang })),
+  assistant: (unitId: string, text: string, page: string, lang: string, history: AssistantTurn[] = []) =>
+    request<AssistantPlan>('/api/assistant', json('POST', { unit_id: unitId, text, page, lang, history })),
   sendMessage: (from: string, to: string, msg: { body?: string; quick_key?: string; keep_tone?: boolean }, delegateId?: number) =>
     request<ChatMessage>('/api/messages', json('POST', { from_unit_id: from, to_unit_id: to, ...msg, delegate_id: delegateId ?? null })),
   reportMessage: (messageId: number, unitId: string, reason: string) =>

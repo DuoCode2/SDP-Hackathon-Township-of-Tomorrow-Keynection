@@ -1044,11 +1044,18 @@ def renovation_draft(body: RenovationTextIn, conn: sqlite3.Connection = Depends(
     return draft
 
 
+class AssistantTurn(BaseModel):
+    who: Literal["resident", "assistant"]
+    text: str = Field(..., max_length=800)
+
+
 class AssistantIn(BaseModel):
     unit_id: str = Field(..., pattern=UNIT_ID)
     text: str = Field(..., min_length=1, max_length=500)
     page: str | None = Field(None, max_length=20)  # the screen the resident is on
     lang: str | None = Field(None, max_length=5)  # the language they read the app in
+    # The chat so far, oldest first, so a follow-up ("and next week?") is understood; only the last few are used.
+    history: list[AssistantTurn] = Field(default_factory=list, max_length=20)
 
 
 # Without AI (off, used up for today, or no answer in time) a few key words decide, and the screens ask for the rest.
@@ -1056,7 +1063,8 @@ class AssistantIn(BaseModel):
 ASSISTANT_WORDS = [
     ("check_status", re.compile(r"warranty|jaminan|保修|status", re.I)),
     ("register_renovation", re.compile(r"renovat|ubah ?suai|装修|翻新|瓷砖|jubin|tile|retil", re.I)),
-    ("say_hello", re.compile(r"hello|\bhai\b|\bhi\b|你好|打招呼|sapa", re.I)),
+    # a hello to the neighbours; a bare "hi" is a greeting to the assistant (GREETING below), not this
+    ("say_hello", re.compile(r"say (hi|hello)|打招呼|sapa|(hello|\bhai\b|\bhi\b|你好).*(neighbou?r|jiran|邻居)", re.I)),
     ("set_quiet_time", re.compile(r"quiet|senyap|安静|午睡|\bnap\b|tidur", re.I)),
 ]
 ASSISTANT_REPLY = {
@@ -1069,7 +1077,15 @@ STATUS_PAGE = {"warranty": "evidence", "case": "evidence", "renovation": "works"
 ASSISTANT_PAGES = {"circle", "chats", "works", "evidence", "impact", "channels", "me"}
 
 
+GREETING = re.compile(r"^\s*(hi|hello|hai|hey|helo|你好|您好|selamat \w+|thanks?|thank you|terima kasih|谢谢)[\s!.,~]*$", re.I)
+GREETING_REPLY = ("Hi! I can get a renovation notice ready, say hello to your neighbours, add a quiet time, or tell you "
+                  "where your warranty ticket, case or notices stand.")
+
+
 def _route_without_ai(text: str) -> dict[str, Any]:
+    if GREETING.match(text):  # a chat starts with a hello: greet back and say what can be done
+        return {"intent": "answer", "language": "en", "reply": GREETING_REPLY, "page": None, "quiet_window": None,
+                "hello_to": [], "status_topic": None, "missing": [], "renovation": None}
     intent = next((name for name, words in ASSISTANT_WORDS if words.search(text)), "unknown")
     topic = None
     if intent == "check_status":
@@ -1136,8 +1152,8 @@ def assistant(body: AssistantIn, conn: sqlite3.Connection = Depends(get_conn)) -
     # Questions are answered only from this: the house rules for this kind of home, then the guideline and the ladder.
     rules = house_rules_for(me["kind"])[0] + [quiet.HOUSE_RULE_HOURS, f"Contractors enter {GATE_OPEN}–{GATE_CLOSE}, Monday to Saturday"]
     plan = ai.plan_request(me["id"], text, date.fromisoformat(_today()), _assistant_context(conn, me, body, status),
-                           home_kind=me["kind"], max_days=MAX_RENOVATION_DAYS,
-                           knowledge=knowledge.for_assistant(rules)) if ai.enabled() else None
+                           home_kind=me["kind"], max_days=MAX_RENOVATION_DAYS, knowledge=knowledge.for_assistant(rules),
+                           history=[(t.who, t.text.strip()[:600]) for t in body.history[-6:]]) if ai.enabled() else None
     by_ai = plan is not None
     plan = plan or _route_without_ai(text)
     if plan["intent"] == "go_to_page" and plan["page"] not in ASSISTANT_PAGES:
