@@ -31,8 +31,8 @@ export const UI: Record<string, Text> = {
     en: 'The "Demo cast" card at the right of the top bar switches to any household, to see what they receive and in which language. For SDP’s command view, switch on "Show every feature" below; it is then menu item 07.',
   },
   sharedDemo: {
-    zh: '这是大家共用的演示：没人用 20 分钟后会自动回到起点。如果某一步显示「今天已做过」，到 SDP 页底按「Reset demo data」。',
-    en: 'This demo is shared: after 20 quiet minutes it starts over by itself. If a step says it was already done today, press "Reset demo data" at the bottom of the SDP page.',
+    zh: '这是大家共用的演示：没人用 20 分钟后会自动回到起点。如果某一步显示「今天已做过」，是别的评审做过了：从顶栏换一户看，或等自动回到起点。评审没有重置按钮，所以谁也清不掉别人的进度。',
+    en: 'This demo is shared: after 20 quiet minutes it starts over by itself. If a step says it was already done today, another judge did it: switch to another household from the top bar, or come back after the reset. There is no reset button for judges, so nobody can wipe another judge's progress.',
   },
   previewNote: {
     zh: '标着「预览」「示意」或「示范编号」的都是示意：WhatsApp 和 SDP App 的手机画面不会真的发出，也不是 SDP 真正的 app；演示版的 Procore 编号是造的。其余画面上的每一步都真的写进了资料库。',
@@ -238,7 +238,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         '邻里关系：隔壁之间互相认识的比例、从交屋到第一次打招呼的天数、30 天内活跃的邻里圈（只有数字，看不到谁跟谁聊、聊什么）',
         '讯息审核也能播放被检举的语音（检举的语音会保留到审核完，其他语音 30 天自动删除）',
         '物业柜台（Front desk）：交屋时发一次性加入码（QR）、列印给未加入住户的纸本通知并记录送达、替偏好纸本的屋主登记装修（职员名字记录在案）',
-        '页底「Reset demo data」：彩排前清空示范资料',
+        '页底「Reset demo data」：彩排前清空示范资料（只在网址加上 ?rehearsal=1 时显示）',
       ],
       en: [
         'Warranty queue: every ticket has a 30-day statutory clock and turns red when overdue; repair photos are checked automatically',
@@ -248,7 +248,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Neighbour relationships: share of next-door pairs who know each other, days from keys to a first hello, circles active in 30 days (counts only, never who or what)',
         'Moderation can play a reported voice message (reported voice is kept until reviewed; all other voice is deleted after 30 days)',
         'Front desk: one-time join codes (QR) at handover, printed notices for households not on Keynection with delivery recorded, and renovations registered for owners who prefer paper (the staff name goes on record)',
-        '"Reset demo data" at the bottom clears everything before a rehearsal',
+        '"Reset demo data" at the bottom clears everything before a rehearsal (shown only when the address ends in ?rehearsal=1)',
       ],
     },
     why: {

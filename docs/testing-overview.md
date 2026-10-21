@@ -80,7 +80,7 @@ Last full run 21 Oct 2026: all seventeen tests in the ten scripts passing, no br
 | Gap | Why | Plan |
 |---|---|---|
 | A real push notification on a real phone | Needs a deployed pilot server with its own address | First week of a pilot |
-| The real AI with a real key | Tests use the stand-in. Walked locally with Claude Haiku 5.5 on 20 Oct 2026 (notice draft, chat check, notice translation, every assistant intent); the online demo's key is still Gemini's | Set `ANTHROPIC_API_KEY` on Render and walk the route once online |
+| The real AI with a real key | Tests use the stand-in. Walked locally with Claude Haiku 5.5 on 20 Oct 2026 (notice draft, chat check, notice translation, every assistant intent); the online demo runs Claude Sonnet 5.5 (`ANTHROPIC_API_KEY` set on Render on 21 Oct 2026) | Walk the route once online after every deploy |
 | WhatsApp delivery | Simulated on purpose; needs SDP's WhatsApp Business account | Templates ready in `docs/whatsapp-templates.md` |
 | Tamil wording | Written with AI help | A native speaker's review before a pilot |
 | Load and many users at once | One SQLite file, one worker, one township | Fine for a pilot phase; measured if it grows |
