@@ -1,0 +1,63 @@
+# Deploy: every change on main whose Tests pass goes to production (https://keynection.agenticcs.net), from anyone's
+# push, with nobody's laptop involved. This job only creates a GitHub Deployment and waits; the deployer on the team's
+# AWS machine (aws32g) builds that commit on Depot, swaps the container, checks it and reports back here, so this run
+# goes green or red with the deploy. "Run workflow" deploys any branch, tag or commit (a redeploy, or a rollback to an
+# older commit), for anyone with write access. No secrets here: only this run's own token, allowed to write
+# deployments. How it works, and how to stop it: docs/deployment.md.
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [Tests]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to deploy
+        required: true
+        default: main
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deploy:
+    name: Deploy to production
+    # Only a push to main that passed its tests (Tests also runs for pull requests), or a deliberate "Run workflow".
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Ask the server to deploy, then wait for its answer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          sha=$(gh api "repos/$REPO/commits/$REF" --jq .sha)
+          echo "Deploying $sha ($REF), asked by $GITHUB_ACTOR"
+          id=$(jq -n --arg ref "$sha" --arg run "$RUN_URL" --arg by "$GITHUB_ACTOR" \
+            '{ref: $ref, environment: "production", auto_merge: false, required_contexts: [], description: ("by " + $by), payload: {run_url: $run}}' \
+            | gh api "repos/$REPO/deployments" --input - --jq .id)
+          echo "Deployment $id (https://github.com/$REPO/deployments)"
+          last=""
+          for _ in $(seq 1 240); do  # 40 minutes: the deployer allows the build 30, then starting, two health checks and a rollback; a build from a cold cache takes about 2
+            s=$(gh api "repos/$REPO/deployments/$id/statuses?per_page=1" --jq '.[0] | [.state, .description, .environment_url] | @tsv' || true)
+            if [ "$s" != "$last" ]; then echo "$(date -u +%H:%M:%S) $s"; last="$s"; fi
+            case "${s%%$'\t'*}" in
+              success) echo "::notice title=Deployed::$sha is live"; exit 0 ;;
+              failure|error) echo "::error title=Deploy failed::$s"; exit 1 ;;
+              inactive) echo "::warning title=Superseded::a newer deployment replaced this one before it started"; exit 0 ;;
+            esac
+            sleep 10
+          done
+          echo "::error title=No answer::nothing picked this deployment up in 40 minutes: is keynection-deployer running on aws32g?"
+          exit 1
