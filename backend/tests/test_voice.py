@@ -114,7 +114,7 @@ def test_the_gateway_address_and_models_can_be_changed(client, gateway, monkeypa
     (OGG, "audio/webm", 415),  # one format claiming to be another
     (b"\x1a\x45\xdf\xa3", "audio/webm", 400),  # empty
     (b"\x1a\x45\xdf\xa3" + b"\x00" * voice.MAX_BYTES, "audio/webm", 413),  # longer than one sentence
-])
+], ids=["not-audio", "html-as-webm", "ogg-as-webm", "empty", "too-long"])  # named: ids made of the bytes are too long for Windows' environment
 def test_only_a_short_real_recording_is_passed_on(client, gateway, audio, kind, status):
     assert _say(client, audio=audio, kind=kind).status_code == status
     assert gateway.sent == []  # refused before anything reaches the gateway

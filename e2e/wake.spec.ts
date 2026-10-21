@@ -8,7 +8,7 @@ import { dismissWelcome, enterSite, resetDemo, watchErrors } from './helpers'
 // word depend on where it runs:
 //  - the browser's own listening (Chrome's goes to Google, which headless Chrome cannot reach) is a stand-in here;
 //  - the server's listening, for a browser without its own, is the server stand-in by default, the real gateway with
-//    KEYNECTION_E2E_REAL=1 (and KEYNECTION_STT_KEY), or whatever a deployed site has with E2E_BASE_URL.
+//    KEYNECTION_E2E_REAL=1 (and KEYNECTION_VOICE_KEY), or whatever a deployed site has with E2E_BASE_URL.
 
 const REMOTE = !!process.env.E2E_BASE_URL
 const REAL = process.env.KEYNECTION_E2E_REAL === '1' || REMOTE
