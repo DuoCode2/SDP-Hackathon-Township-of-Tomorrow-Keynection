@@ -1365,7 +1365,7 @@ def neighbour_card(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
     for n in circle:
         if not n["joined"]:
             # Not on Keynection yet: no name (resident_name is the unit label), no language, no bio, nothing to tap.
-            out.append({**n, "lang": None, "known": False, "bio": "", "waved_today": False, "allow_waves": False})
+            out.append({**n, "lang": None, "known": False, "hello_sent": False, "bio": "", "waved_today": False, "allow_waves": False})
             continue
         they_replied = conn.execute(
             "SELECT 1 FROM intro_recipients r JOIN intros i ON i.id = r.intro_id"
@@ -1380,7 +1380,14 @@ def neighbour_card(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
         recent = (datetime.now(timezone.utc) - wave_window()).isoformat(timespec="seconds")
         waved = conn.execute("SELECT 1 FROM waves WHERE from_unit_id = ? AND to_unit_id = ? AND created_at > ?",
                              (unit_id, n["id"], recent)).fetchone() is not None
-        out.append({**n, "known": they_replied or i_replied or _mutual(conn, unit_id, n["id"]), "bio": _profile_row(conn, n["id"])["bio"],
+        # My hello has reached them but nobody has replied yet: the card says "hello sent" rather than "not met yet",
+        # so the owner does not send it twice.
+        hello_sent = conn.execute(
+            "SELECT 1 FROM intro_recipients r JOIN intros i ON i.id = r.intro_id WHERE i.from_unit_id = ? AND r.unit_id = ?",
+            (unit_id, n["id"]),
+        ).fetchone() is not None
+        out.append({**n, "known": they_replied or i_replied or _mutual(conn, unit_id, n["id"]), "hello_sent": hello_sent,
+                    "bio": _profile_row(conn, n["id"])["bio"],
                     "waved_today": waved, "allow_waves": bool(_profile_row(conn, n["id"])["allow_waves"])})
     return {"unit_id": unit_id, "neighbours": out, "known_count": sum(n["known"] for n in out),
             "not_joined": sum(not n["joined"] for n in out)}

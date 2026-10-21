@@ -61,6 +61,9 @@ export default function OpeningView({ units, onPick, onDone }: {
 
       {step === 'card' && (
         <div className="opening-step">
+          {/* A judge arrives with nothing to scan: say what this is before showing the card. */}
+          <h1 className="opening-tagline">{t('open.tagline')}</h1>
+          <p className="muted opening-tagline-sub">{t('open.taglineSub')}</p>
           <div className="opening-card">
             {qr ? <img src={qr} alt="" /> : <span className="reach-qr-blank" aria-hidden />}
             <span>

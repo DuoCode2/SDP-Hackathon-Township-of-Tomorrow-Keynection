@@ -17,6 +17,7 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
   const toast = useToast()
   const pilot = usePilot()
   const place = usePlace()
+  const rehearsal = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('rehearsal')
   const [d, setD] = useState<Dashboard | null>(null)
   const [queue, setQueue] = useState<WarrantyTicket[]>([])
   const [concerns, setConcerns] = useState<Concern[]>([])
@@ -162,7 +163,9 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
                 </div>
               </Card>
 
-              {!pilot && <button className="link" onClick={reset}><RotateCcw size={12} style={{ verticalAlign: -2 }} /> Reset demo data (for rehearsals)</button>}
+              {/* Rehearsals only: the demo is shared, so a judge must not be able to start everyone over. Open the site
+                  with ?rehearsal=1 to see it (docs/test-plan.md); the shared demo still resets itself after 20 quiet minutes. */}
+              {!pilot && rehearsal && <button className="link" onClick={reset}><RotateCcw size={12} style={{ verticalAlign: -2 }} /> Reset demo data (for rehearsals)</button>}
             </div>
           </div>
         </>

@@ -95,6 +95,8 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
   circle.forEach((n) => { names[n.id] = n.resident_name })
   nearby.forEach((n) => { if (n.resident_name) names[n.id] = n.resident_name })
   const unknown = circle.filter((n) => n.joined && !n.known).length
+  // Every neighbour not yet known has already had my hello: the banner says so instead of asking again.
+  const waiting = unknown > 0 && circle.every((n) => !n.joined || n.known || n.hello_sent)
   const pendingIn = reqs?.incoming.filter((r) => r.status === 'pending') ?? []
 
   async function wave(n: Member) {
@@ -134,7 +136,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
               <button key={n.id} role="listitem" className={`story ${!n.joined ? 'off' : works.has(n.id) ? 'works' : n.known ? 'known' : 'new'}`} onClick={() => setProfile(n)}>
                 <span className="story-ring"><Avatar name={n.resident_name} size={58} /></span>
                 <b>{n.resident_name}</b>
-                <small>{!n.joined ? t('nj.story') : works.has(n.id) ? t('story.renovating') : n.known ? n.label : t('story.sayHi')}</small>
+                <small>{!n.joined ? t('nj.story') : works.has(n.id) ? t('story.renovating') : n.known ? n.label : n.hello_sent ? t('story.helloSent') : t('story.sayHi')}</small>
               </button>
             ))}
           </div>
@@ -168,8 +170,8 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
           {unknown > 0 && (
             <div className="say-hi">
               <span className="say-hi-hand" aria-hidden>👋</span>
-              <div className="grow"><b>{t('sayhi.title', { n: unknown })}</b><small>{t('sayhi.sub')}</small></div>
-              <button className="link" onClick={() => setIntroOpen(true)}>{t('btn.introduce')}</button>
+              <div className="grow"><b>{t(waiting ? 'sayhi.waiting' : 'sayhi.title', { n: unknown })}</b><small>{t(waiting ? 'sayhi.waitingSub' : 'sayhi.sub')}</small></div>
+              {!waiting && <button className="link" onClick={() => setIntroOpen(true)}>{t('btn.introduce')}</button>}
             </div>
           )}
 
@@ -199,7 +201,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
                 </button>
                 {n.bio && <p className="person-bio">{n.bio}</p>}
                 <div className={`person-status ${works.has(n.id) ? 'works' : n.known ? 'known' : ''}`}>
-                  {works.has(n.id) ? <><Hammer size={12} /> {t('status.renovating')}</> : t(n.known ? 'status.known' : 'status.notMet')}
+                  {works.has(n.id) ? <><Hammer size={12} /> {t('status.renovating')}</> : t(n.known ? 'status.known' : n.hello_sent ? 'status.helloSent' : 'status.notMet')}
                 </div>
                 <div className="btn-row">
                   {/* Not met yet: a wave is the easy first step, so it leads; once known, a message does. */}

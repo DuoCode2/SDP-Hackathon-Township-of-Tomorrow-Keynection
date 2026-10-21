@@ -108,7 +108,7 @@ export default function HistoryView({ me, units, version }: { me: UnitInfo; unit
               {data.chain_ok ? <ShieldCheck size={26} /> : <ShieldAlert size={26} />}
               <div>
                 <strong>{t(data.chain_ok ? 'log.ok' : 'log.bad')}</strong>
-                <p>{data.chain_ok ? t('log.okSub', { n: data.events.length }) : t('log.badSub')}</p>
+                <p>{!data.chain_ok ? t('log.badSub') : data.events.length === 1 ? t('log.okSub1') : t('log.okSub', { n: data.events.length })}</p>
               </div>
             </div>
 
