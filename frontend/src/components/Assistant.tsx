@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Ear, Mic, Send, ShieldCheck, Sparkles, Square, Volume2, X } from 'lucide-react'
+import { Ear, Mic, Send, ShieldCheck, Square, Volume2, X } from 'lucide-react'
 import { api, ApiError, type AssistantPlan, type AssistantTurn, type Directory, type QuietTimes, type RenovationDraft, type UnitInfo } from '../api'
 import type { TabId } from '../guide'
 import { noisyHours, useDates, useLang } from '../i18n'
@@ -8,7 +8,7 @@ import { useCelebrate, useToast } from '../ui'
 import RenovationWizard from '../screens/RenovationWizard'
 import IntroWizard from '../screens/IntroWizard'
 import { forget, remember, remembered } from '../storage'
-import { WakeWord, chime, holdWake, recordSentence, wakeSupported, withoutWakePhrase, type WakeState } from '../wake'
+import { WAKE_PHRASE, WakeWord, chime, holdWake, recordSentence, wakeSupported, withoutWakePhrase, type WakeState } from '../wake'
 import { canSpeak, speak, type Speaking } from '../speech'
 
 // Three sentences a judge can try without typing (demo only), one in each language the screens speak.
@@ -21,7 +21,9 @@ const SPEECH_LANG = { en: 'en-MY', ms: 'ms-MY', zh: 'zh-CN' } as const
 const PHONE = '(max-width: 899.98px)'
 const HISTORY = 6  // the last few messages go with each question, so a follow-up is understood
 const HANDS_FREE_WAIT_MS = 8000  // after "Hello Neighbour", how long the browser's listening waits for words
+const FOLLOW_UP_WAIT_MS = 5000  // after a spoken reply, how long it keeps listening for the next question, no wake word
 const WAKE_TO_LISTEN_MS = 350  // the chime and the ripple first, so the listening doesn't start on the chime
+const NAME_MS = 5000  // how long the corner orb says its name before folding back into the orb
 
 // The browser's speech recognition, where there is one (Chrome and Edge call it webkitSpeechRecognition).
 type Recognition = {
@@ -68,6 +70,13 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
   const [easy, setEasy] = useState(false)
   const [wake, setWake] = useState<WakeState>('off')
   const [handsFree, setHandsFree] = useState(false)  // listening because "Hello Neighbour" was heard
+  const [more, setMore] = useState(false)  // listening for a follow-up, right after a spoken reply (no wake word)
+  // Hands-free is offered once, the first time the chat opens in this browser; after that only the ear button.
+  const [offer, setOffer] = useState(() => remembered('wake') === null && remembered('wakeOffered') === null)
+  // The orb in the corner says its name ("Hello Neighbour") for a few seconds the first time it appears in this
+  // browser, and once more each time hands-free is switched on and starts listening; then it folds back into the orb.
+  const [named, setNamed] = useState(() => remembered('named') === null)
+  const announce = useRef(false)
   // What the voice is doing, shown in the panel above the text box: the wake ripple, listening, turning a recording
   // into words, or speaking a reply (thinking is `busy`). `level` moves the orb with the voice, 0 to 1.
   const [phase, setPhase] = useState<'idle' | 'waking' | 'listening' | 'transcribing' | 'speaking'>('idle')
@@ -101,6 +110,18 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
     window.addEventListener('pointerdown', tap)
     return () => window.removeEventListener('pointerdown', tap)
   }, [wake])
+  useEffect(() => {
+    if (!named) return
+    remember('named', '1')
+    const t = window.setTimeout(() => setNamed(false), NAME_MS)
+    return () => window.clearTimeout(t)
+  }, [named])
+  useEffect(() => {
+    if (wake === 'listening' && announce.current) {
+      announce.current = false
+      setNamed(true)
+    }
+  }, [wake])
 
   // Another household starts a chat of its own. Easy mode is the household's setting: the button grows with it.
   useEffect(() => {
@@ -123,7 +144,9 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
   const update = (id: number, patch: Partial<Extract<Msg, { who: 'assistant' }>>) =>
     setChat((c) => c.map((m) => (m.id === id && m.who === 'assistant' ? { ...m, ...patch } : m)))
 
-  async function turnWake(on: boolean) {
+  /** Hands-free on or off; `byHand`: the household just chose it (not a page load remembering it), so the corner orb
+   *  says its name once it listens. */
+  async function turnWake(on: boolean, byHand = false) {
     if (!on) {
       wakeWord.current?.stop()
       wakeWord.current = null
@@ -135,6 +158,9 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
     const w = new WakeWord(() => onWake.current(), setWake)
     wakeWord.current = w
     remember('wake', '1')
+    remember('wakeOffered', '1')
+    setOffer(false)
+    announce.current = byHand
     await w.start()
     if (w.state === 'unsupported') {
       wakeWord.current = null
@@ -158,15 +184,36 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
     }, WAKE_TO_LISTEN_MS)
   }
 
+  // A hands-free conversation goes on without the wake word: after a reply has been spoken to the end, the assistant
+  // listens a few seconds more for the next question (the chime says so), then goes back to waiting for "Hello
+  // Neighbour". Not when the reply was stopped, the chat was closed (a page it opened on a phone), hands-free was
+  // turned off meanwhile, or the page is out of sight. Through a ref so the listening sees the chat as it is now.
+  const followUp = useRef<() => void>(() => undefined)
+  followUp.current = () => {
+    if (!open || busy || listener.current || recording.current || speaking.current || document.hidden) return
+    if (!wakeWord.current || wakeWord.current.state === 'off') return
+    chime()
+    setPhase('waking')
+    holdWake('assistant', true)
+    window.setTimeout(() => {
+      if (Listener) listen(true, true)
+      else if (serverEars) void record(true, true)
+      else { setPhase('idle'); holdWake('assistant', false) }
+    }, WAKE_TO_LISTEN_MS)
+  }
+
   /** Speak one reply (by the server for English, the device's voice otherwise); the wake word waits meanwhile, so it
-   *  never hears the assistant. Pressing a reply's speaker button again stops it. */
-  async function sayReply(id: number, words: string, replyLang: string) {
+   *  never hears the assistant. Pressing a reply's speaker button again stops it. `thenListen`: the question came
+   *  hands-free, so once the reply has been heard to the end the assistant listens for the next one. */
+  async function sayReply(id: number, words: string, replyLang: string, thenListen = false) {
     if (!canSpeak(replyLang, !!ai?.speak)) return
     speaking.current?.stop()
     holdWake('speaking', true)
     setPhase('speaking')
     setSpeakingId(id)
-    const s = speak(words, replyLang, { unitId: me.id, serverSpeaks: !!ai?.speak })
+    let stopped = false
+    const said = speak(words, replyLang, { unitId: me.id, serverSpeaks: !!ai?.speak })
+    const s: Speaking = { done: said.done, stop: () => { stopped = true; said.stop() } }
     speaking.current = s
     try {
       await s.done
@@ -176,14 +223,15 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
         setSpeakingId(null)
         setPhase('idle')
         holdWake('speaking', false)
+        if (thenListen && !stopped) followUp.current()
       }
     }
   }
   const stopSpeaking = () => speaking.current?.stop()
 
   /** Ask; again: the same words once more after the AI didn't answer in time (no second bubble of yours). A question
-   *  that was spoken gets its reply spoken too. */
-  async function ask(words: string, again = false, spoken = false) {
+   *  that was spoken gets its reply spoken too; one that came hands-free gets the next question listened for after it. */
+  async function ask(words: string, again = false, spoken = false, free = false) {
     const what = words.trim()
     if (!what || busy) return
     const history: AssistantTurn[] = chat.slice(-HISTORY).map((m) => ({ who: m.who, text: m.text }))
@@ -194,7 +242,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
       const plan = await api.assistant(me.id, what, tab, lang, history)
       const id = nextId.current++
       setChat((c) => [...c, { id, who: 'assistant', text: plan.reply, said: what, plan }])
-      if (spoken) void sayReply(id, plan.reply, plan.language)
+      if (spoken) void sayReply(id, plan.reply, plan.language, free)
       if (plan.intent === 'go_to_page' && plan.page) {
         onGo(plan.page)
         if (window.matchMedia(PHONE).matches) setOpen(false)  // on a phone the chat covers the page it opened
@@ -253,8 +301,9 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
   }
 
   /** Hold to talk: the words appear in the box as they are heard, and are asked when the button is let go. Hands-free
-   *  (after "Hello Neighbour") the browser stops by itself when the sentence ends, or after a quiet wait. */
-  function listen(free = false) {
+   *  (after "Hello Neighbour") the browser stops by itself when the sentence ends, or after a quiet wait; `more` is
+   *  the shorter wait for a follow-up after a spoken reply, where silence just means the conversation is over. */
+  function listen(free = false, more = false) {
     if (!Listener || listener.current || busy) return
     speaking.current?.stop()
     const r = new Listener()
@@ -277,40 +326,44 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
       listener.current = null
       setHeard(null)
       setHandsFree(false)
+      setMore(false)
       setPhase('idle')
       setLevel(0)
       holdWake('assistant', false)
       const words = withoutWakePhrase(said.current)
       if (cancelled.current) return
-      if (words) void ask(words, false, true)
-      else if (free) toast(t('assistant.wake.nothing'))
+      if (words) void ask(words, false, true, free)
+      else if (free && !more) toast(t('assistant.wake.nothing'))
     }
     holdWake('assistant', true)  // the wake word lets go of the microphone while this listens (iPhone needs it)
     listener.current = r
     setHandsFree(free)
+    setMore(more)
     setPhase('listening')
     setHeard('')
     try {
       r.start()
-      if (free) wait = window.setTimeout(() => r.stop(), HANDS_FREE_WAIT_MS)
+      if (free) wait = window.setTimeout(() => r.stop(), more ? FOLLOW_UP_WAIT_MS : HANDS_FREE_WAIT_MS)
     } catch {
       listener.current = null
       setHeard(null)
       setHandsFree(false)
+      setMore(false)
       setPhase('idle')
       holdWake('assistant', false)
     }
   }
 
   /** For a browser that cannot listen: record the sentence, have the server turn it into words, and ask. */
-  async function record(free = false) {
+  async function record(free = false, more = false) {
     if (recording.current || busy) return
     speaking.current?.stop()
-    const r = recordSentence({ handsFree: free, onLevel: setLevel })
+    const r = recordSentence({ handsFree: free, waitMs: more ? FOLLOW_UP_WAIT_MS : undefined, onLevel: setLevel })
     recording.current = r
     cancelled.current = false
     holdWake('assistant', true)
     setHandsFree(free)
+    setMore(more)
     setPhase('listening')
     setHeard('')
     try {
@@ -318,14 +371,14 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
       setHeard(null)
       setLevel(0)
       if (!got) {
-        if (free && !cancelled.current) toast(t('assistant.wake.nothing'))
+        if (free && !more && !cancelled.current) toast(t('assistant.wake.nothing'))
         return
       }
       setPhase('transcribing')
       const words = await api.transcribe(me.id, got.blob, got.seconds, lang === 'en' && me.lang === 'ta' ? 'ta' : lang)
         .then((x) => withoutWakePhrase(x.text))
       setPhase('idle')
-      if (words && !cancelled.current) await ask(words, false, true)
+      if (words && !cancelled.current) await ask(words, false, true, free)
     } catch (e) {
       if (e instanceof DOMException && e.name === 'NotAllowedError') toast(t('assistant.micBlocked'), 'error')
       else toast(e instanceof ApiError || e instanceof Error ? e.message : 'Could not listen', 'error')
@@ -333,6 +386,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
       recording.current = null
       setHeard(null)
       setHandsFree(false)
+      setMore(false)
       setPhase((p) => (p === 'speaking' ? p : 'idle'))
       setLevel(0)
       holdWake('assistant', false)
@@ -416,23 +470,28 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
 
   return (
     <>
-      <button className={`assistant-fab ${easy ? 'big' : ''} ${open ? 'on' : ''} ${wake === 'listening' ? 'wake' : ''} ${woke ? 'woke' : ''}`}
+      {/* The assistant's face in the corner: an orb, still when hands-free is off, breathing while it listens for
+          "Hello Neighbour", blooming when it hears it, moving with the voice while it listens or speaks with the chat
+          out of the way (a page it opened on a phone). A pill with its name for a few seconds, then the orb alone. */}
+      <button className={`assistant-fab ${easy ? 'big' : ''} ${open ? 'on' : ''} ${wake === 'listening' ? 'wake' : ''} ${woke ? 'woke' : ''} ${named && !open ? 'named' : ''} ${!open && phase !== 'idle' ? phase : ''}`}
+        style={{ '--level': level } as React.CSSProperties}
         onClick={() => (open ? close() : setOpen(true))} aria-label={t('assistant.open')} aria-expanded={open}
         title={wake === 'listening' ? `${t('assistant.open')} · ${t('assistant.wake.fab')}` : t('assistant.open')}>
-        {open ? <X size={easy ? 28 : 22} /> : <Mic size={easy ? 28 : 22} />}
+        {open ? <X size={easy ? 28 : 22} /> : <span className="orb" aria-hidden="true"><i /><i /></span>}
+        <span className="assistant-fab-name" aria-hidden="true">{WAKE_PHRASE}</span>
       </button>
 
       {open && (
         <div className="assistant-chat" role="dialog" aria-label={t('assistant.chatTitle')}>
           <header className="assistant-chat-head">
-            <span className="assistant-avatar"><Sparkles size={16} /></span>
+            <span className="assistant-avatar" aria-hidden="true"><span className="orb"><i /><i /></span></span>
             <span className="grow">
               <b>{t('assistant.chatTitle')}</b>
               <small>{t(ai && !ai.on ? 'assistant.chatOff' : 'assistant.chatOn')}</small>
             </span>
             {canHear && wakeSupported() && (
               <button type="button" className={`icon-btn wake-toggle ${wake !== 'off' ? 'on' : ''}`} aria-pressed={wake !== 'off'}
-                aria-label={t('assistant.wake.toggle')} title={t('assistant.wake.toggle')} onClick={() => void turnWake(wake === 'off')}>
+                aria-label={t('assistant.wake.toggle')} title={t('assistant.wake.toggle')} onClick={() => void turnWake(wake === 'off', true)}>
                 <Ear size={16} />
               </button>
             )}
@@ -442,6 +501,16 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
           <div className="assistant-log" ref={log}>
             <div className="assistant-msg bot">
               <p className="assistant-greeting">{t('assistant.greeting', { name: me.resident_name })}</p>
+              {/* Hands-free, offered once: the tap on "Turn on" is the one browsers need before any audio starts. */}
+              {offer && wake === 'off' && canHear && wakeSupported() && (
+                <div className="assistant-card assistant-offer">
+                  <span><Ear size={14} /> {t('assistant.wake.offer')}</span>
+                  <span className="assistant-offer-btns">
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => void turnWake(true, true)}>{t('assistant.wake.offerYes')}</button>
+                    <button type="button" className="btn btn-sm" onClick={() => { remember('wakeOffered', '1'); setOffer(false) }}>{t('assistant.wake.offerNo')}</button>
+                  </span>
+                </div>
+              )}
               {!pilot && chat.length === 0 && chips}
             </div>
             {chat.map((m, i) => (m.who === 'resident'
@@ -471,11 +540,9 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
           {phase !== 'idle' && (
             <div className={`voice-panel ${phase} ${handsFree ? 'free' : ''}`} style={{ '--level': level } as React.CSSProperties}
               role="status" aria-live="polite">
-              <span className="voice-orb" aria-hidden="true"><i /><i /><i />
-                <b>{phase === 'speaking' ? <Volume2 size={18} /> : <Mic size={18} />}</b>
-              </span>
+              <span className="voice-orb" aria-hidden="true"><i /><i /><i /><b className="orb"><i /><i /></b></span>
               <span className="voice-words">
-                <small>{t(phase === 'listening' ? (handsFree ? 'assistant.wake.yes' : 'assistant.listening') : `voice.${phase}`)}</small>
+                <small>{t(phase === 'listening' ? (handsFree ? (more ? 'assistant.wake.more' : 'assistant.wake.yes') : 'assistant.listening') : `voice.${phase}`)}</small>
                 {heard ? <q>{heard}</q> : phase === 'listening' && handsFree && <span className="voice-wait" key={String(handsFree)} />}
               </span>
               <button type="button" className="voice-cancel" onClick={cancelVoice}
@@ -496,7 +563,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
               </button>
             )}
             <input ref={input} value={heard ?? text} maxLength={500} onChange={(e) => setText(e.target.value)} readOnly={heard !== null}
-              placeholder={t(heard === null ? 'assistant.type' : handsFree ? 'assistant.wake.yes' : 'assistant.listening')} aria-label={t('assistant.type')} />
+              placeholder={t(heard === null ? 'assistant.type' : handsFree ? (more ? 'assistant.wake.more' : 'assistant.wake.yes') : 'assistant.listening')} aria-label={t('assistant.type')} />
             <button className="btn btn-primary" disabled={!text.trim() || busy}><Send size={14} /> {t('assistant.ask')}</button>
           </form>
           <small className="assistant-foot">

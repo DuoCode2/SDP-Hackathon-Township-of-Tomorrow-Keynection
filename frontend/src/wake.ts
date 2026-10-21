@@ -217,9 +217,10 @@ export function chime() {
 
 /** One sentence from the microphone, for a browser that cannot listen by itself: starts at once, stops by itself
  *  after a second of quiet once speech has begun (or when stop() is called, for the hold-to-talk button), and gives up
- *  if nothing is said in the first seconds. The recording is for the server to turn into words, then dropped. */
-export function recordSentence({ handsFree, onLevel }: { handsFree: boolean; onLevel?: (level: number) => void }) {
-  const MAX_MS = 15_000, QUIET_MS = 1000, WAIT_MS = 6000
+ *  if nothing is said in the first seconds (`waitMs`; shorter for a follow-up after a spoken reply). The recording is
+ *  for the server to turn into words, then dropped. */
+export function recordSentence({ handsFree, waitMs, onLevel }: { handsFree: boolean; waitMs?: number; onLevel?: (level: number) => void }) {
+  const MAX_MS = 15_000, QUIET_MS = 1000, WAIT_MS = waitMs ?? 6000
   let stopNow: (keep: boolean) => void = () => undefined
   const done = (async (): Promise<{ blob: Blob; seconds: number } | null> => {
     const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })

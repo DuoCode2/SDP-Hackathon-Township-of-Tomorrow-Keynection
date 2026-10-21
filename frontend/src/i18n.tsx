@@ -261,6 +261,10 @@ const D: Record<string, Entry> = {
   'assistant.wake.yes': ['Yes? I’m listening…', 'Ya? Saya mendengar…', '在，请说…'],
   'assistant.wake.nothing': ['Didn’t hear anything. Say “Hello Neighbour” again, or type.', 'Tiada apa yang didengar. Sebut “Hello Neighbour” lagi, atau taip.', '没听到内容。再说一次 “Hello Neighbour”，或者打字。'],
   'assistant.wake.fab': ['Listening for “Hello Neighbour”', 'Mendengar “Hello Neighbour”', '正在等 “Hello Neighbour”'],
+  'assistant.wake.offer': ['Go hands-free? Say “Hello Neighbour” and I’ll open and listen, no tap. The phrase is heard on this device only.', 'Tanpa tangan? Sebut “Hello Neighbour” dan saya buka dan dengar, tanpa ketik. Ungkapan itu didengar pada peranti ini sahaja.', '要开免提吗？说 “Hello Neighbour” 我就会打开并听你说，不用点。这句话只在本机识别。'],
+  'assistant.wake.offerYes': ['Turn on hands-free', 'Hidupkan tanpa tangan', '开启免提'],
+  'assistant.wake.offerNo': ['Not now', 'Bukan sekarang', '暂时不用'],
+  'assistant.wake.more': ['Anything else? I’m still listening…', 'Ada lagi? Saya masih mendengar…', '还有什么吗？我还在听…'],
   // The voice panel above the text box, and a reply's speaker button.
   'voice.waking': ['Yes?', 'Ya?', '在！'],
   'voice.transcribing': ['Getting your words…', 'Mendapatkan kata-kata anda…', '正在识别你说的话…'],
