@@ -33,9 +33,10 @@ const test = base.extend<{ micFile: string }>({
 // A deployed site: Render's free tier may be waking, and the engine comes over the internet.
 if (REMOTE) test.describe.configure({ timeout: 300_000 })
 
-/** The browser's own listening, standing in for Chrome's: whatever it starts, it hears this sentence. */
-async function browserHears(page: Page, sentence: string) {
-  await page.addInitScript((words) => {
+/** The browser's own listening, standing in for Chrome's: each time it is started it hears the next of these
+ *  sentences; once they are used up it hears nothing and ends after a pause, as Chrome does in silence. */
+async function browserHears(page: Page, ...sentences: string[]) {
+  await page.addInitScript((lines) => {
     class Recognition {
       lang = ''
       interimResults = false
@@ -47,8 +48,9 @@ async function browserHears(page: Page, sentence: string) {
       start() {
         const w = window as unknown as { recognitionStarts?: number }
         w.recognitionStarts = (w.recognitionStarts ?? 0) + 1
+        const words = lines[w.recognitionStarts - 1]
         // The words half a second in; the end when the button is let go (stop) or, like Chrome, after a pause.
-        setTimeout(() => this.onresult?.({ results: [[{ transcript: words }]] }), 500)
+        if (words) setTimeout(() => this.onresult?.({ results: [[{ transcript: words }]] }), 500)
         setTimeout(() => this.end(), 2500)
       }
       stop() { this.end() }
@@ -56,8 +58,9 @@ async function browserHears(page: Page, sentence: string) {
     }
     Object.defineProperty(window, 'SpeechRecognition', { value: Recognition, configurable: true })
     Object.defineProperty(window, 'webkitSpeechRecognition', { value: Recognition, configurable: true })
-  }, sentence)
+  }, sentences)
 }
+const starts = (page: Page) => page.evaluate(() => (window as unknown as { recognitionStarts?: number }).recognitionStarts ?? 0)
 
 /** A browser without its own listening (Firefox, say): what is said goes to the server. */
 async function noBrowserListening(page: Page) {
@@ -99,11 +102,15 @@ async function heardTheReply(page: Page, chat: ReturnType<Page['getByRole']>, sp
   await expect(chat.locator('.voice-panel.speaking')).toBeHidden({ timeout: 15_000 })
 }
 
-/** Turn hands-free on from the chat (the tap that lets the page start audio), wait until it listens, close the chat. */
+/** Turn hands-free on from the chat's own offer, made once under the greeting the first time the chat opens (the tap
+ *  that lets the page start audio), wait until it listens, close the chat. */
 async function handsFreeOn(page: Page) {
   await page.getByRole('button', { name: 'Ask the assistant' }).click()
   const chat = page.getByRole('dialog', { name: 'Keynection assistant' })
-  await chat.getByRole('button', { name: TOGGLE }).click()
+  const offer = chat.locator('.assistant-offer')
+  await expect(offer).toContainText('Go hands-free?')
+  await offer.getByRole('button', { name: 'Turn on hands-free' }).click()
+  await expect(offer).toBeHidden()
   // 8 MB the first time; over a slow or broken connection the engine is fetched once more.
   await expect(chat.getByRole('status').filter({ hasText: LISTENING })).toBeVisible({ timeout: REMOTE ? 200_000 : 90_000 })
   await expect(chat.getByRole('button', { name: TOGGLE })).toHaveAttribute('aria-pressed', 'true')
@@ -139,7 +146,7 @@ test.describe('the browser listens after the wake word', () => {
   test.use({ micFile: 'wake-then-ask.wav' })
 
   test('“Hello Neighbour” opens the assistant and the question that follows is asked', async ({ page }) => {
-    await browserHears(page, 'what is my renovation status')
+    await browserHears(page, 'what is my renovation status', 'and my warranty status')
     const { errors, asked, spoken } = await start(page)
     const chat = await handsFreeOn(page)
 
@@ -148,9 +155,19 @@ test.describe('the browser listens after the wake word', () => {
     await expect(chat.locator('.assistant-msg.me').last()).toHaveText('what is my renovation status')
     await expect(chat.locator('.assistant-reply').last()).toBeVisible()
     expect(asked).toEqual(['what is my renovation status'])
-    expect(await page.evaluate(() => (window as unknown as { recognitionStarts?: number }).recognitionStarts)).toBe(1)
-    // A spoken question gets a spoken reply; while it speaks the wake word waits, then it listens again.
+    expect(await starts(page)).toBe(1)
+    // A spoken question gets a spoken reply; while it speaks the wake word waits.
     await heardTheReply(page, chat, spoken)
+    // Heard to the end, the assistant listens a few seconds more, with no wake word: the next question is asked and
+    // its reply spoken too…
+    await expect(chat.locator('.voice-panel.listening.free')).toBeVisible()
+    await expect(chat.locator('.voice-panel small')).toHaveText('Anything else? I’m still listening…')
+    await expect(chat.locator('.assistant-msg.me').last()).toHaveText('and my warranty status')
+    expect(asked).toEqual(['what is my renovation status', 'and my warranty status'])
+    await heardTheReply(page, chat, spoken, 2)
+    // …and when the household says nothing more, it goes back to waiting for "Hello Neighbour".
+    await expect(chat.locator('.voice-panel')).toBeHidden({ timeout: 10_000 })
+    expect(await starts(page)).toBe(3)
     await expect(page.locator('.assistant-fab')).toHaveClass(/\bwake\b/)
 
     // Turned off, it lets go of the microphone: no more sound reaches the wake word.
@@ -240,6 +257,13 @@ test.describe('the server listens after the wake word', () => {
     expect(heard).toEqual([200])
     expect(asked).toHaveLength(1)
     await heardTheReply(page, chat, spoken)
+    // Heard to the end, it listens once more for a follow-up (the recording would say the phrase and the question
+    // again); the household stops it, and nothing half-heard is asked.
+    await expect(chat.locator('.voice-panel.listening.free')).toBeVisible()
+    await chat.getByRole('button', { name: 'Stop listening' }).click()
+    await expect(chat.locator('.voice-panel')).toBeHidden()
+    expect(asked).toHaveLength(1)
+    await expect(page.locator('.assistant-fab')).toHaveClass(/\bwake\b/)
     expect(errors).toEqual([])
   })
 })
