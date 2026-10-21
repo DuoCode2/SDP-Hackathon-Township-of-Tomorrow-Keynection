@@ -117,7 +117,8 @@ def test_staff_see_whether_the_pilot_is_healthy(pilot, monkeypatch, sign_in):
 
 
 def test_health_says_which_version_is_running(tmp_path, monkeypatch):
-    """On Render, the health check names the branch and commit it runs, so anyone can see which version is live."""
+    """The health check names the commit it runs, so anyone can see which version is live: on Render the branch and
+    commit Render sets, on aws32g the commit the image was built from."""
     monkeypatch.setenv("KEYNECTION_DB_PATH", str(tmp_path / "health.db"))
     monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
     from app.main import app
@@ -125,7 +126,13 @@ def test_health_says_which_version_is_running(tmp_path, monkeypatch):
     with TestClient(app) as client:
         monkeypatch.delenv("RENDER_GIT_COMMIT", raising=False)
         monkeypatch.delenv("RENDER_GIT_BRANCH", raising=False)
+        monkeypatch.delenv("KEYNECTION_COMMIT", raising=False)
         assert client.get("/api/health").json() == {"status": "ok"}
+        monkeypatch.setenv("KEYNECTION_COMMIT", "")  # a local docker build without --build-arg GIT_COMMIT
+        assert client.get("/api/health").json() == {"status": "ok"}
+        monkeypatch.setenv("KEYNECTION_COMMIT", "74ddfd20cfca2e6c4f3d17081888627fd483e31e")  # the aws32g image
+        assert client.get("/api/health").json() == {"status": "ok", "version": "74ddfd2"}
+        monkeypatch.delenv("KEYNECTION_COMMIT")
         monkeypatch.setenv("RENDER_GIT_COMMIT", "ed647b8628cfc9d4573f4efcbcac7c82d91b99cf")
         monkeypatch.setenv("RENDER_GIT_BRANCH", "main")
         assert client.get("/api/health").json() == {"status": "ok", "version": "ed647b8", "branch": "main"}

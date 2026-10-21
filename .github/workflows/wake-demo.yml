@@ -1,5 +1,7 @@
-# Keeps the online demo awake while the judges are looking, so their first open is not a 40-second wait.
-# Render's free tier sleeps after 15 quiet minutes. This pings /api/health (needs no password) every
+# Keeps the address the judges were given (keynection.onrender.com) awake while they are looking, so their first
+# open is not a 40-second wait. Since 22 Oct it only forwards every visit to https://keynection.agenticcs.net (the
+# one site, deployed from main; see docs/deployment.md). Delete this workflow and suspend the Render service after
+# 14 Nov. Render's free tier sleeps after 15 quiet minutes. This pings /api/health (needs no password) every
 # 14 minutes, but only on the judging days listed in DAYS (Malaysian dates). On any other day the job
 # ends in a second and spends almost nothing. GitHub may run a schedule a few minutes late when it is
 # busy; if that lets the site doze, the next ping wakes it, so a judge still rarely meets a cold start.

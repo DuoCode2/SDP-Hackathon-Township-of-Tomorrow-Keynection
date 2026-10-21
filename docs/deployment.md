@@ -36,4 +36,10 @@ push to main ──► Tests (GitHub Actions) ──green──► Deploy (GitHu
 | Stop all deploys | `sudo systemctl stop keynection-deployer` on aws32g (the site keeps running) |
 | Roll back | Run workflow with the older commit, or on aws32g set `IMAGE=keynection:<sha12>` in `/opt/keynection/current.env` and run `docker compose -f /opt/keynection/compose.yaml --env-file /opt/keynection/current.env -p keynection up -d` |
 
-The judges' demo on Render (https://keynection.onrender.com) is separate and still deploys main on its own.
+**Which version is live:** https://keynection.agenticcs.net/api/health answers `{"status":"ok","version":"<commit>"}`
+(the deployer builds the image with `--build-arg GIT_COMMIT=<sha>`; the Dockerfile keeps it as `KEYNECTION_COMMIT`).
+
+https://keynection.agenticcs.net is the only site. The address the judges were given, https://keynection.onrender.com
+(Render, free tier), now sends every visit to the same page there (`KEYNECTION_MOVED_TO`; the password is the same),
+so links already shared keep working. "Keep the demo awake" keeps that forwarder awake on the judging days; after
+14 Nov the Render service is suspended and that workflow deleted.

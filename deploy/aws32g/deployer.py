@@ -150,7 +150,8 @@ def deploy(dep: dict) -> None:
             archive = subprocess.run(["git", "-C", str(src), "archive", sha], capture_output=True, check=True).stdout
             subprocess.run(["tar", "-x", "-C", str(build)], input=archive, check=True)
             run(["/usr/local/bin/depot", "build", "--project", PROJECT, "--platform", "linux/amd64", "--load",
-                 "-t", image, "--label", f"org.opencontainers.image.revision={sha}", str(build)], logfile,
+                 "-t", image, "--label", f"org.opencontainers.image.revision={sha}", "--build-arg", f"GIT_COMMIT={sha}",
+                 str(build)], logfile,
                 env={"DEPOT_TOKEN": DEPOT_TOKEN}, timeout=1800)
             status(dep_id, "in_progress", f"Starting {short}")
             compose(image, logfile)
