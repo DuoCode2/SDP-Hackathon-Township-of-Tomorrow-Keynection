@@ -12,15 +12,15 @@
   │ fonts and icons bundled) │ ◀────────────────  │  │          ledger · planner · talk · privacy      │
   │ 3 interface languages    │                    │  ├─ auth (passkeys) · push (web push) · backup     │
   │ add to Home Screen       │                    │  └─ ai: Claude (design) / Gemini (demo only)       │
-  └──────────────────────────┘                    │ SQLite (34 tables) + photo files on one disk       │
+  └──────────────────────────┘                    │ SQLite (32 tables) + photo files on one disk       │
                                                   └───────────────────────────────────────────────────┘
-       Outside the box, optional: Anthropic or Google (AI text only) · Google/Apple push services (encrypted
+       Outside the box, optional: Anthropic or Google (AI text only) · Deepgram through DuoCode's gateway (the assistant's voice, demo only) · Google/Apple push services (encrypted
        alerts) · SDP's WhatsApp Business account (pilot) · Procore (export file today, API later)
 ```
 
 - **One codebase, two modes.** Demo mode (judges): cast switcher, guide, sample photos, reset; the server trusts the unit number in a request. Pilot mode (`KEYNECTION_DEMO_MODE=0`): passkey sign-in, the server decides identity on every request, no fictional data, no reset.
 - **No network needed to demo.** Fonts, icons and QR generation are bundled; the AI is optional and the app works without it.
-- **Sizes.** 103 API endpoints, 34 tables, 17 screens, about 740 KB of front-end bundle (233 KB gzipped), 326 server tests.
+- **Sizes.** 106 API endpoints, 32 tables, 18 screens, about 790 KB of front-end bundle (251 KB gzipped; the 8 MB wake-word engine loads only when hands-free is switched on), 408 server tests.
 - **Why SQLite and one container.** A pilot is one phase on one server; backups are a file copy; SDP IT can run it with Docker in an afternoon (`docs/pilot-deployment.md`). It is not built for many townships on one database, and says so.
 
 ## 2. Four state machines
