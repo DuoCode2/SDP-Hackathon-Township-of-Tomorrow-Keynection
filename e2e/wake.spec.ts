@@ -244,6 +244,42 @@ test.describe('the server listens after the wake word', () => {
   })
 })
 
+test.describe('switched off while the browser is still asking for the microphone', () => {
+  test('the microphone granted after hands-free was turned off is let go at once', async ({ page }) => {
+    // The permission prompt, still open: the browser answers two and a half seconds late. Every stream it hands out is kept
+    // so the test can see whether its tracks were stopped.
+    await page.addInitScript(() => {
+      const devices = navigator.mediaDevices
+      const real = devices.getUserMedia.bind(devices)
+      const w = window as unknown as { micAsked: number; micStreams: MediaStream[] }
+      w.micAsked = 0
+      w.micStreams = []
+      devices.getUserMedia = async (constraints) => {
+        w.micAsked++
+        await new Promise((r) => setTimeout(r, 2500))
+        const stream = await real(constraints)
+        w.micStreams.push(stream)
+        return stream
+      }
+    })
+    const { errors } = await start(page)
+    await page.getByRole('button', { name: 'Ask the assistant' }).click()
+    const chat = page.getByRole('dialog', { name: 'Keynection assistant' })
+    await chat.getByRole('button', { name: TOGGLE }).click()
+    // The engine is ready and the browser is being asked for the microphone; the household changes its mind now.
+    await expect.poll(() => page.evaluate(() => (window as unknown as { micAsked: number }).micAsked), { timeout: 90_000 }).toBe(1)
+    await chat.getByRole('button', { name: TOGGLE }).click()
+    await expect(chat.getByRole('button', { name: TOGGLE })).toHaveAttribute('aria-pressed', 'false')
+    await page.waitForTimeout(3500)  // the late answer arrives, with the microphone
+    const tracks = await page.evaluate(() => (window as unknown as { micStreams: MediaStream[] }).micStreams.flatMap((s) => s.getTracks().map((t) => t.readyState)))
+    expect(tracks.length).toBeGreaterThan(0)
+    expect(tracks.every((state) => state === 'ended'), `microphone tracks: ${tracks.join(', ')}`).toBe(true)
+    await expect(page.locator('.assistant-fab')).not.toHaveClass(/wake/)
+    expect(await chunks(page)).toBe(0)  // nothing was ever fed to the wake word
+    expect(errors).toEqual([])
+  })
+})
+
 test.describe('talking without the wake word', () => {
   test('holding the mic asks what was said and the reply is spoken; any reply can be read aloud and stopped', async ({ page }) => {
     await browserHears(page, 'what is my warranty status')

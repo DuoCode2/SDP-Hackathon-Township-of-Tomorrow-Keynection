@@ -142,16 +142,26 @@ export class WakeWord {
       return
     }
     if (this.mic) return
+    let mic: MediaStream
     try {
       // The sound as it is: the wake word was measured on unprocessed speech, and Chrome's gain control and noise
       // suppression changed it enough to wake on "Say hello to the neighbours" (measured in the browser walk). Echo
       // cancellation isn't needed: the wake word lets go while the assistant speaks.
-      this.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } })
+      mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } })
     } catch {
+      if (!this.ctx) return  // switched off while the browser was asking
       this.release()
       return this.set('blocked')
     }
+    // Switched off while the permission prompt was still open: the microphone granted after that is let go at once,
+    // or it would stay on (its indicator lit) with nothing listening to it.
+    if (!this.ctx || !this.worker) {
+      mic.getTracks().forEach((t) => t.stop())
+      return
+    }
+    this.mic = mic
     if (this.ctx.state === 'suspended') await this.ctx.resume().catch(() => undefined)
+    if (!this.ctx || !this.worker) return this.release()  // switched off while the audio was resuming
     this.worker.postMessage({ type: 'reset' })
     this.source = this.ctx.createMediaStreamSource(this.mic)
     this.node = new AudioWorkletNode(this.ctx, 'keynection-capture')

@@ -40,7 +40,7 @@ Three tests were written after our own security review, each named for the probl
 
 ## Layer 3 — scripted browser walk
 
-`e2e/` holds ten Playwright scripts (sixteen tests) against the server with the AI stand-in, in a desktop browser at 1920×1080, each starting from the fictional phase as seeded (how to run them: `e2e/README.md`):
+`e2e/` holds ten Playwright scripts (seventeen tests) against the server with the AI stand-in, in a desktop browser at 1920×1080, each starting from the fictional phase as seeded (how to run them: `e2e/README.md`):
 
 - `route.spec.ts` walks the six steps of the judge route (K01–K14, fourteen checks) and saves a screenshot per step to `evidence/route-screenshots/` (17 frames, about 20 seconds). The screenshots go into the deck and the appendix.
 - `warranty.spec.ts` walks K16: a building-defect decision, SDP's repair, the owner sending it back and accepting a proper one; checks that SDP has no Close button and that the demo's invented Procore number is marked as such in all three interface languages (three more frames).
@@ -51,9 +51,9 @@ Three tests were written after our own security review, each named for the probl
 - `ai-off.spec.ts` walks K22's renovation notice with the page told AI is off: a terrace starts on the first card (wet work), the box is titled "Try an example", and the Malay example fills in a ready-made preset on the device with no AI call, so Send notice is reached without touching an approval.
 - `assistant.spec.ts` (two tests) types into the assistant and checks that a renovation sentence opens the notice with the words in it and a status question gets an answer, with AI off and with the AI not answering; neither ever sends a notice or a message.
 - `opening.spec.ts` (two tests) walks the demo's key-day opening (the welcome-pack card, who you are, the five homes lighting up) on a laptop and at phone width, and checks Skip.
-- `wake.spec.ts` (five tests) runs the real wake-word engine with Chrome's fake microphone playing a recording (`fixtures/`): "Hello Neighbour" opens the assistant and the question after it is asked and its reply spoken; near misses never open it over 25 seconds while it keeps hearing, and out of sight it lets go of the microphone; a browser without its own listening sends the recording to the server and gets words back; holding the mic asks what was said, a typed question stays quiet, a reply is read aloud and stopped; and an engine download cut half way is fetched once more. `KEYNECTION_E2E_REAL=1` or `E2E_BASE_URL` runs it against the real gateway or a deployed site.
+- `wake.spec.ts` (six tests) runs the real wake-word engine with Chrome's fake microphone playing a recording (`fixtures/`): "Hello Neighbour" opens the assistant and the question after it is asked and its reply spoken; near misses never open it over 25 seconds while it keeps hearing, and out of sight it lets go of the microphone; a browser without its own listening sends the recording to the server and gets words back; holding the mic asks what was said, a typed question stays quiet, a reply is read aloud and stopped; an engine download cut half way is fetched once more; and hands-free switched off while the browser is still asking for the microphone lets go of the microphone the moment it is granted. `KEYNECTION_E2E_REAL=1` or `E2E_BASE_URL` runs it against the real gateway or a deployed site.
 
-Last full run 21 Oct 2026: all sixteen tests in the ten scripts passing, no browser console errors. They read the text on screen (button labels, headings) rather than test hooks, so a renamed button fails a walk on purpose.
+Last full run 21 Oct 2026: all seventeen tests in the ten scripts passing, no browser console errors. They read the text on screen (button labels, headings) rather than test hooks, so a renamed button fails a walk on purpose.
 
 ## Layer 4 — manual plan
 
