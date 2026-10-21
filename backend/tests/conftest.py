@@ -5,20 +5,20 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def no_real_ai(monkeypatch):
-    """No test talks to the real Claude, Gemini or speech-to-text gateway. Without a key these features are off, as on
-    a laptop that has none; tests that need them swap in a stand-in (see test_ai.py, test_stt.py)."""
+    """No test talks to the real Claude, Gemini or the voice gateway. Without a key these features are off, as on a
+    laptop that has none; tests that need them swap in a stand-in (see test_ai.py, test_voice.py)."""
     for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "GEMINI_API_KEY", "KEYNECTION_AI", "KEYNECTION_AI_MODEL",
                  "KEYNECTION_GEMINI_MODEL", "KEYNECTION_ORIGIN"):
         monkeypatch.delenv(name, raising=False)
     # Server settings, under both names (the old JIRAN_ ones are still read): each test sets what it needs.
-    for name in ("DB_PATH", "DEMO_MODE", "SITE_PASSWORD", "MOVED_TO", "STATIC_DIR", "ALLOWED_ORIGINS", "STT_KEY",
-                 "STT_URL", "STT_MODEL"):
+    for name in ("DB_PATH", "DEMO_MODE", "SITE_PASSWORD", "MOVED_TO", "STATIC_DIR", "ALLOWED_ORIGINS", "VOICE_KEY",
+                 "VOICE_URL", "STT_MODEL", "TTS_MODEL", "TTS_VOICE"):
         for prefix in ("KEYNECTION_", "JIRAN_"):
             monkeypatch.delenv(prefix + name, raising=False)
-    from app import ai, stt
+    from app import ai, voice
 
     ai.reset()
-    stt.reset()
+    voice.reset()
 
 
 @pytest.fixture()

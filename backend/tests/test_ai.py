@@ -61,7 +61,7 @@ def _draft(**overrides):
 # ---------- off by default ----------
 
 def test_ai_is_off_without_a_key_and_nothing_else_changes(client):
-    assert client.get("/api/ai").json() == {"on": False, "model": None, "provider": None, "stt": False}
+    assert client.get("/api/ai").json() == {"on": False, "model": None, "provider": None, "listen": False, "speak": False}
     r = client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "Retiling the bathroom next week"})
     assert r.status_code == 503 and r.json()["detail"]["code"] == "ai_off"
     assert client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "Good morning!"}).status_code == 201
@@ -70,7 +70,7 @@ def test_ai_is_off_without_a_key_and_nothing_else_changes(client):
 
 
 def test_status_names_the_model(client, claude):
-    assert client.get("/api/ai").json() == {"on": True, "model": "claude-opus-5-5", "provider": "anthropic", "stt": False}
+    assert client.get("/api/ai").json() == {"on": True, "model": "claude-opus-5-5", "provider": "anthropic", "listen": False, "speak": False}
 
 
 def test_with_ai_on_households_agree_to_the_notice_that_says_so(client, claude):
@@ -555,6 +555,6 @@ def test_the_demo_with_gemini_shows_the_notice_that_names_google(client, monkeyp
 
     monkeypatch.setenv("GEMINI_API_KEY", "test-not-a-real-key")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    assert client.get("/api/ai").json() == {"on": True, "model": "gemini-3.5-flash", "provider": "gemini", "stt": False}
+    assert client.get("/api/ai").json() == {"on": True, "model": "gemini-3.5-flash", "provider": "gemini", "listen": False, "speak": False}
     token = client.post("/api/units/T-23/join-code").json()["token"]
     assert client.post("/api/join/lookup", json={"token": token}).json()["consent_version"] == CONSENT_VERSION_AI_GEMINI

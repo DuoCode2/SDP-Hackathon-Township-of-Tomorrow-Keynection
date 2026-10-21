@@ -70,14 +70,17 @@ ai.provider = lambda: "anthropic"  # status() reads the provider, so the guide s
 ai.enabled = lambda: True
 ai.model_name = lambda: "stand-in (no key)"
 
-# Speech to text for browsers that cannot listen: a stand-in too, unless the walk is run against the real gateway
-# (KEYNECTION_E2E_REAL=1 with KEYNECTION_STT_KEY set, see e2e/README.md). The stand-in only answers a real recording.
-from app import stt  # noqa: E402
+# The assistant's voice on the server: stand-ins too, unless the walk is run against the real gateway
+# (KEYNECTION_E2E_REAL=1 with KEYNECTION_VOICE_KEY set, see e2e/README.md). The listening stand-in only answers a real
+# recording; the speaking one sends a second and a half of silence, a real MP3 the browser plays.
+from app import voice  # noqa: E402
 
+SILENT_MP3 = Path(__file__).with_name("silence.mp3").read_bytes()
 if os.environ.get("KEYNECTION_E2E_REAL") != "1":
-    stt.enabled = lambda: True
-    stt.transcribe = lambda audio, kind, lang: (f"[stand-in] what is my renovation status ({kind}, {len(audio) // 1000} KB)"
-                                                if len(audio) > 2000 else None)
+    voice.listening = voice.speaking = lambda: True
+    voice.transcribe = lambda audio, kind, lang: (f"[stand-in] what is my renovation status ({kind}, {len(audio) // 1000} KB)"
+                                                  if len(audio) > 2000 else None)
+    voice.speak = lambda text: SILENT_MP3
 
 import uvicorn  # noqa: E402
 

@@ -33,7 +33,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from . import ai, auth, db, ledger, quiet, talk, vision
 from .neighbours import Unit, impact_reason, impact_zone, inverse_relation, neighbour_circle, street_or_block
-from . import backup, knowledge, phase_import, privacy, push, stt
+from . import backup, knowledge, phase_import, privacy, push, voice
 from .planner import MAX_HOMES, home_count, plan_phase
 from .seed import CONSENT_VERSION, CONSENT_VERSION_AI, CONSENT_VERSION_AI_GEMINI
 from .settings import demo_mode, setting
@@ -214,9 +214,9 @@ def _pilot_checks(conn: sqlite3.Connection) -> list[str]:
     if os.environ.get("GEMINI_API_KEY"):
         out.append("GEMINI_API_KEY is not used in a pilot: Google's free tier uses what is sent to improve its products."
                    " Remove it; for AI with real households, set ANTHROPIC_API_KEY.")
-    if setting("STT_KEY"):
-        out.append("KEYNECTION_STT_KEY is not used in a pilot until the privacy notice names Deepgram, which turns"
-                   " speech into text for it. Remove it; residents' own browsers still listen.")
+    if setting("VOICE_KEY"):
+        out.append("KEYNECTION_VOICE_KEY is not used in a pilot until the privacy notice names Deepgram, which listens"
+                   " and speaks for the assistant. Remove it; residents' own browsers still listen and read aloud.")
     if not conn.execute("SELECT COUNT(*) FROM staff WHERE revoked_at IS NULL").fetchone()[0]:
         out.append("No staff member yet: set KEYNECTION_FIRST_STAFF to their name and restart (or run scripts/add_staff.py).")
     if conn.execute("SELECT 1 FROM phases WHERE id = 'demo'").fetchone():
@@ -1030,8 +1030,8 @@ class RenovationTextIn(BaseModel):
 @app.get("/api/ai")
 def ai_status() -> dict[str, Any]:
     """Whether Claude is on for translation and notice writing, so the app can say so, and fall back when it isn't;
-    and whether this server can turn speech into text for a browser that cannot (stt)."""
-    return {**ai.status(), "stt": stt.enabled()}
+    and whether this server can listen for a browser that cannot (listen) and speak the assistant's replies (speak)."""
+    return {**ai.status(), "listen": voice.listening(), "speak": voice.speaking()}
 
 
 @app.post("/api/ai/renovation-draft")
@@ -1176,32 +1176,58 @@ def assistant(body: AssistantIn, conn: sqlite3.Connection = Depends(get_conn)) -
 
 @app.post("/api/assistant/transcribe")
 def assistant_transcribe(unit_id: str = Form(..., pattern=UNIT_ID), lang: str | None = Form(None, max_length=5),
-                         duration: float = Form(..., gt=0, le=stt.MAX_SECONDS), file: UploadFile = File(...),
+                         duration: float = Form(..., gt=0, le=voice.MAX_SECONDS), file: UploadFile = File(...),
                          conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
     """What was said to the assistant, as text, for a browser that cannot listen by itself. The recording is passed
     on and dropped, never kept; the words go back to the chat, where the resident still presses nothing for them to
     reach anyone (the assistant only gets things ready)."""
     me = _unit_row(conn, unit_id)
-    if not stt.enabled():
+    if not voice.listening():
         # Not 503: the app reads 502–504 as "the server can't be reached" and would say so.
         raise HTTPException(501, {"code": "stt_off", "message": "Listening isn't available here. Typing works just the same."})
     kind = (file.content_type or "").split(";")[0].strip()
     ext = VOICE_TYPES.get(kind)
     if ext is None:
         raise HTTPException(415, "Please send an audio recording.")
-    raw = file.file.read(stt.MAX_BYTES + 1)
-    if len(raw) > stt.MAX_BYTES:
-        raise HTTPException(413, f"Say it in up to {stt.MAX_SECONDS} seconds.")
+    raw = file.file.read(voice.MAX_BYTES + 1)
+    if len(raw) > voice.MAX_BYTES:
+        raise HTTPException(413, f"Say it in up to {voice.MAX_SECONDS} seconds.")
     if len(raw) < 64:
         raise HTTPException(400, "That recording is empty.")
     if not _looks_like_audio(raw, ext):
         raise HTTPException(415, "Please send an audio recording.")
-    if not stt.spend(me["id"]):
+    if not voice.spend(me["id"], "listen"):
         raise HTTPException(429, "That's all the listening for today. Typing works just the same.")
-    text = stt.transcribe(raw, kind, lang)
+    text = voice.transcribe(raw, kind, lang)
     if text is None:
         raise HTTPException(424, {"code": "stt_busy", "message": "Didn't catch that. Try again, or type it."})
     return {"text": text[:500]}
+
+
+class SpeakIn(BaseModel):
+    unit_id: str = Field(..., pattern=UNIT_ID)
+    text: str = Field(..., min_length=1, max_length=2000)
+    lang: str | None = Field(None, max_length=5)  # the reply's language: only English has a server voice
+
+
+@app.post("/api/assistant/speak")
+def assistant_speak(body: SpeakIn, conn: sqlite3.Connection = Depends(get_conn)) -> Response:
+    """One of the assistant's replies, spoken (MP3). English only: Deepgram has no Malay, Chinese or Tamil voice, so
+    the app has the browser read those. Cut to a few sentences; the same words come from memory, not bought twice."""
+    me = _unit_row(conn, body.unit_id)
+    if not voice.speaking():
+        raise HTTPException(501, {"code": "tts_off", "message": "Replies are read on screen here."})
+    if (body.lang or "en") not in voice.SPOKEN_LANGS:
+        raise HTTPException(422, {"code": "tts_lang", "message": "This language is read by the browser's own voice."})
+    text = voice.spoken_text(body.text)
+    audio = voice.remembered(text)
+    if audio is None:
+        if not voice.spend(me["id"], "speak"):
+            raise HTTPException(429, "That's all the spoken replies for today. They are on screen as always.")
+        audio = voice.speak(text)
+    if audio is None:
+        raise HTTPException(424, {"code": "tts_busy", "message": "The reply couldn't be spoken. It is on screen as always."})
+    return Response(audio, media_type="audio/mpeg", headers={"Cache-Control": "private, max-age=3600"})
 
 
 @app.post("/api/intros", status_code=201)
