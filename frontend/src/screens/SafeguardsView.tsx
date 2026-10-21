@@ -15,6 +15,7 @@ const RISKS: Risk[] = [
       { text: 'Phone numbers stay hidden until both households agree to exchange them', built: true },
       { text: 'Photos are re-encoded: GPS, camera model and capture time removed', built: true },
       { text: 'Profiles are one line only, visible to your circle and contacts, with a reminder not to share schedules or travel dates', built: true },
+      { text: 'Hands-free is off until the household turns it on; “Hello Neighbour” is heard on the device itself, no sound leaves it before the phrase, and it lets go of the microphone when the page is out of sight', built: true },
       { text: 'Voice notes can only be played by the two people in the chat, and are deleted after 30 days, checked every hour (a reported one is kept for the estate team until reviewed, never longer than 90 days)', built: true },
       { text: '"Download my data" gives each household everything Keynection holds about it as a file; other residents appear by unit only', built: true },
       { text: 'Bios and helper names can’t contain phone numbers, emails or links, so numbers are still exchanged only when both agree', built: true },

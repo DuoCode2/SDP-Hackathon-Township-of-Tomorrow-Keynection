@@ -708,6 +708,8 @@ export interface AiStatus {
   on: boolean
   model: string | null
   provider: 'anthropic' | 'gemini' | null
+  /** The server can turn speech into words, for a browser that cannot listen by itself (demo only). */
+  stt?: boolean
 }
 
 /** One sentence turned into notice fields. Empty fields are left for the owner; "unsure" names what was dropped. */
@@ -931,6 +933,15 @@ export const api = {
   /** Marks the other side's messages read; `marked` is how many were newly read (0 when nothing changed). */
   markRead: (unitId: string, otherId: string) => request<{ ok: boolean; marked: number }>(`/api/units/${unitId}/conversations/${otherId}/read`, { method: 'POST' }),
   aiStatus: () => request<AiStatus>('/api/ai'),
+  /** What was said to the assistant, as words: for a browser without its own listening. The recording is not kept. */
+  transcribe: (unitId: string, blob: Blob, seconds: number, lang: string) => {
+    const form = new FormData()
+    form.append('unit_id', unitId)
+    form.append('lang', lang)
+    form.append('duration', String(Math.max(0.5, Math.min(15, seconds))))
+    form.append('file', blob, 'speech')
+    return request<{ text: string }>('/api/assistant/transcribe', { method: 'POST', body: form })
+  },
   authMe: () => request<AuthMe>('/api/auth/me'),
   signinOptions: () => request<KeyCeremony<PublicKeyCredentialRequestOptionsJSON>>('/api/auth/signin/options', { method: 'POST' }),
   signin: (challengeId: string, credential: AuthenticationResponseJSON) =>

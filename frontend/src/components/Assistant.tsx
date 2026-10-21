@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Mic, Send, ShieldCheck, Sparkles, X } from 'lucide-react'
-import { api, type AssistantPlan, type AssistantTurn, type Directory, type QuietTimes, type RenovationDraft, type UnitInfo } from '../api'
+import { Ear, Mic, Send, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { api, ApiError, type AssistantPlan, type AssistantTurn, type Directory, type QuietTimes, type RenovationDraft, type UnitInfo } from '../api'
 import type { TabId } from '../guide'
 import { noisyHours, useDates, useLang } from '../i18n'
 import { useAi, usePilot } from '../features'
 import { useCelebrate, useToast } from '../ui'
 import RenovationWizard from '../screens/RenovationWizard'
 import IntroWizard from '../screens/IntroWizard'
+import { forget, remember, remembered } from '../storage'
+import { WakeWord, chime, holdWake, recordSentence, wakeSupported, withoutWakePhrase, type WakeState } from '../wake'
 
 // Three sentences a judge can try without typing (demo only), one in each language the screens speak.
 const EXAMPLES = [
@@ -17,11 +19,13 @@ const EXAMPLES = [
 const SPEECH_LANG = { en: 'en-MY', ms: 'ms-MY', zh: 'zh-CN' } as const
 const PHONE = '(max-width: 899.98px)'
 const HISTORY = 6  // the last few messages go with each question, so a follow-up is understood
+const HANDS_FREE_WAIT_MS = 8000  // after "Hello Neighbour", how long the browser's listening waits for words
 
 // The browser's speech recognition, where there is one (Chrome and Edge call it webkitSpeechRecognition).
 type Recognition = {
   lang: string
   interimResults: boolean
+  continuous?: boolean
   onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
   onerror: ((e: { error: string }) => void) | null
   onend: (() => void) | null
@@ -60,6 +64,11 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
   const [reno, setReno] = useState<{ names: Record<string, string>; from: { said: string; renovation: RenovationDraft | null } } | null>(null)
   const [hello, setHello] = useState<{ circle: Directory['circle']; pick: string[] } | null>(null)
   const [easy, setEasy] = useState(false)
+  const [wake, setWake] = useState<WakeState>('off')
+  const [handsFree, setHandsFree] = useState(false)  // listening because "Hello Neighbour" was heard
+  const wakeWord = useRef<WakeWord | null>(null)
+  const onWake = useRef<() => void>(() => undefined)
+  const recording = useRef<ReturnType<typeof recordSentence> | null>(null)
   const listener = useRef<Recognition | null>(null)
   const said = useRef('')
   const log = useRef<HTMLDivElement>(null)
@@ -67,6 +76,21 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
   const nextId = useRef(1)
   // Heard in the language the screens are in; a Tamil-reading household on the English screens is heard in Tamil.
   const speechLang = lang === 'en' && me.lang === 'ta' ? 'ta-IN' : SPEECH_LANG[lang]
+  // Where words come from when spoken: the browser's own listening, or else the server's (demo only).
+  const serverEars = !Listener && !!ai?.stt
+  const canHear = !!Listener || serverEars
+
+  // Hands-free, as this browser last left it. After a page load the audio waits for a tap (WakeWord.resume).
+  useEffect(() => {
+    if (remembered('wake') === '1' && wakeSupported()) void turnWake(true)
+    return () => wakeWord.current?.stop()
+  }, [])
+  useEffect(() => {
+    if (wake !== 'paused') return
+    const tap = () => wakeWord.current?.resume()
+    window.addEventListener('pointerdown', tap)
+    return () => window.removeEventListener('pointerdown', tap)
+  }, [wake])
 
   // Another household starts a chat of its own. Easy mode is the household's setting: the button grows with it.
   useEffect(() => {
@@ -90,6 +114,34 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
     setChat((c) => c.map((m) => (m.id === id && m.who === 'assistant' ? { ...m, ...patch } : m)))
 
   /** Ask; again: the same words once more after the AI didn't answer in time (no second bubble of yours). */
+  async function turnWake(on: boolean) {
+    if (!on) {
+      wakeWord.current?.stop()
+      wakeWord.current = null
+      setWake('off')
+      forget('wake')
+      return
+    }
+    if (wakeWord.current) return
+    const w = new WakeWord(() => onWake.current(), setWake)
+    wakeWord.current = w
+    remember('wake', '1')
+    await w.start()
+    if (w.state === 'unsupported') {
+      wakeWord.current = null
+      forget('wake')
+    }
+  }
+
+  // "Hello Neighbour" was heard: a chime, the chat, and listening for what comes next, as if the mic were held.
+  onWake.current = () => {
+    if (busy || listener.current || recording.current) return
+    chime()
+    setOpen(true)
+    if (Listener) listen(true)
+    else if (serverEars) void record(true)
+  }
+
   async function ask(words: string, again = false) {
     const what = words.trim()
     if (!what || busy) return
@@ -158,35 +210,85 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
     if (window.matchMedia(PHONE).matches) setOpen(false)
   }
 
-  /** Hold to talk: the words appear in the box as they are heard, and are asked when the button is let go. */
-  function listen() {
+  /** Hold to talk: the words appear in the box as they are heard, and are asked when the button is let go. Hands-free
+   *  (after "Hello Neighbour") the browser stops by itself when the sentence ends, or after a quiet wait. */
+  function listen(free = false) {
     if (!Listener || listener.current || busy) return
     const r = new Listener()
     r.lang = speechLang
     r.interimResults = true
+    r.continuous = false
     said.current = ''
+    let wait: number | undefined
     r.onresult = (e) => {
       said.current = Array.from(e.results, (x) => x[0].transcript).join('')
       setHeard(said.current)
+      window.clearTimeout(wait)
     }
     r.onerror = (e) => { if (e.error === 'not-allowed') toast(t('assistant.micBlocked'), 'error') }
     r.onend = () => {
+      window.clearTimeout(wait)
       listener.current = null
       setHeard(null)
-      if (said.current.trim()) void ask(said.current)
+      setHandsFree(false)
+      holdWake('assistant', false)
+      const words = withoutWakePhrase(said.current)
+      if (words) void ask(words)
+      else if (free) toast(t('assistant.wake.nothing'))
     }
+    holdWake('assistant', true)  // the wake word lets go of the microphone while this listens (iPhone needs it)
     listener.current = r
+    setHandsFree(free)
     setHeard('')
     try {
       r.start()
+      if (free) wait = window.setTimeout(() => r.stop(), HANDS_FREE_WAIT_MS)
     } catch {
       listener.current = null
       setHeard(null)
+      setHandsFree(false)
+      holdWake('assistant', false)
     }
   }
-  const stop = () => listener.current?.stop()
+
+  /** For a browser that cannot listen: record the sentence, have the server turn it into words, and ask. */
+  async function record(free = false) {
+    if (recording.current || busy) return
+    const r = recordSentence({ handsFree: free })
+    recording.current = r
+    holdWake('assistant', true)
+    setHandsFree(free)
+    setHeard('')
+    try {
+      const got = await r.done
+      setHeard(null)
+      if (!got) {
+        if (free) toast(t('assistant.wake.nothing'))
+        return
+      }
+      setBusy(true)
+      const words = await api.transcribe(me.id, got.blob, got.seconds, lang === 'en' && me.lang === 'ta' ? 'ta' : lang)
+        .then((x) => withoutWakePhrase(x.text)).finally(() => setBusy(false))
+      if (words) await ask(words)
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'NotAllowedError') toast(t('assistant.micBlocked'), 'error')
+      else toast(e instanceof ApiError || e instanceof Error ? e.message : 'Could not listen', 'error')
+    } finally {
+      recording.current = null
+      setHeard(null)
+      setHandsFree(false)
+      holdWake('assistant', false)
+    }
+  }
+
+  const hear = () => (Listener ? listen() : void record())
+  const stop = () => {
+    listener.current?.stop()
+    recording.current?.stop()
+  }
   function close() {
-    stop()
+    listener.current?.stop()
+    recording.current?.cancel()
     setOpen(false)
   }
 
@@ -250,8 +352,9 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
 
   return (
     <>
-      <button className={`assistant-fab ${easy ? 'big' : ''} ${open ? 'on' : ''}`} onClick={() => (open ? close() : setOpen(true))}
-        aria-label={t('assistant.open')} aria-expanded={open} title={t('assistant.open')}>
+      <button className={`assistant-fab ${easy ? 'big' : ''} ${open ? 'on' : ''} ${wake === 'listening' ? 'wake' : ''}`}
+        onClick={() => (open ? close() : setOpen(true))} aria-label={t('assistant.open')} aria-expanded={open}
+        title={wake === 'listening' ? `${t('assistant.open')} · ${t('assistant.wake.fab')}` : t('assistant.open')}>
         {open ? <X size={easy ? 28 : 22} /> : <Mic size={easy ? 28 : 22} />}
       </button>
 
@@ -263,6 +366,12 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
               <b>{t('assistant.chatTitle')}</b>
               <small>{t(ai && !ai.on ? 'assistant.chatOff' : 'assistant.chatOn')}</small>
             </span>
+            {canHear && wakeSupported() && (
+              <button type="button" className={`icon-btn wake-toggle ${wake !== 'off' ? 'on' : ''}`} aria-pressed={wake !== 'off'}
+                aria-label={t('assistant.wake.toggle')} title={t('assistant.wake.toggle')} onClick={() => void turnWake(wake === 'off')}>
+                <Ear size={16} />
+              </button>
+            )}
             <button className="icon-btn" onClick={close} aria-label={t('btn.cancel')}><X size={16} /></button>
           </header>
 
@@ -282,22 +391,29 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
             {busy && <div className="assistant-msg bot typing" role="status" aria-label={t('assistant.working')}><i /><i /><i /></div>}
           </div>
 
+          {wake !== 'off' && (
+            <p className={`assistant-wake ${wake}`} role="status">
+              <Ear size={13} /> {t(wake === 'listening' ? 'assistant.wake.on' : `assistant.wake.${wake}`)}
+            </p>
+          )}
           <form className="assistant-compose" onSubmit={(e) => { e.preventDefault(); void ask(text) }}>
-            {Listener && (
+            {canHear && (
               <button type="button" className={`assistant-hold ${heard !== null ? 'on' : ''}`} disabled={busy}
                 aria-label={t('assistant.hold')} title={t('assistant.hold')}
-                onPointerDown={(e) => { e.preventDefault(); listen() }} onPointerUp={stop} onPointerLeave={stop} onPointerCancel={stop}
-                onKeyDown={(e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); listen() } }}
+                onPointerDown={(e) => { e.preventDefault(); if (!handsFree) hear() }} onPointerUp={() => !handsFree && stop()}
+                onPointerLeave={() => !handsFree && stop()} onPointerCancel={() => !handsFree && stop()}
+                onKeyDown={(e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); hear() } }}
                 onKeyUp={(e) => { if (e.key === ' ' || e.key === 'Enter') stop() }} onContextMenu={(e) => e.preventDefault()}>
                 <Mic size={18} />
               </button>
             )}
             <input ref={input} value={heard ?? text} maxLength={500} onChange={(e) => setText(e.target.value)} readOnly={heard !== null}
-              placeholder={t(heard !== null ? 'assistant.listening' : 'assistant.type')} aria-label={t('assistant.type')} />
+              placeholder={t(heard === null ? 'assistant.type' : handsFree ? 'assistant.wake.yes' : 'assistant.listening')} aria-label={t('assistant.type')} />
             <button className="btn btn-primary" disabled={!text.trim() || busy}><Send size={14} /> {t('assistant.ask')}</button>
           </form>
           <small className="assistant-foot">
-            <ShieldCheck size={12} /> {t('assistant.never')}{!Listener && <> {t('assistant.noVoice')}</>}
+            <ShieldCheck size={12} /> {t('assistant.never')}{wake !== 'off' && <> {t('assistant.wake.privacy')}</>}
+            {!canHear && <> {t('assistant.noVoice')}</>}
           </small>
         </div>
       )}
