@@ -177,6 +177,17 @@ def close_account(conn: sqlite3.Connection, unit_id: str, by: str, folders: dict
             (folders["photos"] / f"{p}.jpg").unlink(missing_ok=True)
         conn.execute("UPDATE profiles SET bio = '', accept_requests = 1, allow_waves = 1, quiet_mode = 0, notices_read_at = NULL,"
                      " easy_mode = 0, whatsapp_alerts = 1, quiet_times = '[]', quiet_times_at = NULL WHERE unit_id = ?", (unit_id,))
+        # Case notices in the neighbours' threads name this home by unit (the reader's screen looks the name up), so
+        # from here on they read as its unit. A name in their values is taken out all the same.
+        conn.execute("UPDATE messages SET sys_values = json_remove(sys_values, '$.name')"
+                     " WHERE kind = 'system' AND json_extract(sys_values, '$.unit') = ?", (unit_id,))
+        # Old data: notices written before that carried the name itself, in the values and in the English record
+        # ("Siti (No. 11) believes ..."). Matched by the name once, here, and left naming the unit.
+        unit = conn.execute("SELECT resident_name, label FROM units WHERE id = ?", (unit_id,)).fetchone()
+        conn.execute("UPDATE messages SET body = replace(body, ?, ?), sys_values = json_set(json_remove(sys_values, '$.name'), '$.unit', ?)"
+                     " WHERE kind = 'system' AND thread_with = ? AND json_extract(sys_values, '$.unit') IS NULL"
+                     " AND json_extract(sys_values, '$.name') = ?",
+                     (f"{unit['resident_name']} ({unit['label']})", unit["label"], unit_id, unit_id, unit["resident_name"]))
         conn.execute("UPDATE units SET resident_name = label, record_name = NULL, joined_at = NULL, consent_version = NULL WHERE id = ?",
                      (unit_id,))
         conn.execute("UPDATE join_codes SET expires_at = ? WHERE unit_id = ? AND used_at IS NULL", (db.now(), unit_id))

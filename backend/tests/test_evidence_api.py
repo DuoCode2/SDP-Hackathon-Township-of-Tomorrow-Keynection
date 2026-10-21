@@ -111,6 +111,40 @@ def test_only_notified_neighbours_can_attach_photos_to_a_renovation(client):
     assert _demo(client, "T-15", "wall_before", "baseline", intro_id).status_code == 403
 
 
+def test_a_photo_can_be_linked_to_a_renovation_notice_but_never_to_a_hello(client):
+    hello = client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi, I'm Aiman from No. 12.", "to_unit_ids": ["T-11"]})
+    assert hello.status_code == 201 and hello.json()["recipients"] == ["T-11"]
+    hello_id = hello.json()["id"]
+    # The hello is in T-11's inbox, so the recipient check alone would have let it through.
+    assert any(i["id"] == hello_id for i in client.get("/api/units/T-11/inbox").json())
+
+    r = _demo(client, "T-11", "wall_before", "baseline", hello_id)
+    assert r.status_code == 422 and "renovation notice" in r.json()["detail"]
+    assert _demo(client, "T-11", "wall_after_crack", "followup", hello_id).status_code == 422
+    assert client.get("/api/units/T-11/evidence").json()["photos"] == []
+
+    intro_id = _renovation_by_12(client)
+    ok = _demo(client, "T-11", "wall_before", "baseline", intro_id)
+    assert ok.status_code == 201 and ok.json()["renovation_intro_id"] == intro_id
+    # A home that was never notified is still refused as before.
+    assert _demo(client, "T-15", "wall_before", "baseline", intro_id).status_code == 403
+
+
+def test_follow_up_cannot_point_the_case_at_a_different_renovation(client):
+    first, second = _renovation_by_12(client), _renovation_by_12(client)
+    baseline = _demo(client, "T-11", "wall_before", "baseline", first).json()
+
+    other = _demo(client, "T-11", "wall_after_crack", "followup", second).json()
+    r = client.post("/api/incidents", json={"reporter_unit_id": "T-11", "baseline_photo_id": baseline["id"], "followup_photo_id": other["id"]})
+    assert r.status_code == 400 and "different renovation" in r.json()["detail"]
+    assert client.get("/api/units/T-11/incidents").json() == []
+
+    # The same notice on the follow-up is accepted, and the case keeps the pre-work photo's renovation.
+    same = _demo(client, "T-11", "wall_after_crack", "followup", first).json()
+    case = client.post("/api/incidents", json={"reporter_unit_id": "T-11", "baseline_photo_id": baseline["id"], "followup_photo_id": same["id"]})
+    assert case.status_code == 201 and case.json()["renovation"]["id"] == first
+
+
 def test_cannot_compare_someone_elses_photos(client):
     intro_id = _renovation_by_12(client)
     b = _demo(client, "T-11", "wall_before", "baseline", intro_id).json()
@@ -172,7 +206,7 @@ def test_image_urls_differ_when_case_numbers_restart_after_reset(client):
             "reporter_unit_id": "T-11", "baseline_photo_id": b["id"], "followup_photo_id": f["id"]}).json()
 
     first = make_case("wall_before", "wall_after_crack")
-    client.post("/api/demo/reset")
+    client.post("/api/demo/reset", json={"confirm": True})
     second = make_case("ceiling_before", "ceiling_after_stain")
     assert first["id"] == second["id"] == 1
     assert first["images"]["overlay"] != second["images"]["overlay"]
@@ -181,6 +215,6 @@ def test_image_urls_differ_when_case_numbers_restart_after_reset(client):
 def test_reset_removes_photos_and_cases(client):
     intro_id = _renovation_by_12(client)
     _demo(client, "T-11", "wall_before", "baseline", intro_id)
-    client.post("/api/demo/reset")
+    client.post("/api/demo/reset", json={"confirm": True})
     d = client.get("/api/dashboard").json()
     assert d["baseline_photos"] == 0 and d["incidents"] == 0 and d["intros_sent"] == 0

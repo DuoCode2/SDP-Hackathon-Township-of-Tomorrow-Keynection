@@ -2,16 +2,18 @@ import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { BadgeCheck, Bell, CheckCheck, ChevronLeft, Clock3, DoorOpen, FileWarning, House, KeyRound, Megaphone, MessageSquare, Network, Printer, Smartphone } from 'lucide-react'
 import { api, type Conversation, type Official, type UnitInfo, type WhatsAppOutbox } from '../api'
+import type { TabId } from '../guide'
 import { Avatar, Badge, formatDate, formatTime, ScreenTitle, Skeleton } from '../ui'
 
 /** How Keynection reaches residents, in two steps. Step one needs no change to the SDP App: the one-time code comes
  *  with the keys, Keynection opens in the phone's browser, and alerts arrive on WhatsApp. Step two, after the pilot,
  *  makes it a module inside the SDP App with the owner's existing sign-in (integration is SDP's stated direction). */
-export default function ChannelsView({ me, version }: { me: UnitInfo; version: number }) {
+export default function ChannelsView({ me, version, onGo }: { me: UnitInfo; version: number; onGo?: (tab: TabId, peer?: string) => void }) {
   const [convos, setConvos] = useState<Conversation[] | null>(null)
   const [official, setOfficial] = useState<Official | null>(null)
   const [wa, setWa] = useState<WhatsAppOutbox | null>(null)
   const [qr, setQr] = useState<string | null>(null)
+  const [inside, setInside] = useState(false)  // the SDP App phone shows Keynection itself
 
   useEffect(() => {
     let live = true
@@ -95,7 +97,14 @@ export default function ChannelsView({ me, version }: { me: UnitInfo; version: n
                         {m.scheduled ? <><Clock3 size={11} /> Scheduled · goes out by itself at {formatTime(m.at)}</> : <>{formatTime(m.at)} <CheckCheck size={12} /></>}
                       </small>
                     </div>
-                    {m.buttons.length > 0 && <div className="wa-buttons">{m.buttons.map((b) => <span key={b}>{b}</span>)}</div>}
+                    {m.buttons.length > 0 && (
+                      <div className="wa-buttons">
+                        {m.buttons.map((b) => {
+                          const to = opens(m, convos ?? [])
+                          return <button key={b} type="button" disabled={!onGo} onClick={() => onGo?.(to.tab, to.peer)}>{b}</button>
+                        })}
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -106,8 +115,14 @@ export default function ChannelsView({ me, version }: { me: UnitInfo; version: n
 
         <figure className="phone-wrap">
           <Badge tone="blue">Step two · illustration</Badge>
-          <div className="phone sdp-app">
-            <div className="phone-status"><span>9:41</span><span>●●● ▮</span></div>
+          <div className={`phone sdp-app ${inside ? 'inside' : ''}`}>
+            <div className="phone-status">
+              {inside ? <button type="button" className="phone-back" onClick={() => setInside(false)}><ChevronLeft size={13} /> SDP App</button> : <span>9:41</span>}
+              <span>●●● ▮</span>
+            </div>
+            {inside ? (
+              <iframe className="phone-app" src={`/?embed=1&me=${encodeURIComponent(me.id)}`} title="Keynection inside the SDP App" />
+            ) : <>
             <div className="app-head">
               <div className="app-brand"><House size={16} /> SDP App</div>
               <Bell size={16} />
@@ -116,11 +131,11 @@ export default function ChannelsView({ me, version }: { me: UnitInfo; version: n
               <small>Good morning</small>
               <b>{me.joined ? me.resident_name : 'Owner'} · {me.label}</b>
             </div>
-            <div className="app-tile keynection">
+            <button type="button" className="app-tile keynection" onClick={() => setInside(true)} disabled={!me.joined}>
               <Network size={20} />
               <span className="grow"><b>Neighbours · Keynection</b><small>{me.joined ? `${unread} new · your circle, chats and notices` : 'Join with the code in your welcome pack'}</small></span>
               {unread > 0 && <span className="unread">{unread}</span>}
-            </div>
+            </button>
             <div className="app-tiles">
               <div className="app-tile"><House size={18} /><b>My home</b></div>
               <div className="app-tile"><FileWarning size={18} /><b>Defects &amp; warranty</b></div>
@@ -136,10 +151,26 @@ export default function ChannelsView({ me, version }: { me: UnitInfo; version: n
               </div>
             ))}
             {convos?.length === 0 && <div className="app-empty">{me.joined ? 'No chats yet' : 'Not on Keynection yet'}</div>}
+            </>}
           </div>
           <figcaption><b>Step two: a module inside the SDP App</b> A “Neighbours · Keynection” entry with the owner's existing sign-in, so the owner has one app and SDP has one set of data. Step one (welcome pack and WhatsApp) does not wait for it. Layout is an illustration, not SDP's actual app.</figcaption>
         </figure>
       </div>
     </section>
   )
+}
+
+type Alert = WhatsAppOutbox['messages'][number]
+const EVIDENCE_ALERTS = ['reno_photo', 'reno_done', 'repair']
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** Where a tap on an alert leads, as on the phone: the kind of alert decides the screen, and a chat opens on the
+ *  neighbour the alert names by unit number (No. 12), or on the estate office for one of its notices. */
+function opens(m: Alert, convos: Conversation[]): { tab: TabId; peer?: string } {
+  if (EVIDENCE_ALERTS.includes(m.kind)) return { tab: 'evidence' }
+  if (m.kind === 'reno_done_owner') return { tab: 'works' }
+  if (m.kind === 'request') return { tab: 'circle' }
+  if (m.kind === 'notice') return { tab: 'chats', peer: '__estate' }
+  const named = convos.find((c) => new RegExp(`${escape(c.label)}(?!\\d)`).test(m.text))
+  return { tab: 'chats', peer: named?.id }
 }

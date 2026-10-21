@@ -19,7 +19,8 @@ def test_intro_reaches_the_five_neighbours_and_wave_back_forms_the_card(client):
                        "contractor": "ABC Renovation", "contractor_cidb_registered": True},
     })
     assert sent.status_code == 201
-    assert sorted(sent.json()["recipients"]) == ["T-11", "T-13", "T-21", "T-22", "T-23"]
+    # The five homes of the circle, and No. 32 behind: the extension reaches the back fence (it is not in the circle).
+    assert sorted(sent.json()["recipients"]) == ["T-11", "T-13", "T-21", "T-22", "T-23", "T-32"]
 
     inbox = client.get("/api/units/T-11/inbox").json()
     assert len(inbox) == 1 and inbox[0]["from_unit_id"] == "T-12"
@@ -49,17 +50,19 @@ def test_home_history_starts_with_handover_and_records_renovation(client):
 
 def test_reset_wipes_demo_activity(client):
     client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi"})
-    assert client.post("/api/demo/reset").status_code == 200
+    assert client.post("/api/demo/reset").status_code == 400  # a bare POST wipes nothing: the button asks first
+    assert client.post("/api/demo/reset", json={"confirm": False}).status_code == 400
+    assert client.post("/api/demo/reset", json={"confirm": True}).status_code == 200
     d = client.get("/api/dashboard").json()
-    assert d["intros_sent"] == 0 and d["households"] == 36 and d["home_histories_verified"] == 36
+    assert d["intros_sent"] == 0 and d["households"] == 42 and d["home_histories_verified"] == 42
 
 
 def test_dashboard_counts(client):
     intro_id = client.post("/api/intros", json={"from_unit_id": "A-14-3", "message": "Hi"}).json()["id"]
     client.post(f"/api/intros/{intro_id}/ack", json={"unit_id": "A-13-3"})
     d = client.get("/api/dashboard").json()
-    assert d["households"] == 36
+    assert d["households"] == 42
     assert d["intros_sent"] == 1
     assert d["reply_rate"] == 0.25
     assert d["households_with_a_known_neighbour"] == 2
-    assert d["home_histories_verified"] == 36
+    assert d["home_histories_verified"] == 42

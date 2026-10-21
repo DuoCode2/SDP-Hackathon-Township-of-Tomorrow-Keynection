@@ -34,23 +34,24 @@ test('primary buttons and stamps per screen (read-only audit)', async ({ page })
   for (let step = 1; step <= 6; step++) {
     await judgeStep(page, step)
     rows.push(await look(page, `${step} ${names[step - 1]}`))
+    // Step 4 opens both sides; back to one pane so the next screens are read on their own.
+    if (step === 4) await page.locator('button.split-btn').click()
   }
 
   await judgeStep(page, 2)
   await page.getByRole('button', { name: 'Register renovation' }).first().click()
   const sheet = page.getByRole('dialog')
   await expect(sheet).toBeVisible()
-  await sheet.locator('.works-card').first().click() // wet work: a terrace defaults to structural, which needs a permit before Next
   for (let i = 1; i <= 5; i++) {
     rows.push(await look(page, `Register renovation, step ${i}`))
     if (i < 5) await sheet.getByRole('button', { name: /^Next$/ }).click()
   }
   await page.keyboard.press('Escape')
 
-  await judgeStep(page, 4)
-  await page.locator('main').locator('button.chat-row', { hasText: 'Aiman' }).click()
-  await expect(page.locator('textarea.compose-input')).toBeVisible()
+  await judgeStep(page, 4) // both sides, each pane already on the other's thread
+  await expect(page.getByLabel('Pane 2').locator('textarea.compose-input')).toBeVisible()
   rows.push(await look(page, 'Chat thread (Siti ↔ Aiman)'))
+  await page.locator('button.split-btn').click()
 
   await judgeStep(page, 5)
   const sealed = page.waitForResponse((r) => r.url().includes('/photos/demo') && r.request().method() === 'POST')

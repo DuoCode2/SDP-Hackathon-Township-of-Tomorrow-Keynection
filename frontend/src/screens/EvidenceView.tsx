@@ -30,6 +30,10 @@ export default function EvidenceView({ me, version, onChange }: Props) {
       if (!live) return
       setData(d)
       setTickets(w)
+      // The case or ticket open on screen is read again from the fresh lists, so a change made on the other
+      // side of the wall shows here at once (every pane reloads after a write); one that is gone closes.
+      setOpenCase((c) => (c ? d.incidents.find((x) => x.id === c.id) ?? null : null))
+      setOpenTicket((x) => (x ? w.find((y) => y.id === x.id) ?? null : null))
     })
     return () => {
       live = false

@@ -10,7 +10,7 @@ import IntroWizard from './IntroWizard'
 import QuietTimesCard from '../components/QuietTimes'
 import { usePilot, useShowAll } from '../features'
 import { NotificationsAsk } from '../components/Notifications'
-import { forget, remember, remembered } from '../storage'
+import { markWelcomeSeen, welcomeDue } from '../welcome'
 
 interface Props {
   me: UnitInfo
@@ -52,45 +52,22 @@ const REASONS = ['parking', 'noise', 'leak', 'delivery', 'safety', 'other']
 const shares = (t: Translate, relation: string) => t(SHARES[relation] ?? `rel.${relation}`)
 const langName = (t: Translate, code: string) => t(`lang.${code}`)
 
+// The welcome's helpers live in welcome.ts; the join page and the demo reset still reach replayWelcome through here.
+export { replayWelcome } from '../welcome'
+
 /** Who lives around you and who you can talk to: people first, the plan one tap away. */
-// The welcome greets each household once. Seen is remembered per household on this device; the Me page and a
-// demo reset bring it back. (A private window remembers nothing, so it shows once per page load there.)
-const seenThisLoad = new Set<string>()
-
-function seenHomes(): string[] {
-  try {
-    return JSON.parse(remembered('welcome.seen') ?? '[]') as string[]
-  } catch {
-    return []
-  }
-}
-
-function welcomeSeen(unitId: string): boolean {
-  return seenThisLoad.has(unitId) || seenHomes().includes(unitId)
-}
-
-function markWelcomeSeen(unitId: string) {
-  seenThisLoad.add(unitId)
-  remember('welcome.seen', JSON.stringify([...new Set([...seenHomes(), unitId])]))  // a private window: this load only
-}
-
-/** Bring the welcome back (from the Me page, or after a demo reset). */
-export function replayWelcome() {
-  seenThisLoad.clear()
-  forget('welcome.seen')
-}
-
 export default function CircleView({ me, units, version, onChange, onViewAs, onOpenChat, onOpenEvidence }: Props) {
   const t = useT()
   const showAll = useShowAll()  // contact requests beyond the five homes are an extra, shown on request
   const toast = useToast()
   const celebrate = useCelebrate()
-  const [welcome, setWelcome] = useState(() => !welcomeSeen(me.id))
+  const pilot = usePilot()
+  const [welcome, setWelcome] = useState(() => welcomeDue(me.id, !!pilot))  // a pilot household once; the demo never by itself
   const [dir, setDir] = useState<Directory | null>(null)
   const [reqs, setReqs] = useState<{ incoming: ContactRequest[]; outgoing: ContactRequest[] } | null>(null)
   const [mode, setMode] = useState<'people' | 'map'>('people')
   // The plan drawing is of the demo's own layout; a real phase shows its people only.
-  const drawn = !usePilot()
+  const drawn = !pilot
   const [view, setView] = useState<'terrace' | 'apartment'>(me.kind)
   const [selected, setSelected] = useState<string | null>(null)
   const [profile, setProfile] = useState<Member | null>(null)
@@ -192,7 +169,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
             <div className="say-hi">
               <span className="say-hi-hand" aria-hidden>👋</span>
               <div className="grow"><b>{t('sayhi.title', { n: unknown })}</b><small>{t('sayhi.sub')}</small></div>
-              <button className="btn btn-sm btn-primary" onClick={() => setIntroOpen(true)}>{t('btn.introduce')}</button>
+              <button className="link" onClick={() => setIntroOpen(true)}>{t('btn.introduce')}</button>
             </div>
           )}
 
@@ -225,8 +202,9 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
                   {works.has(n.id) ? <><Hammer size={12} /> {t('status.renovating')}</> : t(n.known ? 'status.known' : 'status.notMet')}
                 </div>
                 <div className="btn-row">
-                  <button className="btn btn-sm btn-primary" onClick={() => onOpenChat(n.id)}><MessagesSquare size={14} /> {t('btn.message')}</button>
-                  <button className="btn btn-sm" disabled={n.waved_today || n.allow_waves === false} onClick={() => wave(n)}
+                  {/* Not met yet: a wave is the easy first step, so it leads; once known, a message does. */}
+                  <button className={`btn btn-sm ${n.known ? 'btn-primary' : ''}`} onClick={() => onOpenChat(n.id)}><MessagesSquare size={14} /> {t('btn.message')}</button>
+                  <button className={`btn btn-sm ${n.known ? '' : 'btn-primary'}`} disabled={n.waved_today || n.allow_waves === false} onClick={() => wave(n)}
                     title={n.allow_waves === false ? t('wave.off') : undefined}>
                     👋 {t(n.waved_today ? 'btn.waved' : 'btn.wave')}
                   </button>

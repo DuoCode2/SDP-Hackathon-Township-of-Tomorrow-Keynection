@@ -1,10 +1,10 @@
-from app.neighbours import Unit, neighbour_circle
+from app.neighbours import Unit, impact_reason, impact_zone, neighbour_circle
 from app.seed import demo_units
 
 
 def _units() -> list[Unit]:
     return [
-        Unit(id=u["id"], kind=u["kind"], label=u["label"], row=u.get("row"), facing_row=u.get("facing_row"),
+        Unit(id=u["id"], kind=u["kind"], label=u["label"], row=u.get("row"), facing_row=u.get("facing_row"), back_row=u.get("back_row"),
              block=u.get("block"), floor=u.get("floor"), pos=u["pos"])
         for u in demo_units()
     ]
@@ -38,3 +38,18 @@ def test_apartment_top_floor_corner_has_no_above_or_right():
 def test_terrace_and_apartment_never_mix():
     assert all(not n.startswith("A-") for n in _circle("T-12"))
     assert all(not n.startswith("T-") for n in _circle("A-14-3"))
+
+
+def test_back_row_is_told_for_wet_structural_hacking_only():
+    """The house behind shares the back fence and drain: told about works that reach them, never part of the circle."""
+    units = _units()
+    me = next(u for u in units if u.id == "T-12")
+    for works in ("wet", "structural", "hacking"):
+        zone = {n.unit_id: n.relation for n in impact_zone(me, units, works)}
+        assert zone.get("T-32") == "behind" and len(zone) == 6, works
+        assert impact_reason("behind", works) != "Nearby"
+    assert "T-32" not in {n.unit_id for n in impact_zone(me, units, "light")}
+    assert "T-32" not in _circle("T-12") and len(_circle("T-12")) == 5
+    # Back to back works both ways: wet works at No. 32 tell No. 12.
+    lane = next(u for u in units if u.id == "T-32")
+    assert {n.unit_id: n.relation for n in impact_zone(lane, units, "wet")}.get("T-12") == "behind"

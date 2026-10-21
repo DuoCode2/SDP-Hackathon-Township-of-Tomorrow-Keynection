@@ -24,7 +24,7 @@ from typing import Any, Literal
 from urllib.parse import parse_qs, urlparse
 
 import httpx
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -32,7 +32,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from . import ai, auth, db, ledger, quiet, talk, vision
 from .neighbours import Unit, impact_reason, impact_zone, inverse_relation, neighbour_circle, street_or_block
-from . import backup, phase_import, privacy, push
+from . import backup, knowledge, phase_import, privacy, push
 from .planner import MAX_HOMES, home_count, plan_phase
 from .seed import CONSENT_VERSION, CONSENT_VERSION_AI, CONSENT_VERSION_AI_GEMINI
 from .settings import demo_mode, setting
@@ -450,7 +450,8 @@ async def guard(request: Request, call_next):
                             samesite="lax", secure=secure, path="/")
         response.delete_cookie(OLD_SITE_COOKIE, path="/")
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
-    response.headers.setdefault("X-Frame-Options", "DENY")
+    # Only Keynection may frame its own pages (Channels shows the app inside the SDP App phone); no other site can.
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("X-Robots-Tag", "noindex, nofollow")  # a prototype: keep it out of search results
     if response.headers.get("content-type", "").startswith("text/html"):
@@ -526,12 +527,13 @@ def _unit_row(conn: sqlite3.Connection, unit_id: str) -> sqlite3.Row:
 
 def _to_unit(row: sqlite3.Row) -> Unit:
     return Unit(id=row["id"], kind=row["kind"], label=row["label"], row=row["terrace_row"],
-                facing_row=row["facing_row"], block=row["block"], floor=row["floor"], pos=row["pos"])
+                facing_row=row["facing_row"], back_row=row["back_row"], block=row["block"], floor=row["floor"], pos=row["pos"])
 
 
 def _unit_json(row: sqlite3.Row) -> dict[str, Any]:
     return {"id": row["id"], "phase_id": row["phase_id"], "kind": row["kind"], "label": row["label"], "street": row["street"],
             "resident_name": row["resident_name"], "row": row["terrace_row"], "facing_row": row["facing_row"],
+            "back_row": row["back_row"],
             "block": row["block"], "floor": row["floor"], "pos": row["pos"], "lang": row["lang"],
             "handover_date": row["handover_date"], "joined": row["joined_at"] is not None}
 
@@ -615,10 +617,17 @@ PHOTO_ERRORS = {
 def _store_photo(conn: sqlite3.Connection, unit_id: str, raw: bytes, kind: str, subject: str,
                  renovation_intro_id: int | None) -> dict[str, Any]:
     _unit_row(conn, unit_id)
-    if renovation_intro_id is not None and conn.execute(
-        "SELECT 1 FROM intro_recipients WHERE intro_id = ? AND unit_id = ?", (renovation_intro_id, unit_id)
-    ).fetchone() is None:
-        raise HTTPException(403, "Only neighbours notified of this renovation can attach photos to it.")
+    if renovation_intro_id is not None:
+        linked = conn.execute(
+            "SELECT i.renovation FROM intro_recipients r JOIN intros i ON i.id = r.intro_id"
+            " WHERE r.intro_id = ? AND r.unit_id = ?", (renovation_intro_id, unit_id)
+        ).fetchone()
+        if linked is None:
+            raise HTTPException(403, "Only neighbours notified of this renovation can attach photos to it.")
+        # A hello lands in the inbox the same way a notice does, but a photo is evidence against someone's
+        # works: it can only hang off a renovation notice, never off a plain hello.
+        if linked["renovation"] is None:
+            raise HTTPException(422, "Photos can only be attached to a renovation notice, not to a hello.")
     try:
         photo = vision.ingest(raw)
     except vision.PhotoError as exc:
@@ -732,6 +741,10 @@ class Renovation(BaseModel):
             raise ValueError(f"a renovation notice can cover at most {MAX_RENOVATION_DAYS} days; send a new one after that")
         if self.noisy_to <= self.noisy_from:
             raise ValueError("noisy hours end before they start")
+        # The estate's house rule: noisy work only inside the hours it allows. Which days is the owner's own choice
+        # (weekdays_only). HH:MM strings compare in time order because HHMM keeps them zero-padded, 24-hour.
+        if self.noisy_from < quiet.LEGAL_FROM or self.noisy_to > quiet.LEGAL_TO:
+            raise ValueError(quiet.HOUSE_RULE_HOURS)
         breaks = sorted((b.start, b.end) for b in self.quiet_breaks)
         if any(not self.noisy_from < a < b < self.noisy_to for a, b in breaks):
             raise ValueError("a quiet break must sit inside the noisy hours")
@@ -929,7 +942,9 @@ def impact(unit_id: str, works_type: Literal["wet", "hacking", "structural", "li
     circle = {n.unit_id for n in neighbour_circle(_to_unit(me), phase_units)}
     return [{**(_unit_json(rows[n.unit_id]) if n.unit_id in circle else _unit_public(rows[n.unit_id])),
              "relation": n.relation, "reason": impact_reason(n.relation, works_type),
-             "reason_key": n.relation + ("_wet" if works_type == "wet" and n.relation.startswith("below") else "")}
+             # the home behind has its own reason for each kind of work that reaches the back
+             "reason_key": n.relation + ("_wet" if works_type == "wet" and n.relation.startswith("below")
+                                         else f"_{works_type}" if n.relation == "behind" else "")}
             for n in impact_zone(_to_unit(me), phase_units, works_type)]
 
 
@@ -995,6 +1010,8 @@ def quiet_plan(unit_id: str, start: str = Query(..., pattern=DATE), end: str = Q
         raise HTTPException(422, "start and end must be real calendar dates") from None
     if last < first or noisy_to <= noisy_from:
         raise HTTPException(422, "The dates or the noisy hours are the wrong way round.")
+    if noisy_from < quiet.LEGAL_FROM or noisy_to > quiet.LEGAL_TO:  # the house rule, the same check the notice gets
+        raise HTTPException(422, quiet.HOUSE_RULE_HOURS)
     me, _, phase_units = _phase(conn, unit_id)
     zone = [n.unit_id for n in impact_zone(_to_unit(me), phase_units, works_type)]
     plan = quiet.plan(noisy_from, noisy_to, [_quiet_times(conn, u) for u in zone])
@@ -1027,8 +1044,117 @@ def renovation_draft(body: RenovationTextIn, conn: sqlite3.Connection = Depends(
     return draft
 
 
+class AssistantIn(BaseModel):
+    unit_id: str = Field(..., pattern=UNIT_ID)
+    text: str = Field(..., min_length=1, max_length=500)
+    page: str | None = Field(None, max_length=20)  # the screen the resident is on
+    lang: str | None = Field(None, max_length=5)  # the language they read the app in
+
+
+# Without AI (off, used up for today, or no answer in time) a few key words decide, and the screens ask for the rest.
+# Status words come first, so "my renovation status" is a question, not a new notice.
+ASSISTANT_WORDS = [
+    ("check_status", re.compile(r"warranty|jaminan|保修|status", re.I)),
+    ("register_renovation", re.compile(r"renovat|ubah ?suai|装修|翻新|瓷砖|jubin|tile|retil", re.I)),
+    ("say_hello", re.compile(r"hello|\bhai\b|\bhi\b|你好|打招呼|sapa", re.I)),
+    ("set_quiet_time", re.compile(r"quiet|senyap|安静|午睡|\bnap\b|tidur", re.I)),
+]
+ASSISTANT_REPLY = {
+    "register_renovation": "Opening the renovation notice: check each step, then send it yourself.",
+    "say_hello": "Opening a hello: pick who it goes to, then send it yourself.",
+    "set_quiet_time": "Add the quiet time your home needs under Your quiet times, on the Neighbours page.",
+    "unknown": "Sorry, I didn't catch that. Try one of the examples, or open a page yourself.",
+}
+STATUS_PAGE = {"warranty": "evidence", "case": "evidence", "renovation": "works", "notices": "chats"}
+ASSISTANT_PAGES = {"circle", "chats", "works", "evidence", "impact", "channels", "me"}
+
+
+def _route_without_ai(text: str) -> dict[str, Any]:
+    intent = next((name for name, words in ASSISTANT_WORDS if words.search(text)), "unknown")
+    topic = None
+    if intent == "check_status":
+        topic = "warranty" if re.search(r"warranty|jaminan|保修", text, re.I) else "renovation" if re.search(r"renovat|装修", text, re.I) else None
+    return {"intent": intent, "language": "en", "reply": ASSISTANT_REPLY.get(intent, ""),
+            "page": "circle" if intent == "set_quiet_time" else None, "quiet_window": None, "hello_to": [],
+            "status_topic": topic, "missing": [], "renovation": None}
+
+
+def _status_lines(conn: sqlite3.Connection, me: sqlite3.Row) -> dict[str, str]:
+    """Where this household's own things stand, one line per topic. Counted here, never by the AI, so the numbers
+    are always right; neighbours appear by their unit number only."""
+    unit_id, today = me["id"], _today()
+    span = lambda r: f"{talk.date_text(r['start'], 'en')} – {talk.date_text(r['end'], 'en')}"  # noqa: E731
+    tickets = []
+    for r in conn.execute("SELECT * FROM warranty_tickets WHERE unit_id = ? ORDER BY id DESC LIMIT 3", (unit_id,)):
+        clock = _warranty_clock(me, r)
+        left = "" if r["status"] == "closed" else (f" · {-clock['days_left']} days overdue" if clock["overdue"]
+                                                  else f" · {clock['days_left']} days left")
+        tickets.append(f"#{r['id']} · {STATUS_NAME[r['status']].lower()}{left}")
+    mine = [(json.loads(r["renovation"]), r["told"]) for r in conn.execute(
+        "SELECT i.renovation, (SELECT COUNT(*) FROM intro_recipients x WHERE x.intro_id = i.id) AS told FROM intros i"
+        " WHERE i.from_unit_id = ? AND i.renovation IS NOT NULL ORDER BY i.id DESC", (unit_id,))]
+    mine = [f"“{reno['scope']}” {span(reno)}, {told} homes told" for reno, told in mine if reno["end"] >= today][:2]
+    waiting = []
+    for c in conn.execute("SELECT n.status, n.reporter_unit_id, i.from_unit_id AS renovator FROM incidents n"
+                          " LEFT JOIN intros i ON i.id = n.renovation_intro_id"
+                          " WHERE (n.reporter_unit_id = ? OR i.from_unit_id = ?) AND n.status != 'decided'", (unit_id, unit_id)):
+        turn = c["renovator"] if c["status"] == "proposed" else c["reporter_unit_id"]  # whose move it is now
+        waiting.append("you" if turn == unit_id else _unit_row(conn, turn)["label"])
+    near = [f"{r['label']} {span(json.loads(r['renovation']))}" for r in conn.execute(
+        "SELECT i.renovation, u.label FROM intro_recipients x JOIN intros i ON i.id = x.intro_id"
+        " JOIN units u ON u.id = i.from_unit_id WHERE x.unit_id = ? AND i.renovation IS NOT NULL ORDER BY i.id DESC", (unit_id,))
+            if json.loads(r["renovation"])["end"] >= today][:3]
+    return {
+        "warranty": f"Warranty {'; '.join(tickets)}." if tickets else "No warranty tickets.",
+        "renovation": f"Your renovation {'; '.join(mine)}." if mine else "No renovation notice from your home is running.",
+        "case": f"{len(waiting)} open case{'s' if len(waiting) > 1 else ''}, waiting for {', '.join(dict.fromkeys(waiting))}."
+                if waiting else "No open cases.",
+        "notices": f"Renovation near you: {'; '.join(near)}." if near else "No renovation notices near you right now.",
+    }
+
+
+def _assistant_context(conn: sqlite3.Connection, me: sqlite3.Row, body: AssistantIn, status: dict[str, str]) -> str:
+    """All the assistant is told about the household: its own records and the unit numbers around it. Never a
+    neighbour's name or anything a neighbour wrote."""
+    home = "an apartment in a strata building" if me["kind"] == "apartment" else "a terrace house"
+    lines = [f"The household: {home}, {me['label']}", f"House rule: {quiet.HOUSE_RULE_HOURS}",
+             "Homes around them: " + ", ".join(n["label"] for n in _circle(conn, me["id"])),
+             f"Their records: {status['warranty']} {status['renovation']} {status['case']}"]
+    if body.page in ASSISTANT_PAGES:
+        lines.append(f"Their screen now: {body.page}")
+    if body.lang in ai.LANG_FOR_AI:
+        lines.append(f"They read the app in: {ai.LANG_FOR_AI[body.lang]}")
+    return "\n".join(lines)
+
+
+@app.post("/api/assistant")
+def assistant(body: AssistantIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """One sentence, said or typed, becomes something ready for the household to check: a renovation notice filled
+    in, a hello with its homes ticked, a quiet time, a status, a page. Nothing reaches a neighbour from here."""
+    me = _unit_row(conn, body.unit_id)
+    text, status = body.text.strip(), _status_lines(conn, me)
+    # Questions are answered only from this: the house rules for this kind of home, then the guideline and the ladder.
+    rules = house_rules_for(me["kind"])[0] + [quiet.HOUSE_RULE_HOURS, f"Contractors enter {GATE_OPEN}–{GATE_CLOSE}, Monday to Saturday"]
+    plan = ai.plan_request(me["id"], text, date.fromisoformat(_today()), _assistant_context(conn, me, body, status),
+                           home_kind=me["kind"], max_days=MAX_RENOVATION_DAYS,
+                           knowledge=knowledge.for_assistant(rules)) if ai.enabled() else None
+    by_ai = plan is not None
+    plan = plan or _route_without_ai(text)
+    if plan["intent"] == "go_to_page" and plan["page"] not in ASSISTANT_PAGES:
+        plan = {**_route_without_ai(""), "language": plan["language"]}  # no page named: say so rather than guess
+    if plan["intent"] == "check_status":  # the server's own count, not the AI's words
+        topic = plan["status_topic"]
+        plan["reply"] = status[topic] if topic else " ".join(status.values())
+        plan["page"] = STATUS_PAGE.get(topic or "")
+    hello = []
+    if plan["intent"] == "say_hello":  # only homes in the circle that joined, as a hello itself allows
+        joined = {n["label"].casefold(): n for n in _circle(conn, me["id"]) if n["joined"]}
+        hello = [joined[h.casefold()] for h in plan["hello_to"] if h.casefold() in joined]
+    return {**plan, "hello_to": [n["label"] for n in hello], "hello_ids": [n["id"] for n in hello], "by_ai": by_ai}
+
+
 @app.post("/api/intros", status_code=201)
-def send_intro(body: IntroIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+def send_intro(body: IntroIn, later: BackgroundTasks, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     _require_joined(conn, body.from_unit_id)
     # A hello or notice reaches several homes at once, so it gets at least the checks a chat message gets.
     if talk.tone_problem(body.message):
@@ -1046,11 +1172,11 @@ def send_intro(body: IntroIn, conn: sqlite3.Connection = Depends(get_conn)) -> d
         raise HTTPException(429, f"At most {limit} {'renovation notices' if body.renovation else 'hellos'} a day. Try again tomorrow.")
     sent_by = _delegate_name(conn, body.from_unit_id, body.delegate_id)
     return _register_intro(conn, body.from_unit_id, body.message, body.lang,
-                           body.renovation.model_dump() if body.renovation else None, body.to_unit_ids, sent_by)
+                           body.renovation.model_dump() if body.renovation else None, body.to_unit_ids, sent_by, later)
 
 
 def _register_intro(conn: sqlite3.Connection, from_unit_id: str, message: str, lang: str, renovation: dict[str, Any] | None,
-                    to_unit_ids: list[str] | None, sent_by: str | None) -> dict[str, Any]:
+                    to_unit_ids: list[str] | None, sent_by: str | None, later: BackgroundTasks) -> dict[str, Any]:
     me, rows, phase_units = _phase(conn, from_unit_id)
     if renovation and renovation["works_type"] == "structural":
         # The same rule the app shows: structural work waits for its approval (JMB/MC in strata, the council otherwise).
@@ -1079,17 +1205,16 @@ def _register_intro(conn: sqlite3.Connection, from_unit_id: str, message: str, l
         shown = [n["id"] for n in circle]
         # Someone who blocked the sender never gets it, and the sender isn't told (that would reveal the block).
         circle = [n for n in circle if not _blocked(conn, n["id"], from_unit_id)]
-    # Each neighbour reads it in their own language (paper notices too). Asked before anything is written, so no
-    # lock is held while Claude answers; with no answer the notice goes as written.
-    readers = {rows[n["id"]]["lang"] for n in circle} - {lang}
-    translations = ai.translate_notice(from_unit_id, message, renovation["scope"] if renovation else None, readers) \
-        if readers and ai.enabled() else {}
     cur = conn.execute(
-        "INSERT INTO intros (from_unit_id, message, lang, renovation, sent_by, translations, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (from_unit_id, message, lang, json.dumps(renovation) if renovation else None, sent_by,
-         json.dumps(translations, ensure_ascii=False) if translations else None, db.now()),
+        "INSERT INTO intros (from_unit_id, message, lang, renovation, sent_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (from_unit_id, message, lang, json.dumps(renovation) if renovation else None, sent_by, db.now()),
     )
     intro_id = cur.lastrowid
+    # Each neighbour reads it in their own language (paper notices too), translated after the sender has their answer
+    # so nobody waits for the AI; until then, and with no answer at all, it reads as written.
+    readers = {rows[n["id"]]["lang"] for n in circle} - {lang}
+    if readers and ai.enabled():
+        later.add_task(_translate_intro, intro_id, from_unit_id, message, renovation["scope"] if renovation else None, readers)
     paper = []
     kept = {"avoided": 0, "overlap": 0}
     for n in circle:
@@ -1109,6 +1234,23 @@ def _register_intro(conn: sqlite3.Connection, from_unit_id: str, message: str, l
                          **({"paper_notice_for": paper} if paper else {}), **({"acted_by": sent_by} if sent_by else {})})
     conn.commit()
     return {"id": intro_id, "recipients": shown, "paper_notices": paper}
+
+
+def _translate_intro(intro_id: int, from_unit_id: str, message: str, scope: str | None, readers: set[str]) -> None:
+    """After the answer has gone back: the hello or notice in each reader's language, written onto it. Every screen
+    reads the translation when it shows the notice, so it appears there as soon as it is written."""
+    translations = ai.translate_notice(from_unit_id, message, scope, readers)
+    if not translations:
+        return
+    conn = db.connect(db_path())
+    try:  # matched on the words too: a demo reset meanwhile may have given this number to another notice
+        conn.execute("UPDATE intros SET translations = ? WHERE id = ? AND from_unit_id = ? AND message = ?",
+                     (json.dumps(translations, ensure_ascii=False), intro_id, from_unit_id, message))
+        conn.commit()
+    except sqlite3.Error:
+        log.warning("notice %s: its translation could not be saved", intro_id)
+    finally:
+        conn.close()
 
 
 @app.get("/api/units/{unit_id}/inbox")
@@ -2374,6 +2516,10 @@ def report_incident(body: IncidentIn, conn: sqlite3.Connection = Depends(get_con
         raise HTTPException(400, "Compare a pre-work photo with a follow-up photo.")
     if followup["created_at"] < baseline["created_at"]:
         raise HTTPException(400, "The follow-up photo must be taken after the pre-work photo.")
+    # The case's renovation (and so who answers for it) comes from the pre-work photo. A follow-up either
+    # carries no renovation or the same one; it can't point the case at someone else's works.
+    if followup["renovation_intro_id"] not in (None, baseline["renovation_intro_id"]):
+        raise HTTPException(400, "The follow-up photo is linked to a different renovation than the pre-work photo.")
 
     folder = data_dir("photos")
     comp = vision.compare((folder / f"{baseline['id']}.jpg").read_bytes(), (folder / f"{followup['id']}.jpg").read_bytes())
@@ -2437,7 +2583,8 @@ CASE_OUTCOME = {
 def decide(incident_id: int, body: DecisionIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     """Who may decide what. A building-defect claim, "no action" or "ask an inspector" is the homeowner's own
     call. Blaming the renovation is a claim against the neighbour: it stays a proposal until the renovating owner
-    agrees, or they accept it themselves. Nobody on a resident's phone can record an SDP inspector's finding."""
+    agrees, disagrees or asks an inspector (their answer, so only once blamed), or they accept it themselves.
+    Nobody on a resident's phone can record an SDP inspector's finding."""
     row = conn.execute("SELECT * FROM incidents WHERE id = ?", (incident_id,)).fetchone()
     if row is None:
         raise HTTPException(404, "incident not found")
@@ -2459,12 +2606,18 @@ def decide(incident_id: int, body: DecisionIn, conn: sqlite3.Connection = Depend
         raise HTTPException(400, "No renovation is linked to this case.")
     if role == "renovating_owner" and decision in ("warranty", "no_action"):
         raise HTTPException(403, "Only the owner of the home can decide this about their own home.")
+    # Asking an inspector is the renovating owner's answer to being blamed, not a way to close a case the
+    # neighbour has not decided on yet. Until the neighbour proposes, the case is the neighbour's to decide.
+    if role == "renovating_owner" and decision == "inspect" and row["status"] not in ("proposed", "disputed"):
+        raise HTTPException(403, "You can ask an SDP inspector once your neighbour says the renovation caused it.")
 
     case = f"Case #{incident_id:03d}"
     me = _unit_row(conn, body.unit_id)
-    who = f"{me['resident_name']} ({me['label']})" + (f", by {acted_by}" if acted_by else "")
+    # The notice stays in the neighbour's thread, so it names this home by its unit, never by the resident's name:
+    # the reader's screen looks the name up, and after this household closes its account it reads "No. 11".
+    who = me["label"] + (f", by {acted_by}" if acted_by else "")
     # The same notice as values, so each household reads it in its own language.
-    values = {"case": f"{incident_id:03d}", "name": me["resident_name"], "label": me["label"], "helper": acted_by or ""}
+    values = {"case": f"{incident_id:03d}", "unit": me["id"], "label": me["label"], "helper": acted_by or ""}
     my_note = "decision_note" if role == "reporter" else "response_note"
     if decision == "dispute":
         if role != "renovating_owner":
@@ -2961,12 +3114,19 @@ def home_history(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> 
     return {"unit_id": unit_id, "events": events, "chain_ok": ok, "first_bad_index": bad_index}
 
 
+class DemoResetIn(BaseModel):
+    confirm: bool = False  # the button asks first; a bare POST (a stray click, a crawler) wipes nothing
+
+
 @app.post("/api/demo/reset")
-def reset_demo(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
+def reset_demo(body: DemoResetIn | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
     """Wipe and re-seed the fictional demo data (for rehearsals). Disabled when KEYNECTION_DEMO_MODE=0."""
     if not demo_mode():
         raise HTTPException(403, "demo mode is off")
-    _reset_demo_data(conn)
+    if not (body and body.confirm):
+        raise HTTPException(400, "Send {\"confirm\": true} to reset the demo data.")
+    with _idle_lock:  # one rebuild at a time: two judges pressing it, or this and the quiet-spell one
+        _reset_demo_data(conn)
     return {"status": "reset"}
 
 
@@ -3535,7 +3695,8 @@ def paper_delivered(notice_id: int, body: StaffIn, conn: sqlite3.Connection = De
 
 
 @app.post("/api/estate/renovations", status_code=201)
-def estate_register_renovation(body: EstateRenovationIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+def estate_register_renovation(body: EstateRenovationIn, later: BackgroundTasks,
+                               conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     """An owner who isn't comfortable online fills in the paper form; the estate office registers it for them.
     Same rules as in the app: everyone the work can affect is told, and the staff member's name goes on record."""
     _require_sign_in_or_demo()
@@ -3544,7 +3705,7 @@ def estate_register_renovation(body: EstateRenovationIn, conn: sqlite3.Connectio
     _check_shared_text(body.staff_name)
     _require_joined(conn, body.unit_id, "Help the owner join first: their consent is needed before Keynection holds their renovation.")
     staff = f"Estate office ({body.staff_name.strip()})"
-    return _register_intro(conn, body.unit_id, body.message, body.lang, body.renovation.model_dump(), None, staff)
+    return _register_intro(conn, body.unit_id, body.message, body.lang, body.renovation.model_dump(), None, staff, later)
 
 
 # ---------- what reaches a household on WhatsApp ----------

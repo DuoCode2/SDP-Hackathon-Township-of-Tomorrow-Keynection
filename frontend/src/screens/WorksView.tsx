@@ -5,7 +5,7 @@ import { api, type ContractorView, type GateCode, type GateResult, type Pass, ty
 import { useDates, useT, type Translate } from '../i18n'
 import { Badge, Card, CardHead, Empty, ScreenTitle, Segmented, Sheet, Skeleton, useToast } from '../ui'
 import RenovationWizard from './RenovationWizard'
-import { SHOW_CONTRACTOR_PASSES } from '../features'
+import { SHOW_CONTRACTOR_PASSES, usePilot } from '../features'
 
 interface Props {
   me: UnitInfo
@@ -44,14 +44,16 @@ export default function WorksView({ me, units, version, onChange }: Props) {
   const t = useT()
   const [tab, setTab] = useState<'schedule' | 'passes'>('schedule')
   const [data, setData] = useState<Works | null>(null)
-  const [wizard, setWizard] = useState<Record<string, string> | null>(null)
+  const [wizard, setWizard] = useState<{ names: Record<string, string>; preset?: 'bathroom' } | null>(null)
+  const pilot = usePilot()
 
   // The wizard shows names only for homes this household may know (its circle and accepted contacts).
-  const openWizard = () => api.directory(me.id).then((d) => {
+  // Demo: the quick example opens it already filled in with the bathroom story, on the When step.
+  const openWizard = (preset?: 'bathroom') => api.directory(me.id).then((d) => {
     const names: Record<string, string> = { [me.id]: me.resident_name }
     d.circle.forEach((n) => { names[n.id] = n.resident_name })
     d.nearby.forEach((n) => { if (n.resident_name) names[n.id] = n.resident_name })
-    setWizard(names)
+    setWizard({ names, preset })
   })
 
   useEffect(() => {
@@ -75,7 +77,8 @@ export default function WorksView({ me, units, version, onChange }: Props) {
               {noisy.length ? <Volume2 size={15} /> : <VolumeX size={15} />}
               {t(noisy.length ? 'wk.pill.noisy' : 'wk.pill.quiet')}
             </div>
-            <button className="btn btn-primary" onClick={openWizard}><Hammer size={15} /> {t('wk.register')}</button>
+            {!pilot && <button className="btn" onClick={() => openWizard('bathroom')}>{t('wk.quickExample')}</button>}
+            <button className="btn btn-primary" onClick={() => openWizard()}><Hammer size={15} /> {t('wk.register')}</button>
           </div>
         )} />
       {SHOW_CONTRACTOR_PASSES && (
@@ -84,7 +87,7 @@ export default function WorksView({ me, units, version, onChange }: Props) {
         </div>
       )}
       {!data ? <Card><Skeleton lines={4} /></Card> : SHOW_CONTRACTOR_PASSES && tab === 'passes' ? <Passes me={me} data={data} onChange={onChange} /> : <Schedule data={data} all={all} noisy={noisy} />}
-      {wizard && <RenovationWizard open onClose={() => setWizard(null)} me={me} units={units} names={wizard} onSent={onChange} />}
+      {wizard && <RenovationWizard open onClose={() => setWizard(null)} me={me} units={units} names={wizard.names} preset={wizard.preset} onSent={onChange} />}
     </section>
   )
 }

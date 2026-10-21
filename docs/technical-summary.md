@@ -30,12 +30,13 @@ Every transition is checked on the server (who may take it, in which state) and 
 **Concern ladder** (`concerns.status`)
 
 ```
- open ──(renovating owner replies)──▶ acknowledged ──(raiser: sorted)──▶ resolved
-  │                                        │
-  └──(raiser, after 24 h in a pilot)──▶ escalated ──(estate: remind ×n)──▶ escalated
+ open ──(renovating owner replies)──▶ acknowledged ──(renovating owner: it's sorted)──▶ resolved
+  │                                        │                                                │
+  └──(raiser, after 24 h in a pilot)──▶ escalated ◀──(raiser: still happening, any time)────┘
+                                           ├──(estate: remind ×n)──▶ escalated
                                            └──(estate: close)──▶ closed_by_estate
 ```
-The estate team sees a concern only once it is `escalated`; the private chat stays private.
+Only the renovating owner marks a concern sorted (from `open` or `acknowledged`); only the neighbour who raised it can escalate, and may still do so from `resolved` if the problem comes back. The estate team sees a concern only once it is `escalated`; the private chat stays private.
 
 **Case decision** (`incidents.status`)
 
@@ -44,9 +45,10 @@ The estate team sees a concern only once it is `escalated`; the private chat sta
        ├─(reporter: ask an SDP inspector)──────────────▶ decided  (inspector asked; residents can't record a finding)
        ├─(reporter: nothing to do)─────────────────────▶ decided
        └─(reporter: caused by the renovation)──▶ proposed ─┬─(other side agrees)──▶ decided
+                                                           ├─(other side asks an SDP inspector)──▶ decided
                                                            └─(other side disagrees)──▶ disputed → only inspector / warranty / nothing remain
 ```
-A change photographed before the works can never be proposed as "caused by the renovation"; nothing is pre-selected.
+A change photographed before the works can never be proposed as "caused by the renovation"; nothing is pre-selected. The renovating owner can accept responsibility at any time, but can ask an inspector only once blamed (`proposed` or `disputed`): before that the case is the reporter's to decide.
 
 **Warranty ticket** (`warranty_tickets.status`)
 
@@ -70,7 +72,7 @@ Also: reports `open → warned | dismissed`; paper notices `to_print → printed
 
 | Actor | Sees | Does | Never |
 |---|---|---|---|
-| **Household (owner)** | Its five homes by name; layer 2 by unit; its own chats, photos, cases, tickets, home log | Wave, hello, chat, register a renovation, set quiet times, seal photos, decide a case, close its own ticket, raise and escalate its own concern, block, report, download its data, close its account | Remove a home from a notice; record an inspector's finding; close another home's ticket; see who talked to whom |
+| **Household (owner)** | Its five homes by name; layer 2 by unit; its own chats, photos, cases, tickets, home log | Wave, hello, chat, register a renovation, set quiet times, seal photos, decide a case, close its own ticket, raise and escalate its own concern, reply to or mark sorted a concern about its own renovation, block, report, download its data, close its account | Remove a home from a notice; record an inspector's finding; close another home's ticket; mark sorted a concern it raised; see who talked to whom |
 | **Family helper** | What the household sees | The same actions, each logged under the helper's name | Act for another household; use a name that looks like SDP, the estate or the police |
 | **Neighbour in the circle** | The notice sent to it (hours, whether its quiet time was avoided), the sender's name | Reply, wave, raise a concern, seal its own photos | See the renovating owner's other chats or whose quiet times were used |
 | **Layer-2 home** | Unit numbers | Send a contact request with a reason (3/day) | See a name before acceptance; message directly |
@@ -78,7 +80,7 @@ Also: reports `open → warned | dismissed`; paper notices `to_print → printed
 | **Estate team (staff)** | Escalated concerns, notices it sent, the front desk, counts | Remind, close an escalated concern, send notices, issue join codes, print and log paper notices, register a renovation on paper | Read private chats; close a warranty ticket; see non-escalated concerns |
 | **Warranty / safety staff** | Tickets; reported messages (and a reported voice note) | Submit a repair; warn a sender or dismiss a report; export to Procore | Close a ticket; see who reported |
 | **Contractor pass (switched off)** | Works dates and hours | Show the QR at the guardhouse | See the owner's phone, neighbours' names, photos |
-| **AI service** | The text being written (and a name or unit only if the writer typed it) | Return structured fields: notice draft, translation, calmer wording, whether a message is abuse | See the directory or who writes to whom; its one decision, that a message is abuse, stops that message and nothing else |
+| **AI service** | The text being written (and a name or unit only if the writer typed it); for the assistant, also the household’s own records and its neighbours’ unit numbers | Return structured fields: notice draft, translation, calmer wording, whether a message is abuse, what an assistant request asks for | See the directory or who writes to whom; its one decision, that a message is abuse, stops that message and nothing else |
 
 In the demo the household's identity is the unit number in the request (so judges can switch roles); in a pilot it is the passkey session, checked on every household endpoint (`test_signin.py`).
 
@@ -87,6 +89,7 @@ In the demo the household's identity is the unit number in the request (so judge
 | Data | Stored | Leaves the server? | Kept |
 |---|---|---|---|
 | Names neighbours see, reading language, bio | SQLite | No | Until the household closes its account |
+| Assistant requests | Not stored | The sentence, the household’s own records (notices, warranty tickets, case status) and its neighbours’ unit numbers, to the AI service, when AI is on; never neighbours’ names or what they wrote | Not kept |
 | Messages, voice notes | SQLite / files | Only the typed text, to the AI service, when AI is on | Voice 30 days; messages one year after the home's DLP ends (or one year after they were made, if later) |
 | Photos | Files, re-encoded (no GPS, camera model, capture time) | No | Same as messages; photos inside a home are seen only by that home, staff and the other side of its case |
 | Home log | SQLite, hash chain | No (a pilot adds an outside timestamp) | Stays with the unit |

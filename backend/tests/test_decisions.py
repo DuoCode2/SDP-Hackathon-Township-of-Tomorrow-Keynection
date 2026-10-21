@@ -96,6 +96,41 @@ def test_renovating_owner_cannot_decide_about_the_neighbours_home(client):
     assert _decide(client, case["id"], "T-12", "dispute", "no").status_code == 409  # nothing proposed yet
 
 
+def test_renovating_owner_cannot_ask_an_inspector_before_being_blamed(client):
+    case = _case(client)
+    # Nothing has been proposed yet: the case is still the reporter's to decide.
+    refused = _decide(client, case["id"], "T-12", "inspect")
+    assert refused.status_code == 403
+    assert "neighbour" in refused.json()["detail"]
+    assert client.get("/api/units/T-11/incidents").json()[0]["status"] == "open"
+    # The refused attempt does not lock the reporter out of their own choices.
+    r = _decide(client, case["id"], "T-11", "warranty").json()
+    assert r["status"] == "decided" and r["decision"] == "warranty" and r["decided_by"] == "reporter"
+    assert len(client.get("/api/units/T-11/warranty").json()) == 1
+
+
+def test_renovating_owner_can_ask_an_inspector_in_answer_to_a_proposal(client):
+    case = _case(client)
+    _decide(client, case["id"], "T-11", "renovation", "Crack appeared after the hacking")
+    r = _decide(client, case["id"], "T-12", "inspect", "Let SDP check it").json()
+    assert r["status"] == "decided" and r["decision"] == "inspect" and r["decided_by"] == "renovating_owner"
+    assert r["response_note"] == "Let SDP check it"
+    for unit in ("T-11", "T-12"):
+        assert [e["stage"] for e in _triage_events(client, unit)] == ["proposed", "decided"]
+    # Once decided, nobody can decide again.
+    assert _decide(client, case["id"], "T-11", "warranty").status_code == 409
+
+
+def test_renovating_owner_can_still_ask_an_inspector_after_disagreeing(client):
+    case = _case(client)
+    _decide(client, case["id"], "T-11", "renovation")
+    _decide(client, case["id"], "T-12", "dispute", "The crack was there at handover")
+    r = _decide(client, case["id"], "T-12", "inspect").json()
+    assert r["status"] == "decided" and r["decision"] == "inspect" and r["decided_by"] == "renovating_owner"
+    # The owner's earlier reason is kept on the record (no note was sent with the inspector request).
+    assert r["response_note"] == "The crack was there at handover"
+
+
 def test_households_outside_the_case_cannot_decide(client):
     case = _case(client)
     for decision in ("renovation", "warranty", "inspect", "no_action"):

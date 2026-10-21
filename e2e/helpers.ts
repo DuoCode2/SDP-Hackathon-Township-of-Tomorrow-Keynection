@@ -26,7 +26,8 @@ export async function judgeStep(page: Page, n: number) {
   await expect(step).toHaveClass(/here/)
 }
 
-/** The welcome card greets each household once, in a sheet over the Neighbours screen; close it (after a photo). */
+/** The welcome card: a sheet over Neighbours, once per pilot household; the demo never opens it by itself. Close it
+ *  if it is there (after a photo). */
 export async function dismissWelcome(page: Page, shotName?: string) {
   // The sheet appears once the directory has loaded, a moment after the screen; give it that moment.
   const welcome = page.getByRole('dialog').filter({ hasText: /meet your neighbours/i })
@@ -48,8 +49,11 @@ export function watchErrors(page: Page): string[] {
   return errors
 }
 
-/** Back to the fictional phase as seeded, so a spec never depends on what another spec did. */
-export async function resetDemo(page: Page) {
-  const r = await page.request.post('/api/demo/reset')
+/** Back to the fictional phase as seeded, so a spec never depends on what another spec did. Every spec starts here,
+ *  so this also marks the key-day opening as seen (storage.ts keeps it as keynection.opening.done): the specs start
+ *  on the app itself. opening.spec.ts asks for the opening instead. */
+export async function resetDemo(page: Page, { opening = false } = {}) {
+  if (!opening) await page.addInitScript(() => localStorage.setItem('keynection.opening.done', '1'))
+  const r = await page.request.post('/api/demo/reset', { data: { confirm: true } })
   expect(r.ok(), 'POST /api/demo/reset').toBeTruthy()
 }

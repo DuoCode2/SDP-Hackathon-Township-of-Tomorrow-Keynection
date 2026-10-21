@@ -9,7 +9,7 @@ interface Props {
   open: boolean
   onLang: (lang: GuideLang) => void
   onClose: () => void
-  onGo: (tab: TabId, unit?: string) => void
+  onGo: (tab: TabId, unit?: string, opts?: { split?: boolean; peer?: string }) => void
   showAll: boolean
   onShowAll: (on: boolean) => void
 }
@@ -25,7 +25,8 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, show
         const here = s.tab === tab && (!s.unit || s.unit === me)
         return (
           <li key={i}>
-            <button className={here ? 'here' : ''} onClick={() => onGo(s.tab, s.unit)}>
+            <button className={here ? 'here' : ''} onClick={() => onGo(s.tab, s.unit, { split: s.split, peer: s.peer })}
+              aria-label={`${lang === 'zh' ? `第 ${i + 1} 步` : `Step ${i + 1}`}: ${s.text[lang]}`}>
               <span className="route-n">{i + 1}</span>
               <span>{s.text[lang]}</span>
             </button>
@@ -51,16 +52,19 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, show
           <p className="guide-about">{UI.about[lang]}</p>
 
           <div className="section-label">{UI.judgeRoute[lang]}</div>
-          <p className="guide-hint">{UI.judgeHint[lang]}</p>
-          <p className="guide-hint">{UI.whoseScreen[lang]}</p>
-          <p className="guide-hint">{UI.sharedDemo[lang]}</p>
-          <p className="guide-hint">{UI.previewNote[lang]}</p>
           {ai && (
             <p className={`guide-ai ${ai.on ? 'on' : ''}`}>
               <Sparkles size={13} /> {ai.on ? `${UI.aiOn[lang]} (${ai.model})` : UI.aiOff[lang]}
             </p>
           )}
           {steps(JUDGE_ROUTE, true)}
+          <details className="guide-notes">
+            <summary>{UI.notesForJudges[lang]}</summary>
+            <p className="guide-hint">{UI.judgeHint[lang]}</p>
+            <p className="guide-hint">{UI.whoseScreen[lang]}</p>
+            <p className="guide-hint">{UI.sharedDemo[lang]}</p>
+            <p className="guide-hint">{UI.previewNote[lang]}</p>
+          </details>
 
           <div className="section-label">{UI.thisPage[lang]}</div>
           <div className="guide-card">

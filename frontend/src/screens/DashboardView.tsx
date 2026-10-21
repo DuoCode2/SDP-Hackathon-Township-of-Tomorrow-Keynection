@@ -40,6 +40,8 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
   }, [version])
 
   async function reset() {
+    // The demo is shared: whoever else is in it starts over too.
+    if (!window.confirm('Reset the demo data? Everyone using this demo starts over from the fictional phase as seeded.')) return
     await api.resetDemo()
     try {
       Object.keys(sessionStorage).filter((k) => k.startsWith('keynection.pass:') || k.startsWith('keynection.join:')).forEach((k) => sessionStorage.removeItem(k))

@@ -8,6 +8,7 @@ import type { GuideLang, TabId } from './guide'
 import { EnglishOnly, LangProvider, langChosen, useDates, useLang, type UiLang } from './i18n'
 import { HelperProvider, useActing, useHelper } from './helper'
 import Guide from './components/Guide'
+import Assistant from './components/Assistant'
 import CastPicker, { roleOf } from './components/Cast'
 import { Logo } from './components/Art'
 import { FOCUS_TABS, PilotProvider, PlaceProvider, ShowAllProvider, usePilot, usePlace, type Pilot, type Place } from './features'
@@ -24,6 +25,7 @@ import PlannerView from './screens/PlannerView'
 import ImpactView from './screens/ImpactView'
 import ChannelsView from './screens/ChannelsView'
 import SignInView from './screens/SignInView'
+import OpeningView from './screens/OpeningView'
 
 // Labels come from the dictionary: nav.<id>, nav.<id>.sub, nav.<id>.short.
 const NAV = [
@@ -43,8 +45,8 @@ const NAV = [
     items: [
       { id: 'sdp', icon: LayoutDashboard, dock: false },
       { id: 'planner', icon: Grid3x3, dock: false },
-      { id: 'impact', icon: Calculator, dock: false },
-      { id: 'channels', icon: Smartphone, dock: false },
+      { id: 'impact', icon: Calculator, dock: true },
+      { id: 'channels', icon: Smartphone, dock: true },
     ],
   },
   { group: 'trust', items: [{ id: 'safeguards', icon: ShieldHalf, dock: false }] },
@@ -52,8 +54,10 @@ const NAV = [
 
 type NavItem = (typeof NAV)[number]['items'][number] & { group: string; no: string }
 const ALL: NavItem[] = NAV.flatMap((g) => g.items.map((i) => ({ ...i, group: g.group }))).map((i, n) => ({ ...i, no: String(n + 1).padStart(2, '0') }))
-const WIDE = '(min-width: 1600px)'
+const WIDE = '(min-width: 1312px)'
 const SPLIT_OK = '(min-width: 1100px)'
+// Two panes and a docked Guide fit side by side only from here; below it the Guide floats over two panes instead.
+const ROOMY = '(min-width: 1600px)'
 const UI_LANGS: { code: UiLang; tag: string; name: string }[] = [
   { code: 'en', tag: 'EN', name: 'English' }, { code: 'ms', tag: 'BM', name: 'Bahasa Melayu' }, { code: 'zh', tag: '中', name: '中文' },
 ]
@@ -150,7 +154,9 @@ function Gate() {
   }
   if (me.mode === 'demo') {
     setPhaseId('demo')
-    return <Shell />
+    // Channels draws the SDP App with Keynection running inside it: ?embed=1&me=<unit> is that household's app alone.
+    const q = new URLSearchParams(window.location.search)
+    return <Shell embed={q.get('embed') === '1' ? q.get('me') ?? 'T-12' : undefined} />
   }
   if (!pilot) return <SignInView initialJoin={link.join} initialCode={link.code} onSignedIn={() => { setLink({}); refresh() }} />
   if (!phases) return <div className="boot" aria-busy="true" />
@@ -178,20 +184,23 @@ function storedPhase(): string | null {
   }
 }
 
-function Shell({ pinned }: { pinned?: string }) {
+function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
   const { lang: uiLang, setLang: setUiLang, t } = useLang()
   const place = usePlace()
   const dates = useDates()
   const [units, setUnits] = useState<UnitInfo[]>([])
-  const [panes, setPanes] = useState<PaneState[]>([{ me: pinned ?? 'T-12', tab: 'circle' }])
+  const [panes, setPanes] = useState<PaneState[]>([{ me: pinned ?? embed ?? 'T-12', tab: 'circle' }])
   const [active, setActive] = useState(0)
   const [offline, setOffline] = useState(false)
-  const [guideOpen, setGuideOpen] = useState(() => !pinned && window.matchMedia(WIDE).matches)
+  const [guideOpen, setGuideOpen] = useState(() => !pinned && !embed && window.matchMedia(WIDE).matches)
   const [lang, setLang] = useState<GuideLang>(storedLang)
   const [canSplit, setCanSplit] = useState(() => window.matchMedia(SPLIT_OK).matches)
+  const [roomy, setRoomy] = useState(() => window.matchMedia(ROOMY).matches)
   const [showAll, setShowAll] = useState(storedShowAll)
+  // Demo only: the key-day opening, once per browser (a pilot household has the real join page).
+  const [opening, setOpening] = useState(() => !pinned && !embed && remembered('opening.done') === null)
   // Pilot: the signed-in household's own screens, all of them. Demo: the main story, or every feature.
-  const visible = (id: TabId) => (pinned ? RESIDENT_TABS.includes(id) : showAll || FOCUS_TABS.includes(id))
+  const visible = (id: TabId) => (pinned || embed ? RESIDENT_TABS.includes(id) : showAll || FOCUS_TABS.includes(id))
   // Numbered in the order shown, so the main story reads 01–06 and the sheet count matches what is on screen.
   const shownNav = ALL.filter((i) => visible(i.id)).map((i, n) => ({ ...i, no: String(n + 1).padStart(2, '0') }))
   // Bumped after every write so every open pane reloads its data.
@@ -218,9 +227,17 @@ function Shell({ pinned }: { pinned?: string }) {
 
   useEffect(() => {
     const mq = window.matchMedia(SPLIT_OK)
-    const on = () => setCanSplit(mq.matches)
+    const wide = window.matchMedia(ROOMY)
+    const on = () => {
+      setCanSplit(mq.matches)
+      setRoomy(wide.matches)
+    }
     mq.addEventListener('change', on)
-    return () => mq.removeEventListener('change', on)
+    wide.addEventListener('change', on)
+    return () => {
+      mq.removeEventListener('change', on)
+      wide.removeEventListener('change', on)
+    }
   }, [])
 
   const pickShowAll = (on: boolean) => {
@@ -233,10 +250,12 @@ function Shell({ pinned }: { pinned?: string }) {
   }
   // Back to the main story: a pane left on a screen that is now hidden returns to the neighbours.
   useEffect(() => {
-    if (!showAll && !pinned) setPanes((ps) => ps.map((p) => (FOCUS_TABS.includes(p.tab) ? p : { ...p, tab: 'circle', peer: undefined })))
+    if (!showAll && !pinned && !embed) setPanes((ps) => ps.map((p) => (FOCUS_TABS.includes(p.tab) ? p : { ...p, tab: 'circle', peer: undefined })))
   }, [showAll, pinned])
 
   const split = panes.length === 2 && canSplit
+  // On a 1366 laptop a docked Guide left each of the two panes too narrow: there it floats over them like a drawer.
+  const guideFloats = split && !roomy
   const shown = split ? panes : [panes[Math.min(active, panes.length - 1)]]
   const focus = split ? active : Math.min(active, panes.length - 1)
   const cur = panes[focus]
@@ -244,7 +263,7 @@ function Shell({ pinned }: { pinned?: string }) {
   // Pilot: the household is fixed by its sign-in, so nothing switches it to another home.
   const update = (i: number, patch: Partial<PaneState>) => {
     const next = { ...patch }
-    if (pinned) delete next.me
+    if (pinned || embed) delete next.me
     setPanes((ps) => ps.map((p, j) => (j === i ? { ...p, ...next } : p)))
   }
   const setTab = (tab: TabId) => update(focus, { tab, peer: undefined })
@@ -261,6 +280,7 @@ function Shell({ pinned }: { pinned?: string }) {
     const right = cur.me === 'T-11' ? cur : { me: cur.me === 'T-12' ? 'T-11' : 'T-12', tab: cur.tab }
     setPanes([left, right])
     setActive(cur.me === 'T-11' ? 1 : 0)
+    if (!window.matchMedia(ROOMY).matches) setGuideOpen(false)
   }
 
   const pickLang = (l: GuideLang) => {
@@ -275,12 +295,21 @@ function Shell({ pinned }: { pinned?: string }) {
   }
 
   // Guide steps: in split view, drive the pane that already shows that household.
-  const go = (next: TabId, unit?: string) => {
-    const target = split && unit ? panes.findIndex((p) => p.me === unit) : -1
-    const i = target >= 0 ? target : focus
-    update(i, { tab: next, peer: undefined, ...(unit ? { me: unit } : {}) })
-    setActive(i)
-    if (!window.matchMedia(WIDE).matches) setGuideOpen(false)
+  // A step that wants both sides opens them itself, Aiman left and Siti right, each already on the other's thread;
+  // a screen too narrow for two panes shows Siti alone, still on that thread.
+  const go = (next: TabId, unit?: string, opts?: { split?: boolean; peer?: string }) => {
+    const splitting = !!opts?.split && window.matchMedia(SPLIT_OK).matches
+    if (splitting) {
+      setPanes([{ me: 'T-12', tab: next, peer: 'T-11' }, { me: 'T-11', tab: next, peer: 'T-12' }])
+      setActive(1)
+    } else {
+      const target = split && unit ? panes.findIndex((p) => p.me === unit) : -1
+      const i = target >= 0 ? target : focus
+      update(i, { tab: next, peer: opts?.peer, ...(unit ? { me: unit } : {}) })
+      setActive(i)
+    }
+    // The Guide gets out of the way after a step wherever it covers the screen: a narrow window, or two panes below 1600 px.
+    if (!window.matchMedia(WIDE).matches || ((splitting || split) && !window.matchMedia(ROOMY).matches)) setGuideOpen(false)
   }
 
   const page = shownNav.find((i) => i.id === cur.tab) ?? shownNav[0]
@@ -293,26 +322,34 @@ function Shell({ pinned }: { pinned?: string }) {
   const navButton = (i: NavItem, compact: boolean) => {
     const Icon = i.icon
     const on = i.id === cur.tab
+    const label = t(compact ? `nav.${i.id}.short` : `nav.${i.id}`)  // read out as the tab's name, not "01 … sub-line"
+    const repair = i.id === 'evidence' && pending > 0
     return (
-      <button key={i.id} className={on ? 'active' : ''} onClick={() => setTab(i.id)} aria-current={on ? 'page' : undefined}>
+      <button key={i.id} className={on ? 'active' : ''} onClick={() => setTab(i.id)} aria-current={on ? 'page' : undefined}
+        aria-label={repair ? `${label} · Repair waiting for you` : label}>
         {compact ? <Icon size={19} strokeWidth={on ? 2.4 : 1.9} /> : <span className="nav-no">{i.no}</span>}
         {!compact && <Icon size={17} strokeWidth={on ? 2.3 : 1.9} className="nav-lead" />}
-        {compact ? t(`nav.${i.id}.short`) : (
+        {compact ? label : (
           <span className="nav-text">
-            <b>{t(`nav.${i.id}`)}</b>
+            <b>{label}</b>
             <small>{t(`nav.${i.id}.sub`)}</small>
           </span>
         )}
         {!compact && <Icon size={16} strokeWidth={on ? 2.3 : 1.8} className="nav-icon" />}
-        {i.id === 'evidence' && pending > 0 && <span className="dot" aria-label="Repair waiting for you" />}
+        {repair && <span className="dot" aria-label="Repair waiting for you" />}
       </button>
     )
   }
 
   const groupTitle = (g: string) => t(`group.${g}`)
 
+  if (opening) {
+    return <OpeningView units={units} onPick={(id) => setPanes([{ me: id, tab: 'circle' }])}
+      onDone={() => { remember('opening.done', '1'); setOpening(false) }} />
+  }
+
   return (
-    <div className={`app ${faceOf(cur.tab)} ${guideOpen ? 'guide-on' : ''}`}>
+    <div className={`app ${faceOf(cur.tab)} ${guideOpen ? 'guide-on' : ''} ${guideFloats ? 'guide-float' : ''} ${embed ? 'embed' : ''}`}>
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark"><Logo size={24} /></div>
@@ -346,7 +383,7 @@ function Shell({ pinned }: { pinned?: string }) {
         )}
       </aside>
 
-      <ShowAllProvider value={pinned ? true : showAll}>
+      <ShowAllProvider value={pinned || embed ? true : showAll}>
       <div className="main">
         <header className="topbar">
           <div className="brand mobile-only">
@@ -413,8 +450,10 @@ function Shell({ pinned }: { pinned?: string }) {
       </div>
       </ShowAllProvider>
 
-      {!pinned && <Guide tab={cur.tab} me={cur.me} lang={lang} open={guideOpen} onLang={pickLang} onClose={() => setGuideOpen(false)} onGo={go}
+      {!pinned && !embed && <Guide tab={cur.tab} me={cur.me} lang={lang} open={guideOpen} onLang={pickLang} onClose={() => setGuideOpen(false)} onGo={go}
         showAll={showAll} onShowAll={pickShowAll} />}
+      {/* The household's assistant, for whoever is in the focused pane: it gets things ready, the household sends. */}
+      {curUnit?.joined && !embed && <Assistant me={curUnit} units={units} tab={cur.tab} onGo={(tab, peer) => go(tab, undefined, { peer })} onChanged={changed} />}
       <div id="sheet-root" />
     </div>
   )
@@ -580,7 +619,7 @@ function Pane({ index, pane, units, active, split, version, onChange, onFocus, o
       {pane.tab === 'sdp' && <EnglishOnly><DashboardView version={version} onChange={onChange} onViewAs={(id) => onUpdate({ me: id, tab: 'circle', peer: undefined })} /></EnglishOnly>}
       {pane.tab === 'planner' && <EnglishOnly><PlannerView /></EnglishOnly>}
       {pane.tab === 'impact' && <EnglishOnly><ImpactView /></EnglishOnly>}
-      {pane.tab === 'channels' && <EnglishOnly><ChannelsView me={me} version={version} /></EnglishOnly>}
+      {pane.tab === 'channels' && <EnglishOnly><ChannelsView me={me} version={version} onGo={(tab, peer) => onUpdate({ tab, peer })} /></EnglishOnly>}
       {pane.tab === 'safeguards' && <EnglishOnly><SafeguardsView onGo={tab} /></EnglishOnly>}
       {pane.tab === 'me' && <MeView me={me} version={version} onChange={onChange} onGo={tab} />}
       </>}

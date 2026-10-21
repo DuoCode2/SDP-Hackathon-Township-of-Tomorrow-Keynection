@@ -28,6 +28,21 @@ function addDays(iso: string, n: number): string {
 }
 const daysBetween = (a: string, b: string) => Math.round((new Date(`${b}T00:00:00`).getTime() - new Date(`${a}T00:00:00`).getTime()) / 86_400_000)
 
+/** The coming Monday (a week away when today is Monday), as YYYY-MM-DD. */
+function nextMonday(): string {
+  return daysFromToday((8 - new Date().getDay()) % 7 || 7)
+}
+
+/** The first day of next month, as YYYY-MM-DD. */
+function firstOfNextMonth(): string {
+  const d = new Date()
+  return ymd(new Date(d.getFullYear(), d.getMonth() + 1, 1))
+}
+
+// What an example fills in when AI is off: the kind of work, a short description in that language, dates worked out
+// from today, and the contractor named in the sentence.
+type Preset = { works: WorksType; scope: string; lang: Lang; start: () => string; days: number; contractor: string }
+
 const STEPS = ['reno.steps.type', 'reno.steps.who', 'reno.steps.when', 'reno.steps.approvals', 'reno.steps.review']
 
 // Title and detail come from the dictionary (works.<id>, works.<id>.d). The scope is the owner's own words, sent as typed.
@@ -40,7 +55,7 @@ const WORKS: { id: WorksType; icon: typeof Bath }[] = [
 ]
 
 /** Register a renovation. Who gets the notice is worked out from the plan, not chosen by the owner. */
-export default function RenovationWizard({ open, onClose, me, units, names, onSent, estate }: {
+export default function RenovationWizard({ open, onClose, me, units, names, onSent, estate, preset, fromAssistant }: {
   open: boolean
   onClose: () => void
   me: UnitInfo
@@ -49,6 +64,10 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   onSent: () => void
   /** Set when the estate office registers the renovation for an owner who signed the paper form. */
   estate?: { staff: string }
+  /** Demo quick example: start filled in with the bathroom story (the English example), on the When step. */
+  preset?: 'bathroom'
+  /** The assistant's reading of one sentence: the fields AI filled in (null without AI), and the sentence itself. */
+  fromAssistant?: { said: string; renovation: RenovationDraft | null }
 }) {
   const t = useT()
   const dates = useDates()
@@ -56,8 +75,10 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   const helper = useHelper(me.id)
   const strata = me.kind === 'apartment'
   const [step, setStep] = useState(0)
-  const [works, setWorks] = useState<WorksType>(strata ? 'wet' : 'structural')
+  // Every home starts on wet work: the first card, and the only kind that never needs an approval before Next.
+  const [works, setWorks] = useState<WorksType>('wet')
   const [zone, setZone] = useState<ImpactItem[] | null>(null)
+  const [tapped, setTapped] = useState<string | null>(null)  // a home tapped on the plan: why it is told
   const [lang, setLang] = useState<Lang>(me.lang)
   const [draft, setDraft] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
@@ -71,7 +92,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   const [plan, setPlan] = useState<QuietPlan | null>(null)
   const [usePlan, setUsePlan] = useState(true)
   const [reno, setReno] = useState<Renovation>({
-    scope: t(`works.${strata ? 'wet' : 'structural'}.scope`),
+    scope: t('works.wet.scope'),
     start: daysFromToday(7),
     end: daysFromToday(21),
     noisy_hours: '',
@@ -109,6 +130,9 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
     }
   }, [open, me.id, works, reno.start, reno.end, reno.noisy_from, reno.noisy_to])
   const planned = usePlan && plan && plan.homes_with_quiet_times > 0 ? plan : null
+  // The owner's own hours must sit inside the house rule (09:00–18:00), checked before Next; planned hours always do.
+  const from = reno.noisy_from ?? '', to = reno.noisy_to ?? ''
+  const hoursOk = !!planned || (from >= '09:00' && to <= '18:00' && from < to)
 
   const timed = planned ? { noisy_from: planned.noisy_from, noisy_to: planned.noisy_to, quiet_breaks: planned.quiet_breaks }
     : { noisy_from: reno.noisy_from, noisy_to: reno.noisy_to, quiet_breaks: [] }
@@ -134,15 +158,74 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   }
   const blocked = works === 'structural' && (strata ? reno.management_approval !== 'approved' : reno.council_permit !== 'approved')
 
-  /** The owner's one sentence fills in the steps; whatever AI left empty keeps what was there. Nothing is sent. */
   // One sentence in each language a judge can try without typing; each is a different kind of work, so the
-  // notice list on the next step changes with it.
-  const EXAMPLES = [
-    { label: 'English', text: 'Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 5' },
-    { label: 'Bahasa Melayu', text: 'Nak pecah jubin dapur dan gerudi dinding mulai Isnin depan selama tiga minggu, Kontraktor Maju, Isnin hingga Jumaat 9 pagi hingga 5 petang' },
-    { label: '中文', text: '下个月初开始油漆和做木工，大概一个星期，承包商是兴隆装修，平日早上九点到下午五点' },
+  // notice list on the next step changes with it. Without AI the same button applies the preset beside it, on this
+  // device, so the example still fills in the steps. Nothing is sent either way.
+  const EXAMPLES: { label: string; text: string; preset: Preset }[] = [
+    { label: 'English', text: 'Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 6',
+      preset: { works: 'wet', scope: 'Retile the master bathroom', lang: 'en', start: nextMonday, days: 14, contractor: 'ABC Renovation' } },
+    { label: 'Bahasa Melayu', text: 'Nak pecah jubin dapur dan gerudi dinding mulai Isnin depan selama tiga minggu, Kontraktor Maju, Isnin hingga Jumaat 9 pagi hingga 6 petang',
+      preset: { works: 'hacking', scope: 'Pecah jubin dapur dan gerudi dinding', lang: 'ms', start: nextMonday, days: 21, contractor: 'Kontraktor Maju' } },
+    { label: '中文', text: '下个月初开始油漆和做木工，大概一个星期，承包商是兴隆装修，平日早上九点到下午六点',
+      preset: { works: 'light', scope: '油漆和做木工', lang: 'zh', start: firstOfNextMonth, days: 7, contractor: '兴隆装修' } },
   ]
 
+  /** Without AI, an example fills in the steps from its preset: weekdays 9 to 6, the owner's language. Nothing is sent. */
+  function applyPreset(p: Preset) {
+    const start = p.start()
+    setWorks(p.works)
+    setReno((r) => ({ ...r, scope: p.scope, start, end: addDays(start, p.days - 1), noisy_from: '09:00', noisy_to: '18:00', weekdays_only: true, contractor: p.contractor }))
+    setLang(p.lang)
+    setDraft(null)
+    setFilled(null)
+    setAiNote(t('ai.reno.example'))
+  }
+
+  // The quick example: the same local preset as the English example, then straight to the planned hours. No AI either way.
+  useEffect(() => {
+    if (open && preset === 'bathroom') {
+      applyPreset(EXAMPLES[0].preset)
+      setStep(2)
+    }
+  }, [open, preset])
+
+  /** What AI read from the owner's sentence, onto the steps; whatever it left empty keeps what was there. */
+  function applyDraft(d: RenovationDraft) {
+    setWorks(d.works_type)
+    setReno((r) => {
+      const start = d.start ?? r.start
+      const end = d.end ?? r.end
+      return {
+        ...r, scope: d.scope ?? t(`works.${d.works_type}.scope`), start, end: end < start ? start : end,
+        noisy_from: d.noisy_from ?? r.noisy_from, noisy_to: d.noisy_to ?? r.noisy_to,
+        weekdays_only: d.weekdays_only ?? r.weekdays_only, contractor: d.contractor ?? r.contractor,
+      }
+    })
+    setLang(d.language)  // the notice is written in the language the owner used; each neighbour gets their own
+    setDraft(null)
+    setFilled(d)
+  }
+
+  // From the assistant: a sentence AI read lands on the review, or on the step that still needs the owner (approvals
+  // for structural work, hours outside the house rule). Without AI the sentence waits on the first step. Nothing is sent.
+  useEffect(() => {
+    if (!open || !fromAssistant) return
+    const d = fromAssistant.renovation
+    setSaid(fromAssistant.said)
+    if (!d) {
+      setStep(0)
+      return
+    }
+    applyDraft(d)
+    const outside = (d.noisy_from ?? '09:00') < '09:00' || (d.noisy_to ?? '18:00') > '18:00'
+    setStep(d.works_type === 'structural' ? 3 : outside ? 2 : 4)
+  }, [open, fromAssistant])
+  // With AI off there is no sentence box, so the sentence becomes the description (known once the AI status is in).
+  useEffect(() => {
+    if (open && fromAssistant && !fromAssistant.renovation && ai && !ai.on) setReno((r) => ({ ...r, scope: fromAssistant.said.slice(0, 120) }))
+  }, [open, fromAssistant, ai])
+
+  /** The owner's one sentence fills in the steps; whatever AI left empty keeps what was there. Nothing is sent. */
   async function fillIn(text?: string) {
     const what = (text ?? said).trim()
     if (text !== undefined) setSaid(text)
@@ -150,20 +233,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
     setAiNote(null)
     setFilled(null)
     try {
-      const d = await api.renovationDraft(me.id, what)
-      setWorks(d.works_type)
-      setReno((r) => {
-        const start = d.start ?? r.start
-        const end = d.end ?? r.end
-        return {
-          ...r, scope: d.scope ?? t(`works.${d.works_type}.scope`), start, end: end < start ? start : end,
-          noisy_from: d.noisy_from ?? r.noisy_from, noisy_to: d.noisy_to ?? r.noisy_to,
-          weekdays_only: d.weekdays_only ?? r.weekdays_only, contractor: d.contractor ?? r.contractor,
-        }
-      })
-      setLang(d.language)  // the notice is written in the language the owner used; each neighbour gets their own
-      setDraft(null)
-      setFilled(d)
+      applyDraft(await api.renovationDraft(me.id, what))
     } catch (e) {
       const code = e instanceof ApiError ? e.code : undefined
       setAiNote(code === 'ai_off' ? t('ai.off') : code === 'ai_busy' || !(e instanceof Error) ? t('ai.busy') : e.message)
@@ -209,21 +279,23 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
 
       {step === 0 && (
         <div className="wizard-body">
-          {ai?.on && (
+          {ai && (
             <div className="ai-box">
-              <div className="ai-box-head"><Sparkles size={15} /> <b>{t('ai.reno.title')}</b></div>
-              <small className="muted">{t('ai.reno.hint')}</small>
-              <div className="ai-box-row">
-                <textarea rows={2} maxLength={500} value={said} onChange={(e) => setSaid(e.target.value)} placeholder={t('ai.reno.placeholder')}
-                  aria-label={t('ai.reno.title')} />
-                <button className="btn btn-primary" disabled={!said.trim() || reading} onClick={() => fillIn()}>
-                  <Sparkles size={14} /> {reading ? t('ai.reno.working') : t('ai.reno.fill')}
-                </button>
-              </div>
+              <div className="ai-box-head"><Sparkles size={15} /> <b>{t(ai.on ? 'ai.reno.title' : 'ai.reno.offTitle')}</b></div>
+              <small className="muted">{t(ai.on ? 'ai.reno.hint' : 'ai.reno.offHint')}</small>
+              {ai.on && (
+                <div className="ai-box-row">
+                  <textarea rows={2} maxLength={500} value={said} onChange={(e) => setSaid(e.target.value)} placeholder={t('ai.reno.placeholder')}
+                    aria-label={t('ai.reno.title')} />
+                  <button className="btn btn-primary" disabled={!said.trim() || reading} onClick={() => fillIn()}>
+                    <Sparkles size={14} /> {reading ? t('ai.reno.working') : t('ai.reno.fill')}
+                  </button>
+                </div>
+              )}
               <div className="ai-examples">
-                <small className="muted">{t('ai.reno.try')}</small>
+                <small className="muted">{t(ai.on ? 'ai.reno.try' : 'ai.reno.offTry')}</small>
                 {EXAMPLES.map((x) => (
-                  <button key={x.label} type="button" className="btn btn-sm" disabled={reading} onClick={() => fillIn(x.text)}>{x.label}</button>
+                  <button key={x.label} type="button" className="btn btn-sm" disabled={reading} onClick={() => (ai.on ? fillIn(x.text) : applyPreset(x.preset))}>{x.label}</button>
                 ))}
               </div>
               {aiNote && <div className="ai-note">{aiNote}</div>}
@@ -262,7 +334,9 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
       {step === 1 && (
         <div className="wizard-body two">
           <div className="plan-frame">
-            <PlanMap units={units} me={me} circle={[]} names={names} view={me.kind} impact={zone?.map((z) => z.id) ?? []} />
+            <PlanMap units={units} me={me} circle={[]} names={names} view={me.kind} impact={zone?.map((z) => z.id) ?? []} worksType={works}
+              selected={tapped} onSelect={setTapped}
+              explain={Object.fromEntries((zone ?? []).map((z) => [z.id, `${z.label} · ${t(`rel.${z.relation}`)}: ${t(`reason.${z.reason_key}`)}`]))} />
           </div>
           <div className="stack">
             <div className="wizard-lead">{t('reno.lead')}</div>
@@ -271,7 +345,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
               {zone?.map((z) => (
                 <li key={z.id}>
                   <b>{z.label}</b>
-                  <span>{z.joined === false ? t('nj.status') : z.resident_name ?? t('reno.hidden')}</span>
+                  <span>{z.joined === false ? t('nj.status') : z.relation === 'behind' ? t('rel.behind') : z.resident_name ?? t('reno.hidden')}</span>
                   <small>{t(`reason.${z.reason_key}`)}{z.joined === false ? ` · ${t('nj.paper')}` : ''}</small>
                 </li>
               ))}
@@ -288,15 +362,22 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
             <label className="field">{t('reno.start')}<input type="date" value={reno.start} onChange={set('start')} /></label>
             <label className="field">{t('reno.end')}<input type="date" value={reno.end} min={reno.start} onChange={set('end')} /></label>
           </div>
-          <div className="grid-2">
-            <label className="field">{t('reno.noisyFrom')}<input type="time" value={reno.noisy_from} onChange={set('noisy_from')} /></label>
-            <label className="field">{t('reno.noisyTo')}<input type="time" value={reno.noisy_to} onChange={set('noisy_to')} /></label>
-          </div>
+          {/* The house rule's hours (LEGAL_FROM/LEGAL_TO in quiet.py): the server refuses a notice outside them.
+              Planned hours replace the owner's own inputs, so only one set of hours is on screen. */}
+          {planned ? (
+            <HoursBar plan={planned} legend={t('plan.avoids', { hours: noisyHours(t, { ...reno, ...planned }), n: planned.avoided })} />
+          ) : (
+            <div className="grid-2">
+              <label className="field">{t('reno.noisyFrom')}<input type="time" value={reno.noisy_from} min="09:00" max="18:00" onChange={set('noisy_from')} /></label>
+              <label className="field">{t('reno.noisyTo')}<input type="time" value={reno.noisy_to} min="09:00" max="18:00" onChange={set('noisy_to')} /></label>
+            </div>
+          )}
+          <small className={hoursOk ? undefined : 'warn'}>{t('reno.hoursRule')}</small>
           <label className="switch-row"><input type="checkbox" checked={!!reno.weekdays_only} onChange={set('weekdays_only')} /> {t('reno.weekends')}</label>
           {plan && plan.homes_with_quiet_times > 0 && (
             <div className="qplan-card">
               <div className="qplan-head"><CalendarClock size={15} /> <b>{t('plan.title')}</b></div>
-              <p>{t('plan.avoids', { hours: noisyHours(t, { ...reno, ...plan }), n: plan.avoided })}</p>
+              {!usePlan && <p>{t('plan.avoids', { hours: noisyHours(t, { ...reno, ...plan }), n: plan.avoided })}</p>}
               {plan.not_avoided > 0 && <p className="warn">{t('plan.notAvoided', { n: plan.not_avoided, h: 4 })}</p>}
               <Segmented value={usePlan ? 'plan' : 'own'} onChange={(v) => { setUsePlan(v === 'plan'); setDraft(null) }}
                 options={[{ id: 'plan', label: t('plan.use') }, { id: 'own', label: t('plan.own') }]} />
@@ -388,11 +469,34 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
         <button className="btn" onClick={step === 0 ? close : () => setStep(step - 1)}>{t(step === 0 ? 'btn.cancel' : 'btn.back')}</button>
         <span className="muted small">{t('reno.step', { n: step + 1, m: STEPS.length })}</span>
         {step < STEPS.length - 1 ? (
-          <button className="btn btn-primary" disabled={(step === 3 && blocked) || !reno.scope.trim()} onClick={() => setStep(step + 1)}>{t('btn.next')}</button>
+          <button className="btn btn-primary" disabled={(step === 3 && blocked) || (step === 2 && !hoursOk) || !reno.scope.trim()} onClick={() => setStep(step + 1)}>{t('btn.next')}</button>
         ) : (
           <button className="btn btn-primary" disabled={sending || blocked} onClick={send}><Send size={15} /> {sending ? t('btn.sending') : t('reno.send')}</button>
         )}
       </div>
     </Sheet>
+  )
+}
+
+// The house rule's working day, 09:00–18:00, in minutes.
+const DAY_FROM = 9 * 60
+const DAY_TO = 18 * 60
+const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
+const place = (from: string, to: string) => ({
+  left: `${((minutes(from) - DAY_FROM) / (DAY_TO - DAY_FROM)) * 100}%`,
+  width: `${((minutes(to) - minutes(from)) / (DAY_TO - DAY_FROM)) * 100}%`,
+})
+
+/** The planned hours on the 09:00–18:00 day: noisy work solid, quiet breaks striped, the plan's sentence below. */
+function HoursBar({ plan, legend }: { plan: QuietPlan; legend: string }) {
+  return (
+    <div className="hours-bar">
+      <div className="hours-track" role="img" aria-label={legend}>
+        <span className="noisy" style={place(plan.noisy_from, plan.noisy_to)} title={`${plan.noisy_from}–${plan.noisy_to}`} />
+        {plan.quiet_breaks.map((b) => <span key={b.start} className="quiet" style={place(b.start, b.end)} title={`${b.start}–${b.end}`} />)}
+      </div>
+      <div className="hours-axis"><span>09:00</span><span>18:00</span></div>
+      <small>{legend}</small>
+    </div>
   )
 }

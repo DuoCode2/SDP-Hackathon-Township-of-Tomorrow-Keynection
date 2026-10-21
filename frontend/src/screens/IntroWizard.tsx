@@ -9,18 +9,20 @@ import { Avatar, Sheet, Steps, useToast } from '../ui'
 type Member = Neighbour & { known: boolean }
 
 /** Say hello, step by step. Only the homes in the circle; anyone else needs a contact request. */
-export default function IntroWizard({ open, onClose, me, circle, onSent }: {
+export default function IntroWizard({ open, onClose, me, circle, onSent, pick }: {
   open: boolean
   onClose: () => void
   me: UnitInfo
   circle: Member[]
   onSent: () => void
+  /** Homes the assistant heard named: ticked instead of everyone not met yet. */
+  pick?: string[]
 }) {
   const t = useT()
   const toast = useToast()
   const helper = useHelper(me.id)
   const [step, setStep] = useState(0)
-  const [picked, setPicked] = useState<Set<string>>(() => new Set(circle.filter((n) => n.joined && !n.known).map((n) => n.id)))
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(circle.filter((n) => n.joined && (pick?.length ? pick.includes(n.id) : !n.known)).map((n) => n.id)))
   const [lang, setLang] = useState<Lang>(me.lang)
   const [draft, setDraft] = useState<string | null>(null)
   const [consent, setConsent] = useState(false)

@@ -8,7 +8,9 @@ Ring 2, the street or block: everyone else on the same lorong (both rows) or in 
 Ring 3, the township: community notices only.
 
 The impact zone of a renovation is separate: it depends on the type of work (water travels down,
-hacking noise travels up and down), so a wet job on level 15 also reaches level 13.
+hacking noise travels up and down), so a wet job on level 15 also reaches level 13. A terrace house
+backing onto another row is told about wet, hacking and structural works too (it shares the back fence
+and the back drain), but it stays outside the circle: the circle is still five homes.
 
 End units and top/bottom floors simply have fewer neighbours.
 """
@@ -23,6 +25,7 @@ class Unit:
     label: str
     row: str | None = None  # terrace: row id
     facing_row: str | None = None  # terrace: the row across the road
+    back_row: str | None = None  # terrace: the row behind, sharing the back fence (same pos numbering)
     block: str | None = None  # apartment: block id
     floor: int | None = None  # apartment: floor number
     pos: int | None = None  # position along the row / along the floor
@@ -31,17 +34,18 @@ class Unit:
 @dataclass(frozen=True)
 class Neighbour:
     unit_id: str
-    relation: str  # left | right | across-left | across | across-right | above | below | above-2 | below-2
+    relation: str  # left | right | across-left | across | across-right | above | below | above-2 | below-2 | behind
 
 
 _INVERSE = {
     "left": "right", "right": "left",
     "across-left": "across-right", "across-right": "across-left", "across": "across",
-    "above": "below", "below": "above", "above-2": "below-2", "below-2": "above-2",
+    "above": "below", "below": "above", "above-2": "below-2", "below-2": "above-2", "behind": "behind",
     "street": "street", "block": "block", "contact": "contact",
 }
 
 WORKS_TYPES = ("wet", "hacking", "structural", "light")
+REACHES_THE_BACK = ("wet", "hacking", "structural")  # the back fence and drain: told, though not in the circle
 
 
 def inverse_relation(relation: str) -> str:
@@ -99,7 +103,13 @@ def impact_zone(unit: Unit, units: list[Unit], works_type: str, index: dict | No
         raise ValueError(f"unknown works type: {works_type}")
     if unit.kind == "terrace":
         circle = _terrace_circle(unit, units, index)
-        return [n for n in circle if n.relation in ("left", "right")] if works_type == "light" else circle
+        zone = [n for n in circle if n.relation in ("left", "right")] if works_type == "light" else circle
+        if works_type in REACHES_THE_BACK and unit.back_row:
+            by_slot = index["terrace"] if index else {(u.row, u.pos): u for u in units if u.kind == "terrace"}
+            behind = by_slot.get((unit.back_row, unit.pos))
+            if behind:
+                zone = [*zone, Neighbour(behind.id, "behind")]
+        return zone
     by_slot = index["apartment"] if index else {(u.block, u.floor, u.pos): u for u in units if u.kind == "apartment"}
     b, f, p = unit.block, unit.floor, unit.pos
     wanted = [((b, f, p - 1), "left"), ((b, f, p + 1), "right")]
@@ -118,6 +128,9 @@ IMPACT_REASON = {
     ("below", "wet"): "Directly below: leak risk", ("below-2", "wet"): "Two floors below: leaks can travel",
     ("above", None): "Directly above: noise and vibration", ("above-2", None): "Two floors up: noise travels through the frame",
     ("below", None): "Directly below: noise, vibration and leaks", ("below-2", None): "Two floors below: noise travels through the frame",
+    ("behind", "structural"): "Shares your back fence: an extension reaches it",
+    ("behind", "wet"): "The back drain runs along both homes",
+    ("behind", "hacking"): "Vibration crosses the back wall",
 }
 
 

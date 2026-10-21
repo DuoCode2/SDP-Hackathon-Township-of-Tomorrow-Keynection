@@ -18,7 +18,7 @@ Keynection has 333 automated server tests (`testing-overview.md`). This page is 
 | K00 | Open the URL | Enter the shared password | Trilingual password page → the app opens. Note how long the first open took |
 | K01 | Neighbours, Aiman (No. 12) | Look at the home screen | A row of door avatars at the top; five neighbour cards: Siti (No. 11), Kumar (No. 13), Priya (No. 21), Hafiz (No. 22) and No. 23 shown by unit only ("not on Keynection yet"); a welcome card the first time |
 | K02 | Neighbours | Press **👋 Wave** on Siti's card | A short celebration; the button changes to "waved today"; Siti's avatar ring turns green once she waves back later |
-| K03 | Works → **Register renovation** | Type one sentence in "Just say it in one sentence" (e.g. *Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5*) → **Fill it in for me** | AI on: type of work, dates, hours and contractor are filled in, with one line saying why and what is still missing; approvals and the CIDB tick stay empty. AI off: a note says AI is off and the form is filled in by hand (see K22). Either is a pass; record which |
+| K03 | Works → **Register renovation** | Type one sentence in "Just say it in one sentence" (e.g. *Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5*) → **Fill it in for me** | AI on: type of work, dates, hours and contractor are filled in, with one line saying why and what is still missing; approvals and the CIDB tick stay empty. AI off: the box is titled "Try an example"; tapping an example fills in a ready-made preset without AI, or the form is filled in by hand (see K22). Either is a pass; record which |
 | K04 | Step 2, "Who is told" | Read the list and the plan | Every home in range is listed with the reason (shared wall, across the road…); No. 23 is marked for a paper notice; there is no way to remove a home |
 | K05 | Step 3, "When" | Read the planned hours | "Noisy hours planned around the neighbours" with the hours (e.g. 11:00–17:00, quiet 13:00–15:00) and "avoids the quiet times of 2 homes"; whose is never shown; the owner keeps at least 4 hours a day; "Use my own hours" is available |
 | K06 | Step 5, review → **Send** | Check the notice text, send | "Sent to N homes"; Works shows the renovation; the home screen shows the works badge; No. 23's copy appears at Front desk as a paper notice |
@@ -51,7 +51,7 @@ In **pilot mode** (`KEYNECTION_DEMO_MODE=0`) two more boundaries apply that the 
 
 | ID | Situation | Do | Expect |
 |---|---|---|---|
-| K22 | **AI is off** (no key on the server, or offline) | Walk K03, K07, K10, K11 | The guide's top line says AI is off; the notice is filled in step by step; typed words go as written; quick replies are still translated (they are pre-translated); nothing errors or hangs |
+| K22 | **AI is off** (no key on the server, or offline) | Walk K03, K07, K10, K11 | The guide's top line says AI is off; the three examples still fill the notice in (from a preset on the device, no AI call), or it is filled in step by step from the first card; typed words go as written; quick replies are still translated (they are pre-translated); nothing errors or hangs |
 | K23 | **Shared demo starts over** (local check) | Start the server with `KEYNECTION_DEMO_IDLE_MINUTES=0.1`, wave at Siti, wait 10 s, reload | The wave is gone and the fictional phase is as seeded; a pilot server never does this (`test_shared_demo.py`) |
 
 ## D. Record

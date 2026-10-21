@@ -38,6 +38,7 @@ export const UI: Record<string, Text> = {
     zh: '标着「预览」「示意」或「示范编号」的都是示意：WhatsApp 和 SDP App 的手机画面不会真的发出，也不是 SDP 真正的 app；演示版的 Procore 编号是造的。其余画面上的每一步都真的写进了资料库。',
     en: 'Anything labelled "preview", "illustration" or "demo number" is a mock-up: the WhatsApp and SDP App phones send nothing and are not SDP’s real app, and the demo’s Procore numbers are invented. Every other step on screen really is written to the database.',
   },
+  notesForJudges: { zh: '给评委的说明', en: 'Notes for judges' },
   about: {
     zh: 'Keynection：每一把钥匙都附送五户邻居。从交钥匙那天起，帮屋主认识左右和对面这 5 户；装修季是邻居变朋友还是变仇人的关键期，所以装修通知就是第一次自我介绍。万一出了裂缝漏水，公平的记录、分流和保修在背后撑着。',
     en: 'Keynection: every key comes with five neighbours. From the day they get their keys, owners meet the five homes beside and opposite them. Renovation season decides whether neighbours become friends or enemies, so the renovation notice doubles as the first introduction. If a crack or leak appears, a fair record, triage and the warranty back it up.',
@@ -45,8 +46,8 @@ export const UI: Record<string, Text> = {
   fictional: { zh: '所有住户、门牌和照片都是虚构的示范资料。', en: 'All residents, units and photos are fictional demo data.' },
   aiOn: { zh: 'AI 已开启：打字自动翻译、太冲先劝、一句话写装修通知', en: 'AI on: typed words translated, heated ones calmed, the notice written from one sentence' },
   aiOff: {
-    zh: 'AI 没开（服务器没有 AI 金钥）：路线照样能走，只是打的字照原文送、装修通知要逐步填',
-    en: 'AI off (no AI key on the server): the route still works; typed words go as written and the notice is filled in step by step',
+    zh: 'AI 没开（服务器没有 AI 金钥）：路线照样能走。打的字照原文送；装修通知的三句示例仍可按，会填入现成的内容（浴室那句按「English」），或保留第一张「浴室、厨房或水管」卡自己逐步填',
+    en: 'AI off (no AI key on the server): the route still works. Typed words go as written; the three renovation examples still fill the notice in from a ready-made preset (the bathroom story is the "English" one), or keep the first card, "Bathroom, kitchen or plumbing", and fill in the steps yourself',
   },
   showAll: { zh: '显示全部功能', en: 'Show every feature' },
   showAllHint: {
@@ -402,6 +403,9 @@ export const PAGES: Record<TabId, PageGuide> = {
 export interface RouteStep {
   tab: TabId
   unit?: string
+  // Both sides of the shared wall at once (Aiman left, Siti right), and the thread to open on the focused side.
+  split?: boolean
+  peer?: string
   text: Text
 }
 
@@ -417,8 +421,8 @@ export const JUDGE_ROUTE: RouteStep[] = [
   {
     tab: 'works', unit: 'T-12',
     text: {
-      zh: '装修通知就是自我介绍：Works →「Register renovation」→ 在「一句话说清楚」打「Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5」（中文、马来文也行）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 →「时间」那一步系统已按邻居作息排好：避开 Siti 宝宝午睡（13–15 点）和对面 Hafiz 夜班后补眠（9–11 点），但不说是谁 → 检查后发送（还没加入的 No. 23 由物业送纸本）',
-      en: 'The renovation notice is the introduction: Works → Register renovation → in "Just say it in one sentence" type "Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5" (Malay or Chinese work too) → Fill it in for me → AI picks the type of work and the plan marks who is told → at "When" the hours are already planned around the neighbours: clear of Siti’s baby nap (1–3pm) and Hafiz’s sleep after night shifts (9–11am), without saying whose → check and send (No. 23, not on the app yet, gets it on paper)',
+      zh: '快捷方式：按右下角的麦克风，直接说「Retiling the master bathroom from next Monday…」→ 单子填好停在复核页。一步步来：装修通知就是自我介绍：Works →「Register renovation」→ 在「一句话说清楚」打「Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6」（中文、马来文也行）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 →「时间」那一步系统已按邻居作息排好：避开 Siti 宝宝午睡（13–15 点）和对面 Hafiz 夜班后补眠（9–11 点），但不说是谁 → 检查后发送（还没加入的 No. 23 由物业送纸本）',
+      en: 'Shortcut: press the mic at the bottom right and just say "Retiling the master bathroom from next Monday…" → the notice is filled in and waits on Review. Step by step: the renovation notice is the introduction: Works → Register renovation → in "Just say it in one sentence" type "Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6" (Malay or Chinese work too) → Fill it in for me → AI picks the type of work and the plan marks who is told → at "When" the hours are already planned around the neighbours: clear of Siti’s baby nap (1–3pm) and Hafiz’s sleep after night shifts (9–11am), without saying whose → check and send (No. 23, not on the app yet, gets it on paper)',
     },
   },
   {
@@ -429,10 +433,10 @@ export const JUDGE_ROUTE: RouteStep[] = [
     },
   },
   {
-    tab: 'chats', unit: 'T-11',
+    tab: 'chats', unit: 'T-11', split: true, peer: 'T-12',
     text: {
-      zh: '按顶栏「Both sides」（左 Aiman、右 Siti）→ Siti 打开 Aiman 的通知，看到「吵闹时段已避开你的安静时间」，宝宝午睡不用她开口 → 回 👋 → 再用马来文打一句冲的话（例：「Rumah awak bising macam kilang! Tak reti hormat jiran ke?」）→ AI 先给她平和的说法 → Aiman 看到的是英文，原文点一下就有',
-      en: 'Turn on "Both sides" (Aiman left, Siti right) → Siti opens Aiman’s notice: "Noisy hours planned around your quiet time", so she never had to ask about the baby’s nap → she waves back → then types something sharp in Malay ("Rumah awak bising macam kilang! Tak reti hormat jiran ke?") → AI offers her a calmer wording → Aiman reads it in English, the original one tap away',
+      zh: 'Siti 打开 Aiman 的通知，看到「吵闹时段已避开你的安静时间」，宝宝午睡不用她开口 → 回 👋 → 再用马来文打一句冲的话（例：「Rumah awak bising macam kilang! Tak reti hormat jiran ke?」）→ AI 先给她平和的说法 → Aiman 看到的是英文，原文点一下就有',
+      en: 'Siti opens Aiman’s notice: "Noisy hours planned around your quiet time", so she never had to ask about the baby’s nap → she waves back → then types something sharp in Malay ("Rumah awak bising macam kilang! Tak reti hormat jiran ke?") → AI offers her a calmer wording → Aiman reads it in English, the original one tap away',
     },
   },
   {
@@ -467,6 +471,13 @@ export const ROUTE: RouteStep[] = [
     },
   },
   {
+    tab: 'works', unit: 'T-12',
+    text: {
+      zh: '（助手，可选）Aiman 按右下角的麦克风（或打字）问「我的装修通知怎样了」→ 日期和通知了几户由服务器算，不是 AI 编的；说「宝宝一点到三点午睡」→ 直接加一个安静时段，可撤销；说一句装修的话 → 通知填好停在复核页，自己按发送才会发出',
+      en: '(Assistant, optional) Aiman presses the mic at the bottom right (or types) and asks "How is my renovation notice doing?" → the dates and homes told are counted by the server, not the AI; "Baby naps 1 to 3" adds a quiet time, with Undo; a renovation sentence fills in the notice and waits on Review until he sends it',
+    },
+  },
+  {
     tab: 'circle', unit: 'A-15-3',
     text: {
       zh: '（公寓，可选）Sofia（A-15-3）：Works →「Register renovation」→ 浴室 → 剖面图显示楼下两层也被通知，A-13-3 名字隐藏',
@@ -474,10 +485,10 @@ export const ROUTE: RouteStep[] = [
     },
   },
   {
-    tab: 'chats', unit: 'T-11',
+    tab: 'chats', unit: 'T-11', split: true, peer: 'T-12',
     text: {
-      zh: '按顶栏「Both sides」开分屏（左 Aiman、右 Siti）→ Siti 在 Chats 回 👋、按表情 ❤️、按快捷回复「宝宝午睡」→ 左边 Aiman 看到英文翻译；也可以按麦克风录语音',
-      en: 'Turn on "Both sides" (Aiman left, Siti right) → Siti waves back, reacts ❤️ and taps the baby-nap quick reply → Aiman sees it in English; the mic records a voice note',
+      zh: 'Siti 在 Chats 回 👋、按表情 ❤️、按快捷回复「宝宝午睡」→ 左边 Aiman 看到英文翻译；也可以按麦克风录语音',
+      en: 'Siti waves back, reacts ❤️ and taps the baby-nap quick reply → Aiman sees it in English; the mic records a voice note',
     },
   },
   {

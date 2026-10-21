@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS units (
     street TEXT,
     terrace_row TEXT,
     facing_row TEXT,
+    -- Terrace houses: the row behind, across the back fence (told about wet, hacking and structural works).
+    back_row TEXT,
     block TEXT,
     floor INTEGER,
     pos INTEGER,
@@ -347,13 +349,17 @@ def now() -> str:
 
 def connect(path: str) -> sqlite3.Connection:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path, check_same_thread=False)
+    conn = sqlite3.connect(path, timeout=15, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    # Readers don't wait for a writer, and a writer waits its turn instead of failing with "database is locked"
+    # (two judges in the shared demo at once). backup.py copies with SQLite's online backup, which reads the WAL too.
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 15000")
     return conn
 
 
-SCHEMA_VERSION = 15
+SCHEMA_VERSION = 16  # 16: units.back_row (the row behind a terrace house)
 TABLES = ("settings", "deliveries", "push_subscriptions", "auth_challenges", "webauthn_handles", "passkeys", "sessions", "access_codes", "staff", "paper_notices", "join_codes", "delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
           "warranty_tickets", "gate_logs", "passes", "incidents", "photos",
           "intro_recipients", "intros", "events", "units", "phases")
@@ -432,10 +438,10 @@ def _seed(conn: sqlite3.Connection) -> None:
     for u in demo_units():
         joined = u["id"] not in NOT_JOINED
         conn.execute(
-            "INSERT INTO units (id, phase_id, kind, label, resident_name, street, terrace_row, facing_row, block, floor, pos,"
-            " lang, handover_date, record_name, joined_at, consent_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO units (id, phase_id, kind, label, resident_name, street, terrace_row, facing_row, back_row, block, floor,"
+            " pos, lang, handover_date, record_name, joined_at, consent_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (u["id"], u["phase_id"], u["kind"], u["label"], u["resident_name"] if joined else u["label"], u.get("street"),
-             u.get("row"), u.get("facing_row"), u.get("block"), u.get("floor"), u["pos"], u["lang"], handover,
+             u.get("row"), u.get("facing_row"), u.get("back_row"), u.get("block"), u.get("floor"), u["pos"], u["lang"], handover,
              u["resident_name"], handover if joined else None, CONSENT_VERSION if joined else None),
         )
         # Every home history starts with SDP's handover record.

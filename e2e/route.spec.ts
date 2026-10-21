@@ -6,7 +6,7 @@ import { dismissWelcome, judgeStep, resetDemo, shot, watchErrors } from './helpe
 // text a judge reads (button labels, headings), on purpose: a renamed button fails the walk.
 // The server is the AI stand-in (serve.mjs): AI screens show, every AI answer is marked [stand-in].
 
-const SENTENCE = 'Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 5'
+const SENTENCE = 'Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 6'
 const SHARP_MALAY = 'Rumah awak bising macam kilang! Tak reti hormat jiran ke?'
 const TAMIL = /[஀-௿]/
 
@@ -54,13 +54,17 @@ test('the 3-minute judge route, with a screenshot per step', async ({ page }) =>
     await next(sheet)
     await expect(sheet.locator('ol.zone-list > li').first()).toBeVisible()
     await expect(sheet.locator('ol.zone-list')).toContainText('Not on Keynection yet') // No. 23 goes on paper
-    expect(await sheet.locator('ol.zone-list > li').count()).toBeGreaterThanOrEqual(5)
+    // Wet work: the five homes of the circle, and No. 32 behind (the back drain runs along both homes).
+    await expect(sheet.locator('ol.zone-list > li')).toHaveCount(6)
+    await expect(sheet.locator('ol.zone-list > li', { hasText: 'No. 32' })).toContainText('Behind you · shares your back fence')
     await shot(page, 'K04-who-is-told')
   })
 
   await test.step('K05 When: hours planned around the neighbours', async () => {
     await next(sheet)
-    await expect(sheet.locator('.qplan-card')).toContainText(/quiet times of 2 home/)
+    // One set of hours: the planned ones, drawn on the day, with no time inputs beside them.
+    await expect(sheet.locator('.hours-bar')).toContainText(/quiet times of 2 home/)
+    await expect(sheet.locator('input[type="time"]')).toHaveCount(0)
     await shot(page, 'K05-when')
   })
 
@@ -86,15 +90,15 @@ test('the 3-minute judge route, with a screenshot per step', async ({ page }) =>
   const right = page.getByLabel('Pane 2')
 
   await test.step('K08 Both sides of the shared wall', async () => {
-    await judgeStep(page, 4)
-    await page.locator('button.split-btn').click()
+    await judgeStep(page, 4) // one click: the Guide opens both panes itself
     await expect(left).toBeVisible()
     await expect(right).toBeVisible()
     await shot(page, 'K08-both-sides')
   })
 
   await test.step('K09 Siti reads the notice: planned around her quiet time', async () => {
-    await right.locator('button.chat-row', { hasText: 'Aiman' }).click()
+    // Already open on Aiman's thread, no row to tap.
+    await expect(right.locator('.thread-head')).toContainText('Aiman')
     await expect(right.getByText('Noisy hours planned around your quiet time')).toBeVisible()
     await shot(page, 'K09-notice-quiet-time')
   })
@@ -107,16 +111,14 @@ test('the 3-minute judge route, with a screenshot per step', async ({ page }) =>
     await expect(right.getByRole('button', { name: 'Use this' })).toBeVisible()
     await shot(page, 'K10-calmer-wording')
     await right.getByRole('button', { name: 'Use this' }).click()
-    // Sent, not yet read: one tick on Siti's own message (Aiman has not opened the thread).
-    const ticks = right.locator('.msg.mine .msg-ticks').last()
-    await expect(ticks).toBeVisible()
-    await expect(ticks).not.toHaveClass(/read/)
+    await expect(right.locator('.msg.mine .msg-ticks').last()).toBeVisible()
   })
 
   await test.step('K11 Aiman reads it in English, the original one tap away', async () => {
-    await left.locator('button.chat-row', { hasText: 'Siti' }).click()
+    // Aiman's pane is already open on Siti's thread, so no row to tap.
+    await expect(left.locator('.thread-head')).toContainText('Siti')
     await expect(left.getByText(/\[stand-in → EN\]/).last()).toBeVisible()
-    // Aiman opened the thread, so Siti's message now shows two ticks, live, on her side.
+    // Aiman has the thread open, so Siti's message shows two ticks, live, on her side.
     await expect(right.locator('.msg.mine .msg-ticks.read').last()).toBeVisible()
     await shot(page, 'K11-translated')
     await page.locator('button.split-btn').click() // back to one pane

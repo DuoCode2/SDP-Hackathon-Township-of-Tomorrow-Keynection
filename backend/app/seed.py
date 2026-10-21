@@ -12,15 +12,17 @@ HANDOVER_DAYS_AGO = 14
 # the notice has one more paragraph (what residents type is translated by Claude, outside Malaysia): its own version.
 # 10b: how long each kind of data is kept, said exactly; backups; closing the account in the app.
 # 10c (the AI versions only): the AI paragraph now says that a message the AI judges to be abuse is refused.
+# 10d (the AI versions only): the AI paragraph also says what the assistant sends: the household's own records and
+#   its neighbours' unit numbers, never their names or what they wrote.
 CONSENT_VERSION = "pilot-2026-10b"
-CONSENT_VERSION_AI = "pilot-2026-10c-ai"
+CONSENT_VERSION_AI = "pilot-2026-10d-ai"
 # The demo with Gemini instead: the paragraph names Google, says its free tier may use what is sent to improve
 # Google's products, and asks for made-up details only. Never shown in a pilot (ai.provider).
-CONSENT_VERSION_AI_GEMINI = "pilot-2026-10c-ai-gemini"
+CONSENT_VERSION_AI_GEMINI = "pilot-2026-10d-ai-gemini"
 
 # Households that have not joined Keynection yet. Until they do, neighbours see their unit number only, never a name,
 # and renovation notices reach them on paper through the estate office.
-NOT_JOINED = {"T-23"}
+NOT_JOINED = {"T-23", "T-34"}
 # Households that use easy mode (bigger text, fewer options). Private to the household itself.
 EASY_MODE = {"T-20"}
 # Family helpers already set up at handover: (unit, helper name, relationship).
@@ -67,6 +69,7 @@ def demo_notices() -> list[tuple[str, str, str]]:
 
 _SOUTH_NAMES = ["Farid", "Siti", "Aiman", "Kumar", "Wei Jie", "Nurul"]
 _NORTH_NAMES = ["Ah Hock", "Priya", "Hafiz", "Mei Ling", "Daniel", "Aisyah"]
+_LANE_NAMES = ["Ravi", "Azura", "Boon Keat", "Salmah", "Vimala", "Iskandar"]
 _APT_NAMES = {
     11: ["Faizal", "Mei Xin", "Ganesh", "Amira"],
     12: ["Ismail", "Hui Min", "Lakshmi", "Danish"],
@@ -84,6 +87,7 @@ _LANG = {
     "Arjun": "en", "Yong": "zh", "Hana": "ms", "Rajesh": "en", "Sofia": "en", "Chong": "zh",
     "Faizal": "ms", "Mei Xin": "zh", "Ganesh": "en", "Amira": "ms", "Ismail": "ms", "Hui Min": "zh",
     "Lakshmi": "en", "Danish": "ms", "Nadia": "ms", "Wei Ming": "zh", "Thinesh": "en", "Farah": "ms",
+    "Ravi": "en", "Azura": "ms", "Boon Keat": "zh", "Salmah": "ms", "Vimala": "ta", "Iskandar": "ms",
 }
 
 
@@ -111,15 +115,23 @@ QUIET_TIMES = {
 
 def demo_units() -> list[dict]:
     units = []
-    # South row: houses 10-15, facing north row houses 20-25 (house 12 faces 22).
+    # South row: houses 10-15, facing north row houses 20-25 (house 12 faces 22), backing onto the lane row 30-35
+    # across the back fence (house 12 backs onto 32).
     for pos in range(6):
         units.append({
             "id": f"T-{10 + pos}", "phase_id": "demo", "kind": "terrace", "label": f"No. {10 + pos}", "street": "Jalan Demo 1",
-            "resident_name": _SOUTH_NAMES[pos], "row": "south", "facing_row": "north", "pos": pos,
+            "resident_name": _SOUTH_NAMES[pos], "row": "south", "facing_row": "north", "back_row": "lane", "pos": pos,
         })
         units.append({
             "id": f"T-{20 + pos}", "phase_id": "demo", "kind": "terrace", "label": f"No. {20 + pos}", "street": "Jalan Demo 1",
             "resident_name": _NORTH_NAMES[pos], "row": "north", "facing_row": "south", "pos": pos,
+        })
+    # The lane row: houses 30-35 on Jalan Demo 2, back to back with the south row. Not in anyone's circle on Jalan Demo 1,
+    # but told when works there reach the back (wet, hacking, structural).
+    for pos in range(6):
+        units.append({
+            "id": f"T-{30 + pos}", "phase_id": "demo", "kind": "terrace", "label": f"No. {30 + pos}", "street": "Jalan Demo 2",
+            "resident_name": _LANE_NAMES[pos], "row": "lane", "back_row": "south", "pos": pos,
         })
     # Block A: floors 11-16 shown (the lower floors are left out of the demo), units 1-4 per floor.
     for floor, names in _APT_NAMES.items():

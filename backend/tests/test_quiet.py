@@ -134,6 +134,27 @@ def test_quiet_breaks_must_sit_inside_the_noisy_hours(client):
     assert _notice(client, quiet_breaks=[{"start": "14:00", "end": "13:00"}]).status_code == 422
 
 
+def test_noisy_hours_outside_the_house_rule_are_refused(client):
+    # Evening work is turned away at the door, with the house rule as the reason, whether the owner asks for a plan
+    # or sends the notice; the planner never falls back to hours the rule forbids.
+    late = {"noisy_from": "20:00", "noisy_to": "23:00"}
+    r = client.get("/api/units/T-12/quiet-plan", params={**RENO, **late})
+    assert r.status_code == 422 and r.json()["detail"] == quiet.HOUSE_RULE_HOURS
+    r = _notice(client, **late)
+    assert r.status_code == 422 and r.json()["detail"][0]["msg"].endswith(quiet.HOUSE_RULE_HOURS)
+    # Starting before the rule's hours is refused too, even when the day ends inside them.
+    assert client.get("/api/units/T-12/quiet-plan", params={**RENO, "noisy_from": "08:00"}).status_code == 422
+    assert _notice(client, noisy_from="08:00").status_code == 422
+    assert "Monday to Saturday" in quiet.HOUSE_RULE_HOURS and quiet.LEGAL_FROM in quiet.HOUSE_RULE_HOURS
+
+
+def test_noisy_hours_inside_the_house_rule_still_go_through(client):
+    # The defaults (09:00–17:00) and the rule's own edges (09:00–18:00) are both fine.
+    assert client.get("/api/units/T-12/quiet-plan", params={**RENO}).status_code == 200
+    assert _notice(client).status_code == 201
+    assert _notice(client, frm="T-14", works_type="light", noisy_from="09:00", noisy_to="18:00").status_code == 201
+
+
 def test_a_home_about_to_get_works_from_two_sides_is_spotted(client):
     # Farid (No. 10) is already renovating next to Siti; Aiman (No. 12) on her other side plans overlapping dates.
     first_end = (date.fromisoformat(START) + timedelta(days=4)).isoformat()

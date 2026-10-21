@@ -31,7 +31,7 @@ The route is the top of the **Guide** panel (top-right). One click per step jump
 5. **If something goes wrong.** Siti: Use sample → Sample crack → the crack was there before the works, so it goes to the warranty, not to Aiman.
 6. **How SDP checks it works.** The Impact model uses the 2020 census question (share of residents with no face-to-face neighbour contact in a month), asked before and after a pilot. The command view also counts next-door pairs who know each other.
 
-Without an AI key, steps 2 and 4 still work: the notice is filled in step by step and typed words go as written. The Guide's top line says whether AI is on. A 7-minute full route is in the Guide under *Show every feature* (see "Beyond the main story" below).
+Without an AI key, steps 2 and 4 still work: the three examples fill the notice in from a ready-made preset (the bathroom story is the English one; by hand, keep the first card, *Bathroom, kitchen or plumbing*, and fill in the steps), and typed words go as written. The Guide's top line says whether AI is on. A 7-minute full route is in the Guide under *Show every feature* (see "Beyond the main story" below).
 
 ## What is different
 
@@ -170,7 +170,7 @@ Dockerfile · render.yaml · railway.json · start-demo.bat / .sh · start-dev.b
 
 ## AI use and provenance
 
-This code was written with the help of Claude (Anthropic), declared under clause 13 of the competition terms. At run time the prototype uses Claude by design and Google's Gemini free tier on the online demo; both appear in the AI-use disclosure and in the privacy notice residents accept. Only the text being written is sent to an AI service, never the directory, unit numbers or who talks to whom. This is a fresh codebase for the hackathon; it contains no code from any team member's earlier projects.
+This code was written with the help of Claude (Anthropic), declared under clause 13 of the competition terms. At run time the prototype uses Claude by design and Google's Gemini free tier on the online demo; both appear in the AI-use disclosure and in the privacy notice residents accept. Only the text being written is sent to an AI service, never the directory, unit numbers or who talks to whom. The one exception is the assistant (one sentence, said or typed, becomes a notice, a hello, a quiet time, a status or a page, ready for the household to check): with the request go the household’s own records (notices, warranty tickets, case status) and its neighbours’ unit numbers, never their names or what they wrote. This is a fresh codebase for the hackathon; it contains no code from any team member's earlier projects.
 
 ## Team notes
 

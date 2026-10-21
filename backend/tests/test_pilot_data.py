@@ -21,7 +21,7 @@ def test_a_pilot_database_starts_empty(tmp_path):
 def test_the_demo_database_is_still_seeded_and_rebuilt(tmp_path):
     conn = _connect(tmp_path)
     db.init_db(conn)
-    assert conn.execute("SELECT COUNT(*) FROM units").fetchone()[0] == 36
+    assert conn.execute("SELECT COUNT(*) FROM units").fetchone()[0] == 42
     conn.execute(f"PRAGMA user_version = {db.SCHEMA_VERSION - 1}")
     conn.execute("DELETE FROM notices")
     db.init_db(conn)  # an older demo layout is simply rebuilt from the seed

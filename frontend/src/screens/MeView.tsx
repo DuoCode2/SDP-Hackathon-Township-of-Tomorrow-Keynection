@@ -10,7 +10,7 @@ import { refusal, useT } from '../i18n'
 import { useActing } from '../helper'
 import { roleOf } from '../components/Cast'
 import { Avatar, Card, CardHead, ScreenTitle, Skeleton, useToast } from '../ui'
-import { replayWelcome } from './CircleView'
+import { replayWelcome } from '../welcome'
 import { usePilot } from '../features'
 import { cancelled, keysSupported, makeKey, problem } from '../passkey'
 import { NotificationsCard } from '../components/Notifications'
@@ -141,7 +141,7 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
             <CardHead icon={<Languages size={16} />} title={t('me.shortcuts')} />
             <button className="shortcut" onClick={() => onGo('log')}><Hexagon size={15} /> {t('me.myLog')} <ArrowUpRight size={14} /></button>
             {!pilot && <button className="shortcut" onClick={() => onGo('safeguards')}><ShieldHalf size={15} /> {t('me.safe')} <ArrowUpRight size={14} /></button>}
-            <button className="shortcut muted-shortcut" onClick={() => { replayWelcome(); onGo('circle') }}>{t('me.welcomeAgain')} <ArrowUpRight size={14} /></button>
+            <button className="shortcut muted-shortcut" onClick={() => { replayWelcome(me.id); onGo('circle') }}>{t('me.welcomeAgain')} <ArrowUpRight size={14} /></button>
             {!pilot && <button className="shortcut muted-shortcut" onClick={() => onGo('sdp')}>{t('me.sdp')} <ArrowUpRight size={14} /></button>}
           </Card>
         </div>
