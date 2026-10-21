@@ -1039,13 +1039,15 @@ def renovation_draft(body: RenovationTextIn, conn: sqlite3.Connection = Depends(
     """The owner says what they are doing in one sentence, in any language; Claude fills in the notice for them to
     check. Nothing is sent from here: the owner still goes through the steps and presses send."""
     me = _unit_row(conn, body.unit_id)
+    # Not 502–504: the app reads those as "the server can't be reached" and shows a red bar, when only the AI is
+    # off or slow and the steps below still work (the app looks at the code, not the status).
     if not ai.enabled():
-        raise HTTPException(503, {"code": "ai_off", "message": "AI isn't switched on here. Fill in the steps below."})
+        raise HTTPException(501, {"code": "ai_off", "message": "AI isn't switched on here. Fill in the steps below."})
     if not ai.spend(body.unit_id):
         raise HTTPException(429, "That's all the AI help for today. Fill in the steps below.")
     draft = ai.draft_renovation(body.text.strip(), me["kind"], date.fromisoformat(_today()), MAX_RENOVATION_DAYS)
     if draft is None:
-        raise HTTPException(503, {"code": "ai_busy", "message": "The AI didn't answer in time. Try again, or fill in the steps below."})
+        raise HTTPException(424, {"code": "ai_busy", "message": "The AI didn't answer in time. Try again, or fill in the steps below."})
     return draft
 
 

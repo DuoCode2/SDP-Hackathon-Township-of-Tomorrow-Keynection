@@ -25,9 +25,9 @@ Figures and sources, written once: [`docs/judging-criteria-map.md`](docs/judging
 The route is the top of the **Guide** panel (top-right). One click per step jumps to the screen and the household. Six steps, main story only:
 
 1. **Key day.** Aiman (No. 12) has just moved in; his home screen is the five homes beside and opposite him → 👋 Wave at Siti.
-2. **The renovation notice is the introduction.** Works → Register renovation → type one sentence in *Just say it in one sentence* ("Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 5", or tap an example in English, Malay or Chinese) → *Fill it in for me* → AI picks the type of work and the plan marks who is told → at *When*, the noisy hours are already planned around the neighbours' private quiet times (Siti's baby nap, Hafiz's night-shift sleep, without saying whose) → review and send. No. 23 is not on Keynection yet, so the estate office prints a paper notice.
+2. **The renovation notice is the introduction.** Works → Register renovation → type one sentence in *Just say it in one sentence* ("Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6", or tap an example in English, Malay or Chinese, or just say it to the assistant) → *Fill it in for me* → AI picks the type of work and the plan marks who is told (the five, and for wet, hacking or structural works on a terrace the house behind the back fence too) → at *When*, the noisy hours are already planned around the neighbours' private quiet times (Siti's baby nap, Hafiz's night-shift sleep, without saying whose) → review and send. No. 23 is not on Keynection yet, so the estate office prints a paper notice.
 3. **Kumar next door (No. 13) reads Tamil.** Channels shows the same notice reaching him on WhatsApp in Tamil, down to the work Aiman described, translated by AI. Below it, two reminders that go out by themselves: photograph three days before the works, a check the day after they end.
-4. **Both sides.** Switch on *Both sides* (Aiman left, Siti right). Siti opens the notice: "Noisy hours planned around your quiet time", so she never had to ask about the nap → she waves back → types something sharp in Malay → AI offers her a calmer wording → Aiman reads it in English, the original one tap away.
+4. **Both sides.** One click opens both sides (Aiman left, Siti right), each already in the other's chat. Siti sees the notice: "Noisy hours planned around your quiet time", so she never had to ask about the nap → she waves back → types something sharp in Malay → AI offers her a calmer wording → Aiman reads it in English, the original one tap away.
 5. **If something goes wrong.** Siti: Use sample → Sample crack → the crack was there before the works, so it goes to the warranty, not to Aiman.
 6. **How SDP checks it works.** The Impact model uses the 2020 census question (share of residents with no face-to-face neighbour contact in a month), asked before and after a pilot. The command view also counts next-door pairs who know each other.
 
@@ -57,7 +57,7 @@ Nobody is left out: **Easy mode** (bigger text, fewer options, visible only to t
 
 ![Impact model: the census question is the main measure; the cost lines below it are labelled assumptions SDP can change](docs/images/impact-model-census.png)
 
-For scale (17 Oct 2026): 17 screens, 103 API endpoints, 3 interface languages plus Tamil, three research reports (4, 10 and 16 Oct), and automated tests plus the front-end build on every push (layers and counts in [`docs/testing-overview.md`](docs/testing-overview.md)).
+For scale (21 Oct 2026): 18 screens, 106 API endpoints, 3 interface languages plus Tamil, three research reports (4, 10 and 16 Oct), and automated tests plus the front-end build on every push (layers and counts in [`docs/testing-overview.md`](docs/testing-overview.md)).
 
 ## Beyond the main story
 

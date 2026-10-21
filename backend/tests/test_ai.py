@@ -63,7 +63,7 @@ def _draft(**overrides):
 def test_ai_is_off_without_a_key_and_nothing_else_changes(client):
     assert client.get("/api/ai").json() == {"on": False, "model": None, "provider": None, "listen": False, "speak": False}
     r = client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "Retiling the bathroom next week"})
-    assert r.status_code == 503 and r.json()["detail"]["code"] == "ai_off"
+    assert r.status_code == 501 and r.json()["detail"]["code"] == "ai_off"  # not 502-504: the app would say "can't reach"
     assert client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "Good morning!"}).status_code == 201
     item = _items(client, "T-11", "T-12", "message")[-1]
     assert item["text"] == "Good morning!" and item["translated"] is False and item["by_ai"] is False
@@ -133,7 +133,7 @@ def test_the_why_only_names_neighbours_the_home_has(client, claude):
 def test_no_answer_means_fill_in_the_steps_yourself(client, claude):
     claude.answers["RenovationDraft"] = None
     r = client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom next week"})
-    assert r.status_code == 503 and r.json()["detail"]["code"] == "ai_busy"
+    assert r.status_code == 424 and r.json()["detail"]["code"] == "ai_busy"  # not 502-504: the app would say "can't reach"
 
 
 def test_each_home_has_a_daily_ai_allowance(client, claude, monkeypatch):

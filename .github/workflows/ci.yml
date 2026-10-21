@@ -1,5 +1,5 @@
 # Runs the two automated layers on every push and pull request (see docs/testing-overview.md):
-#   1. the 339 server tests (pytest, SQLite per test, AI stand-in: nothing reaches Anthropic or Google)
+#   1. the 408 server tests (pytest, SQLite per test, AI stand-in: nothing reaches Anthropic or Google)
 #   2. the front-end build (TypeScript strict; a type error fails it)
 # Same Python and Node majors as the team's laptops and the Dockerfile. It cannot stop Render deploying a
 # broken push to main (Render deploys on commit), but it says within minutes that one went wrong.
