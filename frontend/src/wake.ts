@@ -5,14 +5,17 @@
 //
 // Why this phrase: "Hey Keynection" was measured first and caught 36–63% of synthetic voices even at the loosest
 // settings, against 82–84% for the model's own phrases on the same voices; a made-up word is what this model,
-// untrained, hears worst. "Hello Neighbour" caught 93.8% of voices it was not tuned on, 0 false wakes in 3.3 hours of
-// the app's own sentences read aloud (20 Oct 2026, kws-eval; the numbers are in the pull request).
+// untrained, hears worst. "Hello Neighbour", at the settings below: 91.7% of voices it was not tuned on (clean; 77-79%
+// with noise or other speech under it), 0 false wakes in 6 hours of the app's own sentences read aloud in English,
+// Malay, Chinese and Tamil (21 Oct 2026; frontend/wake-engine/README.md).
 
 export const WAKE_PHRASE = 'Hello Neighbour'
 // The phrase as the model's word pieces (its BPE vocabulary), both spellings; boost and threshold as measured.
 const KEYWORDS = ['▁HE LL O ▁NE IG H B O UR @HELLO_NEIGHBOUR', '▁HE LL O ▁NE IG H B OR @HELLO_NEIGHBOUR'].join('\n')
-const SCORE = 2.0
-const THRESHOLD = 0.1
+// The loosest setting with no false wake: at 0.1 one Chinese sentence and "Hello there. Say hello to the neighbours."
+// woke it; 0.15 to 0.25 never did, and 0.15 hears the most.
+const SCORE = 1.5
+const THRESHOLD = 0.15
 const COOLDOWN_MS = 2000  // one "Hello Neighbour" wakes it once
 const BASE = `${import.meta.env.BASE_URL}wake/`
 

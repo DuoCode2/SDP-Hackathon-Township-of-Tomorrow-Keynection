@@ -64,7 +64,9 @@ def corpus() -> dict[str, list[str]]:
     readme = (REPO / "README.md").read_text(encoding="utf-8")
     out["en"] += [p for p in re.split(r"\n\s*\n", re.sub(r"[`*#>\[\]()|!]", " ", readme)) if len(p) > 40 and not re.search(r"[一-鿿]", p)]
     for lang in out:
-        out[lang] = [re.sub(r"(?i)\bhey\s+keynection\b|\bkeynection\b|\bjiran\b", "the app", s) for s in out[lang]]
+        # A line that says the wake phrase itself ("免提：说 “Hello Neighbour”") is a positive, not a negative: it goes.
+        out[lang] = [re.sub(r"(?i)\bhey\s+keynection\b|\bkeynection\b|\bjiran\b", "the app", s) for s in out[lang]
+                     if not re.search(r"(?i)\b(hello|hey|hi)\s+neighbou?rs?\b", s)]
     return out
 
 

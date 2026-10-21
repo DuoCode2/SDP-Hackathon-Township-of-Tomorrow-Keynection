@@ -42,12 +42,19 @@ Measure before changing it: this model was not trained on any wake word, and how
 
 Synthetic voices only (macOS's built-in voices, English with US, UK, Irish, Australian, South African and Indian accents, plus the Malay, Tamil and Chinese voices saying the English phrase), each at three speaking rates. Voices were split in two: thresholds were chosen on one half, recall is reported on the other (the Malay and Tamil voices are in that held-out half). The false-wake test is the app's own sentences read aloud in English, Malay, Chinese and Tamil (product name removed). The scripts are in `eval/`.
 
-| | Hey Keynection (first choice) | Hello Neighbour (used) |
+| | Hey Keynection (first choice) | Hello Neighbour (used: threshold 0.15, boost 1.5) |
 |---|---|---|
-| Clean, tuning voices | 36–63% (loosest settings) | 100% |
-| Clean, held-out voices | — | 89.6% at threshold 0.25 |
+| Clean, tuning voices | 36–63% (even at the loosest settings) | 100% (42/42) |
+| Clean, held-out voices | — | **91.7% (44/48)** |
+| Pink noise at 15 dB, held out | — | 77.1% |
+| Other speech under it at 10 dB, held out | — | 79.2% |
+| False wakes: the app's sentences read aloud, en 3.3 h, ms 1.2 h, zh 1.3 h, ta 0.2 h | — | **0 in 6.0 h** |
 | Control: the model's own phrases ("Hello world", "Alexa", "Hey Siri"), same voices | 82–84% | |
 
-"Keynection" is a made-up word; the macOS voices also say it close to "connection". The full numbers for "Hello Neighbour", the threshold chosen and why, are in the pull request that added this.
+"Keynection" is a made-up word; the macOS voices also say it close to "connection".
+
+The threshold is the loosest with no false wake: at 0.1 one Chinese sentence woke it, and so did "Hello there. Say hello to the neighbours." run together (the browser walk's near-miss recording); 0.15 to 0.25 never did. What it still gets wrong, measured: the Malay voice missed all three of its clips (Malay-accented speakers may need to say it clearly), and phrases that sound almost the same wake it often ("Yellow neighbour", "Hollow neighbour" about 60%, "Hello labour" about 35%). "Hello neighbourhood" wakes it, as it contains the phrase.
+
+A first run counted 21 "false wakes" in Chinese and 4 in Malay: the app's own new strings were in the negatives and say "Hello Neighbour" themselves (免提：说 “Hello Neighbour”). The negatives now leave out any line that says the phrase.
 
 The engine compiled here and the Python package scored the same clips with the same settings: 67 of 68 clips agreed on whether it fired, and where both fired the time was identical. The worklet's resampling (48 kHz → 16 kHz by averaging) caught the same held-out clips as 16 kHz audio fed directly (43/48 against 43/48 at 0.25).
