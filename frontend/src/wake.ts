@@ -71,7 +71,12 @@ export class WakeWord {
       this.ctx = new AudioContext()
       if (this.ctx.state === 'suspended') await Promise.race([this.ctx.resume(), new Promise((r) => setTimeout(r, 500))])
       await this.ctx.audioWorklet.addModule(`${BASE}capture-worklet.js`)
-      await this.load()
+      // Once more if the first download fails: the browser picks another connection for the second (measured:
+      // HTTP/3 to Render failing after 45 s through a home router, the retry over TCP fine).
+      await this.load().catch((e) => {
+        console.warn('wake word engine failed to load, trying once more', e)
+        return this.load()
+      })
     } catch (e) {
       this.stop()
       this.set('unsupported')
@@ -98,15 +103,18 @@ export class WakeWord {
 
   /** The engine in its worker, ready to listen: about 8 MB the first time, then from the browser's cache. */
   private load(): Promise<void> {
+    this.worker?.terminate()
+    this.worker = null
     return new Promise((resolve, reject) => {
       const w = new Worker(`${BASE}kws-worker.js`)
-      const timer = setTimeout(() => reject(new Error('the wake word engine took too long to load')), 60_000)
+      const timer = setTimeout(() => { w.terminate(); reject(new Error('the wake word engine took too long to load')) }, 90_000)
       w.onmessage = (e: MessageEvent<{ type: string; message?: string }>) => {
         if (e.data.type === 'ready') {
           clearTimeout(timer)
           resolve()
         } else if (e.data.type === 'error') {
           clearTimeout(timer)
+          w.terminate()
           reject(new Error(e.data.message))
         } else if (e.data.type === 'wake') {
           heard.wakes.push(heard.chunks)

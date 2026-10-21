@@ -11,7 +11,14 @@ let kws = null
 let stream = null
 let runtime = false
 
+// A download that fails half way (the engine is 8 MB) must say so at once, not leave the page waiting: Chrome then
+// retries over another connection when the page starts a new worker (seen: HTTP/3 failing through a home router).
+const fail = (e) => self.postMessage({ type: 'error', message: String((e && (e.message || e.reason)) || e) })
+self.addEventListener('unhandledrejection', (e) => fail(e.reason))
+self.addEventListener('error', (e) => fail(e.message))
+
 self.Module = {
+  onAbort: (what) => fail(what),
   locateFile: (file) => new URL(file, self.location.href).href,
   onRuntimeInitialized: () => {
     runtime = true

@@ -10,7 +10,8 @@ import { dismissWelcome, enterSite, resetDemo, watchErrors } from './helpers'
 //  - the server's listening, for a browser without its own, is the server stand-in by default, the real gateway with
 //    KEYNECTION_E2E_REAL=1 (and KEYNECTION_STT_KEY), or whatever a deployed site has with E2E_BASE_URL.
 
-const REAL = process.env.KEYNECTION_E2E_REAL === '1' || !!process.env.E2E_BASE_URL
+const REMOTE = !!process.env.E2E_BASE_URL
+const REAL = process.env.KEYNECTION_E2E_REAL === '1' || REMOTE
 const TOGGLE = 'Hands-free: say “Hello Neighbour”'
 const LISTENING = 'Say “Hello Neighbour” to ask, any time this page is open'
 
@@ -26,6 +27,8 @@ const test = base.extend<{ micFile: string }>({
     await browser.close()
   },
 })
+// A deployed site: Render's free tier may be waking, and the engine comes over the internet.
+if (REMOTE) test.describe.configure({ timeout: 300_000 })
 
 /** The browser's own listening, standing in for Chrome's: whatever it starts, it hears this sentence. */
 async function browserHears(page: Page, sentence: string) {
@@ -98,7 +101,8 @@ async function handsFreeOn(page: Page) {
   await page.getByRole('button', { name: 'Ask the assistant' }).click()
   const chat = page.getByRole('dialog', { name: 'Keynection assistant' })
   await chat.getByRole('button', { name: TOGGLE }).click()
-  await expect(chat.getByRole('status').filter({ hasText: LISTENING })).toBeVisible({ timeout: 90_000 })  // 8 MB, once
+  // 8 MB the first time; over a slow or broken connection the engine is fetched once more.
+  await expect(chat.getByRole('status').filter({ hasText: LISTENING })).toBeVisible({ timeout: REMOTE ? 200_000 : 90_000 })
   await expect(chat.getByRole('button', { name: TOGGLE })).toHaveAttribute('aria-pressed', 'true')
   await chat.getByRole('button', { name: 'Cancel' }).click()
   await expect(chat).toBeHidden()
@@ -154,6 +158,20 @@ test.describe('the browser listens after the wake word', () => {
     await page.waitForTimeout(1500)
     expect(await chunks(page)).toBe(before)
     expect(errors).toEqual([])
+  })
+})
+
+test.describe('a broken download', () => {
+  test.skip(REMOTE, 'cuts a download on purpose: local server only')
+
+  test('if the engine download fails half way, it is fetched once more and hands-free still starts', async ({ page }) => {
+    const { errors } = await start(page)
+    let tries = 0
+    await page.context().route('**/wake/sherpa-onnx-wasm-kws-main.data', (route) => (++tries === 1 ? route.abort('failed') : route.continue()))
+    await handsFreeOn(page)
+    expect(tries).toBe(2)
+    // The worker's own report of the first failure is expected; anything else is not.
+    expect(errors.filter((x) => !/Failed to load resource|net::ERR_FAILED|network error/i.test(x))).toEqual([])
   })
 })
 
