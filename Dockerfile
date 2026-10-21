@@ -26,5 +26,9 @@ COPY backend/app backend/app
 COPY backend/scripts backend/scripts
 COPY --from=web /web/dist frontend/dist
 EXPOSE 8000
+# The commit this image was built from, which /api/health names (the aws32g deployer passes --build-arg
+# GIT_COMMIT=<sha>; Render names its own commit instead). Last, so a new commit reuses every layer above.
+ARG GIT_COMMIT=""
+ENV KEYNECTION_COMMIT=${GIT_COMMIT}
 # One worker on purpose: the demo database is SQLite on a single volume.
 CMD ["sh", "-c", "exec python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port ${PORT:-8000}"]

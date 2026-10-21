@@ -3,9 +3,10 @@
 Every push to `main` of DuoCode2/SDP-Hackathon-Township-of-Tomorrow-Keynection whose Tests pass makes the repo's
 Deploy workflow create a GitHub Deployment (environment `production`); anyone with write access can also start one
 with "Run workflow". This service picks the newest pending one, builds it on Depot (project `keynection`
-b3gw1528tz, `depot build --load`, no registry), swaps the `keynection-app` container, checks /api/health on
-127.0.0.1:8095 and on the public URL, and reports the result to the deployment the workflow waits on. Unhealthy:
-the previous image goes back. Public URL and settings: /etc/keynection/deployer.json.
+b3gw1528tz, `depot build --load`, no registry; `--build-arg GIT_COMMIT=<sha>` so /api/health names the version),
+swaps the `keynection-app` container, checks /api/health on 127.0.0.1:8095 and on the public URL, and reports the
+result to the deployment the workflow waits on. Unhealthy: the previous image goes back. Public URL and settings:
+/etc/keynection/deployer.json (public URL https://keynection.agenticcs.net since 22 Oct).
 
 - Files: /opt/keynection/{compose.yaml, app.env (600), tunnel.env (600), current.env, data/, src/, builds/};
   logs per deployment /var/log/keynection-deployer/<id>-<sha>.log; journal `journalctl -u keynection-deployer`.

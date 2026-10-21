@@ -825,9 +825,10 @@ class OwnerResponseIn(BaseModel):
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
-    """For the host's health checks. On Render it also names the branch and commit it runs (Render sets both), so
-    anyone can see which version is live after a deploy."""
-    running = {"version": os.environ.get("RENDER_GIT_COMMIT", "")[:7], "branch": os.environ.get("RENDER_GIT_BRANCH", "")}
+    """For the host's health checks. It also names the commit it runs, so anyone can see which version is live after a
+    deploy: on Render the commit and branch Render sets, elsewhere the commit the image was built from (Dockerfile)."""
+    commit = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("KEYNECTION_COMMIT", "")
+    running = {"version": commit[:7], "branch": os.environ.get("RENDER_GIT_BRANCH", "")}
     return {"status": "ok", **{k: v for k, v in running.items() if v}}
 
 
