@@ -106,6 +106,26 @@ async function handsFreeOn(page: Page) {
   return chat
 }
 
+/** What the wake word heard since `record` was set (16 kHz), as a WAV in the test's own output folder, with the
+ *  100 ms pieces at which it heard the phrase: what to listen to when this walk fails. */
+async function saveHeard(page: Page, name: string) {
+  const got = await page.evaluate(() => {
+    const w = (window as unknown as { keynectionWake?: { record?: Float32Array[]; wakes: number[] } }).keynectionWake
+    return { samples: Array.from(w?.record ?? []).flatMap((c) => Array.from(c)), wakes: w?.wakes ?? [] }
+  })
+  const pcm = Buffer.alloc(44 + got.samples.length * 2)
+  pcm.write('RIFF', 0); pcm.writeUInt32LE(36 + got.samples.length * 2, 4); pcm.write('WAVEfmt ', 8)
+  pcm.writeUInt32LE(16, 16); pcm.writeUInt16LE(1, 20); pcm.writeUInt16LE(1, 22); pcm.writeUInt32LE(16000, 24)
+  pcm.writeUInt32LE(32000, 28); pcm.writeUInt16LE(2, 32); pcm.writeUInt16LE(16, 34); pcm.write('data', 36)
+  pcm.writeUInt32LE(got.samples.length * 2, 40)
+  got.samples.forEach((x, i) => pcm.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(x * 32767))), 44 + i * 2))
+  const fs = await import('node:fs')
+  fs.writeFileSync(test.info().outputPath(`${name}.wav`), pcm)
+  await test.info().attach(`${name}.wav`, { body: pcm, contentType: 'audio/wav' })
+  await test.info().attach(`${name}-wakes.json`, { body: JSON.stringify(got.wakes), contentType: 'application/json' })
+  return got.wakes
+}
+
 const chunks = (page: Page) => page.evaluate(() => (window as unknown as { keynectionWake?: { chunks: number } }).keynectionWake?.chunks ?? 0)
 
 test.describe('the browser listens after the wake word', () => {
@@ -146,8 +166,11 @@ test.describe('near misses', () => {
     const chat = await handsFreeOn(page)
 
     // "Hello there. Say hello to the neighbours. Hey, connection. My neighbour said hello…", over and over.
+    await page.evaluate(() => { (window as unknown as { keynectionWake: { record?: Float32Array[] } }).keynectionWake.record = [] })
     const first = await chunks(page)
     await page.waitForTimeout(25_000)
+    const wakes = await saveHeard(page, 'near-misses-heard')
+    expect(wakes, 'the wake word heard the phrase at these 100 ms pieces').toEqual([])
     await expect(chat).toBeHidden()
     expect(asked).toEqual([])
     expect(await chunks(page) - first).toBeGreaterThan(150)  // about 250 pieces of 100 ms: it was hearing all along

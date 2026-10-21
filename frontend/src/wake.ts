@@ -38,9 +38,10 @@ export function holdWake(reason: string, on: boolean) {
   onHolds.forEach((f) => f())
 }
 
-// How many 100 ms pieces of sound have gone to the wake word: the browser tests read it to tell "listening and heard
-// nothing" from "not listening at all".
-const heard = { chunks: 0 }
+// How many 100 ms pieces of sound have gone to the wake word, and how many times it heard the phrase (before the
+// cooldown and holds): the browser tests read these to tell "listening and heard nothing" from "not listening at all".
+// A test can also set `record` to an array to keep a copy of what the wake word heard (16 kHz), and save it.
+const heard: { chunks: number; wakes: number[]; record?: Float32Array[] } = { chunks: 0, wakes: [] }
 ;(window as unknown as { keynectionWake?: typeof heard }).keynectionWake = heard
 
 export class WakeWord {
@@ -108,6 +109,7 @@ export class WakeWord {
           clearTimeout(timer)
           reject(new Error(e.data.message))
         } else if (e.data.type === 'wake') {
+          heard.wakes.push(heard.chunks)
           const now = performance.now()
           if (now - this.last < COOLDOWN_MS || holds.size || document.hidden) return
           this.last = now
@@ -133,7 +135,10 @@ export class WakeWord {
     }
     if (this.mic) return
     try {
-      this.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } })
+      // The sound as it is: the wake word was measured on unprocessed speech, and Chrome's gain control and noise
+      // suppression changed it enough to wake on "Say hello to the neighbours" (measured in the browser walk). Echo
+      // cancellation isn't needed: the wake word lets go while the assistant speaks.
+      this.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } })
     } catch {
       this.release()
       return this.set('blocked')
@@ -145,6 +150,7 @@ export class WakeWord {
     const worker = this.worker
     this.node.port.onmessage = (e: MessageEvent<Float32Array>) => {
       heard.chunks++
+      heard.record?.push(e.data.slice())
       worker.postMessage({ type: 'audio', samples: e.data }, [e.data.buffer])
     }
     // Not heard by anyone: a muted path to the output keeps every browser running the worklet.
