@@ -41,7 +41,9 @@ async function browserHears(page: Page, sentence: string) {
       start() {
         const w = window as unknown as { recognitionStarts?: number }
         w.recognitionStarts = (w.recognitionStarts ?? 0) + 1
-        setTimeout(() => { this.onresult?.({ results: [[{ transcript: words }]] }); this.end() }, 500)
+        // The words half a second in; the end when the button is let go (stop) or, like Chrome, after a pause.
+        setTimeout(() => this.onresult?.({ results: [[{ transcript: words }]] }), 500)
+        setTimeout(() => this.end(), 2500)
       }
       stop() { this.end() }
       private end() { if (!this.ended) { this.ended = true; this.onend?.() } }
@@ -62,15 +64,33 @@ async function noBrowserListening(page: Page) {
 async function start(page: Page) {
   const errors = watchErrors(page)
   const asked: string[] = []
+  const spoken: { text: string; lang: string; status?: number }[] = []
   page.on('request', (r) => {
     if (r.method() === 'POST' && r.url().endsWith('/api/assistant')) asked.push(r.postDataJSON().text)
+    if (r.method() === 'POST' && r.url().endsWith('/api/assistant/speak')) spoken.push(r.postDataJSON())
+  })
+  page.on('response', (r) => {
+    if (r.request().method() === 'POST' && r.url().endsWith('/api/assistant/speak')) {
+      const said = spoken.find((x) => x.status === undefined)
+      if (said) said.status = r.status()
+    }
   })
   await enterSite(page)
   await resetDemo(page)
   await page.goto('/')
   await expect(page.locator('article.person-card').first()).toBeVisible()
   await dismissWelcome(page)
-  return { errors, asked }
+  return { errors, asked, spoken }
+}
+
+/** The spoken reply: the reply's own words go to the server's voice, the speaking panel shows while it plays, and
+ *  then the panel goes. */
+async function heardTheReply(page: Page, chat: ReturnType<Page['getByRole']>, spoken: { text: string; lang: string; status?: number }[], n = 1) {
+  const reply = (await chat.locator('.assistant-reply').last().innerText()).trim()
+  await expect.poll(() => spoken.length).toBe(n)
+  expect(spoken[n - 1]).toMatchObject({ text: reply, lang: 'en' })
+  await expect.poll(() => spoken[n - 1].status).toBe(200)
+  await expect(chat.locator('.voice-panel.speaking')).toBeHidden({ timeout: 15_000 })
 }
 
 /** Turn hands-free on from the chat (the tap that lets the page start audio), wait until it listens, close the chat. */
@@ -93,7 +113,7 @@ test.describe('the browser listens after the wake word', () => {
 
   test('“Hello Neighbour” opens the assistant and the question that follows is asked', async ({ page }) => {
     await browserHears(page, 'what is my renovation status')
-    const { errors, asked } = await start(page)
+    const { errors, asked, spoken } = await start(page)
     const chat = await handsFreeOn(page)
 
     // Nobody touches anything now: the recording says "Hello neighbour", then the question.
@@ -102,6 +122,9 @@ test.describe('the browser listens after the wake word', () => {
     await expect(chat.locator('.assistant-reply').last()).toBeVisible()
     expect(asked).toEqual(['what is my renovation status'])
     expect(await page.evaluate(() => (window as unknown as { recognitionStarts?: number }).recognitionStarts)).toBe(1)
+    // A spoken question gets a spoken reply; while it speaks the wake word waits, then it listens again.
+    await heardTheReply(page, chat, spoken)
+    await expect(page.locator('.assistant-fab')).toHaveClass(/\bwake\b/)
 
     // Turned off, it lets go of the microphone: no more sound reaches the wake word.
     await chat.getByRole('button', { name: TOGGLE }).click()
@@ -153,7 +176,7 @@ test.describe('the server listens after the wake word', () => {
 
   test('without the browser’s own listening, the sentence is recorded, turned into words by the server and asked', async ({ page }) => {
     await noBrowserListening(page)
-    const { errors, asked } = await start(page)
+    const { errors, asked, spoken } = await start(page)
     const heard: number[] = []
     page.on('response', (r) => {
       if (r.request().method() === 'POST' && r.url().endsWith('/api/assistant/transcribe')) heard.push(r.status())
@@ -172,6 +195,39 @@ test.describe('the server listens after the wake word', () => {
     await expect(chat.locator('.assistant-reply').last()).toBeVisible()
     expect(heard).toEqual([200])
     expect(asked).toHaveLength(1)
+    await heardTheReply(page, chat, spoken)
+    expect(errors).toEqual([])
+  })
+})
+
+test.describe('talking without the wake word', () => {
+  test('holding the mic asks what was said and the reply is spoken; any reply can be read aloud and stopped', async ({ page }) => {
+    await browserHears(page, 'what is my warranty status')
+    const { errors, asked, spoken } = await start(page)
+    await page.getByRole('button', { name: 'Ask the assistant' }).click()
+    const chat = page.getByRole('dialog', { name: 'Keynection assistant' })
+    const mic = chat.getByRole('button', { name: 'Hold to talk' })
+    await mic.hover()
+    await page.mouse.down()
+    await expect(chat.locator('.voice-panel.listening')).toBeVisible()
+    await expect(chat.locator('.voice-panel q')).toHaveText('what is my warranty status')
+    await page.mouse.up()
+    await expect(chat.locator('.assistant-msg.me').last()).toHaveText('what is my warranty status')
+    expect(asked).toEqual(['what is my warranty status'])
+    await heardTheReply(page, chat, spoken)
+
+    // Typed questions stay quiet; their reply can still be read aloud, and stopped.
+    await chat.getByLabel('Type what you need').fill('my renovation status')
+    await chat.getByRole('button', { name: 'Ask', exact: true }).click()
+    await expect(chat.locator('.assistant-reply')).toHaveCount(2)
+    await page.waitForTimeout(800)
+    expect(spoken).toHaveLength(1)
+    const last = chat.locator('.assistant-msg.bot').last()
+    await last.getByRole('button', { name: 'Read aloud' }).click()
+    await expect(chat.locator('.voice-panel.speaking')).toBeVisible()
+    await last.getByRole('button', { name: 'Stop speaking' }).click()
+    await expect(chat.locator('.voice-panel.speaking')).toBeHidden()
+    expect(spoken).toHaveLength(2)
     expect(errors).toEqual([])
   })
 })
