@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Ear, Mic, Send, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { Ear, Mic, Send, ShieldCheck, Sparkles, Square, Volume2, X } from 'lucide-react'
 import { api, ApiError, type AssistantPlan, type AssistantTurn, type Directory, type QuietTimes, type RenovationDraft, type UnitInfo } from '../api'
 import type { TabId } from '../guide'
 import { noisyHours, useDates, useLang } from '../i18n'
@@ -9,6 +9,7 @@ import RenovationWizard from '../screens/RenovationWizard'
 import IntroWizard from '../screens/IntroWizard'
 import { forget, remember, remembered } from '../storage'
 import { WakeWord, chime, holdWake, recordSentence, wakeSupported, withoutWakePhrase, type WakeState } from '../wake'
+import { canSpeak, speak, type Speaking } from '../speech'
 
 // Three sentences a judge can try without typing (demo only), one in each language the screens speak.
 const EXAMPLES = [
@@ -20,6 +21,7 @@ const SPEECH_LANG = { en: 'en-MY', ms: 'ms-MY', zh: 'zh-CN' } as const
 const PHONE = '(max-width: 899.98px)'
 const HISTORY = 6  // the last few messages go with each question, so a follow-up is understood
 const HANDS_FREE_WAIT_MS = 8000  // after "Hello Neighbour", how long the browser's listening waits for words
+const WAKE_TO_LISTEN_MS = 350  // the chime and the ripple first, so the listening doesn't start on the chime
 
 // The browser's speech recognition, where there is one (Chrome and Edge call it webkitSpeechRecognition).
 type Recognition = {
@@ -66,6 +68,14 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
   const [easy, setEasy] = useState(false)
   const [wake, setWake] = useState<WakeState>('off')
   const [handsFree, setHandsFree] = useState(false)  // listening because "Hello Neighbour" was heard
+  // What the voice is doing, shown in the panel above the text box: the wake ripple, listening, turning a recording
+  // into words, or speaking a reply (thinking is `busy`). `level` moves the orb with the voice, 0 to 1.
+  const [phase, setPhase] = useState<'idle' | 'waking' | 'listening' | 'transcribing' | 'speaking'>('idle')
+  const [level, setLevel] = useState(0)
+  const [woke, setWoke] = useState(false)
+  const [speakingId, setSpeakingId] = useState<number | null>(null)
+  const speaking = useRef<Speaking | null>(null)
+  const cancelled = useRef(false)
   const wakeWord = useRef<WakeWord | null>(null)
   const onWake = useRef<() => void>(() => undefined)
   const recording = useRef<ReturnType<typeof recordSentence> | null>(null)
@@ -77,7 +87,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
   // Heard in the language the screens are in; a Tamil-reading household on the English screens is heard in Tamil.
   const speechLang = lang === 'en' && me.lang === 'ta' ? 'ta-IN' : SPEECH_LANG[lang]
   // Where words come from when spoken: the browser's own listening, or else the server's (demo only).
-  const serverEars = !Listener && !!ai?.stt
+  const serverEars = !Listener && !!ai?.listen
   const canHear = !!Listener || serverEars
 
   // Hands-free, as this browser last left it. After a page load the audio waits for a tap (WakeWord.resume).
@@ -113,7 +123,6 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
   const update = (id: number, patch: Partial<Extract<Msg, { who: 'assistant' }>>) =>
     setChat((c) => c.map((m) => (m.id === id && m.who === 'assistant' ? { ...m, ...patch } : m)))
 
-  /** Ask; again: the same words once more after the AI didn't answer in time (no second bubble of yours). */
   async function turnWake(on: boolean) {
     if (!on) {
       wakeWord.current?.stop()
@@ -135,14 +144,46 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
 
   // "Hello Neighbour" was heard: a chime, the chat, and listening for what comes next, as if the mic were held.
   onWake.current = () => {
-    if (busy || listener.current || recording.current) return
+    if (busy || listener.current || recording.current || speaking.current) return
     chime()
     setOpen(true)
-    if (Listener) listen(true)
-    else if (serverEars) void record(true)
+    setWoke(true)
+    setPhase('waking')
+    holdWake('assistant', true)
+    window.setTimeout(() => setWoke(false), 900)
+    window.setTimeout(() => {
+      if (Listener) listen(true)
+      else if (serverEars) void record(true)
+      else setPhase('idle')
+    }, WAKE_TO_LISTEN_MS)
   }
 
-  async function ask(words: string, again = false) {
+  /** Speak one reply (by the server for English, the device's voice otherwise); the wake word waits meanwhile, so it
+   *  never hears the assistant. Pressing a reply's speaker button again stops it. */
+  async function sayReply(id: number, words: string, replyLang: string) {
+    if (!canSpeak(replyLang, !!ai?.speak)) return
+    speaking.current?.stop()
+    holdWake('speaking', true)
+    setPhase('speaking')
+    setSpeakingId(id)
+    const s = speak(words, replyLang, { unitId: me.id, serverSpeaks: !!ai?.speak })
+    speaking.current = s
+    try {
+      await s.done
+    } finally {
+      if (speaking.current === s) {
+        speaking.current = null
+        setSpeakingId(null)
+        setPhase('idle')
+        holdWake('speaking', false)
+      }
+    }
+  }
+  const stopSpeaking = () => speaking.current?.stop()
+
+  /** Ask; again: the same words once more after the AI didn't answer in time (no second bubble of yours). A question
+   *  that was spoken gets its reply spoken too. */
+  async function ask(words: string, again = false, spoken = false) {
     const what = words.trim()
     if (!what || busy) return
     const history: AssistantTurn[] = chat.slice(-HISTORY).map((m) => ({ who: m.who, text: m.text }))
@@ -153,6 +194,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
       const plan = await api.assistant(me.id, what, tab, lang, history)
       const id = nextId.current++
       setChat((c) => [...c, { id, who: 'assistant', text: plan.reply, said: what, plan }])
+      if (spoken) void sayReply(id, plan.reply, plan.language)
       if (plan.intent === 'go_to_page' && plan.page) {
         onGo(plan.page)
         if (window.matchMedia(PHONE).matches) setOpen(false)  // on a phone the chat covers the page it opened
@@ -214,15 +256,19 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
    *  (after "Hello Neighbour") the browser stops by itself when the sentence ends, or after a quiet wait. */
   function listen(free = false) {
     if (!Listener || listener.current || busy) return
+    speaking.current?.stop()
     const r = new Listener()
     r.lang = speechLang
     r.interimResults = true
     r.continuous = false
     said.current = ''
+    cancelled.current = false
     let wait: number | undefined
     r.onresult = (e) => {
       said.current = Array.from(e.results, (x) => x[0].transcript).join('')
       setHeard(said.current)
+      setLevel(0.9)  // the browser gives words, not sound: each new word lifts the orb
+      window.setTimeout(() => setLevel(0.35), 180)
       window.clearTimeout(wait)
     }
     r.onerror = (e) => { if (e.error === 'not-allowed') toast(t('assistant.micBlocked'), 'error') }
@@ -231,14 +277,18 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
       listener.current = null
       setHeard(null)
       setHandsFree(false)
+      setPhase('idle')
+      setLevel(0)
       holdWake('assistant', false)
       const words = withoutWakePhrase(said.current)
-      if (words) void ask(words)
+      if (cancelled.current) return
+      if (words) void ask(words, false, true)
       else if (free) toast(t('assistant.wake.nothing'))
     }
     holdWake('assistant', true)  // the wake word lets go of the microphone while this listens (iPhone needs it)
     listener.current = r
     setHandsFree(free)
+    setPhase('listening')
     setHeard('')
     try {
       r.start()
@@ -247,6 +297,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
       listener.current = null
       setHeard(null)
       setHandsFree(false)
+      setPhase('idle')
       holdWake('assistant', false)
     }
   }
@@ -254,22 +305,27 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
   /** For a browser that cannot listen: record the sentence, have the server turn it into words, and ask. */
   async function record(free = false) {
     if (recording.current || busy) return
-    const r = recordSentence({ handsFree: free })
+    speaking.current?.stop()
+    const r = recordSentence({ handsFree: free, onLevel: setLevel })
     recording.current = r
+    cancelled.current = false
     holdWake('assistant', true)
     setHandsFree(free)
+    setPhase('listening')
     setHeard('')
     try {
       const got = await r.done
       setHeard(null)
+      setLevel(0)
       if (!got) {
-        if (free) toast(t('assistant.wake.nothing'))
+        if (free && !cancelled.current) toast(t('assistant.wake.nothing'))
         return
       }
-      setBusy(true)
+      setPhase('transcribing')
       const words = await api.transcribe(me.id, got.blob, got.seconds, lang === 'en' && me.lang === 'ta' ? 'ta' : lang)
-        .then((x) => withoutWakePhrase(x.text)).finally(() => setBusy(false))
-      if (words) await ask(words)
+        .then((x) => withoutWakePhrase(x.text))
+      setPhase('idle')
+      if (words && !cancelled.current) await ask(words, false, true)
     } catch (e) {
       if (e instanceof DOMException && e.name === 'NotAllowedError') toast(t('assistant.micBlocked'), 'error')
       else toast(e instanceof ApiError || e instanceof Error ? e.message : 'Could not listen', 'error')
@@ -277,6 +333,8 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
       recording.current = null
       setHeard(null)
       setHandsFree(false)
+      setPhase((p) => (p === 'speaking' ? p : 'idle'))
+      setLevel(0)
       holdWake('assistant', false)
     }
   }
@@ -286,9 +344,15 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
     listener.current?.stop()
     recording.current?.stop()
   }
-  function close() {
+  /** Stop whatever the voice is doing; nothing half-heard is asked. */
+  function cancelVoice() {
+    cancelled.current = true
     listener.current?.stop()
     recording.current?.cancel()
+    speaking.current?.stop()
+  }
+  function close() {
+    cancelVoice()
     setOpen(false)
   }
 
@@ -352,7 +416,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
 
   return (
     <>
-      <button className={`assistant-fab ${easy ? 'big' : ''} ${open ? 'on' : ''} ${wake === 'listening' ? 'wake' : ''}`}
+      <button className={`assistant-fab ${easy ? 'big' : ''} ${open ? 'on' : ''} ${wake === 'listening' ? 'wake' : ''} ${woke ? 'woke' : ''}`}
         onClick={() => (open ? close() : setOpen(true))} aria-label={t('assistant.open')} aria-expanded={open}
         title={wake === 'listening' ? `${t('assistant.open')} · ${t('assistant.wake.fab')}` : t('assistant.open')}>
         {open ? <X size={easy ? 28 : 22} /> : <Mic size={easy ? 28 : 22} />}
@@ -384,7 +448,15 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
               ? <div key={m.id} className="assistant-msg me"><p>{m.text}</p></div>
               : (
                 <div key={m.id} className="assistant-msg bot" aria-live="polite">
-                  <p className="assistant-reply">{m.text}</p>
+                  <p className="assistant-reply">{m.text}
+                    {canSpeak(m.plan.language, !!ai?.speak) && (
+                      <button type="button" className={`assistant-say ${speakingId === m.id ? 'on' : ''}`}
+                        aria-label={t(speakingId === m.id ? 'voice.stop' : 'voice.read')} title={t(speakingId === m.id ? 'voice.stop' : 'voice.read')}
+                        onClick={() => (speakingId === m.id ? stopSpeaking() : void sayReply(m.id, m.text, m.plan.language))}>
+                        {speakingId === m.id ? <Square size={12} /> : <Volume2 size={13} />}
+                      </button>
+                    )}
+                  </p>
                   {card(m, i === chat.length - 1)}
                 </div>
               )))}
@@ -395,6 +467,22 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
             <p className={`assistant-wake ${wake}`} role="status">
               <Ear size={13} /> {t(wake === 'listening' ? 'assistant.wake.on' : `assistant.wake.${wake}`)}
             </p>
+          )}
+          {phase !== 'idle' && (
+            <div className={`voice-panel ${phase} ${handsFree ? 'free' : ''}`} style={{ '--level': level } as React.CSSProperties}
+              role="status" aria-live="polite">
+              <span className="voice-orb" aria-hidden="true"><i /><i /><i />
+                <b>{phase === 'speaking' ? <Volume2 size={18} /> : <Mic size={18} />}</b>
+              </span>
+              <span className="voice-words">
+                <small>{t(phase === 'listening' ? (handsFree ? 'assistant.wake.yes' : 'assistant.listening') : `voice.${phase}`)}</small>
+                {heard ? <q>{heard}</q> : phase === 'listening' && handsFree && <span className="voice-wait" key={String(handsFree)} />}
+              </span>
+              <button type="button" className="voice-cancel" onClick={cancelVoice}
+                aria-label={t(phase === 'speaking' ? 'voice.stop' : 'voice.cancel')} title={t(phase === 'speaking' ? 'voice.stop' : 'voice.cancel')}>
+                {phase === 'speaking' ? <Square size={14} /> : <X size={16} />}
+              </button>
+            </div>
           )}
           <form className="assistant-compose" onSubmit={(e) => { e.preventDefault(); void ask(text) }}>
             {canHear && (

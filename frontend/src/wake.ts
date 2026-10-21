@@ -191,7 +191,7 @@ export function chime() {
 /** One sentence from the microphone, for a browser that cannot listen by itself: starts at once, stops by itself
  *  after a second of quiet once speech has begun (or when stop() is called, for the hold-to-talk button), and gives up
  *  if nothing is said in the first seconds. The recording is for the server to turn into words, then dropped. */
-export function recordSentence({ handsFree }: { handsFree: boolean }) {
+export function recordSentence({ handsFree, onLevel }: { handsFree: boolean; onLevel?: (level: number) => void }) {
   const MAX_MS = 15_000, QUIET_MS = 1000, WAIT_MS = 6000
   let stopNow: (keep: boolean) => void = () => undefined
   const done = (async (): Promise<{ blob: Blob; seconds: number } | null> => {
@@ -211,6 +211,7 @@ export function recordSentence({ handsFree }: { handsFree: boolean }) {
       const tick = setInterval(() => {
         meter.getFloatTimeDomainData(frame)
         const rms = Math.sqrt(frame.reduce((a, x) => a + x * x, 0) / frame.length)
+        onLevel?.(Math.min(1, rms * 8))  // for the listening orb: 0 silent, 1 loud
         const now = performance.now()
         if (frames++ < 5) floor = Math.max(floor, rms)  // the room in the first quarter second
         const loud = rms > Math.max(0.015, floor * 2.5)

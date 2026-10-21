@@ -1750,6 +1750,40 @@ button.ring-row:hover { background: var(--surface-2); }
 .wake-toggle.on { color: var(--ok-text); background: color-mix(in srgb, var(--ok) 14%, transparent); }
 .assistant-wake { margin: 0; padding: 6px 14px; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ok-text); background: color-mix(in srgb, var(--ok) 9%, var(--surface)); border-top: 1px solid var(--line-2); }
 .assistant-wake.blocked, .assistant-wake.unsupported, .assistant-wake.paused { color: var(--muted); background: var(--surface-2); }
+/* The wake ripple: the button pops and two rings burst from it when "Hello Neighbour" is heard. */
+.assistant-fab.woke { animation: wake-pop 600ms var(--ease); }
+.assistant-fab.woke::before, .assistant-fab.woke::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--brand); opacity: 0; animation: wake-burst 900ms ease-out forwards; pointer-events: none; }
+.assistant-fab.woke::after { animation-delay: 160ms; }
+@keyframes wake-pop { 0% { transform: scale(1); } 35% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@keyframes wake-burst { from { opacity: 0.8; transform: scale(1); } to { opacity: 0; transform: scale(2.4); } }
+/* The voice panel above the text box: waking, listening, turning a recording into words, speaking. The orb's centre
+   grows and its rings reach further with the voice (--level, 0 to 1). */
+.voice-panel { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--line-2); background: color-mix(in srgb, var(--brand) 7%, var(--surface)); animation: rise 200ms var(--ease) both; }
+.voice-panel.speaking { background: color-mix(in srgb, var(--ok) 9%, var(--surface)); }
+.voice-orb { position: relative; width: 44px; height: 44px; flex: none; display: grid; place-items: center; }
+.voice-orb b { position: relative; z-index: 1; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--brand-grad); box-shadow: var(--brand-glow); transform: scale(calc(1 + var(--level, 0) * 0.18)); transition: transform 90ms linear; }
+.voice-panel.speaking .voice-orb b { background: linear-gradient(135deg, var(--ok-2) 0%, var(--ok) 100%); }
+.voice-orb i { position: absolute; inset: 5px; border-radius: 50%; border: 2px solid var(--brand); opacity: 0; animation: voice-ring 1.6s ease-out infinite; }
+.voice-orb i:nth-child(2) { animation-delay: 0.53s; }
+.voice-orb i:nth-child(3) { animation-delay: 1.06s; }
+.voice-panel.speaking .voice-orb i { border-color: var(--ok); animation-duration: 1.1s; }
+.voice-panel.waking .voice-orb i, .voice-panel.transcribing .voice-orb i { animation-duration: 0.9s; }
+@keyframes voice-ring { 0% { opacity: 0.55; transform: scale(0.9); } 100% { opacity: 0; transform: scale(calc(1.7 + var(--level, 0) * 0.6)); } }
+.voice-words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.voice-words small { font-size: 12px; font-weight: 600; color: var(--muted); }
+.voice-words q { font-size: 14.5px; line-height: 1.35; color: var(--ink); quotes: none; overflow-wrap: anywhere; }
+/* Hands-free: how long the listening still waits for words. */
+.voice-wait { position: relative; display: block; height: 3px; border-radius: 3px; overflow: hidden; background: color-mix(in srgb, var(--brand) 18%, transparent); }
+.voice-wait::after { content: ""; position: absolute; inset: 0; background: var(--brand); transform-origin: left; animation: voice-wait 8s linear forwards; }
+@keyframes voice-wait { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.voice-cancel { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line-2); background: var(--surface); color: var(--text-2); cursor: pointer; }
+.voice-cancel:focus-visible, .assistant-say:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.assistant-say { margin-left: 6px; width: 24px; height: 24px; display: inline-grid; place-items: center; vertical-align: -5px; border-radius: 50%; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.assistant-say:hover, .assistant-say.on { color: var(--brand-text); background: var(--brand-bg); }
+@media (prefers-reduced-motion: reduce) {
+  .assistant-fab.woke, .assistant-fab.woke::before, .assistant-fab.woke::after, .voice-orb i, .voice-wait::after, .voice-panel { animation: none; }
+  .voice-orb b { transition: none; }
+}
 .assistant-chat { position: fixed; inset: 0; z-index: 45; display: flex; flex-direction: column; background: var(--paper); animation: rise 240ms var(--ease) both; }
 @media (min-width: 900px) {
   .assistant-chat { inset: auto 24px 88px auto; width: 400px; height: min(620px, calc(100dvh - 120px)); border-radius: 18px; border: 1px solid var(--line-2); overflow: hidden; box-shadow: var(--shadow-2), 0 30px 60px -30px color-mix(in srgb, var(--ink) 45%, transparent); animation: pop 200ms var(--ease) both; }

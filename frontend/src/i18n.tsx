@@ -261,6 +261,13 @@ const D: Record<string, Entry> = {
   'assistant.wake.yes': ['Yes? I’m listening…', 'Ya? Saya mendengar…', '在，请说…'],
   'assistant.wake.nothing': ['Didn’t hear anything. Say “Hello Neighbour” again, or type.', 'Tiada apa yang didengar. Sebut “Hello Neighbour” lagi, atau taip.', '没听到内容。再说一次 “Hello Neighbour”，或者打字。'],
   'assistant.wake.fab': ['Listening for “Hello Neighbour”', 'Mendengar “Hello Neighbour”', '正在等 “Hello Neighbour”'],
+  // The voice panel above the text box, and a reply's speaker button.
+  'voice.waking': ['Yes?', 'Ya?', '在！'],
+  'voice.transcribing': ['Getting your words…', 'Mendapatkan kata-kata anda…', '正在识别你说的话…'],
+  'voice.speaking': ['Speaking… tap the square to stop', 'Sedang bercakap… ketik petak untuk berhenti', '正在朗读…点方块停止'],
+  'voice.cancel': ['Stop listening', 'Berhenti mendengar', '停止聆听'],
+  'voice.stop': ['Stop speaking', 'Berhenti bercakap', '停止朗读'],
+  'voice.read': ['Read aloud', 'Baca dengan kuat', '朗读'],
   'assistant.type': ['Type what you need', 'Taip apa yang anda perlukan', '打字说你要做什么'],
   'assistant.ask': ['Ask', 'Tanya', '问'],
   'assistant.working': ['Working it out…', 'Sedang memahami…', '正在理解…'],

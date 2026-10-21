@@ -709,7 +709,9 @@ export interface AiStatus {
   model: string | null
   provider: 'anthropic' | 'gemini' | null
   /** The server can turn speech into words, for a browser that cannot listen by itself (demo only). */
-  stt?: boolean
+  listen?: boolean
+  /** The server can speak the assistant's English replies (demo only); other languages use the browser's voices. */
+  speak?: boolean
 }
 
 /** One sentence turned into notice fields. Empty fields are left for the owner; "unsure" names what was dropped. */
@@ -933,6 +935,12 @@ export const api = {
   /** Marks the other side's messages read; `marked` is how many were newly read (0 when nothing changed). */
   markRead: (unitId: string, otherId: string) => request<{ ok: boolean; marked: number }>(`/api/units/${unitId}/conversations/${otherId}/read`, { method: 'POST' }),
   aiStatus: () => request<AiStatus>('/api/ai'),
+  /** One of the assistant's replies, spoken (MP3). English only; the server says so (422) for other languages. */
+  speak: async (unitId: string, text: string, lang: string): Promise<Blob> => {
+    const res = await fetch('/api/assistant/speak', json('POST', { unit_id: unitId, text, lang }))
+    if (!res.ok) throw new ApiError(res.status, 'The reply could not be spoken.')
+    return res.blob()
+  },
   /** What was said to the assistant, as words: for a browser without its own listening. The recording is not kept. */
   transcribe: (unitId: string, blob: Blob, seconds: number, lang: string) => {
     const form = new FormData()
