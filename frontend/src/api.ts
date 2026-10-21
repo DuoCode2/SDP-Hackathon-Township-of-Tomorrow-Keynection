@@ -95,7 +95,7 @@ export interface NearbyHome extends Omit<UnitInfo, 'resident_name' | 'lang' | 'h
 }
 
 export interface Directory {
-  circle: (Neighbour & { known: boolean; bio?: string; lang: Lang | null })[]
+  circle: (Neighbour & { known: boolean; hello_sent?: boolean; bio?: string; lang: Lang | null })[]
   nearby: NearbyHome[]
   works: string[]
   ring2_label: string

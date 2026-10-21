@@ -1755,6 +1755,14 @@ button.ring-row:hover { background: var(--surface-2); }
 .assistant-fab.big { height: 64px; min-width: 64px; }
 .assistant-fab.big .orb { width: 64px; height: 64px; }
 .assistant-fab:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; }
+/* On a phone the orb floats over the cards' right-hand buttons (Wave at Siti sat under it on a 375 px screen): smaller,
+   tucked into the corner above the dock, and the page scrolls past it so nothing stays hidden at the bottom. */
+@media (max-width: 899.98px) {
+  .assistant-fab { right: 10px; bottom: calc(78px + env(safe-area-inset-bottom)); height: 44px; min-width: 44px; }
+  .assistant-fab .orb { width: 44px; height: 44px; }
+  .assistant-fab.on { width: 44px; }
+  .content { padding-bottom: 150px; }
+}
 @media (min-width: 900px) { .assistant-fab { right: 24px; bottom: 24px; } }
 @media (min-width: 1312px) { .app.guide-on .assistant-fab { right: 324px; } }
 .assistant-fab.on { background: var(--ink); justify-content: center; width: 52px; }
@@ -1856,6 +1864,8 @@ button.ring-row:hover { background: var(--surface-2); }
 .opening-step { width: min(560px, 100%); margin-block: auto; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; animation: enter 260ms var(--ease) both; }
 .opening-step.wide { width: min(960px, 100%); }
 .opening-step h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
+.opening-tagline { font-size: 24px; color: var(--ink); }
+.opening-tagline-sub { max-width: 440px; margin-bottom: 4px !important; }
 .opening-step p { margin: 0; }
 .opening-card { display: flex; align-items: center; gap: 16px; width: 100%; padding: 18px; border-radius: 18px; background: #fff; border: 1px solid var(--line-2); box-shadow: var(--shadow-2); text-align: left; }
 .opening-card img, .opening-card .reach-qr-blank { width: 132px; height: 132px; flex: none; border-radius: 10px; }

@@ -8,7 +8,7 @@ Keynection has 408 automated server tests (`testing-overview.md`). This page is 
 
 - **Where**: the online demo https://keynection.onrender.com (shared password, given privately), or locally with `start-demo.bat` (http://localhost:8000). Locally, AI screens can be checked without a key using the stand-in server (`.claude/launch.json` → `keynection-ai-standin`, port 8030; answers are marked `[stand-in]`).
 - **Clean start**: clear this site's storage in the browser (or use a private window) so the welcome card and the guide appear as a judge sees them.
-- **Shared demo**: the online demo is one database for everyone. After 20 quiet minutes it starts over by itself; a wave counts as "already waved" for 5 minutes; daily caps are ten times a pilot's. If a step still says it was already done, press **Reset demo data** at the bottom of the SDP page (under "Show every feature").
+- **Shared demo**: the online demo is one database for everyone. After 20 quiet minutes it starts over by itself; a wave counts as "already waved" for 5 minutes; daily caps are ten times a pilot's. If a step still says it was already done, open the site with `?rehearsal=1` on the address and press **Reset demo data** at the bottom of the SDP page (under "Show every feature"); without that flag the button is hidden, so a judge cannot start everyone over.
 - **Record**: for each ID write *Pass* or *Blocked (one line: where)*, the device, browser and date. Screenshots go to `evidence/device-check/` (phones) or `evidence/route-screenshots/` (desktop, scripted).
 
 ## A. The 3-minute judge route (K00–K15)

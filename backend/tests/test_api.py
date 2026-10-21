@@ -33,6 +33,24 @@ def test_intro_reaches_the_five_neighbours_and_wave_back_forms_the_card(client):
     assert next(n for n in card["neighbours"] if n["id"] == "T-11")["known"] is True
 
 
+def test_a_hello_that_nobody_has_answered_shows_as_sent_not_as_not_met(client):
+    """The owner should not be told "not met yet" about a neighbour they already greeted: the card says the hello
+    is out until someone replies, and the circle as a whole reports who still hasn't had one."""
+    before = {n["id"]: n for n in client.get("/api/units/T-12/card").json()["neighbours"]}
+    assert before["T-11"]["hello_sent"] is False and before["T-11"]["known"] is False
+    sent = client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi, Aiman from No. 12", "lang": "en",
+                                            "to_unit_ids": ["T-11", "T-13"]})
+    assert sent.status_code == 201
+    after = {n["id"]: n for n in client.get("/api/units/T-12/card").json()["neighbours"]}
+    assert after["T-11"]["hello_sent"] is True and after["T-11"]["known"] is False
+    assert after["T-13"]["hello_sent"] is True
+    assert after["T-21"]["hello_sent"] is False  # Priya was not on the list
+    assert after["T-23"]["hello_sent"] is False  # not on Keynection: nothing could reach them
+    # Siti's side is untouched: she received a hello, she did not send one.
+    siti = {n["id"]: n for n in client.get("/api/units/T-11/card").json()["neighbours"]}
+    assert siti["T-12"]["hello_sent"] is False
+
+
 def test_someone_outside_the_circle_cannot_wave_back(client):
     intro_id = client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi"}).json()["id"]
     assert client.post(f"/api/intros/{intro_id}/ack", json={"unit_id": "T-15"}).status_code == 404

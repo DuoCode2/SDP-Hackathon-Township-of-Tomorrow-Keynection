@@ -17,7 +17,7 @@ test('key day: the card, who you are, five homes light up, and a wave lands on N
   await page.goto('/')
 
   await expect(opening(page).getByText('Your keys came with this card')).toBeVisible()
-  await opening(page).getByRole('button', { name: 'Scan the code' }).click()
+  await opening(page).getByRole('button', { name: 'Open my welcome card' }).click()
   await expect(opening(page).getByRole('heading', { name: 'Who are you?' })).toBeVisible()
   const aiman = opening(page).getByRole('button', { name: /^Aiman/ })
   await expect(aiman).toContainText('Start here')
@@ -50,7 +50,7 @@ test('key day: Skip goes straight to Neighbours, and no screen scrolls sideways 
   await page.goto('/')
   await expect(opening(page).getByText('Your keys came with this card')).toBeVisible()
   await noSidewaysScroll(page)
-  await opening(page).getByRole('button', { name: 'Scan the code' }).click()
+  await opening(page).getByRole('button', { name: 'Open my welcome card' }).click()
   await expect(opening(page).getByRole('heading', { name: 'Who are you?' })).toBeVisible()
   await noSidewaysScroll(page)
   await opening(page).getByRole('button', { name: /^Siti/ }).click()
@@ -58,7 +58,7 @@ test('key day: Skip goes straight to Neighbours, and no screen scrolls sideways 
   await noSidewaysScroll(page)
 
   await page.reload()  // not done yet: it starts again, and Skip ends it from any screen
-  await opening(page).getByRole('button', { name: 'Skip' }).click()
+  await opening(page).getByRole('button', { name: 'Skip the opening' }).click()
   await expect(opening(page)).toBeHidden()
   await expect(page.locator('article.person-card').first()).toBeVisible()
   expect(errors, errors.join('\n')).toEqual([])
