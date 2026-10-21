@@ -13,6 +13,7 @@
     "ai-off": "playwright test ai-off.spec.ts",
     "assistant": "playwright test assistant.spec.ts",
     "opening": "playwright test opening.spec.ts",
+    "wake": "playwright test wake.spec.ts",
     "all": "playwright test",
     "report": "playwright show-report"
   },

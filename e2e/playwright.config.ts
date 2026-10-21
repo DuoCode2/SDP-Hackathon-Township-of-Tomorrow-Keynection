@@ -5,10 +5,13 @@ import { defineConfig, devices } from '@playwright/test'
 // the demo you may have open on 8000 or 8030, and never needs a key. The front end must be built first
 // (`npm run build` in prototype/frontend): the server serves frontend/dist.
 const PORT = process.env.KEYNECTION_E2E_PORT ?? '8031'
+// A deployed site instead (wake.spec.ts against the real gateway): E2E_BASE_URL=https://…, E2E_SITE_PASSWORD=…; no
+// local server is started then.
+const REMOTE = process.env.E2E_BASE_URL
 
 export default defineConfig({
   testDir: '.',
-  testMatch: ['route.spec.ts', 'warranty.spec.ts', 'bothsides.spec.ts', 'a11y.spec.ts', 'monkey.spec.ts', 'audit.spec.ts', 'ai-off.spec.ts', 'assistant.spec.ts', 'opening.spec.ts'], // each starts from the fictional phase as seeded
+  testMatch: ['route.spec.ts', 'warranty.spec.ts', 'bothsides.spec.ts', 'a11y.spec.ts', 'monkey.spec.ts', 'audit.spec.ts', 'ai-off.spec.ts', 'assistant.spec.ts', 'opening.spec.ts', 'wake.spec.ts'], // each starts from the fictional phase as seeded
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
@@ -16,7 +19,7 @@ export default defineConfig({
   retries: 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: `http://127.0.0.1:${PORT}`,
+    baseURL: REMOTE ?? `http://127.0.0.1:${PORT}`,
     ...devices['Desktop Chrome'],
     // 1920×1080: deck-sized frames, and wide enough (≥ 1600 px) for the Guide to be a side column instead of a drawer.
     viewport: { width: 1920, height: 1080 },
@@ -26,7 +29,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  webServer: {
+  webServer: REMOTE ? undefined : {
     command: 'node serve.mjs',
     url: `http://127.0.0.1:${PORT}/api/health`,
     timeout: 120_000,

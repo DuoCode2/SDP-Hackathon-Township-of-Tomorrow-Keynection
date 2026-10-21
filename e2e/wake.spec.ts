@@ -1,0 +1,177 @@
+import { chromium, devices, expect, test as base, type Page } from '@playwright/test'
+import path from 'node:path'
+import { dismissWelcome, enterSite, resetDemo, watchErrors } from './helpers'
+
+// Hands-free: "Hello Neighbour" opens the assistant and what follows is asked. Chrome's fake microphone plays a
+// recording (fixtures/, made by fixtures/make.sh) on a loop, and the real engine hears it: the page's audio worklet,
+// the worker, sherpa-onnx as WebAssembly and the model, as a resident's browser runs them. Two things after the wake
+// word depend on where it runs:
+//  - the browser's own listening (Chrome's goes to Google, which headless Chrome cannot reach) is a stand-in here;
+//  - the server's listening, for a browser without its own, is the server stand-in by default, the real gateway with
+//    KEYNECTION_E2E_REAL=1 (and KEYNECTION_STT_KEY), or whatever a deployed site has with E2E_BASE_URL.
+
+const REAL = process.env.KEYNECTION_E2E_REAL === '1' || !!process.env.E2E_BASE_URL
+const TOGGLE = 'Hands-free: say “Hello Neighbour”'
+const LISTENING = 'Say “Hello Neighbour” to ask, any time this page is open'
+
+// Each test hears its own recording, so each gets its own Chrome with that file as the microphone.
+const test = base.extend<{ micFile: string }>({
+  micFile: ['wake-then-ask.wav', { option: true }],
+  page: async ({ micFile, baseURL }, use) => {
+    const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
+      `--use-file-for-fake-audio-capture=${path.join(__dirname, 'fixtures', micFile)}`] })
+    const context = await browser.newContext({ ...devices['Desktop Chrome'], baseURL, permissions: ['microphone'],
+      viewport: { width: 1920, height: 1080 }, locale: 'en-MY', timezoneId: 'Asia/Kuala_Lumpur', colorScheme: 'light' })
+    await use(await context.newPage())
+    await browser.close()
+  },
+})
+
+/** The browser's own listening, standing in for Chrome's: whatever it starts, it hears this sentence. */
+async function browserHears(page: Page, sentence: string) {
+  await page.addInitScript((words) => {
+    class Recognition {
+      lang = ''
+      interimResults = false
+      continuous = false
+      onresult: ((e: unknown) => void) | null = null
+      onerror: ((e: unknown) => void) | null = null
+      onend: (() => void) | null = null
+      private ended = false
+      start() {
+        const w = window as unknown as { recognitionStarts?: number }
+        w.recognitionStarts = (w.recognitionStarts ?? 0) + 1
+        setTimeout(() => { this.onresult?.({ results: [[{ transcript: words }]] }); this.end() }, 500)
+      }
+      stop() { this.end() }
+      private end() { if (!this.ended) { this.ended = true; this.onend?.() } }
+    }
+    Object.defineProperty(window, 'SpeechRecognition', { value: Recognition, configurable: true })
+    Object.defineProperty(window, 'webkitSpeechRecognition', { value: Recognition, configurable: true })
+  }, sentence)
+}
+
+/** A browser without its own listening (Firefox, say): what is said goes to the server. */
+async function noBrowserListening(page: Page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'SpeechRecognition', { value: undefined, configurable: true })
+    Object.defineProperty(window, 'webkitSpeechRecognition', { value: undefined, configurable: true })
+  })
+}
+
+async function start(page: Page) {
+  const errors = watchErrors(page)
+  const asked: string[] = []
+  page.on('request', (r) => {
+    if (r.method() === 'POST' && r.url().endsWith('/api/assistant')) asked.push(r.postDataJSON().text)
+  })
+  await enterSite(page)
+  await resetDemo(page)
+  await page.goto('/')
+  await expect(page.locator('article.person-card').first()).toBeVisible()
+  await dismissWelcome(page)
+  return { errors, asked }
+}
+
+/** Turn hands-free on from the chat (the tap that lets the page start audio), wait until it listens, close the chat. */
+async function handsFreeOn(page: Page) {
+  await page.getByRole('button', { name: 'Ask the assistant' }).click()
+  const chat = page.getByRole('dialog', { name: 'Keynection assistant' })
+  await chat.getByRole('button', { name: TOGGLE }).click()
+  await expect(chat.getByRole('status').filter({ hasText: LISTENING })).toBeVisible({ timeout: 90_000 })  // 8 MB, once
+  await expect(chat.getByRole('button', { name: TOGGLE })).toHaveAttribute('aria-pressed', 'true')
+  await chat.getByRole('button', { name: 'Cancel' }).click()
+  await expect(chat).toBeHidden()
+  await expect(page.locator('.assistant-fab')).toHaveClass(/\bwake\b/)
+  return chat
+}
+
+const chunks = (page: Page) => page.evaluate(() => (window as unknown as { keynectionWake?: { chunks: number } }).keynectionWake?.chunks ?? 0)
+
+test.describe('the browser listens after the wake word', () => {
+  test.use({ micFile: 'wake-then-ask.wav' })
+
+  test('“Hello Neighbour” opens the assistant and the question that follows is asked', async ({ page }) => {
+    await browserHears(page, 'what is my renovation status')
+    const { errors, asked } = await start(page)
+    const chat = await handsFreeOn(page)
+
+    // Nobody touches anything now: the recording says "Hello neighbour", then the question.
+    await expect(chat).toBeVisible({ timeout: 30_000 })
+    await expect(chat.locator('.assistant-msg.me').last()).toHaveText('what is my renovation status')
+    await expect(chat.locator('.assistant-reply').last()).toBeVisible()
+    expect(asked).toEqual(['what is my renovation status'])
+    expect(await page.evaluate(() => (window as unknown as { recognitionStarts?: number }).recognitionStarts)).toBe(1)
+
+    // Turned off, it lets go of the microphone: no more sound reaches the wake word.
+    await chat.getByRole('button', { name: TOGGLE }).click()
+    await expect(chat.getByRole('button', { name: TOGGLE })).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.locator('.assistant-fab')).not.toHaveClass(/\bwake\b/)
+    const before = await chunks(page)
+    await page.waitForTimeout(1500)
+    expect(await chunks(page)).toBe(before)
+    expect(errors).toEqual([])
+  })
+})
+
+test.describe('near misses', () => {
+  test.use({ micFile: 'near-misses.wav' })
+
+  test('sentences close to the phrase never open it, while it listens the whole time; out of sight it stops', async ({ page }) => {
+    await browserHears(page, 'this should never be asked')
+    const { errors, asked } = await start(page)
+    const chat = await handsFreeOn(page)
+
+    // "Hello there. Say hello to the neighbours. Hey, connection. My neighbour said hello…", over and over.
+    const first = await chunks(page)
+    await page.waitForTimeout(25_000)
+    await expect(chat).toBeHidden()
+    expect(asked).toEqual([])
+    expect(await chunks(page) - first).toBeGreaterThan(150)  // about 250 pieces of 100 ms: it was hearing all along
+
+    // The page out of sight (another tab, the phone locked): the microphone goes, and comes back with the page.
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { value: true, configurable: true })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await expect(page.locator('.assistant-fab')).not.toHaveClass(/\bwake\b/)
+    const hidden = await chunks(page)
+    await page.waitForTimeout(1500)
+    expect(await chunks(page)).toBe(hidden)
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { value: false, configurable: true })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await expect(page.locator('.assistant-fab')).toHaveClass(/\bwake\b/)
+    await expect.poll(() => chunks(page)).toBeGreaterThan(hidden + 5)
+    expect(errors).toEqual([])
+  })
+})
+
+test.describe('the server listens after the wake word', () => {
+  test.use({ micFile: 'wake-then-ask.wav' })
+
+  test('without the browser’s own listening, the sentence is recorded, turned into words by the server and asked', async ({ page }) => {
+    await noBrowserListening(page)
+    const { errors, asked } = await start(page)
+    const heard: number[] = []
+    page.on('response', (r) => {
+      if (r.request().method() === 'POST' && r.url().endsWith('/api/assistant/transcribe')) heard.push(r.status())
+    })
+    const chat = await handsFreeOn(page)
+
+    await expect(chat).toBeVisible({ timeout: 30_000 })
+    const said = chat.locator('.assistant-msg.me').last()
+    if (REAL) {
+      await expect(said).toContainText(/renovation status/i, { timeout: 30_000 })  // the real gateway: Deepgram heard it
+    } else {
+      // The stand-in says what it was sent: a WebM recording of a few seconds, not an empty clip.
+      await expect(said).toContainText('[stand-in] what is my renovation status (audio/webm', { timeout: 30_000 })
+      expect(Number(/, (\d+) KB\)/.exec(await said.innerText())?.[1])).toBeGreaterThanOrEqual(4)
+    }
+    await expect(chat.locator('.assistant-reply').last()).toBeVisible()
+    expect(heard).toEqual([200])
+    expect(asked).toHaveLength(1)
+    expect(errors).toEqual([])
+  })
+})
