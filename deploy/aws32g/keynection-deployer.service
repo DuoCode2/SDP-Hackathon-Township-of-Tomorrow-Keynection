@@ -1,0 +1,20 @@
+[Unit]
+Description=keynection-deployer: deploys DuoCode2/SDP-Hackathon-Township-of-Tomorrow-Keynection main (Depot build, compose) on GitHub Deployments
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+ExecStart=/usr/bin/python3 -I /usr/local/lib/keynection-deployer/deployer.py
+LoadCredentialEncrypted=github-token:/etc/keynection/github-token.cred
+LoadCredentialEncrypted=depot-token:/etc/keynection/depot-token.cred
+Restart=always
+RestartSec=10
+Nice=5
+MemoryMax=2G
+WorkingDirectory=/opt/keynection
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,51 @@
+# keynection on aws32g (2026-10-21): the app the Deploy workflow ships from main, and the Cloudflare tunnel that is
+# its only way in. Managed by keynection-deployer (it sets IMAGE in current.env); see
+# /usr/local/lib/keynection-deployer/README.md. This host also runs Vaultwarden and the backup secretary, so the
+# app is locked down: non-root, read-only root filesystem, no capabilities, its own network, port on 127.0.0.1 only.
+name: keynection
+services:
+  app:
+    image: ${IMAGE:?set by keynection-deployer in current.env}
+    container_name: keynection-app
+    restart: unless-stopped
+    env_file: app.env
+    environment:
+      KEYNECTION_DEMO_MODE: "1"
+      KEYNECTION_DB_PATH: /data/app.db
+      PORT: "8000"
+      HOME: /tmp
+    user: "10001:10001"
+    read_only: true
+    tmpfs: ["/tmp:size=128m,mode=1777"]
+    volumes: ["/opt/keynection/data:/data"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m
+    cpus: 1.0
+    pids_limit: 256
+    ports: ["127.0.0.1:8095:8000"]
+    networks: [keynection]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+  tunnel:
+    # Cloudflare tunnel keynection-aws32g (remotely managed ingress -> http://keynection-app:8000). Outbound only;
+    # http2 rather than QUIC. Same digest as the llm-backup tunnel on N150 (2026.9.3).
+    image: cloudflare/cloudflared@sha256:072c067d25ccbe61d46e18f0d0723255f2bb5304f7317caa95b27031520ff92c
+    container_name: keynection-tunnel
+    command: ["tunnel", "--no-autoupdate", "--protocol", "http2", "run"]
+    env_file: tunnel.env
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.25
+    networks: [keynection]
+    depends_on: [app]
+networks:
+  keynection:
+    driver: bridge
