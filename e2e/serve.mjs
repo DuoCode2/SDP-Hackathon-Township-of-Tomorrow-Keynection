@@ -31,6 +31,9 @@ delete env.KEYNECTION_SITE_PASSWORD
 delete env.JIRAN_SITE_PASSWORD
 delete env.ANTHROPIC_API_KEY  // the stand-in answers; no key is ever used here
 delete env.GEMINI_API_KEY
+// The assistant's voice has stand-ins too. KEYNECTION_E2E_REAL=1 (with KEYNECTION_VOICE_KEY) sends wake.spec.ts's
+// recording and the spoken reply to the real gateway instead, a fraction of a cent per run; nothing else changes.
+if (process.env.KEYNECTION_E2E_REAL !== '1') delete env.KEYNECTION_VOICE_KEY
 
 const child = spawn(python, [path.join(backend, 'scripts', 'ai_standin_server.py'), backend, port], { stdio: 'inherit', env })
 child.on('exit', (code) => process.exit(code ?? 0))

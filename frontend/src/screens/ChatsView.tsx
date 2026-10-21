@@ -14,6 +14,7 @@ import { useAi, usePilot, usePlace } from '../features'
 import { LANG_TAG } from '../components/Cast'
 import ConcernCard from '../components/ConcernCard'
 import { Avatar, Empty, Sheet, Skeleton, Stamp, useCelebrate, useToast } from '../ui'
+import { holdWake } from '../wake'
 
 const langName = (t: Translate, code: string) => t(`lang.${code}`)
 
@@ -540,6 +541,7 @@ function useRecorder(onDone: (blob: Blob, seconds: number) => void, onError: (me
     cancelled.current = true
     if (rec.current?.state === 'recording') rec.current.stop()
     window.clearInterval(timer.current)
+    holdWake('voice-note', false)
   }, [])
 
   async function begin() {
@@ -548,9 +550,11 @@ function useRecorder(onDone: (blob: Blob, seconds: number) => void, onError: (me
       return
     }
     let stream: MediaStream
+    holdWake('voice-note', true)  // a voice note saying "hello neighbour" is for the neighbour, not the assistant
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch {
+      holdWake('voice-note', false)
       onError('Microphone permission was not given.')
       return
     }
@@ -561,6 +565,7 @@ function useRecorder(onDone: (blob: Blob, seconds: number) => void, onError: (me
     r.ondataavailable = (e) => { if (e.data.size) chunks.current.push(e.data) }
     r.onstop = () => {
       stream.getTracks().forEach((track) => track.stop())
+      holdWake('voice-note', false)
       window.clearInterval(timer.current)
       const seconds = (Date.now() - started.current) / 1000
       setState('idle')

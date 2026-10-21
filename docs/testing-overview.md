@@ -1,6 +1,6 @@
 # How Keynection is tested
 
-> **给队员的中文摘要**：测试分五层，底层是 369 个自动测试（后端，用 AI 替身，永远不连真的 AI），往上是前端的严格类型检查、浏览器自动走完评审路线并截图、人工按 `test-plan.md` 核对、真手机核对；每次推送到 GitHub 都自动跑前两层。最后一节老实写了还没测到的东西。**数字只在这里写一次**，README 和其他文件引用这一页。
+> **给队员的中文摘要**：测试分五层，底层是 408 个自动测试（后端，用 AI 替身，永远不连真的 AI），往上是前端的严格类型检查、浏览器自动走完评审路线并截图、人工按 `test-plan.md` 核对、真手机核对；每次推送到 GitHub 都自动跑前两层。最后一节老实写了还没测到的东西。**数字只在这里写一次**，README 和其他文件引用这一页。
 
 ```
                      ┌───────────────────────────┐
@@ -12,23 +12,23 @@
                      ├───────────────────────────┤
                      │  Front end: strict types    │  npm run build (TypeScript strict, Vite)
                      ├───────────────────────────┤
-                     │  369 server tests           │  backend/tests (pytest), ~2½ min, every push (CI)
+                     │  408 server tests           │  backend/tests (pytest), ~3½ min, every push (CI)
                      └───────────────────────────┘
 ```
 
-## Layer 1 — 369 automated server tests
+## Layer 1 — 408 automated server tests
 
-`cd backend && .venv/Scripts/python -m pytest -q` — 369 collected, all passing on 20 Oct 2026 (about 2½ minutes on a laptop). Each test gets its own SQLite database in a temporary folder; the AI is a **stand-in** (`tests/conftest.py`), so no test ever reaches Anthropic or Google. The count below is what pytest collects (parametrised cases counted separately).
+`cd backend && .venv/Scripts/python -m pytest -q` — 408 collected, all passing on 21 Oct 2026 (about 3½ minutes on a laptop). Each test gets its own SQLite database in a temporary folder; the AI is a **stand-in** (`tests/conftest.py`), so no test ever reaches Anthropic or Google. The count below is what pytest collects (parametrised cases counted separately).
 
 | What they protect | Files | Tests |
 |---|---|---|
 | **Plain rules** — noisy hours planned around quiet times (owner keeps ≥ 4 h, inside the council's hours, private, capped), two-sided works, reminders; triage by time order with reason codes; three layers of neighbours and notice ranges; the house behind a terrace told about wet, hacking and structural works; phase setup from a site plan; photo alignment and change detection; the home-log hash chain under concurrent writes | `test_quiet.py`, `test_triage.py`, `test_neighbours.py`, `test_rings.py`, `test_vision.py`, `test_ledger.py`, `test_pilot_phase.py` | 17 + 7 + 6 + 16 + 11 + 4 + 17 = **78** |
 | **Who may do what** — only owners close tickets, only recipients report, only raisers escalate; residents can't record an inspector's finding; blocks, quiet mode, daily caps; staff screens closed without staff sign-in; nobody writes to a home log by hand; in a pilot the server decides identity on every household endpoint; the site password gate; PDPA deletion, closure, backups | `test_decisions.py`, `test_hello_safety.py`, `test_talk.py`, `test_layers_2_4.py`, `test_staff_gating.py`, `test_signin.py`, `test_site_gate.py`, `test_privacy.py`, `test_care.py` | 13 + 11 + 22 + 14 + 12 + 13 + 13 + 13 + 13 = **124** |
 | **Languages** — quick replies and notices in English, Malay, Chinese and Tamil; dates and hours written per reader; every server-generated line carries a code so the screen can show it in the reader's language | `test_keynection.py`, `test_codes.py`, `test_talk.py` (shared above) | 11 + 11 = **22** |
-| **AI, with the stand-in** — one sentence → notice fields, rule-breaking answers dropped; translation and calmer wording per reader; an insult refused outright, on the word list or on Claude's own judgement, with no "send anyway"; no key / no answer / network down → everything works as before; daily allowance; only the text leaves; the official SDK is exercised with the network swapped out; Gemini is demo-only, and a 503 is tried once more; the assistant reads one sentence into one of six intents and its fields, answers house-rule questions from a fixed text, counts status lines on the server, falls back to key words without AI, and sends only the household's own records and its neighbours' unit numbers | `test_ai.py`, `test_assistant.py` | 35 + 14 = **49** |
+| **AI, with the stand-in** — one sentence → notice fields, rule-breaking answers dropped; translation and calmer wording per reader; an insult refused outright, on the word list or on Claude's own judgement, with no "send anyway"; no key / no answer / network down → everything works as before; daily allowance; only the text leaves; the official SDK is exercised with the network swapped out; Gemini is demo-only, and a 503 is tried once more; the assistant reads one sentence into one of six intents and its fields, answers house-rule questions from a fixed text, counts status lines on the server, falls back to key words without AI, keeps the last six turns as history, and sends only the household's own records and its neighbours' unit numbers; the assistant's voice through the gateway — a short real recording is passed on and dropped, Malay and Chinese asked for by Deepgram's own detect_language, only English replies are spoken and cut at a sentence, the same reply from memory, daily allowances per home, the key never logged, off in a pilot | `test_ai.py`, `test_assistant.py`, `test_voice.py` | 35 + 19 + 34 = **88** |
 | **Pilot mode** — passkey sign-in, re-entry codes, CSV import that refuses a bad row, welcome packs, push subscriptions and encryption, Procore export, the first staff member, start-up self-checks, no rebuild of a pilot's data | `test_signin.py` (above), `test_pilot_setup.py`, `test_pilot_data.py`, `test_procore.py`, `test_push.py`, `test_join.py` | 7 + 6 + 7 + 10 + 13 = **43** |
 | **Demo and surface** — waves, reactions, voice notes, profiles, the official account; evidence API; the shared demo that starts over after a quiet spell with loosened caps; old `JIRAN_` names still working; health check; `.env.example` complete and honest | `test_social.py`, `test_evidence_api.py`, `test_shared_demo.py`, `test_rename.py`, `test_api.py`, `test_env_example.py` | 15 + 15 + 8 + 6 + 5 + 4 = **53** |
-| | **Total (31 files)** | **369** |
+| | **Total (32 files)** | **408** |
 
 Three files answer the question judges ask most, "who is stopped from doing what": `test_staff_gating.py` (every SDP screen closes without a staff sign-in; nobody can write to a home log directly), `test_decisions.py` (propose, agree, disagree, inspector: who may take each step), `test_hello_safety.py` (blocks, quiet mode, tone, contact details, daily caps, approvals before structural works).
 
@@ -40,7 +40,7 @@ Three tests were written after our own security review, each named for the probl
 
 ## Layer 3 — scripted browser walk
 
-`e2e/` holds nine Playwright scripts (eleven tests) against the server with the AI stand-in, in a desktop browser at 1920×1080, each starting from the fictional phase as seeded (how to run them: `e2e/README.md`):
+`e2e/` holds ten Playwright scripts (seventeen tests) against the server with the AI stand-in, in a desktop browser at 1920×1080, each starting from the fictional phase as seeded (how to run them: `e2e/README.md`):
 
 - `route.spec.ts` walks the six steps of the judge route (K01–K14, fourteen checks) and saves a screenshot per step to `evidence/route-screenshots/` (17 frames, about 20 seconds). The screenshots go into the deck and the appendix.
 - `warranty.spec.ts` walks K16: a building-defect decision, SDP's repair, the owner sending it back and accepting a proper one; checks that SDP has no Close button and that the demo's invented Procore number is marked as such in all three interface languages (three more frames).
@@ -51,8 +51,9 @@ Three tests were written after our own security review, each named for the probl
 - `ai-off.spec.ts` walks K22's renovation notice with the page told AI is off: a terrace starts on the first card (wet work), the box is titled "Try an example", and the Malay example fills in a ready-made preset on the device with no AI call, so Send notice is reached without touching an approval.
 - `assistant.spec.ts` (two tests) types into the assistant and checks that a renovation sentence opens the notice with the words in it and a status question gets an answer, with AI off and with the AI not answering; neither ever sends a notice or a message.
 - `opening.spec.ts` (two tests) walks the demo's key-day opening (the welcome-pack card, who you are, the five homes lighting up) on a laptop and at phone width, and checks Skip.
+- `wake.spec.ts` (six tests) runs the real wake-word engine with Chrome's fake microphone playing a recording (`fixtures/`): "Hello Neighbour" opens the assistant and the question after it is asked and its reply spoken; near misses never open it over 25 seconds while it keeps hearing, and out of sight it lets go of the microphone; a browser without its own listening sends the recording to the server and gets words back; holding the mic asks what was said, a typed question stays quiet, a reply is read aloud and stopped; an engine download cut half way is fetched once more; and hands-free switched off while the browser is still asking for the microphone lets go of the microphone the moment it is granted. `KEYNECTION_E2E_REAL=1` or `E2E_BASE_URL` runs it against the real gateway or a deployed site.
 
-Last full run 20 Oct 2026: all eleven tests in the nine scripts passing, no browser console errors. They read the text on screen (button labels, headings) rather than test hooks, so a renamed button fails a walk on purpose.
+Last full run 21 Oct 2026: all seventeen tests in the ten scripts passing, no browser console errors. They read the text on screen (button labels, headings) rather than test hooks, so a renamed button fails a walk on purpose.
 
 ## Layer 4 — manual plan
 

@@ -49,6 +49,20 @@ export function watchErrors(page: Page): string[] {
   return errors
 }
 
+/** A deployed demo sits behind the shared password page (E2E_BASE_URL with E2E_SITE_PASSWORD): pass it once, the
+ *  cookie lasts 30 days. The local stand-in server has no password, so this does nothing there. */
+export async function enterSite(page: Page) {
+  const password = process.env.E2E_SITE_PASSWORD
+  if (!password) return
+  await page.goto('/')
+  const field = page.locator('input[name="password"]')
+  if (await field.isVisible().catch(() => false)) {
+    await field.fill(password)
+    await page.getByRole('button', { name: /^Enter/ }).click()
+    await expect(field).toBeHidden()
+  }
+}
+
 /** Back to the fictional phase as seeded, so a spec never depends on what another spec did. Every spec starts here,
  *  so this also marks the key-day opening as seen (storage.ts keeps it as keynection.opening.done): the specs start
  *  on the app itself. opening.spec.ts asks for the opening instead. */

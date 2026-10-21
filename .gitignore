@@ -14,3 +14,6 @@ frontend/*.tsbuildinfo
 Thumbs.db
 .vscode/
 .idea/
+
+# The wake engine build (frontend/wake-engine/build.sh)
+frontend/wake-engine/.build/
