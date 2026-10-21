@@ -19,8 +19,11 @@ const LISTENING = 'Say “Hello Neighbour” to ask, any time this page is open'
 const test = base.extend<{ micFile: string }>({
   micFile: ['wake-then-ask.wav', { option: true }],
   page: async ({ micFile, baseURL }, use) => {
+    // E2E_CHROME_ARGS for the network the walk runs from, e.g. "--disable-quic": through the team's home router, the
+    // engine's 8 MB over HTTP/3 stalls (measured; over TCP it loads in 3 s).
+    const extra = (process.env.E2E_CHROME_ARGS ?? '').split(' ').filter(Boolean)
     const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
-      `--use-file-for-fake-audio-capture=${path.join(__dirname, 'fixtures', micFile)}`] })
+      `--use-file-for-fake-audio-capture=${path.join(__dirname, 'fixtures', micFile)}`, ...extra] })
     const context = await browser.newContext({ ...devices['Desktop Chrome'], baseURL, permissions: ['microphone'],
       viewport: { width: 1920, height: 1080 }, locale: 'en-MY', timezoneId: 'Asia/Kuala_Lumpur', colorScheme: 'light' })
     await use(await context.newPage())
