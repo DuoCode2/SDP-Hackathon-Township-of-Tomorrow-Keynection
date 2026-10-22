@@ -66,7 +66,7 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
       ) : (
         <>
           <div className="kpi-strip">
-            <Kpi icon={<UserCheck size={14} />} label="Joined Keynection" value={d.households_joined} sub={`of ${d.households} homes · ${d.paper_notices_pending} on paper`} />
+            <Kpi icon={<UserCheck size={14} />} label="Joined Keynection" value={d.households_joined} sub={`of ${d.households} homes · ${count(d.paper_notices_pending, 'paper notice')} to deliver`} />
             <Kpi icon={<House size={14} />} label="Know a neighbour" value={d.households_with_a_known_neighbour} sub={`of ${d.households} homes`} />
             <Kpi icon={<MessagesSquare size={14} />} label="Messages" value={d.messages_sent} sub={`${d.intros_sent} intros · ${d.contact_requests_accepted}/${d.contact_requests} requests accepted`} />
             <Kpi icon={<Handshake size={14} />} label="Settled by neighbours" value={d.concerns_settled_by_neighbours} sub={`of ${d.concerns_raised} concerns`} />

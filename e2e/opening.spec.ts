@@ -33,6 +33,11 @@ test('key day: the card, who you are, five homes light up, and a wave lands on N
   await expect(hi).toBeInViewport()
   await opening(page).getByRole('button', { name: '👋 Wave at Siti' }).click()
 
+  // After the hello, one card says where the story goes next (Works); staying keeps the judge on the neighbours.
+  await expect(opening(page).getByRole('heading', { name: 'Next: your renovation notice is your first introduction' })).toBeVisible()
+  await expect(opening(page).getByRole('button', { name: 'Go to Works' })).toBeVisible()
+  await opening(page).getByRole('button', { name: 'Stay with my neighbours' }).click()
+
   await expect(opening(page)).toBeHidden()
   await expect(page.locator('article.person-card').first()).toBeVisible()
   await expect(page.getByText('You waved at Siti')).toBeVisible()

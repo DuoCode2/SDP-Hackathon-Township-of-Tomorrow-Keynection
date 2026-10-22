@@ -74,7 +74,8 @@ def plan_phase(lorongs: int, houses_per_row: int, facing: bool, blocks: int, flo
         "circle_sizes": {str(k): v for k, v in sorted(sizes.items())},
         "avg_circle": round(mean(sizes.elements()), 2) if homes else 0,
         "fewer_neighbours": fewer,
-        "avg_ring2": round(mean(ring2), 1) if ring2 else 0,
+        # Whole homes: "about 186 more homes", never 185.6.
+        "avg_ring2": round(mean(ring2)) if ring2 else 0,
         "notice_zone": {w: {"avg": round(mean(z), 1) if z else 0, "max": max(z) if z else 0} for w, z in zones.items()},
         "took_ms": took_ms,
         "checks": [

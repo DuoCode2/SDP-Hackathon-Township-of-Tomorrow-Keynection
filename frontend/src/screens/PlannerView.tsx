@@ -99,7 +99,7 @@ export default function PlannerView({ phases = [], current = null, onImported }:
                 <div><b>{plan.homes.toLocaleString('en-MY')}</b><span>homes · {plan.terrace_homes} landed, {plan.apartment_homes} strata</span></div>
                 <div><b>{plan.avg_circle}</b><span>neighbours in an average circle</span></div>
                 <div><b>{plan.fewer_neighbours.toLocaleString('en-MY')}</b><span>with fewer (end lots, corners, top and lowest floors)</span></div>
-                <div><b><Timer size={15} /> {plan.took_ms} ms</b><span>to set up the whole phase</span></div>
+                <div><b><Timer size={15} /> {plan.took_ms < 1000 ? 'under 1 s' : `${(plan.took_ms / 1000).toFixed(1)} s`}</b><span>to set up the whole phase{plan.took_ms < 1000 ? ` (${Math.round(plan.took_ms)} ms)` : ''}</span></div>
               </div>
               <Card>
                 <CardHead icon={<Home size={16} />} title="Circle sizes" sub="How many homes each household gets to know" />
@@ -122,7 +122,7 @@ export default function PlannerView({ phases = [], current = null, onImported }:
                     ))}
                   </tbody>
                 </table>
-                <div className="mono muted">ABOUT {plan.avg_ring2} MORE HOMES PER LORONG OR BLOCK ARE REACHABLE BY REQUEST</div>
+                <div className="mono muted">ABOUT {Math.round(plan.avg_ring2)} MORE HOMES PER LORONG OR BLOCK ARE REACHABLE BY REQUEST</div>
               </Card>
               <Card>
                 <CardHead icon={<ListChecks size={16} />} title="Before the pilot" />

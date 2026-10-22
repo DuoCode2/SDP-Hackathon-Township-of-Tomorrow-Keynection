@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
-import { BadgeCheck, Bell, CheckCheck, ChevronLeft, Clock3, DoorOpen, FileWarning, House, KeyRound, Megaphone, MessageSquare, Network, Printer, Smartphone } from 'lucide-react'
+import { BadgeCheck, Bell, CheckCheck, ChevronDown, ChevronLeft, Clock3, DoorOpen, FileWarning, House, KeyRound, Megaphone, MessageSquare, Network, Printer, Smartphone } from 'lucide-react'
 import { api, type Conversation, type Official, type UnitInfo, type WhatsAppOutbox } from '../api'
 import type { TabId } from '../guide'
 import { Avatar, Badge, formatDate, formatTime, ScreenTitle, Skeleton } from '../ui'
@@ -14,6 +14,8 @@ export default function ChannelsView({ me, version, onGo }: { me: UnitInfo; vers
   const [wa, setWa] = useState<WhatsAppOutbox | null>(null)
   const [qr, setQr] = useState<string | null>(null)
   const [inside, setInside] = useState(false)  // the SDP App phone shows Keynection itself
+  // The two steps read as three headings; their paragraphs open on request, so the phones are on the first screen.
+  const [more, setMore] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -46,27 +48,30 @@ export default function ChannelsView({ me, version, onGo }: { me: UnitInfo; vers
   return (
     <section className="screen">
       <ScreenTitle eyebrow="SDP · Channels" title="How Keynection reaches residents"
-        subtitle={`Two steps. Step one needs no change to the SDP App: the code comes with the keys, Keynection opens in the phone's browser, and alerts arrive on WhatsApp. Step two makes it a module inside the SDP App, with the owner's existing sign-in. Showing what ${who} would see.`} />
+        subtitle={`Step one needs no change to the SDP App: a code with the keys, alerts on WhatsApp. Step two is a module inside the SDP App. Showing what ${who} would see.`}
+        aside={<button className="btn btn-sm" onClick={() => setMore((m) => !m)} aria-expanded={more}>{more ? 'Hide the details' : 'How the two steps work'} <ChevronDown size={14} className={more ? 'flip' : ''} /></button>} />
 
-      <div className="reach-steps">
+      <div className={`reach-steps ${more ? '' : 'compact'}`}>
         <div className="reach-step">
           <div className="reach-when"><KeyRound size={14} /> Step one · key day</div>
           <b>A one-time code in the welcome pack</b>
-          <p>SDP already meets every owner at handover. Scan the code, choose a name and language, agree to the privacy notice: the five neighbours appear. Nothing in the SDP App has to change first.</p>
-          <div className="reach-card">
-            {qr ? <img src={qr} alt="" /> : <span className="reach-qr-blank" aria-hidden />}
-            <span><b>Keynection · {me.label}</b><small>Scan to meet your five neighbours.</small><small>Illustration: the real card carries a one-time code for that home.</small></span>
-          </div>
+          {more && <>
+            <p>SDP already meets every owner at handover. Scan the code, choose a name and language, agree to the privacy notice: the five neighbours appear. Nothing in the SDP App has to change first.</p>
+            <div className="reach-card">
+              {qr ? <img src={qr} alt="" /> : <span className="reach-qr-blank" aria-hidden />}
+              <span><b>Keynection · {me.label}</b><small>Scan to meet your five neighbours.</small><small>Illustration: the real card carries a one-time code for that home.</small></span>
+            </div>
+          </>}
         </div>
         <div className="reach-step">
           <div className="reach-when"><MessageSquare size={14} /> Step one · every day</div>
           <b>WhatsApp alerts, in the reader's language</b>
-          <p>Short alerts from pre-approved templates on the WhatsApp residents already use. Keynection itself is a web app: open it from the alert or from the Home Screen, no app store needed. In a pilot it also sends the phone's own notifications.</p>
+          {more && <p>Short alerts from pre-approved templates on the WhatsApp residents already use. Keynection itself is a web app: open it from the alert or from the Home Screen, no app store needed. In a pilot it also sends the phone's own notifications.</p>}
         </div>
         <div className="reach-step later">
           <div className="reach-when"><DoorOpen size={14} /> Step two · after the pilot</div>
           <b>A module inside the SDP App</b>
-          <p>The SDP App shows a “Neighbours” entry that opens Keynection with the owner's existing sign-in: one app and one sign-in for the owner, one set of data for SDP. Step one keeps working meanwhile, so the integration can take the time it needs.</p>
+          {more && <p>The SDP App shows a “Neighbours” entry that opens Keynection with the owner's existing sign-in: one app and one sign-in for the owner, one set of data for SDP. Step one keeps working meanwhile, so the integration can take the time it needs.</p>}
         </div>
       </div>
 

@@ -244,7 +244,10 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   const [concernOpen, setConcernOpen] = useState(false)
   const [reporting, setReporting] = useState<ChatMessage | null>(null)
   const [menu, setMenu] = useState(false)
+  // Exchanging numbers is the most sensitive tap in the app: a request goes out only after this sheet is confirmed.
+  const [askContact, setAskContact] = useState(false)
   const [picker, setPicker] = useState<number | null>(null)
+  const menuBox = useRef<HTMLDivElement>(null)
   const [showOriginal, setShowOriginal] = useState<Set<number>>(new Set())
   const body = useRef<HTMLDivElement>(null)
 
@@ -275,6 +278,18 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   useLayoutEffect(() => {
     if (body.current) body.current.scrollTop = body.current.scrollHeight
   }, [t?.items.length])
+
+  useEffect(() => {
+    if (!menu) return
+    const away = (e: MouseEvent) => { if (!menuBox.current?.contains(e.target as Node)) setMenu(false) }
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setMenu(false)
+    window.addEventListener('mousedown', away)
+    window.addEventListener('keydown', esc)
+    return () => {
+      window.removeEventListener('mousedown', away)
+      window.removeEventListener('keydown', esc)
+    }
+  }, [menu])
 
   if (!t) return <div style={{ padding: 18 }}><Skeleton lines={6} /></div>
   const n = t.neighbour
@@ -321,10 +336,19 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   }
 
   async function contact() {
-    const r = await api.shareContact(me.id, other)
-    toast(r.contact === 'mutual' ? tr('thread.exchanged') : tr('thread.willAsk', { name: n.resident_name }))
-    onChange()
+    setAskContact(false)
+    try {
+      const r = await api.shareContact(me.id, other)
+      toast(r.contact === 'mutual' ? tr('thread.exchanged') : tr('thread.willAsk', { name: n.resident_name }))
+      onChange()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : tr('err.tryAgain'), 'error')
+    }
   }
+  // Accepting their request is already a deliberate tap; starting one asks first.
+  const askOrContact = () => (t?.contact === 'requested_by_them' ? contact() : setAskContact(true))
+  // The last thing they wrote, for a report started from the menu (phones have no hover for the flag on a message).
+  const theirLast = [...(t?.items ?? [])].reverse().find((i) => i.type === 'message' && i.from_unit_id !== me.id && !i.expired)
 
   async function block(on: boolean) {
     await api.setBlock(me.id, other, on)
@@ -349,14 +373,17 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
         ) : t.contact === 'requested_by_me' ? (
           <span className="contact-wait">{tr('thread.waiting', { name: n.resident_name })}</span>
         ) : (
-          <button className={`btn btn-sm ${t.contact === 'requested_by_them' ? 'btn-primary' : ''}`} onClick={contact} disabled={t.blocked}>
+          <button className={`btn btn-sm ${t.contact === 'requested_by_them' ? 'btn-primary' : ''}`} onClick={askOrContact} disabled={t.blocked}>
             <Phone size={13} /> {tr(t.contact === 'requested_by_them' ? 'thread.acceptExchange' : 'thread.exchange')}
           </button>
         )}
-        <div className="menu-wrap">
-          <button className="icon-btn" onClick={() => setMenu((m) => !m)} aria-label="More"><MoreHorizontal size={16} /></button>
+        <div className="menu-wrap" ref={menuBox}>
+          <button className="icon-btn" onClick={() => setMenu((m) => !m)} aria-label="More" aria-expanded={menu}><MoreHorizontal size={16} /></button>
           {menu && (
             <div className="menu">
+              <button onClick={() => { setMenu(false); if (theirLast) setReporting(theirLast as ChatMessage) }} disabled={!theirLast}>
+                <Flag size={14} /> {tr(theirLast ? 'thread.reportLast' : 'thread.reportNone', { name: n.resident_name })}
+              </button>
               <button onClick={() => block(!t.blocked)}><Ban size={14} /> {tr(t.blocked ? 'thread.unblock' : 'thread.block', { name: n.resident_name })}</button>
               <p>{tr('thread.blockNote')}</p>
             </div>
@@ -512,6 +539,14 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
 
       <ConcernSheet open={concernOpen} onClose={() => setConcernOpen(false)} me={me} t={t} helperId={helper?.id} onRaised={onChange} />
       <ReportSheet message={reporting} me={me} name={n.resident_name} onClose={() => setReporting(null)} />
+      <Sheet open={askContact} onClose={() => setAskContact(false)}>
+        <h2 className="sheet-title">{tr('thread.exchangeAsk', { name: n.resident_name })}</h2>
+        <p className="muted">{tr('thread.exchangeAskBody', { name: n.resident_name })}</p>
+        <div className="sheet-actions">
+          <button className="btn" onClick={() => setAskContact(false)}>{tr('btn.cancel')}</button>
+          <button className="btn btn-primary" onClick={contact}><Phone size={14} /> {tr('thread.exchangeGo', { name: n.resident_name })}</button>
+        </div>
+      </Sheet>
     </div>
   )
 }
