@@ -136,3 +136,94 @@ def test_search_engines_are_asked_not_to_index_it(client, monkeypatch):
     assert client.get("/api/units").headers["x-robots-tag"] == "noindex, nofollow"
     monkeypatch.setenv("KEYNECTION_SITE_PASSWORD", PASSWORD)
     assert client.get("/").headers["x-robots-tag"] == "noindex, nofollow"
+
+
+# ---------- a link that carries the password ----------
+# The submission form has a box for the prototype's link and none for a password, so the link carries it:
+# …/?key=<password>. One click signs the browser in for the same 30 days as the page, and lands on a clean address.
+
+def test_a_link_with_the_password_opens_the_site_and_drops_it_from_the_address(gated):
+    r = gated.get(f"/?key={PASSWORD}", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/"
+    assert r.headers["cache-control"] == "no-store"
+    cookie = r.headers["set-cookie"].lower()
+    assert "keynection_site=" in cookie and "httponly" in cookie and "samesite=lax" in cookie
+    assert "max-age=2592000" in cookie  # 30 days, as after the page
+    assert PASSWORD.lower() not in cookie
+    assert gated.get("/api/units").status_code == 200
+
+
+def test_the_link_keeps_the_rest_of_its_address(gated):
+    r = gated.get(f"/?embed=1&key={PASSWORD}&me=T-12", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/?embed=1&me=T-12"
+
+
+def test_the_link_always_lands_on_the_app_itself(gated):
+    """Whatever path the link has, it lands on / here: no crafted address can turn it into a jump to another site."""
+    for path in ("/site-login", "/assets/index.js", "/%2F%2Felsewhere.example/", "/%5Celsewhere.example"):
+        r = gated.get(f"{path}?key={PASSWORD}", follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "/", path
+
+
+def test_a_link_with_a_wrong_password_shows_the_page_and_says_why(gated):
+    for query in ("key=wrong", "key=", f"key={PASSWORD}x"):
+        r = gated.get(f"/?{query}", follow_redirects=False)
+        assert r.status_code == 401 and "set-cookie" not in r.headers, query
+        assert r.headers["cache-control"] == "no-store"
+        assert '<form method="post" action="/site-login"' in r.text
+        assert "password in this link" in r.text and "pautan ini" in r.text and "链接里的密码" in r.text
+        assert "Wrong password" not in r.text
+    assert gated.get("/api/units").status_code == 401
+
+
+def test_a_signed_in_browser_just_gets_the_clean_address(gated):
+    _sign_in(gated, PASSWORD)
+    for key in (PASSWORD, "an-old-password"):  # the right one again, or a link from before a password change
+        r = gated.get(f"/?key={key}&join=ABC", follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "/?join=ABC"
+    assert gated.get("/api/units").status_code == 200
+
+
+def test_the_key_opens_pages_only_never_the_api(gated):
+    r = gated.get(f"/api/units?key={PASSWORD}", follow_redirects=False)
+    assert r.status_code == 401 and "set-cookie" not in r.headers  # scripts send HTTP Basic instead
+    assert gated.post(f"/api/demo/reset?key={PASSWORD}").status_code == 401
+    r = gated.post(f"/?key={PASSWORD}", follow_redirects=False)
+    assert r.status_code == 401 and "set-cookie" not in r.headers
+
+
+def test_a_password_with_symbols_works_once_written_into_the_link(client, monkeypatch):
+    from urllib.parse import quote
+
+    odd = "kopi o+kosong&2026#ais/limau?"
+    monkeypatch.setenv("KEYNECTION_SITE_PASSWORD", odd)
+    r = client.get(f"/?key={quote(odd, safe='')}", follow_redirects=False)
+    assert r.status_code == 303 and "keynection_site=" in r.headers["set-cookie"]
+    assert client.get("/api/units").status_code == 200
+
+
+def test_the_link_cookie_is_marked_secure_behind_https(gated):
+    r = gated.get(f"/?key={PASSWORD}", headers={"X-Forwarded-Proto": "https"}, follow_redirects=False)
+    assert "secure" in r.headers["set-cookie"].lower()
+
+
+def test_without_a_site_password_a_key_changes_nothing(client):
+    r = client.get("/?key=anything", follow_redirects=False)
+    assert r.status_code != 303 and "keynection_site" not in r.headers.get("set-cookie", "")
+
+
+def test_the_server_log_never_shows_the_password_from_a_link():
+    """uvicorn's access log line for a key link would hold the password; it is written as key=*** instead."""
+    import logging
+
+    from app.main import _HideSiteKey
+
+    assert any(isinstance(f, _HideSiteKey) for f in logging.getLogger("uvicorn.access").filters)
+    record = logging.LogRecord("uvicorn.access", logging.INFO, __file__, 0, '%s - "%s %s HTTP/%s" %d',
+                               ("203.0.113.9:50000", "GET", f"/?embed=1&key={PASSWORD}&me=T-12", "1.1", 303), None)
+    assert _HideSiteKey().filter(record)
+    line = record.getMessage()
+    assert PASSWORD not in line and "/?embed=1&key=***&me=T-12" in line
+    plain = logging.LogRecord("uvicorn.access", logging.INFO, __file__, 0, '%s - "%s %s HTTP/%s" %d',
+                              ("203.0.113.9:50000", "GET", "/api/units?monkey=1", "1.1", 200), None)
+    assert _HideSiteKey().filter(plain) and plain.getMessage().endswith('"GET /api/units?monkey=1 HTTP/1.1" 200')

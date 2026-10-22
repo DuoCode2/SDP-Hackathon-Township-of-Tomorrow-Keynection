@@ -22,7 +22,7 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
@@ -329,6 +329,7 @@ OLD_SITE_COOKIE = "jiran5_site"
 SITE_COOKIE_SECONDS = 30 * 24 * 3600
 SITE_LOGIN_PATH = "/site-login"
 SITE_LOGIN_MAX_BYTES = 4096  # a one-field form; anything bigger is not a person typing a password
+SITE_KEY = "key"  # …/?key=<password>: a link that opens the demo by itself (see _site_key_login)
 
 
 def _site_password() -> str | None:
@@ -341,6 +342,14 @@ def _site_token(password: str, context: bytes = b"keynection-site-v1") -> str:
     """What the browser keeps after the password page: a keyed hash, never the password. A new password signs
     everyone out."""
     return hmac.new(password.encode(), context, hashlib.sha256).hexdigest()
+
+
+def _remember_site(response: Response, request: Request, password: str) -> None:
+    """Keep this browser past the password page for 30 days: a keyed hash of the password (HttpOnly), marked Secure
+    when the visit came over HTTPS (the host ends HTTPS, so the scheme comes from X-Forwarded-Proto)."""
+    secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+    response.set_cookie(SITE_COOKIE, _site_token(password), max_age=SITE_COOKIE_SECONDS, httponly=True,
+                        samesite="lax", secure=secure, path="/")
 
 
 def _site_password_ok(request: Request) -> bool:
@@ -410,10 +419,13 @@ SITE_LOGIN_PAGE = """<!doctype html>
 
 SITE_LOGIN_ERROR = ('<p class="error" role="alert">Wrong password. Please try again. · '
                     "Kata laluan salah. Cuba lagi. · 密码不对，请再试一次。</p>")
+SITE_LINK_ERROR = ('<p class="error" role="alert">The password in this link is not right, or it has changed. '
+                   "Please type the password below. · Kata laluan dalam pautan ini tidak betul atau sudah ditukar. "
+                   "Sila taip kata laluan di bawah. · 这个链接里的密码不对，或者已经换了，请在下面输入密码。</p>")
 
 
-def _site_login_page(wrong: bool = False) -> HTMLResponse:
-    return HTMLResponse(SITE_LOGIN_PAGE.replace("{error}", SITE_LOGIN_ERROR if wrong else ""), status_code=401,
+def _site_login_page(error: str = "") -> HTMLResponse:
+    return HTMLResponse(SITE_LOGIN_PAGE.replace("{error}", error), status_code=401,
                         headers={"Cache-Control": "no-store"})
 
 
@@ -424,16 +436,57 @@ async def _site_login(request: Request) -> HTMLResponse | RedirectResponse:
     async for chunk in request.stream():
         body += chunk
         if len(body) > SITE_LOGIN_MAX_BYTES:
-            return _site_login_page(wrong=True)
+            return _site_login_page(SITE_LOGIN_ERROR)
     given = parse_qs(body.decode("utf-8", "replace")).get("password", [""])[0]
     if not given or not secrets.compare_digest(given.encode(), password.encode()):
         await asyncio.sleep(0.5)  # slows guessing a little; the password itself is long
-        return _site_login_page(wrong=True)
+        return _site_login_page(SITE_LOGIN_ERROR)
     response = RedirectResponse("/", status_code=303)
-    secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"  # the host ends HTTPS
-    response.set_cookie(SITE_COOKIE, _site_token(password), max_age=SITE_COOKIE_SECONDS, httponly=True,
-                        samesite="lax", secure=secure, path="/")
+    _remember_site(response, request, password)
     return response
+
+
+def _site_key_link(request: Request) -> bool:
+    """A page visit whose address carries the password: …/?key=<password>. The hackathon's submission form has a box
+    for the prototype's link and none for a password, so this is how a judge's one click opens the demo. Never for
+    /api/: scripts send the password as HTTP Basic instead."""
+    return (bool(_site_password()) and request.method in ("GET", "HEAD") and not request.url.path.startswith("/api/")
+            and SITE_KEY in request.query_params)
+
+
+async def _site_key_login(request: Request) -> HTMLResponse | RedirectResponse:
+    """Right key: remember this browser exactly as the password page does, then the app at a clean address, so the
+    password does not stay in the address bar, a screenshot or a link copied from there. It always lands on / here
+    (the link's own path is never followed, so no address can turn it into a jump elsewhere); the rest of the query
+    (?join=, ?embed=…) comes along. Wrong key from a browser already signed in: the clean address, nothing else.
+    Wrong key otherwise: the password page, saying the link's password did not work."""
+    password = _site_password() or ""
+    given = request.query_params.get(SITE_KEY, "")
+    rest = [(k, v) for k, v in request.query_params.multi_items() if k != SITE_KEY]
+    clean = RedirectResponse("/?" + urlencode(rest) if rest else "/", status_code=303,
+                             headers={"Cache-Control": "no-store"})
+    if given and secrets.compare_digest(given.encode(), password.encode()):
+        _remember_site(clean, request, password)
+        return clean
+    if _site_password_ok(request):
+        return clean
+    await asyncio.sleep(0.5)  # as for a wrong password typed on the page
+    return _site_login_page(SITE_LINK_ERROR)
+
+
+class _HideSiteKey(logging.Filter):
+    """uvicorn writes every address it serves into its access log, query and all; for a key link that line would hold
+    the password. It is written as key=*** instead (uvicorn's arguments: client, method, path?query, version, status)."""
+    pattern = re.compile(rf"([?&]{SITE_KEY}=)[^&]*")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) > 2 and isinstance(args[2], str) and f"{SITE_KEY}=" in args[2]:
+            record.args = (*args[:2], self.pattern.sub(r"\1***", args[2]), *args[3:])
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(_HideSiteKey())
 
 
 def _moved_to(request: Request) -> RedirectResponse | None:
@@ -453,6 +506,8 @@ async def guard(request: Request, call_next):
         return moved
     if _site_password() and request.url.path == SITE_LOGIN_PATH and request.method == "POST":
         response = await _site_login(request)
+    elif _site_key_link(request):
+        response = await _site_key_login(request)
     elif not _site_password_ok(request):
         if request.url.path.startswith("/api/"):
             response = JSONResponse({"detail": "This demo needs the password from the Keynection team."}, status_code=401)
@@ -466,9 +521,7 @@ async def guard(request: Request, call_next):
             return JSONResponse({"detail": "Request too large. Photos must be under 12 MB."}, status_code=413)
         response = await call_next(request)
     if getattr(request.state, "old_site_cookie", False):
-        secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
-        response.set_cookie(SITE_COOKIE, _site_token(_site_password() or ""), max_age=SITE_COOKIE_SECONDS, httponly=True,
-                            samesite="lax", secure=secure, path="/")
+        _remember_site(response, request, _site_password() or "")
         response.delete_cookie(OLD_SITE_COOKIE, path="/")
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     # Only Keynection may frame its own pages (Channels shows the app inside the SDP App phone); no other site can.

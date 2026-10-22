@@ -1,8 +1,8 @@
 # Manual test plan: the judge route and the safety boundaries
 
-> **给队员的中文摘要**：这是人能读的测试清单，和 `evidence/device-check/README.md` 用同一套编号（K00–K15 是评审 3 分钟路线，每一步一条；K16–K21 是六条安全边界；K22–K23 是没开 AI 时的替代走法和共用演示的自动重置）。每一条写明怎么做、应该看到什么、在哪台设备核对过。评审看不懂 424 个自动测试，但看得懂这一页。做法：开始前清掉浏览器里这个网站的储存资料（或用无痕模式），这样看到的才是评审第一眼的样子。
+> **给队员的中文摘要**：这是人能读的测试清单，和 `evidence/device-check/README.md` 用同一套编号（K00–K15 是评审 3 分钟路线，每一步一条；K16–K21 是六条安全边界；K22–K23 是没开 AI 时的替代走法和共用演示的自动重置）。每一条写明怎么做、应该看到什么、在哪台设备核对过。评审看不懂 436 个自动测试，但看得懂这一页。做法：开始前清掉浏览器里这个网站的储存资料（或用无痕模式），这样看到的才是评审第一眼的样子。
 
-Keynection has 424 automated server tests (`testing-overview.md`). This page is the part a person walks through: the 3-minute judge route step by step, then the boundaries that protect residents. The numbering is shared with the real-device record in `evidence/device-check/README.md`, so one table serves both.
+Keynection has 436 automated server tests (`testing-overview.md`). This page is the part a person walks through: the 3-minute judge route step by step, then the boundaries that protect residents. The numbering is shared with the real-device record in `evidence/device-check/README.md`, so one table serves both.
 
 ## Before you start
 
@@ -15,7 +15,7 @@ Keynection has 424 automated server tests (`testing-overview.md`). This page is 
 
 | ID | Where | Do | Expect |
 |---|---|---|---|
-| K00 | Open the URL | Enter the shared password | Trilingual password page → the app opens. Note how long the first open took |
+| K00 | Open the URL | Enter the shared password; in a fresh private window, open the key link from the submission form (`/?key=<password>`) | Trilingual password page → the app opens. The key link skips the page and the address bar shows only the site, no key. Note how long the first open took |
 | K01 | Neighbours, Aiman (No. 12) | Look at the home screen | A row of door avatars at the top; five neighbour cards: Siti (No. 11), Kumar (No. 13), Priya (No. 21), Hafiz (No. 22) and No. 23 shown by unit only ("not on Keynection yet"); in a pilot the first-day tour (four cards) the first time, in the demo from Me → "Show the first-day tour again" |
 | K02 | Neighbours | Press **👋 Wave** on Siti's card | A short celebration; the button changes to "waved today"; Siti's avatar ring turns green once she waves back later |
 | K03 | Works → **Register renovation** | Type one sentence in "Just say it in one sentence" (e.g. *Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6*) → **Fill it in for me** | AI on: type of work, dates, hours and contractor are filled in, with one line saying why and what is still missing; approvals and the CIDB tick stay empty. AI off: the box is titled "Try an example"; tapping an example fills in a ready-made preset without AI, or the form is filled in by hand (see K22). Either is a pass; record which |
