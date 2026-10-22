@@ -8,7 +8,7 @@ import { dismissWelcome, resetDemo, watchErrors } from './helpers'
 const RETRY = 'The AI didn’t answer in time · Try again'
 
 async function ask(page: Page, words: string, { aiOn = true } = {}) {
-  const chat = page.getByRole('dialog', { name: 'Keynection assistant' })
+  const chat = page.getByRole('dialog', { name: 'Hello Neighbour' })
   if (!(await chat.isVisible())) await page.getByRole('button', { name: 'Ask the assistant' }).click()
   await expect(chat.locator('.assistant-greeting')).toBeVisible()
   const replies = await chat.locator('.assistant-reply').count()

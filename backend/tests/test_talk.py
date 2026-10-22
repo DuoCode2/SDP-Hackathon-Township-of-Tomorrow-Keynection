@@ -255,7 +255,8 @@ INSULTS = [
     "sohai", "kanina", "kan ni na", "knn", "kns", "cibai", "lanjiao", "diu lei", "nabei",
     # Malay
     "bodoh", "bodo punya jiran", "sial la", "sialan", "bangsat", "pukimak", "tolol", "dungu", "mampus kau",
-    "kau pergi mati", "pergi mampus", "otak udang", "kepala otak kau", "celaka", "bangang", "babi",
+    "kau pergi mati", "pergi mampus", "otak udang", "kepala otak kau", "celaka", "bangang", "kau babi", "jiran ni babi",
+    "babi punya kontraktor", "kontraktor tu sial", "sial punya jiran", "kau ni sengal", "mati kau", "kau mati",
     # Chinese
     "去死", "去死吧", "吃屎", "草", "草！", "艹", "神经病", "傻逼", "傻B", "脑残", "智障", "白目", "滚开", "滚蛋",
     "给我滚", "妈的", "他妈的", "操你", "靠北", "仆街", "冚家铲", "死全家", "找死", "贱人", "畜生", "变态", "蠢货",
@@ -268,6 +269,10 @@ COMPLAINTS = [
     "It was a hell of a night with the drilling", "Assess the crack first before painting", "The class starts at 8",
     "Lampu mati sejak semalam", "Bekalan air mati lagi", "Bising gila pagi ni", "Anjing awak menyalak sepanjang malam",
     "Sampah bertimbun depan rumah saya", "Kontraktor awak tak ikut masa",
+    # babi, sial, sengal and mati in their everyday senses: a wild boar, bad luck, aching, a light that is out
+    "Lampu jalan depan rumah awak mati", "Wi-Fi awak mati ke?", "Kalau kamu mati lampu, beritahu saya",
+    "Ada babi hutan masuk kawasan kita malam tadi", "Jangan bawa daging babi ke rumah kami",
+    "Nasib sial, paip pecah lagi", "Hari ini sial betul", "Badan saya sengal-sengal lepas angkat almari",
     "草地上的垃圾堆了三天", "除草机太吵了", "滚水管漏水", "狗屎在我门口", "我家小孩有病，可以安静一点吗", "死角那边积水",
     "他妈妈昨天来过", "你妈妈的车挡住了我家门口", "废物处理公司几点来", "装修垃圾放哪里",
 ]

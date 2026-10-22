@@ -107,7 +107,7 @@ async function heardTheReply(page: Page, chat: ReturnType<Page['getByRole']>, sp
  *  so a household is never asked for the microphone before it has asked for anything. */
 async function handsFreeOn(page: Page) {
   await page.getByRole('button', { name: 'Ask the assistant' }).click()
-  const chat = page.getByRole('dialog', { name: 'Keynection assistant' })
+  const chat = page.getByRole('dialog', { name: 'Hello Neighbour' })
   await expect(chat.locator('.assistant-offer')).toBeHidden()  // not before the microphone was used by hand
   await chat.getByRole('button', { name: TOGGLE }).click()
   // 8 MB the first time; over a slow or broken connection the engine is fetched once more.
@@ -287,7 +287,7 @@ test.describe('switched off while the browser is still asking for the microphone
     })
     const { errors } = await start(page)
     await page.getByRole('button', { name: 'Ask the assistant' }).click()
-    const chat = page.getByRole('dialog', { name: 'Keynection assistant' })
+    const chat = page.getByRole('dialog', { name: 'Hello Neighbour' })
     await chat.getByRole('button', { name: TOGGLE }).click()
     // The engine is ready and the browser is being asked for the microphone; the household changes its mind now.
     await expect.poll(() => page.evaluate(() => (window as unknown as { micAsked: number }).micAsked), { timeout: 90_000 }).toBe(1)
@@ -308,7 +308,7 @@ test.describe('talking without the wake word', () => {
     await browserHears(page, 'what is my warranty status')
     const { errors, asked, spoken } = await start(page)
     await page.getByRole('button', { name: 'Ask the assistant' }).click()
-    const chat = page.getByRole('dialog', { name: 'Keynection assistant' })
+    const chat = page.getByRole('dialog', { name: 'Hello Neighbour' })
     const mic = chat.getByRole('button', { name: 'Hold to talk' })
     await mic.hover()
     await page.mouse.down()

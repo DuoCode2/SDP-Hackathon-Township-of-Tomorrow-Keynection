@@ -203,7 +203,7 @@ BIOS: dict[str, dict[str, str]] = {
     "Ah Hock": {"en": "Retired. Voice messages are easiest for me; my daughter helps with the app.",
                 "ms": "Sudah bersara. Mesej suara paling senang untuk saya; anak perempuan saya tolong dengan app ini.",
                 "zh": "退休了。语音讯息对我最方便；女儿帮我用这个 app。",
-                "ta": "ஓய்வு பெற்றவன். குரல் செய்திகள்தான் எனக்கு எளிது; மகள் இந்த app-க்கு உதவுகிறாள்."},
+                "ta": "ஓய்வு பெற்றவன். குரல் செய்திகள்தான் எனக்கு எளிது; இந்த app-ஐப் பயன்படுத்த மகள் உதவுகிறாள்."},
 }
 
 
