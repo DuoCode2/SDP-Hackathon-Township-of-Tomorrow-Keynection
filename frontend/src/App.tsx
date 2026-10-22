@@ -3,6 +3,7 @@ import { Building2, Calculator, Camera, CalendarClock, CircleUserRound, Columns2
 import { api, onReachability, setPhaseId, type AuthMe, type PhaseInfo, type UnitInfo } from './api'
 import { forgetThisPhone, onOpenTab, syncPush } from './push'
 import { remember, remembered } from './storage'
+import { replayWelcome } from './welcome'
 import { Avatar, ToastProvider } from './ui'
 import type { GuideLang, TabId } from './guide'
 import { EnglishOnly, LangProvider, langChosen, useDates, useLang, type UiLang } from './i18n'
@@ -474,7 +475,7 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
       </ShowAllProvider>
 
       {!pinned && !embed && <Guide tab={cur.tab} me={cur.me} lang={lang} open={guideOpen} onLang={pickLang} onClose={() => setGuideOpen(false)} onGo={go}
-        showAll={showAll} onShowAll={pickShowAll} />}
+        onTour={() => { replayWelcome(cur.me); go('circle', cur.me) }} showAll={showAll} onShowAll={pickShowAll} />}
       {/* The household's assistant, for whoever is in the focused pane: it gets things ready, the household sends. */}
       {curUnit?.joined && !embed && <Assistant me={curUnit} units={units} tab={cur.tab} onGo={(tab, peer) => go(tab, undefined, { peer })} onChanged={changed} />}
       <div id="sheet-root" />
@@ -638,9 +639,9 @@ function Pane({ index, pane, units, active, split, version, onChange, onFocus, o
       {lang !== 'en' && ENGLISH_TABS.includes(pane.tab) && !(me && !me.joined && NEEDS_JOIN.includes(pane.tab)) && <div className="records-note"><Languages size={14} /> {t('records.english')}</div>}
       {!me.joined && NEEDS_JOIN.includes(pane.tab) ? <JoinView me={me} onJoined={onChange} /> : <>
       {pane.tab === 'circle' && <CircleView me={me} units={units} version={version} onChange={onChange}
-        onViewAs={(id) => onUpdate({ me: id })} onOpenChat={(peer) => onUpdate({ tab: 'chats', peer })} onOpenEvidence={() => tab('evidence')} />}
+        onViewAs={(id) => onUpdate({ me: id })} onOpenChat={(peer) => onUpdate({ tab: 'chats', peer })} onOpenEvidence={() => tab('evidence')} onGo={tab} />}
       {pane.tab === 'chats' && <ChatsView me={me} version={version} onChange={onChange} peer={pane.peer} onPeer={(peer) => onUpdate({ peer })} />}
-      {pane.tab === 'works' && <WorksView me={me} units={units} version={version} onChange={onChange} />}
+      {pane.tab === 'works' && <WorksView me={me} units={units} version={version} onChange={onChange} onOpenEvidence={() => tab('evidence')} />}
       {pane.tab === 'evidence' && <EvidenceView me={me} version={version} onChange={onChange} />}
       {pane.tab === 'log' && <HistoryView me={me} units={units} version={version} />}
       {/* SDP's side stays in English, including the resident components it reuses (clock, comparison, concerns). */}

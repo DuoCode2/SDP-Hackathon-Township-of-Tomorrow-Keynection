@@ -201,6 +201,28 @@ const D: Record<string, Entry> = {
   'open.nextSub': ['Say what you are doing in one sentence. The plan decides who is told, and the noisy hours are planned around their quiet times.', 'Nyatakan apa yang anda buat dalam satu ayat. Pelan menentukan siapa diberitahu, dan waktu bising dirancang mengikut waktu senyap mereka.', '一句话说清楚你要做什么。图纸决定通知谁，吵闹时段会避开他们的安静时间。'],
   'open.nextGo': ['Go to Works', 'Pergi ke Ubah suai', '去装修页'], 'open.nextStay': ['Stay with my neighbours', 'Kekal dengan jiran saya', '先留在邻居页'],
   'welcome.later': ['Look around first', 'Lihat-lihat dahulu', '先看看'], 'welcome.hello': ['Say hello to them', 'Tegur mereka', '跟他们打招呼'],
+  // The first-day tour: four cards a new owner can read in a minute, each one tap from the screen it describes.
+  'tour.skip': ['Skip the tour', 'Langkau lawatan', '跳过导览'], 'tour.done': ['Done', 'Selesai', '完成'],
+  'tour.step': ['{n} of {m}', '{n} daripada {m}', '第 {n} 步，共 {m} 步'],
+  'welcome.sentTitle': ['Hi {name}, your hello is out', 'Hai {name}, ucapan anda sudah dihantar', '{name}，你的招呼已经送出'],
+  'welcome.sentBody': ['{n} of the homes around yours have your hello. Once one of them waves or writes back, you count as neighbours who know each other.', '{n} rumah di sekeliling anda sudah terima ucapan anda. Apabila salah seorang melambai atau membalas, anda dikira jiran yang saling kenal.', '周围 {n} 户已收到你的招呼。只要有一户挥手或回复，你们就算认识了。'],
+  'tour.works.title': ['Renovating? Say it in one sentence', 'Nak ubah suai? Cakap dalam satu ayat', '要装修？说一句话就好'],
+  'tour.works.body': ['The homes the work can reach are told, and the noisy hours are planned around their quiet times. Your notice is your first introduction.', 'Rumah yang terkesan akan diberitahu, dan waktu bising dirancang mengikut waktu senyap mereka. Notis anda ialah perkenalan pertama.', '会受影响的住户都会收到通知，吵的时段会避开他们的安静时间。你的通知就是第一次自我介绍。'],
+  'tour.works.go': ['Open Works', 'Buka Ubah suai', '打开装修页'],
+  'tour.photos.title': ['One photo before any works', 'Satu foto sebelum sebarang kerja', '开工前拍一张'],
+  'tour.photos.body': ['Your side of the shared wall, sealed in your home log. If a crack appears later, both sides compare the same spot fairly.', 'Pihak anda pada dinding berkongsi, dimeterai dalam log rumah. Jika retak muncul kemudian, kedua-dua pihak membandingkan tempat yang sama dengan adil.', '拍下你这边的共用墙，封存在屋历里。日后出现裂缝，两边比对同一个位置，公平。'],
+  'tour.photos.go': ['Open Photos', 'Buka Foto', '打开照片页'],
+  'tour.ask.title': ['Ask anything, in your language', 'Tanya apa-apa, dalam bahasa anda', '用你的语言，随时发问'],
+  'tour.ask.body': ['Tap the orb in the corner: “Can my contractor come on Sunday?” Your quiet times, quiet mode and easy mode live under Me.', 'Ketik bulatan di penjuru: “Boleh kontraktor saya datang hari Ahad?” Waktu senyap, mod senyap dan mod mudah ada di bawah Saya.', '点右下角的小球：「我的承包商可以星期天来吗？」安静时间、免打扰和简易模式都在「我」页。'],
+  'tour.ask.go': ['Open Me', 'Buka Saya', '打开「我」页'],
+  'day.today': ['Today', 'Hari ini', '今天'], 'day.yesterday': ['Yesterday', 'Semalam', '昨天'],
+  'wk.none.sub': ['Nothing in the next 4 weeks', 'Tiada apa-apa dalam 4 minggu akan datang', '接下来 4 周没有安排'],
+  'wk.permit.add': ['Add permit reference', 'Tambah rujukan permit', '补上准证编号'], 'wk.permit.none': ['Council (PBT) permit: not stated yet', 'Permit majlis (PBT): belum dinyatakan', '市政局（PBT）准证：还没填'],
+  'wk.permit.sheetTitle': ['Council (PBT) permit', 'Permit majlis (PBT)', '市政局（PBT）准证'],
+  'wk.permit.sheetBody': ['Your neighbours see this on your notice. The estate office may ask for the reference.', 'Jiran anda nampak ini pada notis anda. Pejabat estet mungkin meminta rujukannya.', '邻居会在你的通知上看到。物业办公室可能会要准证编号。'],
+  'wk.permit.saved': ['Permit noted on your notice', 'Permit dicatat pada notis anda', '准证已记在你的通知上'],
+  'wk.photoNext': ['Before {date}: photograph your side of the shared walls', 'Sebelum {date}: ambil foto pihak anda pada dinding berkongsi', '{date} 前：先拍你这边的共用墙'],
+  'wk.photoNextGo': ['Open Photos', 'Buka Foto', '去拍照'],
   'welcome.privacy': ['Only these neighbours see your first name. Your phone number stays private.', 'Hanya jiran ini nampak nama pertama anda. Nombor telefon anda kekal rahsia.', '只有这些邻居看得到你的名字，你的电话号码保密。'],
 
   // introduce yourself
@@ -260,8 +282,8 @@ const D: Record<string, Entry> = {
   'ai.busy': ['The AI didn’t answer in time. Try again, or fill in the steps yourself.', 'AI tidak menjawab tepat pada masanya. Cuba lagi, atau isi langkah sendiri.', 'AI 没及时回应。再试一次，或自己填写各步骤。'],
   // The household's assistant: one sentence, said or typed, gets something ready to check. It never sends for you.
   'assistant.open': ['Ask the assistant', 'Tanya pembantu', '问助手'],
-  'assistant.chatTitle': ['Keynection assistant', 'Pembantu Keynection', 'Keynection 助手'],
-  'assistant.chatOn': ['AI · replies in your language', 'AI · membalas dalam bahasa anda', 'AI · 用你的语言回复'],
+  'assistant.chatTitle': ['Hello Neighbour', 'Hello Neighbour', 'Hello Neighbour'],
+  'assistant.chatOn': ['Keynection assistant · AI, replies in your language', 'Pembantu Keynection · AI, membalas dalam bahasa anda', 'Keynection 助手 · AI，用你的语言回复'],
   'assistant.chatOff': ['Key words only · AI is off here', 'Kata kunci sahaja · AI tidak dihidupkan di sini', '只按关键词 · 这里没开 AI'],
   'assistant.greeting': ['Hi {name} 👋 Ask about your home, your neighbours or the house rules, or say what you want to do.', 'Hai {name} 👋 Tanya tentang rumah, jiran atau peraturan rumah, atau beritahu apa yang anda mahu buat.', '{name} 你好 👋 问我你家、邻居或屋规的事，或说你想做什么。'],
   'assistant.hold': ['Hold to talk', 'Tekan dan tahan untuk bercakap', '按住说话'],
@@ -316,7 +338,7 @@ const D: Record<string, Entry> = {
   'reno.weekends': ['No noisy work on weekends', 'Tiada kerja bising pada hujung minggu', '周末不做吵闹工程'],
   'reno.hoursRule': ['Noisy work is allowed 09:00–18:00, Monday to Saturday.', 'Kerja bising dibenarkan 09:00–18:00, Isnin hingga Sabtu.', '吵闹工程只能在星期一至六 09:00–18:00 进行。'],
   'reno.rules': ['House rules still apply: no work on Sundays or public holidays, contractor entry 08:00–18:00.', 'Peraturan rumah tetap terpakai: tiada kerja pada hari Ahad atau cuti umum, kontraktor masuk 08:00–18:00.', '屋规照常适用：周日和公共假期不施工，承包商 08:00–18:00 才能进入。'],
-  'reno.contractor': ['Contractor', 'Kontraktor', '承包商'], 'reno.cidb': ['Contractor is CIDB-registered (check simulated in the prototype)', 'Kontraktor berdaftar dengan CIDB (semakan disimulasikan)', '承包商已在 CIDB 注册（原型中为模拟检查）'],
+  'reno.contractor': ['Contractor', 'Kontraktor', '承包商'], 'reno.cidb': ['Contractor is CIDB-registered', 'Kontraktor berdaftar dengan CIDB', '承包商已在 CIDB 注册'],
   'reno.jmb': ['Management (JMB/MC) approval', 'Kelulusan pengurusan (JMB/MC)', '管理机构（JMB/MC）批准'], 'reno.jmbApproved': ['Approved, deposit paid', 'Diluluskan, deposit dibayar', '已批准，已付押金'], 'reno.jmbPending': ['Submitted, waiting', 'Dihantar, menunggu', '已提交，等待中'],
   'reno.permit': ['Council (PBT) permit', 'Permit PBT', '地方政府（PBT）准证'], 'reno.permitApproved': ['Approved', 'Diluluskan', '已批准'], 'reno.permitApplied': ['Applied, waiting', 'Dipohon, menunggu', '已申请，等待中'],
   'reno.permitNone': ['Not needed for this work', 'Tidak perlu untuk kerja ini', '这项工程不需要'], 'reno.permitRef': ['Permit reference', 'Rujukan permit', '准证编号'],
@@ -466,7 +488,7 @@ const D: Record<string, Entry> = {
   'me.blocked': ['Blocked', 'Disekat', '已封锁'], 'me.blockedSub': ['They aren’t told. Formal notices and concerns stay on record.', 'Mereka tidak diberitahu. Notis rasmi dan kebimbangan tetap direkodkan.', '对方不会知道，正式通知和问题照样留下纪录。'],
   'me.noneBlocked': ['Nobody blocked.', 'Tiada yang disekat.', '没有封锁任何人。'], 'me.unblocked': ['{name} is unblocked', '{name} dinyahsekat', '已解除封锁 {name}'],
   'me.shortcuts': ['Shortcuts', 'Pintasan', '捷径'], 'me.myLog': ['My home log', 'Log rumah saya', '我的屋历'], 'me.safe': ['How Keynection keeps you safe', 'Bagaimana Keynection melindungi anda', 'Keynection 怎样保护你'],
-  'me.welcomeAgain': ['Show the welcome again', 'Tunjuk sambutan semula', '再看一次欢迎画面'], 'me.sdp': ['SDP command view (demo)', 'Paparan kawalan SDP (demo)', 'SDP 管理后台（演示）'],
+  'me.welcomeAgain': ['Show the first-day tour again', 'Tunjuk lawatan hari pertama semula', '再看一次第一天导览'], 'me.sdp': ['SDP command view (demo)', 'Paparan kawalan SDP (demo)', 'SDP 管理后台（演示）'],
   'me.impact': ['SDP impact model (demo)', 'Model impak SDP (demo)', 'SDP 影响估算（演示）'], 'me.channels': ['How Keynection reaches residents (demo)', 'Cara Keynection sampai kepada penduduk (demo)', 'Keynection 怎么触达住户（演示）'],
   'helpers.title': ['Family helpers', 'Pembantu keluarga', '家人代办'],
   'helpers.sub': ['Let a family member use Keynection for you. Everything they do is recorded under their name.', 'Benarkan ahli keluarga menggunakan Keynection untuk anda. Semua tindakan mereka direkodkan atas nama mereka.', '授权家人替你使用 Keynection，他们做的每件事都会以他们的名字记录。'],
@@ -474,6 +496,7 @@ const D: Record<string, Entry> = {
   'helpers.name': ['Name', 'Nama', '名字'], 'helpers.relation': ['Relationship', 'Hubungan', '关系'],
   'relation.child': ['Son or daughter', 'Anak', '子女'], 'relation.spouse': ['Spouse', 'Pasangan', '配偶'], 'relation.sibling': ['Brother or sister', 'Adik-beradik', '兄弟姐妹'],
   'relation.caregiver': ['Caregiver', 'Penjaga', '看护'], 'relation.other': ['Other', 'Lain-lain', '其他'],
+  'helpers.thisPerson': ['this person', 'orang ini', '这个人'],
   'helpers.consent': ['I am the owner and I agree that {name} can act for my household.', 'Saya pemilik dan saya bersetuju {name} boleh bertindak bagi pihak isi rumah saya.', '我是屋主，同意 {name} 代表我的住户操作。'],
   'helpers.add': ['Add helper', 'Tambah pembantu', '新增代办人'], 'helpers.use': ['Use the app as {name}', 'Guna aplikasi sebagai {name}', '以 {name} 的身份使用'],
   'helpers.added': ['{name} can now help this household', '{name} kini boleh membantu isi rumah ini', '{name} 现在可以代办了'], 'helpers.removed': ['{name} removed', '{name} dibuang', '已移除 {name}'],
@@ -483,7 +506,7 @@ const D: Record<string, Entry> = {
   'data.sub': ['Under Malaysia’s Personal Data Protection Act you can see everything Keynection holds about you.', 'Di bawah Akta Perlindungan Data Peribadi Malaysia, anda boleh melihat semua data Keynection tentang anda.', '根据马来西亚个人资料保护法，你可以查看 Keynection 保存的所有关于你的资料。'],
   'data.download': ['Download my data', 'Muat turun data saya', '下载我的资料'], 'data.downloading': ['Your data file is downloading', 'Fail data anda sedang dimuat turun', '正在下载你的资料'],
   'data.note': ['Other residents appear by unit only. Voice messages are deleted after 30 days.', 'Penduduk lain dipaparkan mengikut unit sahaja. Mesej suara dipadam selepas 30 hari.', '其他住户只以门牌显示；语音讯息会在 30 天后删除。'],
-  'data.leave': ['Leaving Keynection removes your profile and chats; the home log stays with the unit as part of the property’s record. (Pilot)', 'Meninggalkan Keynection membuang profil dan sembang anda; log rumah kekal bersama unit sebagai rekod hartanah. (Perintis)', '退出 Keynection 会删除你的资料和聊天；屋历会留在这间房子，作为房产纪录。（试点）'],
+  'data.leave': ['Leaving Keynection removes your profile and chats; the home log stays with the unit as part of the property’s record.', 'Meninggalkan Keynection membuang profil dan sembang anda; log rumah kekal bersama unit sebagai rekod hartanah.', '退出 Keynection 会删除你的资料和聊天；屋历会留在这间房子，作为房产纪录。'],
 
   // new SDP pages (nav only: the pages themselves are records screens, in English)
   'group.sdp': ['Sime Darby Property', 'Sime Darby Property', 'Sime Darby Property'],
@@ -726,17 +749,18 @@ const D: Record<string, Entry> = {
   'task.fixedWall': ['corner, socket or switch', 'bucu, soket atau suis', '墙角、插座或开关'], 'task.fixedCeiling': ['light, fan or vent', 'lampu, kipas atau lubang udara', '灯、风扇或通风口'],
   'task.tipLight': ['Lights on; avoid flash glare', 'Hidupkan lampu; elakkan silau flash', '开灯；避免闪光灯反光'],
   'task.tipLocation': ['Location data removed automatically', 'Data lokasi dibuang secara automatik', '位置资料会自动删除'],
-  'task.take': ['Take photo', 'Ambil foto', '拍照'], 'task.sample': ['Use sample', 'Guna contoh', '用示范照片'],
+  'task.take': ['Take photo', 'Ambil foto', '拍照'], 'task.sample': ['Use sample (demo)', 'Guna contoh (demo)', '用示范照片（演示）'],
   'task.sealedOn': ['Sealed {date} · stays with you', 'Dimeterai {date} · kekal bersama anda', '{date} 封存 · 一直归你所有'],
   'task.spotted': ["Spotted a new crack or stain? Photograph the same spot again; we'll align and compare.", 'Nampak retak atau kesan air baharu? Foto tempat yang sama sekali lagi; kami akan selaraskan dan bandingkan.', '发现新的裂缝或水渍？在同一个位置再拍一张，系统会对齐比较。'],
-  'task.followup': ['Follow-up', 'Susulan', '跟进照片'], 'task.sampleCrack': ['Sample crack', 'Contoh retak', '示范裂缝'], 'task.sampleStain': ['Sample stain', 'Contoh kesan air', '示范水渍'],
-  'task.sampleSame': ['Try a sample with no change', 'Cuba contoh tanpa perubahan', '试一张没有变化的示范照片'],
+  'task.followup': ['Photograph it again', 'Ambil foto semula', '再拍同一处'], 'task.sampleCrack': ['Sample crack (demo)', 'Contoh retak (demo)', '示范裂缝（演示）'], 'task.sampleStain': ['Sample stain (demo)', 'Contoh kesan air (demo)', '示范水渍（演示）'],
+  'task.sampleSame': ['Try a sample with no change (demo)', 'Cuba contoh tanpa perubahan (demo)', '试一张没有变化的示范照片（演示）'],
+  'task.ownSealedSub': ['your side of the shared walls is on record', 'pihak anda pada dinding berkongsi sudah direkod', '你这边的共用墙已留底'],
   'task.busyPrint': ['Fingerprinting photo', 'Mencap jari foto', '正在记录照片指纹'], 'task.busyCompare': ['Aligning & comparing', 'Menyelaras & membandingkan', '正在对齐比较'],
   'task.tooBig': ['Photo is larger than 12 MB', 'Foto melebihi 12 MB', '照片超过 12 MB'],
   'task.savedOk': ['Pre-work photo sealed in your home log', 'Foto sebelum kerja dimeterai dalam log rumah anda', '开工前照片已封存进你的屋历'],
   'task.savedWarn': ['Saved, but check the photo quality tips', 'Disimpan, tetapi semak tip kualiti foto', '已储存，但请看看拍照提示'],
   'task.wentWrong': ['Something went wrong', 'Ada masalah', '出了点问题'],
-  'task.sharp': ['Sharp', 'Tajam', '清晰'], 'task.lit': ['Lit', 'Terang', '光线'], 'task.res': ['Res', 'Resolusi', '解析度'],
+  'task.sharp': ['Sharp', 'Tajam', '清晰'], 'task.lit': ['Well lit', 'Cukup terang', '光线够'], 'task.res': ['Full size', 'Saiz penuh', '解析度够'],
 
   'rp.opened': ['{label} · opened {date}', '{label} · dibuka {date}', '{label} · {date} 开单'], 'rp.repairedBy': [' · repaired by {who}', ' · dibaiki oleh {who}', ' · 由 {who} 维修'],
   'rp.damage': ['Damage', 'Kerosakan', '损坏'], 'rp.repair': ['Repair', 'Pembaikan', '维修'], 'rp.afterRepair': ['After repair', 'Selepas pembaikan', '维修后'],
@@ -851,9 +875,9 @@ const D: Record<string, Entry> = {
   'wk.none.body': ['When anyone in your circle registers renovation, it appears on this timeline.', 'Apabila sesiapa dalam lingkungan anda mendaftar ubah suai, ia akan dipaparkan pada garis masa ini.', '邻里圈有人登记装修时，会显示在这条时间线上。'],
   'wk.yourHome': ['Your home', 'Rumah anda', '你家'], 'wk.yourReno': ['Your renovation', 'Ubah suai anda', '你的装修'],
   'wk.noiseFrom': ['Noise from', 'Bising dari', '吵闹施工从'], 'wk.noiseUntil': ['Noise until', 'Bising hingga', '吵闹施工到'],
-  'wk.weekend': ['Weekend', 'Hujung minggu', '周末'], 'wk.sat': ['Sat', 'Sabtu', '周六可以'], 'wk.noWeekend': ['None', 'Tiada', '不施工'],
+  'wk.weekend': ['Weekend', 'Hujung minggu', '周末'], 'wk.sat': ['Sat', 'Sabtu', '周六可以'], 'wk.noWeekend': ['No work', 'Tiada kerja', '不施工'],
   'wk.permit.approved': ['Council (PBT) permit approved', 'Permit PBT diluluskan', '地方政府（PBT）准证已批准'],
-  'wk.permit.applied': ['Council permit applied for: structural work should wait for approval', 'Permit PBT telah dipohon: kerja struktur perlu menunggu kelulusan', '已申请 PBT 准证：结构工程要等批准才能开始'],
+  'wk.permit.applied': ['Council permit applied for, waiting for approval', 'Permit PBT telah dipohon, menunggu kelulusan', '已申请 PBT 准证，等待批准'],
   'wk.permit.not_needed': ['No council permit needed for this work', 'Permit PBT tidak diperlukan untuk kerja ini', '这项工程不需要 PBT 准证'],
   'wk.live': ['Now · {time}', 'Sekarang · {time}', '现在 · {time}'],
   'wk.noisyAt': ['Noisy work allowed now at {where}', 'Kerja bising dibenarkan sekarang di {where}', '{where} 现在可以吵闹施工'],
@@ -919,7 +943,7 @@ const D: Record<string, Entry> = {
   'sys.bothOwners': ['both owners', 'kedua-dua pemilik', '双方屋主'],
   'sys.helper': [', by {name}', ', oleh {name}', '，由 {name} 代办'],
   'sys.note': [' Note: {note}', ' Nota: {note}', ' 备注：{note}'],
-  'pv.renovation': ['Renovation notice', 'Notis ubah suai', '装修通知'], 'pv.wave': ['👋 Wave', '👋 Lambaian', '👋 打招呼'],
+  'pv.renovation': ['Renovation notice', 'Notis ubah suai', '装修通知'], 'pv.waveMine': ['👋 You waved', '👋 Anda melambai', '👋 你打了招呼'], 'pv.waveTheirs': ['👋 Waved at you', '👋 Melambai kepada anda', '👋 向你打招呼'],
   'pv.voice': ['🎤 Voice message ({n}s)', '🎤 Mesej suara ({n}s)', '🎤 语音讯息（{n} 秒）'],
   'pv.concern': ['Concern: {what}', 'Kebimbangan: {what}', '问题：{what}'],
 
@@ -1069,6 +1093,7 @@ const D: Record<string, Entry> = {
   'err.case_why_disagree': ['Say briefly why you disagree.', 'Nyatakan secara ringkas mengapa anda tidak bersetuju.', '请简短说明为什么不同意。'],
   'err.case_already_asked': ['You have already asked {label} to confirm.', 'Anda sudah meminta {label} mengesahkan.', '你已经请 {label} 确认过了。'],
   'err.case_disagreed': ['{label} disagreed. Ask an SDP inspector to check instead.', '{label} tidak bersetuju. Minta pemeriksa SDP menyemak sebaliknya.', '{label} 不同意。请改为请 SDP 检查员查看。'],
+  'err.permit_owner_only': ['Only the renovating household can state its permit.', 'Hanya isi rumah yang mengubah suai boleh menyatakan permitnya.', '只有装修户能填自己的准证。'],
   'err.pass_owner_only': ['Only the renovating household can issue passes for it.', 'Hanya isi rumah yang mengubah suai boleh mengeluarkan pas untuknya.', '只有装修户能为这项装修发通行证。'],
   'err.pass_cap': ['At most {n} active passes per renovation. Revoke one first.', 'Paling banyak {n} pas aktif bagi setiap ubah suai. Batalkan satu dahulu.', '每项装修最多 {n} 张有效通行证，先撤销一张。'],
   'err.pass_not_found': ['That pass was not found.', 'Pas itu tidak dijumpai.', '找不到那张通行证。'],
@@ -1146,8 +1171,18 @@ export function useDates() {
     const loc = LOCALE[lang]
     const date = (iso: string) => new Date(iso).toLocaleDateString(loc, { day: 'numeric', month: 'short', year: 'numeric' })
     const dayMonth = (iso: string) => new Date(iso).toLocaleDateString(loc, { day: 'numeric', month: 'short' })
+    const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString()
+    const day = (iso: string) => {
+      const d = new Date(iso)
+      const now = new Date()
+      if (sameDay(d, now)) return translate(lang, 'day.today')
+      if (sameDay(d, new Date(now.getTime() - 86_400_000))) return translate(lang, 'day.yesterday')
+      return date(iso)
+    }
     return {
       date,
+      /** Today, Yesterday, or the date: for the separators of a thread. */
+      day,
       range: (start: string, end: string) => `${dayMonth(start)} – ${dayMonth(end)}`,
       weekday: (d: Date) => d.toLocaleDateString(loc, { weekday: 'short', day: 'numeric', month: 'short' }),
       time: (d: Date) => d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' }),

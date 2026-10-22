@@ -96,6 +96,30 @@ OWNER_REPLIES: dict[str, dict[str, str]] = {
     },
 }
 
+# Before any notice between two homes, a thread is a first hello: these lines fit a new owner on key day. "Welcome"
+# comes from QUICK_REPLIES, under the same rule (only to a household that moved in after you).
+HELLO_REPLIES: dict[str, dict[str, str]] = {
+    "welcome": QUICK_REPLIES["welcome"],
+    "just_moved": {
+        "en": "Hi! We just moved in. Nice to meet you!",
+        "ms": "Hai! Kami baru pindah masuk. Selamat berkenalan!",
+        "zh": "你好！我们刚搬来，很高兴认识你！",
+        "ta": "வணக்கம்! நாங்கள் இப்போதுதான் குடிவந்தோம். உங்களைச் சந்தித்ததில் மகிழ்ச்சி!",
+    },
+    "need_anything": {
+        "en": "If you ever need anything, just knock or message me.",
+        "ms": "Kalau perlukan apa-apa, ketuk pintu atau mesej saya.",
+        "zh": "有需要随时敲门或发讯息给我。",
+        "ta": "ஏதாவது தேவைப்பட்டால், கதவைத் தட்டுங்கள் அல்லது செய்தி அனுப்புங்கள்.",
+    },
+    "teh_tarik": {
+        "en": "Let's have a teh tarik one of these days!",
+        "ms": "Jom minum teh tarik satu hari nanti!",
+        "zh": "改天一起喝杯拉茶吧！",
+        "ta": "ஒரு நாள் சேர்ந்து தேநீர் குடிப்போம்!",
+    },
+}
+
 CONCERN_CATEGORIES: dict[str, str] = {
     "noise_hours": "Noise outside the agreed hours",
     "debris": "Debris, dust or blocked drains",
@@ -172,11 +196,11 @@ def official_sounding(text: str) -> bool:
 
 def is_quick(key: str | None) -> bool:
     """A quick reply from either side of the wall."""
-    return key in QUICK_REPLIES or key in OWNER_REPLIES
+    return key in QUICK_REPLIES or key in OWNER_REPLIES or key in HELLO_REPLIES
 
 
 def quick_text(key: str, lang: str) -> str:
-    texts = QUICK_REPLIES.get(key) or OWNER_REPLIES[key]
+    texts = QUICK_REPLIES.get(key) or OWNER_REPLIES.get(key) or HELLO_REPLIES[key]
     return texts.get(lang) or texts["en"]
 
 

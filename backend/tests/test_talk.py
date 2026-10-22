@@ -60,9 +60,9 @@ def test_every_quick_reply_exists_in_every_language():
 
 
 def test_the_renovating_side_gets_its_own_quick_replies(client):
-    # Before any works, both sides get the neighbour's lines (everyone in the demo got their keys the same day, so
-    # "Welcome to the neighbourhood" is fair from either side).
-    assert [q["key"] for q in _thread(client, "T-12", "T-11")["quick_replies"]] == list(talk.QUICK_REPLIES)
+    # Before any works, both sides get a first hello (everyone in the demo got their keys the same day, so
+    # "Welcome to the neighbourhood" is fair from either side): never "thanks for the notice" with no notice.
+    assert [q["key"] for q in _thread(client, "T-12", "T-11")["quick_replies"]] == list(talk.HELLO_REPLIES)
     client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi",  # Aiman's notice reaches Siti
                                      "renovation": {"scope": "Retile the bathroom", "start": "2099-10-15", "end": "2099-10-30"}})
     owner = _thread(client, "T-12", "T-11")["quick_replies"]
@@ -263,3 +263,33 @@ def test_the_word_list_catches_common_insults():
 
 def test_the_word_list_lets_plain_complaints_through():
     assert [t for t in COMPLAINTS if talk.tone_problem(t)] == []
+
+
+def test_a_first_hello_has_no_notice_lines_and_every_hello_line_is_in_four_languages(client):
+    """A fresh thread offers hello lines; once the other side's notice reaches me, the neighbour's lines; and
+    a hello line tapped in English reaches a Malay reader in Malay."""
+    keys = [q["key"] for q in _thread(client, "T-12", "T-11")["quick_replies"]]
+    assert "thanks_notice" not in keys and "just_moved" in keys
+    for key, texts in talk.HELLO_REPLIES.items():
+        assert set(texts) == set(talk.LANGS), key
+    assert _send(client, "T-12", "T-11", quick_key="just_moved").status_code == 201
+    got = _thread(client, "T-11", "T-12")["items"][-1]
+    assert got["text"] == talk.quick_text("just_moved", "ms")
+    _reno(client, "T-11")  # Siti's notice reaches Aiman: now he answers a notice
+    assert [q["key"] for q in _thread(client, "T-12", "T-11")["quick_replies"]] == list(talk.QUICK_REPLIES)
+
+
+def test_the_owner_states_the_permit_later_from_works(client):
+    """The review step promises "add the reference later from Works": the owner can, nobody else can, and the
+    notified neighbour sees it on the notice afterwards."""
+    intro = client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi",
+                                             "renovation": {"scope": "Retile the bathroom", "start": "2099-10-15", "end": "2099-10-30"}}).json()["id"]
+    assert client.post(f"/api/intros/{intro}/permit", json={"unit_id": "T-11", "council_permit": "approved"}).status_code == 403
+    r = client.post(f"/api/intros/{intro}/permit", json={"unit_id": "T-12", "council_permit": "applied", "permit_ref": " PBT/2099/0007 "})
+    assert r.status_code == 200 and r.json()["renovation"]["permit_ref"] == "PBT/2099/0007"
+    mine = client.get("/api/units/T-12/works").json()["mine"][0]["renovation"]
+    assert mine["council_permit"] == "applied" and mine["permit_ref"] == "PBT/2099/0007"
+    seen = next(i for i in _thread(client, "T-11", "T-12")["items"] if i["type"] == "intro")
+    assert seen["renovation"]["council_permit"] == "applied"
+    assert client.post(f"/api/intros/{intro}/permit", json={"unit_id": "T-12", "council_permit": "not_needed", "permit_ref": "X"}).json()["renovation"]["permit_ref"] is None
+    assert client.post("/api/intros/99999/permit", json={"unit_id": "T-12", "council_permit": "approved"}).status_code == 404

@@ -236,7 +236,7 @@ function TaskCard({ me, task, onChange, onCase }: {
   return (
     <Card className={task.baseline ? '' : 'alert'}>
       <CardHead icon={<Hammer size={16} />} tone="amber" title={own ? t('task.ownTitle') : `${task.from_name} · ${task.from_label}`}
-        sub={own ? `${r.scope} · ${range(r.start, r.end)} · ${t('task.ownSub')}` : `${r.scope} · ${range(r.start, r.end)}`}
+        sub={own ? `${r.scope} · ${range(r.start, r.end)} · ${t(task.baseline ? 'task.ownSealedSub' : 'task.ownSub')}` : `${r.scope} · ${range(r.start, r.end)}`}
         right={task.needs_photo ? <Badge tone={task.baseline ? 'brand' : 'amber'}>{t(task.baseline ? 'task.sealed' : 'task.photoNeeded')}</Badge> : <Badge>{t('task.optional')}</Badge>} />
       <div className="subject"><Camera size={14} /> {subjectText(t, subject)}</div>
 

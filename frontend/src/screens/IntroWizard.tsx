@@ -6,7 +6,7 @@ import { useT } from '../i18n'
 import { useHelper } from '../helper'
 import { Avatar, Sheet, Steps, useToast } from '../ui'
 
-type Member = Neighbour & { known: boolean }
+type Member = Neighbour & { known: boolean; hello_sent?: boolean }
 
 /** Say hello, step by step. Only the homes in the circle; anyone else needs a contact request. */
 export default function IntroWizard({ open, onClose, me, circle, onSent, pick }: {
@@ -22,7 +22,10 @@ export default function IntroWizard({ open, onClose, me, circle, onSent, pick }:
   const toast = useToast()
   const helper = useHelper(me.id)
   const [step, setStep] = useState(0)
-  const [picked, setPicked] = useState<Set<string>>(() => new Set(circle.filter((n) => n.joined && (pick?.length ? pick.includes(n.id) : !n.known)).map((n) => n.id)))
+  // Everyone not met yet, except the homes that already have my hello (a wave is one too); a home the assistant
+  // heard named is ticked whatever its state. If every home has had one, all of them are offered again.
+  const fresh = circle.filter((n) => n.joined && !n.known && !n.hello_sent)
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(circle.filter((n) => n.joined && (pick?.length ? pick.includes(n.id) : fresh.length ? !n.known && !n.hello_sent : !n.known)).map((n) => n.id)))
   const [lang, setLang] = useState<Lang>(me.lang)
   const [draft, setDraft] = useState<string | null>(null)
   const [consent, setConsent] = useState(false)
@@ -78,7 +81,7 @@ export default function IntroWizard({ open, onClose, me, circle, onSent, pick }:
                 <Avatar name={n.resident_name} size={32} />
                 <span className="grow">
                   <b>{n.joined ? <>{n.resident_name} <i>· {n.label}</i></> : n.label}</b>
-                  <small>{t(`rel.${n.relation}`)}{!n.joined ? ` · ${t('nj.status')}` : n.known ? ` · ${t('intro.met')}` : ''}</small>
+                  <small>{t(`rel.${n.relation}`)}{!n.joined ? ` · ${t('nj.status')}` : n.known ? ` · ${t('intro.met')}` : n.hello_sent ? ` · ${t('story.helloSent')}` : ''}</small>
                 </span>
               </button>
             ))}

@@ -18,6 +18,12 @@ const EXAMPLES: Record<string, string> = {
   ms: 'Isnin depan saya nak tukar jubin bilik air utama, ABC Renovation, dua minggu',
   zh: '我下周一开始换主浴室瓷砖，ABC Renovation，大概两个星期',
 }
+// Once the household's own notice is out, the same chip asks a question instead: the notice is not sent twice.
+const EXAMPLES_AFTER: Record<string, string> = {
+  en: 'Can my contractor come on Sunday?',
+  ms: 'Boleh kontraktor saya datang hari Ahad?',
+  zh: '我的承包商可以星期天来吗？',
+}
 const SPEECH_LANG = { en: 'en-MY', ms: 'ms-MY', zh: 'zh-CN' } as const
 const PHONE = '(max-width: 899.98px)'
 const HISTORY = 6  // the last few messages go with each question, so a follow-up is understood
@@ -67,6 +73,15 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
   const [busy, setBusy] = useState(false)
   const [chat, setChat] = useState<Msg[]>([])
   const [reno, setReno] = useState<{ names: Record<string, string>; from: { said: string; renovation: RenovationDraft | null } } | null>(null)
+  // Whether this household's own notice is already out (the example chip then asks a question instead).
+  const [hasWorks, setHasWorks] = useState(false)
+  useEffect(() => {
+    let live = true
+    api.works(me.id).then((w) => live && setHasWorks(w.mine.length > 0)).catch(() => live && setHasWorks(false))
+    return () => {
+      live = false
+    }
+  }, [me.id, open])
   const [hello, setHello] = useState<{ circle: Directory['circle']; pick: string[] } | null>(null)
   const [easy, setEasy] = useState(false)
   const [wake, setWake] = useState<WakeState>('off')
@@ -418,7 +433,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
     setOpen(false)
   }
 
-  const example = EXAMPLES[lang] ?? EXAMPLES.en
+  const example = (hasWorks ? EXAMPLES_AFTER[lang] ?? EXAMPLES_AFTER.en : EXAMPLES[lang]) ?? EXAMPLES.en
   const chips = (
     <div className="assistant-chips">
       <button type="button" disabled={busy} onClick={() => void ask(example)}>{example}</button>

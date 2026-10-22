@@ -285,7 +285,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
               <small className="muted">{t(ai.on ? 'ai.reno.hint' : 'ai.reno.offHint')}</small>
               {ai.on && (
                 <div className="ai-box-row">
-                  <textarea rows={2} maxLength={500} value={said} onChange={(e) => setSaid(e.target.value)} placeholder={t('ai.reno.placeholder')}
+                  <textarea rows={3} maxLength={500} value={said} onChange={(e) => setSaid(e.target.value)} placeholder={t('ai.reno.placeholder')}
                     aria-label={t('ai.reno.title')} />
                   <button className="btn btn-primary" disabled={!said.trim() || reading} onClick={() => fillIn()}>
                     <Sparkles size={14} /> {reading ? t('ai.reno.working') : t('ai.reno.fill')}

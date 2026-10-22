@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
-  ArrowUpRight, BellOff, Ban, Check, Download, EyeOff, Fingerprint, Hand, HandHeart, Hexagon, KeyRound, Languages, Lock, LogOut, MessageCircle,
-  ShieldHalf, Type, UserPlus, UserRound, UserX,
+  ArrowUpRight, BellOff, Ban, Check, Download, EyeOff, Fingerprint, Hand, HandHeart, Hexagon, KeyRound, Lock, LogOut, MessageCircle,
+  Route, ShieldHalf, Type, UserPlus, UserRound, UserX,
 } from 'lucide-react'
 import { api, type Delegate, type Lang, type Profile, type UnitInfo } from '../api'
 import { LANGS } from '../messages'
 import type { TabId } from '../guide'
-import { refusal, useT } from '../i18n'
+import { refusal, useLang, useT } from '../i18n'
 import { useActing } from '../helper'
 import { roleOf } from '../components/Cast'
 import { Avatar, Card, CardHead, ScreenTitle, Skeleton, useToast } from '../ui'
@@ -21,6 +21,7 @@ const RELATIONS: Delegate['relation'][] = ['child', 'spouse', 'sibling', 'caregi
 /** Profile and privacy: how neighbours see you, how reachable you are, who helps you, and your data. */
 export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; version: number; onChange: () => void; onGo: (tab: TabId) => void }) {
   const t = useT()
+  const { setLang: setUiLang } = useLang()
   const pilot = usePilot()
   const toast = useToast()
   const [p, setP] = useState<Profile | null>(null)
@@ -88,7 +89,7 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
             </div>
             {tone && <div className="tone-check"><Lock size={15} /><div><b>{t(`${tone}.title`)}</b>{t(`${tone}.body`)}</div></div>}
             <label className="field">{t('me.langField')}
-              <select value={p.lang} onChange={(e) => update({ lang: e.target.value as Lang }, t('me.langSaved'))}>
+              <select value={p.lang} onChange={(e) => { const l = e.target.value as Lang; update({ lang: l }, t('me.langSaved')); if (pilot && (l === 'en' || l === 'ms' || l === 'zh')) setUiLang(l) }}>
                 {LANGS.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
               </select>
             </label>
@@ -138,7 +139,7 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
           {pilot && <CloseAccount me={me} />}
 
           <Card>
-            <CardHead icon={<Languages size={16} />} title={t('me.shortcuts')} />
+            <CardHead icon={<Route size={16} />} title={t('me.shortcuts')} />
             <button className="shortcut" onClick={() => onGo('log')}><Hexagon size={15} /> {t('me.myLog')} <ArrowUpRight size={14} /></button>
             {!pilot && <button className="shortcut" onClick={() => onGo('safeguards')}><ShieldHalf size={15} /> {t('me.safe')} <ArrowUpRight size={14} /></button>}
             <button className="shortcut muted-shortcut" onClick={() => { replayWelcome(me.id); onGo('circle') }}>{t('me.welcomeAgain')} <ArrowUpRight size={14} /></button>
@@ -310,7 +311,7 @@ function Helpers({ me, version, onChange }: { me: UnitInfo; version: number; onC
           </div>
           <label className="switch-row consent">
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-            <span>{t('helpers.consent', { name: name.trim() || '…' })}</span>
+            <span>{t('helpers.consent', { name: name.trim() || t('helpers.thisPerson') })}</span>
           </label>
           {why && <div className="tone-check"><Lock size={15} /><div><b>{t(`${why}.title`)}</b>{t(`${why}.body`)}</div></div>}
           <button className="btn btn-sm btn-primary" disabled={busy || !consent || name.trim().length < 2} onClick={add}><UserPlus size={14} /> {t('helpers.add')}</button>

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Camera, Eye, Hammer, Languages, Lock, Map as MapIcon, MessagesSquare, UserPlus, Users, X } from 'lucide-react'
+import type { TabId } from '../guide'
 import { api, type ContactRequest, type Directory, type Lang, type NearbyHome, type RenovationTask, type UnitInfo } from '../api'
-import { bioFor, readLang, refusal, useDates, useLang, useT, type Translate } from '../i18n'
+import { bioFor, readLang, refusal, useLang, useT, type Translate } from '../i18n'
 import PlanMap from '../components/PlanMap'
 import { LANG_TAG, roleOf } from '../components/Cast'
 import { Avatar, Badge, Card, CardHead, ScreenTitle, Segmented, Sheet, Skeleton, useCelebrate, useToast } from '../ui'
-import { Logo } from '../components/Art'
+import Tour from '../components/Tour'
 import IntroWizard from './IntroWizard'
 import QuietTimesCard from '../components/QuietTimes'
 import { usePilot, useShowAll } from '../features'
@@ -20,6 +21,8 @@ interface Props {
   onViewAs: (unitId: string) => void
   onOpenChat: (unitId: string) => void
   onOpenEvidence: () => void
+  /** The tour's cards open the screen they describe. */
+  onGo: (tab: TabId) => void
 }
 
 /** Whole days from today (Malaysian calendar) to an ISO date. */
@@ -56,7 +59,7 @@ const langName = (t: Translate, code: string) => t(`lang.${code}`)
 export { replayWelcome } from '../welcome'
 
 /** Who lives around you and who you can talk to: people first, the plan one tap away. */
-export default function CircleView({ me, units, version, onChange, onViewAs, onOpenChat, onOpenEvidence }: Props) {
+export default function CircleView({ me, units, version, onChange, onViewAs, onOpenChat, onOpenEvidence, onGo }: Props) {
   const t = useT()
   const reads = readLang(useLang().lang, me)  // bios arrive in this language
   const showAll = useShowAll()  // contact requests beyond the five homes are an extra, shown on request
@@ -290,7 +293,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
       )}
       {introOpen && <IntroWizard open onClose={() => setIntroOpen(false)} me={me} circle={circle} onSent={() => { celebrate('👋', t('celebrate.hello')); onChange() }} />}
       {welcome && dir && (
-        <Welcome me={me} circle={circle} onClose={() => { markWelcomeSeen(me.id); setWelcome(false) }} onIntro={() => setIntroOpen(true)} />
+        <Tour me={me} circle={circle} onClose={() => { markWelcomeSeen(me.id); setWelcome(false) }} onIntro={() => setIntroOpen(true)} onGo={onGo} />
       )}
       {requestFor && <RequestSheet home={requestFor} me={me} onClose={() => setRequestFor(null)} onSent={onChange} />}
     </section>
@@ -493,42 +496,6 @@ function RequestSheet({ home, me, onClose, onSent }: { home: NearbyHome; me: Uni
         value={note} onChange={(e) => { setNote(e.target.value); setTone(null) }} />
       {tone && <div className="tone-check"><Lock size={15} /><div><b>{t(`${tone}.title`)}</b>{t(`${tone}.body`)}</div></div>}
       <button className="btn btn-primary btn-block" disabled={busy} onClick={send}><UserPlus size={15} /> {busy ? t('btn.sending') : t('request.send')}</button>
-    </Sheet>
-  )
-}
-
-/** The moment you meet the homes around yours. */
-function Welcome({ me, circle, onClose, onIntro }: {
-  me: UnitInfo
-  circle: Member[]
-  onClose: () => void
-  onIntro: () => void
-}) {
-  const t = useT()
-  const dates = useDates()
-  return (
-    <Sheet open onClose={onClose} wide>
-      <div className="welcome">
-        <div className="welcome-logo"><Logo size={44} /></div>
-        <div className="eyebrow">{t('welcome.eyebrow')}</div>
-        <h1>{t('welcome.title', { name: me.resident_name })}</h1>
-        <p>{t('welcome.body', { label: me.label, date: dates.date(me.handover_date), n: circle.length })}</p>
-        <div className="welcome-doors">
-          {circle.map((n, i) => (
-            <div key={n.id} className={`welcome-door ${n.joined ? '' : 'off'}`} style={{ ['--i' as string]: i }}>
-              <Avatar name={n.resident_name} size={64} />
-              <b>{n.resident_name}</b>
-              <small>{n.joined ? shares(t, n.relation) : t('nj.status')}</small>
-            </div>
-          ))}
-        </div>
-        {circle.some((n) => !n.joined) && <small className="welcome-nj">{t('nj.welcome', { n: circle.filter((n) => !n.joined).length })}</small>}
-        <div className="welcome-actions">
-          <button className="btn" onClick={onClose}>{t('welcome.later')}</button>
-          <button className="btn btn-primary" onClick={() => { onClose(); onIntro() }}>👋 {t('welcome.hello')}</button>
-        </div>
-        <small className="welcome-privacy"><Lock size={12} /> {t('welcome.privacy')}</small>
-      </div>
     </Sheet>
   )
 }

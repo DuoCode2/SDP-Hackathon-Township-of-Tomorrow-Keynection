@@ -1,4 +1,4 @@
-import { Compass, Eye, Focus, Lightbulb, Sparkles, X } from 'lucide-react'
+import { Compass, Eye, Focus, Lightbulb, Sparkles, Route, X } from 'lucide-react'
 import { JUDGE_ROUTE, PAGES, ROUTE, UI, type GuideLang, type RouteStep, type TabId } from '../guide'
 import { useAi } from '../features'
 
@@ -10,13 +10,15 @@ interface Props {
   onLang: (lang: GuideLang) => void
   onClose: () => void
   onGo: (tab: TabId, unit?: string, opts?: { split?: boolean; peer?: string }) => void
+  /** Open the resident's first-day tour for the household on screen. */
+  onTour: () => void
   showAll: boolean
   onShowAll: (on: boolean) => void
 }
 
 // Explains the current screen and walks through the demo routes (the 3-minute judge route first, then the full one).
 // A side column on wide screens, a drawer otherwise.
-export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, showAll, onShowAll }: Props) {
+export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, onTour, showAll, onShowAll }: Props) {
   const page = PAGES[tab]
   const ai = useAi()
   const steps =(route: RouteStep[], judge = false) => (
@@ -58,6 +60,10 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, show
 
         <div className="guide-body" lang={lang === 'zh' ? 'zh-Hans' : lang === 'ms' ? 'ms' : 'en'}>
           <p className="guide-about">{UI.about[lang]}</p>
+          <button className="guide-tour" onClick={onTour}>
+            <Route size={15} />
+            <span><b>{UI.tourBtn[lang]}</b><small>{UI.residentTour[lang]}</small></span>
+          </button>
 
           <div className="section-label">{UI.judgeRoute[lang]}</div>
           {ai && (

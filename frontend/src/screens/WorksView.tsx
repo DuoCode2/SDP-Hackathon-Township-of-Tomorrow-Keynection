@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
-import { BadgeCheck, Ban, CalendarClock, CalendarRange, Eye, EyeOff, FileCheck2, FileClock, Hammer, KeyRound, ListChecks, ScanLine, ShieldCheck, ShieldX, Volume2, VolumeX } from 'lucide-react'
-import { api, type ContractorView, type GateCode, type GateResult, type Pass, type UnitInfo, type WorkItem, type Works } from '../api'
+import { BadgeCheck, Ban, CalendarClock, CalendarRange, Camera, Eye, EyeOff, FileCheck2, FileClock, FilePlus2, Hammer, KeyRound, ListChecks, ScanLine, ShieldCheck, ShieldX, Volume2, VolumeX } from 'lucide-react'
+import { api, type ContractorView, type GateCode, type GateResult, type Pass, type Renovation, type UnitInfo, type WorkItem, type Works } from '../api'
 import { useDates, useT, type Translate } from '../i18n'
 import { Badge, Card, CardHead, Empty, ScreenTitle, Segmented, Sheet, Skeleton, useToast } from '../ui'
 import RenovationWizard from './RenovationWizard'
@@ -12,6 +12,8 @@ interface Props {
   units: UnitInfo[]
   version: number
   onChange: () => void
+  /** The owner's next step after the notice: the pre-work photo lives on Photos. */
+  onOpenEvidence: () => void
 }
 
 type Item = WorkItem & { mine: boolean }
@@ -40,7 +42,7 @@ function gateText(t: Translate, dates: Dates, code: GateCode | null, values: Rec
   })
 }
 
-export default function WorksView({ me, units, version, onChange }: Props) {
+export default function WorksView({ me, units, version, onChange, onOpenEvidence }: Props) {
   const t = useT()
   const [tab, setTab] = useState<'schedule' | 'passes'>('schedule')
   const [data, setData] = useState<Works | null>(null)
@@ -87,7 +89,7 @@ export default function WorksView({ me, units, version, onChange }: Props) {
           <Segmented value={tab} onChange={setTab} options={[{ id: 'schedule', label: t('wk.tab.schedule') }, { id: 'passes', label: t('wk.tab.passes') }]} />
         </div>
       )}
-      {!data ? <Card><Skeleton lines={4} /></Card> : SHOW_CONTRACTOR_PASSES && tab === 'passes' ? <Passes me={me} data={data} onChange={onChange} /> : <Schedule data={data} all={all} noisy={noisy} />}
+      {!data ? <Card><Skeleton lines={4} /></Card> : SHOW_CONTRACTOR_PASSES && tab === 'passes' ? <Passes me={me} data={data} onChange={onChange} /> : <Schedule me={me} data={data} all={all} noisy={noisy} onChange={onChange} onOpenEvidence={onOpenEvidence} />}
       {wizard && <RenovationWizard open onClose={() => setWizard(null)} me={me} units={units} names={wizard.names} preset={wizard.preset} onSent={onChange} />}
     </section>
   )
@@ -95,9 +97,10 @@ export default function WorksView({ me, units, version, onChange }: Props) {
 
 // ---------- schedule ----------
 
-function Schedule({ data, all, noisy }: { data: Works; all: Item[]; noisy: Item[] }) {
+function Schedule({ me, data, all, noisy, onChange, onOpenEvidence }: { me: UnitInfo; data: Works; all: Item[]; noisy: Item[]; onChange: () => void; onOpenEvidence: () => void }) {
   const t = useT()
   const dates = useDates()
+  const [permitFor, setPermitFor] = useState<Item | null>(null)
   const now = new Date()
   const today = iso(now)
   const upcoming = all.filter((w) => w.renovation.start > today).sort((a, b) => a.renovation.start.localeCompare(b.renovation.start))[0]
@@ -112,7 +115,7 @@ function Schedule({ data, all, noisy }: { data: Works; all: Item[]; noisy: Item[
     <div className="cols">
       <div className="col">
         <Card>
-          <CardHead icon={<CalendarRange size={16} />} title={t('wk.next4')} sub={t('wk.next4.sub')} />
+          <CardHead icon={<CalendarRange size={16} />} title={t('wk.next4')} sub={t(all.length ? 'wk.next4.sub' : 'wk.none.sub')} />
           {all.length === 0 ? (
             <Empty art="house" icon={<VolumeX size={22} />} title={t('wk.none.title')}>{t('wk.none.body')}</Empty>
           ) : (
@@ -122,7 +125,8 @@ function Schedule({ data, all, noisy }: { data: Works; all: Item[]; noisy: Item[
                 <div className="tl-days">
                   {cal.map((d, i) => (
                     <span key={i} className={`tl-day ${i === 0 ? 'today' : ''} ${d.getDay() === 0 ? 'sun' : ''}`}>
-                      {i === 0 || d.getDate() === 1 || d.getDay() === 1 ? d.getDate() : ''}
+                      {/* Today, each Monday and the 1st are labelled, never two days in a row (the labels would touch). */}
+                      {i === 0 || ((d.getDate() === 1 || d.getDay() === 1) && i > 1 && cal[i - 1].getDate() !== 1) ? d.getDate() : ''}
                     </span>
                   ))}
                 </div>
@@ -163,10 +167,28 @@ function Schedule({ data, all, noisy }: { data: Works; all: Item[]; noisy: Item[
                 {w.renovation.council_permit === 'applied' ? <FileClock size={14} /> : <FileCheck2 size={14} />}
                 {t(`wk.permit.${w.renovation.council_permit}`)}
                 {w.renovation.permit_ref && <span className="mono">{w.renovation.permit_ref}</span>}
+                {w.mine && w.renovation.council_permit !== 'not_needed' && !w.renovation.permit_ref && (
+                  <button className="link" onClick={() => setPermitFor(w)}>{t('wk.permit.add')}</button>
+                )}
+              </div>
+            )}
+            {/* The owner's own notice: what the review step left open, and what to do before the works start. */}
+            {w.mine && !w.renovation.council_permit && (
+              <div className="permit permit-not_needed">
+                <FilePlus2 size={14} /> {t('wk.permit.none')}
+                <button className="link" onClick={() => setPermitFor(w)}>{t('wk.permit.add')}</button>
+              </div>
+            )}
+            {w.mine && (w.prework_photos ?? 0) === 0 && w.renovation.start >= today && (
+              <div className="next-step">
+                <Camera size={14} />
+                <span className="grow">{t('wk.photoNext', { date: dates.date(w.renovation.start) })}</span>
+                <button className="btn btn-sm btn-primary" onClick={onOpenEvidence}>{t('wk.photoNextGo')}</button>
               </div>
             )}
           </Card>
         ))}
+        {permitFor && <PermitSheet me={me} item={permitFor} onClose={() => setPermitFor(null)} onSaved={onChange} />}
       </div>
 
       <div className="col sticky">
@@ -205,6 +227,49 @@ function Schedule({ data, all, noisy }: { data: Works; all: Item[]; noisy: Item[
         </Card>
       </div>
     </div>
+  )
+}
+
+/** The owner states the council permit after the notice went out: the review step said this could wait. */
+function PermitSheet({ me, item, onClose, onSaved }: { me: UnitInfo; item: Item; onClose: () => void; onSaved: () => void }) {
+  const t = useT()
+  const toast = useToast()
+  const [status, setStatus] = useState<NonNullable<Renovation['council_permit']>>(item.renovation.council_permit ?? 'applied')
+  const [ref, setRef] = useState(item.renovation.permit_ref ?? '')
+  const [busy, setBusy] = useState(false)
+  async function save() {
+    setBusy(true)
+    try {
+      await api.setPermit(item.intro_id, me.id, status, status === 'not_needed' ? null : ref.trim() || null)
+      toast(t('wk.permit.saved'))
+      onSaved()
+      onClose()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Sheet open onClose={onClose}>
+      <div className="eyebrow">{t('wk.yourReno')}</div>
+      <div className="card-title" style={{ fontSize: 18 }}>{t('wk.permit.sheetTitle')}</div>
+      <p className="muted small">{t('wk.permit.sheetBody')}</p>
+      <label className="field">{t('reno.permit')}
+        <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
+          <option value="approved">{t('reno.permitApproved')}</option>
+          <option value="applied">{t('reno.permitApplied')}</option>
+          <option value="not_needed">{t('reno.permitNone')}</option>
+        </select>
+      </label>
+      <label className="field">{t('reno.permitRef')}
+        <input value={ref} maxLength={40} disabled={status === 'not_needed'} onChange={(e) => setRef(e.target.value)} placeholder="e.g. PBT/2026/0412" />
+      </label>
+      <div className="sheet-actions">
+        <button className="btn" onClick={onClose}>{t('btn.cancel')}</button>
+        <button className="btn btn-primary" disabled={busy} onClick={save}><FileCheck2 size={14} /> {t('btn.save')}</button>
+      </div>
+    </Sheet>
   )
 }
 

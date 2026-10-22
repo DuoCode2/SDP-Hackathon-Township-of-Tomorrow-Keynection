@@ -9,7 +9,7 @@ import WarrantyClock from '../components/WarrantyClock'
 import { Badge, Card, CardHead, count, CountUp, Empty, formatDate, Ring, ScreenTitle, Segmented, Skeleton, useToast } from '../ui'
 import { ticketBadge } from './RepairView'
 import { tEn } from '../i18n'
-import { replayWelcome } from './CircleView'
+import { replayOpening } from '../welcome'
 
 const SUBCONTRACTORS = ['Jaya Plaster Sdn Bhd', 'Kemas Waterproofing', 'Bina Teguh Builders']
 
@@ -46,7 +46,7 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
     await api.resetDemo()
     try {
       Object.keys(sessionStorage).filter((k) => k.startsWith('keynection.pass:') || k.startsWith('keynection.join:')).forEach((k) => sessionStorage.removeItem(k))
-      replayWelcome()
+      replayOpening()
     } catch {
       /* storage blocked */
     }
