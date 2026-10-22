@@ -23,13 +23,20 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, show
     <ol className={`route ${judge ? 'route-judge' : ''}`}>
       {route.map((s, i) => {
         const here = s.tab === tab && (!s.unit || s.unit === me)
+        const line = s.brief?.[lang] ?? s.text[lang]
         return (
           <li key={i}>
             <button className={here ? 'here' : ''} onClick={() => onGo(s.tab, s.unit, { split: s.split, peer: s.peer })}
-              aria-label={`${UI.step[lang].replace('{n}', String(i + 1))}: ${s.text[lang]}`}>
+              aria-label={`${UI.step[lang].replace('{n}', String(i + 1))}: ${line}`}>
               <span className="route-n">{i + 1}</span>
-              <span>{s.text[lang]}</span>
+              <span>{line}</span>
             </button>
+            {s.brief && (
+              <details className="route-more">
+                <summary>{UI.more[lang]}</summary>
+                <p>{s.text[lang]}</p>
+              </details>
+            )}
           </li>
         )
       })}
@@ -54,8 +61,8 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, show
 
           <div className="section-label">{UI.judgeRoute[lang]}</div>
           {ai && (
-            <p className={`guide-ai ${ai.on ? 'on' : ''}`}>
-              <Sparkles size={13} /> {ai.on ? `${UI.aiOn[lang]} (${ai.model})` : UI.aiOff[lang]}
+            <p className={`guide-ai ${ai.on ? 'on' : ''}`} title={ai.on && ai.model ? `${ai.provider ?? 'AI'} · ${ai.model}` : undefined}>
+              <Sparkles size={13} /> {ai.on ? UI.aiOn[lang] : UI.aiOff[lang]}
             </p>
           )}
           {steps(JUDGE_ROUTE, true)}
@@ -72,14 +79,16 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, show
             <span className="badge badge-brand">{page.layer[lang]}</span>
             <h2>{page.title[lang]}</h2>
             <p>{page.what[lang]}</p>
-            <div className="guide-sub">{UI.features[lang]}</div>
-            <ul>
-              {page.features[lang].map((f) => <li key={f}>{f}</li>)}
-            </ul>
-            <div className="guide-why">
-              <Lightbulb size={15} />
-              <div><b>{UI.why[lang]}</b>{page.why[lang]}</div>
-            </div>
+            <details className="guide-more">
+              <summary className="guide-sub">{UI.features[lang]}</summary>
+              <ul>
+                {page.features[lang].map((f) => <li key={f}>{f}</li>)}
+              </ul>
+              <div className="guide-why">
+                <Lightbulb size={15} />
+                <div><b>{UI.why[lang]}</b>{page.why[lang]}</div>
+              </div>
+            </details>
           </div>
 
           {showAll && <>

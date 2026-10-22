@@ -8,10 +8,10 @@ import type { TabId } from './guide'
 export const SHOW_CONTRACTOR_PASSES = false
 
 // The demo opens on the main story only: meet the five homes, the renovation notice as a hello, a fair photo check if a
-// crack appears, and how SDP reaches residents and measures the result. "Show every feature" in the guide brings back
-// the rest (home log, profile and family helpers, the command view, phase setup, safeguards, contact requests beyond
-// the five) for judges' questions. These are the screens of the 3-minute judge route.
-export const FOCUS_TABS: readonly TabId[] = ['circle', 'chats', 'works', 'evidence', 'impact', 'channels']
+// crack appears, the household's own page, and (for judges, in the sidebar and from the guide) how SDP reaches
+// residents and measures the result. "Show every feature" in the guide brings back the rest (home log, family helpers,
+// the command view, phase setup, safeguards, contact requests beyond the five) for judges' questions.
+export const FOCUS_TABS: readonly TabId[] = ['circle', 'chats', 'works', 'evidence', 'me', 'impact', 'channels']
 
 const ShowAllContext = createContext(false)
 export const ShowAllProvider = ShowAllContext.Provider

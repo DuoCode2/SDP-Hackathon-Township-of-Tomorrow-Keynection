@@ -162,11 +162,11 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   // notice list on the next step changes with it. Without AI the same button applies the preset beside it, on this
   // device, so the example still fills in the steps. Nothing is sent either way.
   const EXAMPLES: { label: string; text: string; preset: Preset }[] = [
-    { label: 'English', text: 'Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 6',
+    { label: t('ai.reno.exBathroom'), text: 'Retiling the master bathroom from next Monday for two weeks, ABC Renovation, weekdays 9 to 6',
       preset: { works: 'wet', scope: 'Retile the master bathroom', lang: 'en', start: nextMonday, days: 14, contractor: 'ABC Renovation' } },
-    { label: 'Bahasa Melayu', text: 'Nak pecah jubin dapur dan gerudi dinding mulai Isnin depan selama tiga minggu, Kontraktor Maju, Isnin hingga Jumaat 9 pagi hingga 6 petang',
+    { label: t('ai.reno.exKitchen'), text: 'Nak pecah jubin dapur dan gerudi dinding mulai Isnin depan selama tiga minggu, Kontraktor Maju, Isnin hingga Jumaat 9 pagi hingga 6 petang',
       preset: { works: 'hacking', scope: 'Pecah jubin dapur dan gerudi dinding', lang: 'ms', start: nextMonday, days: 21, contractor: 'Kontraktor Maju' } },
-    { label: '中文', text: '下个月初开始油漆和做木工，大概一个星期，承包商是兴隆装修，平日早上九点到下午六点',
+    { label: t('ai.reno.exPaint'), text: '下个月初开始油漆和做木工，大概一个星期，承包商是兴隆装修，平日早上九点到下午六点',
       preset: { works: 'light', scope: '油漆和做木工', lang: 'zh', start: firstOfNextMonth, days: 7, contractor: '兴隆装修' } },
   ]
 

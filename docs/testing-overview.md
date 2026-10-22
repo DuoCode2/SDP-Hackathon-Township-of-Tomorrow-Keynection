@@ -1,6 +1,6 @@
 # How Keynection is tested
 
-> **给队员的中文摘要**：测试分五层，底层是 420 个自动测试（后端，用 AI 替身，永远不连真的 AI），往上是前端的严格类型检查、浏览器自动走完评审路线并截图、人工按 `test-plan.md` 核对、真手机核对；每次推送到 GitHub 都自动跑前两层。最后一节老实写了还没测到的东西。**数字只在这里写一次**，README 和其他文件引用这一页。
+> **给队员的中文摘要**：测试分五层，底层是 424 个自动测试（后端，用 AI 替身，永远不连真的 AI），往上是前端的严格类型检查、浏览器自动走完评审路线并截图、人工按 `test-plan.md` 核对、真手机核对；每次推送到 GitHub 都自动跑前两层。最后一节老实写了还没测到的东西。**数字只在这里写一次**，README 和其他文件引用这一页。
 
 ```
                      ┌───────────────────────────┐
@@ -12,13 +12,13 @@
                      ├───────────────────────────┤
                      │  Front end: strict types    │  npm run build (TypeScript strict, Vite)
                      ├───────────────────────────┤
-                     │  420 server tests           │  backend/tests (pytest), ~3½ min, every push (CI)
+                     │  424 server tests           │  backend/tests (pytest), ~3½ min, every push (CI)
                      └───────────────────────────┘
 ```
 
-## Layer 1 — 420 automated server tests
+## Layer 1 — 424 automated server tests
 
-`cd backend && .venv/Scripts/python -m pytest -q` — 420 collected, all passing on 22 Oct 2026 (about 3½ minutes on a laptop). Each test gets its own SQLite database in a temporary folder; the AI is a **stand-in** (`tests/conftest.py`), so no test ever reaches Anthropic or Google. The count below is what pytest collects (parametrised cases counted separately).
+`cd backend && .venv/Scripts/python -m pytest -q` — 424 collected, all passing on 22 Oct 2026 (about 3½ minutes on a laptop). Each test gets its own SQLite database in a temporary folder; the AI is a **stand-in** (`tests/conftest.py`), so no test ever reaches Anthropic or Google. The count below is what pytest collects (parametrised cases counted separately).
 
 | What they protect | Files | Tests |
 |---|---|---|
@@ -28,7 +28,7 @@
 | **AI, with the stand-in** — one sentence → notice fields, rule-breaking answers dropped; translation and calmer wording per reader; an insult refused outright, on the word list or on Claude's own judgement, with no "send anyway"; no key / no answer / network down → everything works as before; daily allowance; only the text leaves; the official SDK is exercised with the network swapped out; Gemini is demo-only, and a 503 is tried once more; the assistant reads one sentence into one of six intents and its fields, answers house-rule questions from a fixed text, counts status lines on the server, falls back to key words without AI, keeps the last six turns as history, and sends only the household's own records and its neighbours' unit numbers; the assistant's voice through the gateway — a short real recording is passed on and dropped, Malay and Chinese asked for by Deepgram's own detect_language, only English replies are spoken and cut at a sentence, the same reply from memory, daily allowances per home, the key never logged, off in a pilot | `test_ai.py`, `test_assistant.py`, `test_voice.py` | 35 + 19 + 34 = **88** |
 | **Pilot mode** — passkey sign-in, re-entry codes, CSV import that refuses a bad row, welcome packs, push subscriptions and encryption, Procore export, the first staff member, start-up self-checks, no rebuild of a pilot's data | `test_signin.py` (above), `test_pilot_setup.py`, `test_pilot_data.py`, `test_procore.py`, `test_push.py`, `test_join.py` | 7 + 6 + 7 + 10 + 13 = **43** |
 | **Demo and surface** — waves, reactions, voice notes, profiles, the official account; evidence API; the shared demo that starts over after a quiet spell with loosened caps; old `JIRAN_` names still working; health check; `.env.example` complete and honest | `test_social.py`, `test_evidence_api.py`, `test_shared_demo.py`, `test_rename.py`, `test_api.py`, `test_env_example.py` | 15 + 15 + 8 + 6 + 6 + 4 = **54** |
-| | **Total (33 files)** | **420** |
+| | **Total (33 files)** | **424** |
 
 Three files answer the question judges ask most, "who is stopped from doing what": `test_staff_gating.py` (every SDP screen closes without a staff sign-in; nobody can write to a home log directly), `test_decisions.py` (propose, agree, disagree, inspector: who may take each step), `test_hello_safety.py` (blocks, quiet mode, tone, contact details, daily caps, approvals before structural works).
 

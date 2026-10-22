@@ -47,7 +47,9 @@ export default function EvidenceView({ me, version, onChange }: Props) {
     return <RepairView me={me} ticket={openTicket} onBack={() => setOpenTicket(null)} onChanged={(u) => { setOpenTicket(u); onChange() }} />
   }
 
-  const tasks = data ? [...data.renovations].sort((a, b) => Number(b.needs_photo) - Number(a.needs_photo)) : []
+  // My own works first (my side of the wall, before they start), then the neighbours' works that need my photo.
+  const mine = data ? data.renovations.filter((x) => x.mine) : []
+  const tasks = data ? data.renovations.filter((x) => !x.mine).sort((a, b) => Number(b.needs_photo) - Number(a.needs_photo)) : []
   const waiting = tickets.filter((x) => x.status === 'repair_submitted')
   // A neighbour says my renovation caused a change: nothing is settled until I answer.
   const toAnswer = data?.incidents.filter((c) => c.status === 'proposed' && caseRole(c, me) === 'renovating_owner') ?? []
@@ -91,17 +93,19 @@ export default function EvidenceView({ me, version, onChange }: Props) {
         </button>
       ))}
 
-      {data && tasks.length === 0 && data.incidents.length === 0 && tickets.length === 0 && (
+      {data && mine.length === 0 && tasks.length === 0 && data.incidents.length === 0 && tickets.length === 0 && (
         <Card>
           <Empty art="camera" icon={<Camera size={24} />} title={t('ev.nothingTitle')}>{t('ev.nothingBody')}</Empty>
         </Card>
       )}
 
-      {data && (tasks.length > 0 || data.incidents.length > 0 || others.length > 0) && (
-      <div className={tasks.length > 0 ? 'cols' : 'stack'}>
-      {tasks.length > 0 && (
+      {data && (mine.length > 0 || tasks.length > 0 || data.incidents.length > 0 || others.length > 0) && (
+      <div className={mine.length > 0 || tasks.length > 0 ? 'cols' : 'stack'}>
+      {(mine.length > 0 || tasks.length > 0) && (
         <div className="col">
-          <div className="section-label">{t('ev.renoNextDoor')}</div>
+          {mine.length > 0 && <div className="section-label">{t('ev.yourWorks')}</div>}
+          {mine.map((x) => <TaskCard key={x.intro_id} me={me} task={x} onChange={onChange} onCase={setOpenCase} />)}
+          {tasks.length > 0 && <div className="section-label">{t('ev.renoNextDoor')}</div>}
           {tasks.map((x) => <TaskCard key={x.intro_id} me={me} task={x} onChange={onChange} onCase={setOpenCase} />)}
         </div>
       )}
@@ -121,6 +125,8 @@ export default function EvidenceView({ me, version, onChange }: Props) {
             <div className="mono muted">{t('case.no', { n: String(c.id).padStart(3, '0') })}</div>
             <div className="card-title" style={{ fontSize: 14 }}>{subjectText(t, c.baseline.subject)}</div>
             <div className="muted small">{t('ev.reportedBy', { label: c.reporter_label, date: date(c.created_at) })}</div>
+            {/* What the rule found and what it means for this reader, so a case is never just a label and a question mark. */}
+            <div className="small case-meaning">{c.hint.codes ? t(`hint.${c.hint.suggestion}`) : c.hint.headline}{caseMeaning(t, c, me)}</div>
           </div>
           {caseBadge(t, c, me)}
         </button>
@@ -147,6 +153,20 @@ export default function EvidenceView({ me, version, onChange }: Props) {
   )
 }
 
+/** One line on what a case means for the reader: the renovating owner learns at once whether anything is asked of
+ *  them, the reporter what happens next. Decided cases say so. */
+function caseMeaning(t: ReturnType<typeof useT>, c: Incident, me: UnitInfo): string {
+  if (c.status === 'decided') return ' · ' + t('ev.meaning.decided')
+  const role = caseRole(c, me)
+  if (role === 'renovating_owner') {
+    if (c.status === 'proposed') return ' · ' + t('ev.meaning.answer')
+    if (c.hint.suggestion === 'renovation') return ' · ' + t('ev.meaning.mayAsk')
+    return ' · ' + t('ev.meaning.nothing')
+  }
+  if (role === 'reporter' && c.status === 'open') return ' · ' + t('ev.meaning.decide')
+  return ''
+}
+
 function TaskCard({ me, task, onChange, onCase }: {
   me: UnitInfo
   task: RenovationTask
@@ -161,6 +181,7 @@ function TaskCard({ me, task, onChange, onCase }: {
   const followupInput = useRef<HTMLInputElement>(null)
   const subject = task.suggested_subject  // stored in English: it is part of the record
   const ceiling = isCeiling(subject)
+  const own = task.mine  // my own renovation: my side of the shared walls, before the contractor starts
 
   async function run<T>(label: string, work: () => Promise<T>): Promise<T | undefined> {
     setBusy(label)
@@ -214,7 +235,8 @@ function TaskCard({ me, task, onChange, onCase }: {
   const r = task.renovation
   return (
     <Card className={task.baseline ? '' : 'alert'}>
-      <CardHead icon={<Hammer size={16} />} tone="amber" title={`${task.from_name} · ${task.from_label}`} sub={`${r.scope} · ${range(r.start, r.end)}`}
+      <CardHead icon={<Hammer size={16} />} tone="amber" title={own ? t('task.ownTitle') : `${task.from_name} · ${task.from_label}`}
+        sub={own ? `${r.scope} · ${range(r.start, r.end)} · ${t('task.ownSub')}` : `${r.scope} · ${range(r.start, r.end)}`}
         right={task.needs_photo ? <Badge tone={task.baseline ? 'brand' : 'amber'}>{t(task.baseline ? 'task.sealed' : 'task.photoNeeded')}</Badge> : <Badge>{t('task.optional')}</Badge>} />
       <div className="subject"><Camera size={14} /> {subjectText(t, subject)}</div>
 

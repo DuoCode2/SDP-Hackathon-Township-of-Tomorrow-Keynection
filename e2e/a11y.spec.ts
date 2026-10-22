@@ -38,11 +38,12 @@ test('every button on the judge route has a name, on a desktop and on a phone', 
   await dismissWelcome(page)
   const found: string[] = []
 
-  // The tabs: the sidebar on a desktop, the dock on a phone. All six main-story tabs are there, each with a name.
-  for (const [size, where] of [[DESKTOP, 'sidebar'], [PHONE, 'dock']] as const) {
+  // The tabs: the sidebar on a desktop (the seven main-story tabs), the dock on a phone (the five resident tabs:
+  // SDP's two pages are not on a resident's phone). Each has a name.
+  for (const [size, where, least] of [[DESKTOP, 'sidebar', 7], [PHONE, 'dock', 5]] as const) {
     await page.setViewportSize(size)
     await page.waitForTimeout(400)
-    expect(await page.locator('nav button:visible').count(), `${where}: tab buttons`).toBeGreaterThanOrEqual(6)
+    expect(await page.locator('nav button:visible').count(), `${where}: tab buttons`).toBeGreaterThanOrEqual(least)
     found.push(...(await unnamed(page, where, 'nav button')))
   }
 

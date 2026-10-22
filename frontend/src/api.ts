@@ -508,9 +508,11 @@ export interface RenovationTask {
   from_unit_id: string
   from_label: string
   from_name: string
-  relation_to_me: Relation
+  // 'self': this household's own renovation, which it photographs its side of before the works start.
+  relation_to_me: Relation | 'self'
   renovation: Renovation
   needs_photo: boolean
+  mine: boolean
   suggested_subject: string
   baseline: Photo | null
 }

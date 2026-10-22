@@ -142,6 +142,8 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
             <button className="shortcut" onClick={() => onGo('log')}><Hexagon size={15} /> {t('me.myLog')} <ArrowUpRight size={14} /></button>
             {!pilot && <button className="shortcut" onClick={() => onGo('safeguards')}><ShieldHalf size={15} /> {t('me.safe')} <ArrowUpRight size={14} /></button>}
             <button className="shortcut muted-shortcut" onClick={() => { replayWelcome(me.id); onGo('circle') }}>{t('me.welcomeAgain')} <ArrowUpRight size={14} /></button>
+            {!pilot && <button className="shortcut muted-shortcut" onClick={() => onGo('impact')}>{t('me.impact')} <ArrowUpRight size={14} /></button>}
+            {!pilot && <button className="shortcut muted-shortcut" onClick={() => onGo('channels')}>{t('me.channels')} <ArrowUpRight size={14} /></button>}
             {!pilot && <button className="shortcut muted-shortcut" onClick={() => onGo('sdp')}>{t('me.sdp')} <ArrowUpRight size={14} /></button>}
           </Card>
         </div>

@@ -5,7 +5,7 @@ import { api, type ContractorView, type GateCode, type GateResult, type Pass, ty
 import { useDates, useT, type Translate } from '../i18n'
 import { Badge, Card, CardHead, Empty, ScreenTitle, Segmented, Sheet, Skeleton, useToast } from '../ui'
 import RenovationWizard from './RenovationWizard'
-import { SHOW_CONTRACTOR_PASSES, usePilot } from '../features'
+import { SHOW_CONTRACTOR_PASSES, usePilot, useShowAll } from '../features'
 
 interface Props {
   me: UnitInfo
@@ -46,6 +46,7 @@ export default function WorksView({ me, units, version, onChange }: Props) {
   const [data, setData] = useState<Works | null>(null)
   const [wizard, setWizard] = useState<{ names: Record<string, string>; preset?: 'bathroom' } | null>(null)
   const pilot = usePilot()
+  const showAll = useShowAll()  // the quick example is for presenters, behind "Show every feature"
 
   // The wizard shows names only for homes this household may know (its circle and accepted contacts).
   // Demo: the quick example opens it already filled in with the bathroom story, on the When step.
@@ -77,7 +78,7 @@ export default function WorksView({ me, units, version, onChange }: Props) {
               {noisy.length ? <Volume2 size={15} /> : <VolumeX size={15} />}
               {t(noisy.length ? 'wk.pill.noisy' : 'wk.pill.quiet')}
             </div>
-            {!pilot && <button className="btn" onClick={() => openWizard('bathroom')}>{t('wk.quickExample')}</button>}
+            {!pilot && showAll && <button className="btn" onClick={() => openWizard('bathroom')}>{t('wk.quickExample')}</button>}
             <button className="btn btn-primary" onClick={() => openWizard()}><Hammer size={15} /> {t('wk.register')}</button>
           </div>
         )} />

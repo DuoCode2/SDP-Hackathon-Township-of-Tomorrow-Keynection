@@ -34,7 +34,7 @@ function daysUntil(iso: string): number {
  *  time-sensitive thing on the page, because once work begins the photo can no longer show "before". */
 function photoTasksDue(tasks: RenovationTask[]): (RenovationTask & { days: number })[] {
   return tasks
-    .filter((x) => x.needs_photo && !x.baseline)
+    .filter((x) => !x.mine && x.needs_photo && !x.baseline)  // my own works have their card on Photos & repairs
     .map((x) => ({ ...x, days: daysUntil(x.renovation.start) }))
     .filter((x) => x.days >= 0)
     .sort((a, b) => a.days - b.days)
@@ -137,7 +137,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
               <button key={n.id} role="listitem" className={`story ${!n.joined ? 'off' : works.has(n.id) ? 'works' : n.known ? 'known' : 'new'}`} onClick={() => setProfile(n)}>
                 <span className="story-ring"><Avatar name={n.resident_name} size={58} /></span>
                 <b>{n.resident_name}</b>
-                <small>{!n.joined ? t('nj.story') : works.has(n.id) ? t('story.renovating') : n.known ? n.label : n.hello_sent ? t('story.helloSent') : t('story.sayHi')}</small>
+                <small>{!n.joined ? t('nj.story') : works.has(n.id) ? t('story.renovating') : n.known ? t('story.known') : n.hello_sent ? t('story.helloSent') : t('story.sayHi')}</small>
               </button>
             ))}
           </div>
@@ -205,12 +205,14 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
                   {works.has(n.id) ? <><Hammer size={12} /> {t('status.renovating')}</> : t(n.known ? 'status.known' : n.hello_sent ? 'status.helloSent' : 'status.notMet')}
                 </div>
                 <div className="btn-row">
-                  {/* Not met yet: a wave is the easy first step, so it leads; once known, a message does. */}
+                  {/* Not met yet: a wave is the easy first step, so it leads. Once you know each other, you talk. */}
                   <button className={`btn btn-sm ${n.known ? 'btn-primary' : ''}`} onClick={() => onOpenChat(n.id)}><MessagesSquare size={14} /> {t('btn.message')}</button>
-                  <button className={`btn btn-sm ${n.known ? '' : 'btn-primary'}`} disabled={n.waved_today || n.allow_waves === false} onClick={() => wave(n)}
-                    title={n.allow_waves === false ? t('wave.off') : undefined}>
-                    👋 {t(n.waved_today ? 'btn.waved' : 'btn.wave')}
-                  </button>
+                  {!n.known && (
+                    <button className="btn btn-sm btn-primary" disabled={n.waved_today || n.allow_waves === false} onClick={() => wave(n)}
+                      title={n.allow_waves === false ? t('wave.off') : undefined}>
+                      👋 {t(n.waved_today ? 'btn.waved' : 'btn.wave')}
+                    </button>
+                  )}
                 </div>
               </article>
             ))}

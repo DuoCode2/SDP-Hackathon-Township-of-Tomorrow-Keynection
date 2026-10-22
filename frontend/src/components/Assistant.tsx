@@ -11,12 +11,13 @@ import { forget, remember, remembered } from '../storage'
 import { WAKE_PHRASE, WakeWord, chime, holdWake, recordSentence, wakeSupported, withoutWakePhrase, type WakeState } from '../wake'
 import { canSpeak, speak, type Speaking } from '../speech'
 
-// Three sentences a judge can try without typing (demo only), one in each language the screens speak.
-const EXAMPLES = [
-  'Saturday I’m retiling the bathroom, ABC Renovation, two weeks',
-  'Sabtu ni saya nak tukar jubin bilik air, dua minggu',
-  '我下周六开始换浴室瓷砖，大概两个星期',
-]
+// One sentence a judge can try without typing (demo only), in the language the screens are in: the same story as
+// the guide's step 2, so what the chip does and what the guide says agree.
+const EXAMPLES: Record<string, string> = {
+  en: 'Retiling the master bathroom from next Monday, ABC Renovation, two weeks',
+  ms: 'Isnin depan saya nak tukar jubin bilik air utama, ABC Renovation, dua minggu',
+  zh: '我下周一开始换主浴室瓷砖，ABC Renovation，大概两个星期',
+}
 const SPEECH_LANG = { en: 'en-MY', ms: 'ms-MY', zh: 'zh-CN' } as const
 const PHONE = '(max-width: 899.98px)'
 const HISTORY = 6  // the last few messages go with each question, so a follow-up is understood
@@ -71,8 +72,15 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
   const [wake, setWake] = useState<WakeState>('off')
   const [handsFree, setHandsFree] = useState(false)  // listening because "Hello Neighbour" was heard
   const [more, setMore] = useState(false)  // listening for a follow-up, right after a spoken reply (no wake word)
-  // Hands-free is offered once, the first time the chat opens in this browser; after that only the ear button.
+  // Hands-free is offered once, after the household has used the microphone once by hand (so the first thing the
+  // chat asks for is never the microphone); after that only the ear button.
   const [offer, setOffer] = useState(() => remembered('wake') === null && remembered('wakeOffered') === null)
+  const [micUsed, setMicUsed] = useState(() => remembered('micUsed') !== null)
+  const noteMicUse = () => {
+    if (micUsed) return
+    remember('micUsed', '1')
+    setMicUsed(true)
+  }
   // The orb in the corner says its name ("Hello Neighbour") for a few seconds the first time it appears in this
   // browser, and once more each time hands-free is switched on and starts listening; then it folds back into the orb.
   const [named, setNamed] = useState(() => remembered('named') === null)
@@ -410,9 +418,10 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
     setOpen(false)
   }
 
+  const example = EXAMPLES[lang] ?? EXAMPLES.en
   const chips = (
     <div className="assistant-chips">
-      {EXAMPLES.map((x) => <button key={x} type="button" disabled={busy} onClick={() => void ask(x)}>{x}</button>)}
+      <button type="button" disabled={busy} onClick={() => void ask(example)}>{example}</button>
     </div>
   )
 
@@ -502,7 +511,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
             <div className="assistant-msg bot">
               <p className="assistant-greeting">{t('assistant.greeting', { name: me.resident_name })}</p>
               {/* Hands-free, offered once: the tap on "Turn on" is the one browsers need before any audio starts. */}
-              {offer && wake === 'off' && canHear && wakeSupported() && (
+              {offer && micUsed && wake === 'off' && canHear && wakeSupported() && (
                 <div className="assistant-card assistant-offer">
                   <span><Ear size={14} /> {t('assistant.wake.offer')}</span>
                   <span className="assistant-offer-btns">
@@ -555,9 +564,9 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
             {canHear && (
               <button type="button" className={`assistant-hold ${heard !== null ? 'on' : ''}`} disabled={busy}
                 aria-label={t('assistant.hold')} title={t('assistant.hold')}
-                onPointerDown={(e) => { e.preventDefault(); if (!handsFree) hear() }} onPointerUp={() => !handsFree && stop()}
+                onPointerDown={(e) => { e.preventDefault(); if (!handsFree) { noteMicUse(); hear() } }} onPointerUp={() => !handsFree && stop()}
                 onPointerLeave={() => !handsFree && stop()} onPointerCancel={() => !handsFree && stop()}
-                onKeyDown={(e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); hear() } }}
+                onKeyDown={(e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); noteMicUse(); hear() } }}
                 onKeyUp={(e) => { if (e.key === ' ' || e.key === 'Enter') stop() }} onContextMenu={(e) => e.preventDefault()}>
                 <Mic size={18} />
               </button>

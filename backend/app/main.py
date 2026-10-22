@@ -735,12 +735,13 @@ def _store_photo(conn: sqlite3.Connection, unit_id: str, raw: bytes, kind: str, 
                  renovation_intro_id: int | None) -> dict[str, Any]:
     _unit_row(conn, unit_id)
     if renovation_intro_id is not None:
+        # A neighbour the notice reached, or the household that sent it (its own side of the wall, before the works).
         linked = conn.execute(
-            "SELECT i.renovation FROM intro_recipients r JOIN intros i ON i.id = r.intro_id"
-            " WHERE r.intro_id = ? AND r.unit_id = ?", (renovation_intro_id, unit_id)
+            "SELECT i.renovation FROM intros i LEFT JOIN intro_recipients r ON r.intro_id = i.id AND r.unit_id = ?"
+            " WHERE i.id = ? AND (r.unit_id IS NOT NULL OR i.from_unit_id = ?)", (unit_id, renovation_intro_id, unit_id)
         ).fetchone()
         if linked is None:
-            raise refuse(403, "photo_not_notified", "Only neighbours notified of this renovation can attach photos to it.")
+            raise refuse(403, "photo_not_notified", "Only the household renovating and the neighbours its notice reached can attach photos to it.")
         # A hello lands in the inbox the same way a notice does, but a photo is evidence against someone's
         # works: it can only hang off a renovation notice, never off a plain hello.
         if linked["renovation"] is None:
@@ -793,6 +794,8 @@ def _incident_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]
     }
 
 
+# The renovating household's own record, before its works start (one photo of the walls it shares).
+OWN_SIDE_SUBJECT = "Your side of the shared walls, before the works"
 SUBJECT_BY_RELATION = {
     "left": "Shared wall with {label}",
     "right": "Shared wall with {label}",
@@ -1661,7 +1664,7 @@ def _message_json(row: sqlite3.Row, viewer_lang: str, reactions: list[dict[str, 
            "code": row["sys_code"], "values": json.loads(row["sys_values"] or "{}")}
     if row["kind"] == "voice":
         out["text"] = "Voice message"
-    if row["kind"] == "quick" and row["quick_key"] in talk.QUICK_REPLIES:
+    if row["kind"] == "quick" and talk.is_quick(row["quick_key"]):
         out["text"] = talk.quick_text(row["quick_key"], viewer_lang)
         out["translated"] = viewer_lang != row["lang"]
         out["original"] = row["body"] if out["translated"] else None
@@ -1808,8 +1811,22 @@ def thread(unit_id: str, other_id: str, conn: sqlite3.Connection = Depends(get_c
             "contact": _contact_state(conn, unit_id, other_id), "blocked": _blocked(conn, unit_id, other_id),
             "their_renovations": _renovations_from(conn, other_id, unit_id),
             "quick_replies": [{"key": k, "text": talk.quick_text(k, me["lang"]), "arrives": talk.quick_text(k, n["lang"])}
-                              for k in talk.QUICK_REPLIES],
+                              for k in _quick_keys(conn, me, n)],
             "concern_categories": talk.CONCERN_CATEGORIES}
+
+
+def _quick_keys(conn: sqlite3.Connection, me: sqlite3.Row | dict[str, Any], other: dict[str, Any]) -> list[str]:
+    """Which quick replies fit this side of the thread. A household whose current renovation reaches the other
+    gets the owner's lines (patience, the contractor's hours, an apology for the noise); everyone else gets the
+    neighbour's, and "Welcome to the neighbourhood" only when the other household moved in after this one."""
+    today = _today()
+    mine = [r for r in _renovations_from(conn, me["id"], other["id"]) if r["end"] >= today]
+    if mine:
+        return list(talk.OWNER_REPLIES)
+    keys = list(talk.QUICK_REPLIES)
+    if (_unit_row(conn, other["id"])["handover_date"] or "") < (me["handover_date"] or ""):
+        keys.remove("welcome")  # they were here first: it is not mine to welcome them
+    return keys
 
 
 @app.post("/api/units/{unit_id}/conversations/{other_id}/read")
@@ -1836,7 +1853,7 @@ def send_message(body: MessageIn, conn: sqlite3.Connection = Depends(get_conn)) 
     _check_daily_limit(conn, body.from_unit_id, body.to_unit_id)
     translations = None
     if body.quick_key:
-        if body.quick_key not in talk.QUICK_REPLIES:
+        if not talk.is_quick(body.quick_key):
             raise refuse(404, "quick_unknown", "unknown quick reply")
         kind, text = "quick", talk.quick_text(body.quick_key, sender["lang"])
     else:
@@ -2666,6 +2683,21 @@ def evidence(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict
     photos = [_photo_json(r) for r in conn.execute(
         "SELECT * FROM photos WHERE unit_id = ? ORDER BY created_at DESC", (unit_id,))]
     renovations = []
+    # The household doing the works photographs its own side first: a neighbour's claim later is settled against
+    # both records, not only theirs. One task per current renovation (works that ended are past photographing).
+    me = _unit_row(conn, unit_id)
+    today = _today()
+    for row in conn.execute("SELECT id, renovation FROM intros WHERE from_unit_id = ? AND renovation IS NOT NULL ORDER BY id DESC",
+                            (unit_id,)):
+        renovation = json.loads(row["renovation"])
+        if renovation.get("end", "") < today:
+            continue
+        renovations.append({
+            "intro_id": row["id"], "from_unit_id": unit_id, "from_label": me["label"], "from_name": me["resident_name"],
+            "relation_to_me": "self", "renovation": renovation, "needs_photo": True, "mine": True,
+            "suggested_subject": OWN_SIDE_SUBJECT,
+            "baseline": next((p for p in photos if p["kind"] == "baseline" and p["renovation_intro_id"] == row["id"]), None),
+        })
     for item in inbox(unit_id, conn):
         if not item["renovation"]:
             continue
@@ -2674,7 +2706,7 @@ def evidence(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict
         renovations.append({
             "intro_id": item["id"], "from_unit_id": item["from_unit_id"], "from_label": item["from_label"],
             "from_name": item["from_name"], "relation_to_me": rel, "renovation": item["renovation"],
-            "needs_photo": template is not None,
+            "needs_photo": template is not None, "mine": False,
             "suggested_subject": (template or "Front of your home facing {label}").format(label=item["from_label"]),
             "baseline": next((p for p in photos if p["kind"] == "baseline" and p["renovation_intro_id"] == item["id"]), None),
         })

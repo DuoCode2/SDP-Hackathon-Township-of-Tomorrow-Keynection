@@ -60,6 +60,42 @@ QUICK_REPLIES: dict[str, dict[str, str]] = {
     },
 }
 
+# The other side of the wall: what the household doing the works says to a neighbour its notice reached. The thread
+# offers these instead of the replies above while that household's renovation is current, so the one making the noise
+# is never handed "Welcome to the neighbourhood" or "Thanks for letting us know".
+OWNER_REPLIES: dict[str, dict[str, str]] = {
+    "thanks_patience": {
+        "en": "Thank you for your patience with the works.",
+        "ms": "Terima kasih atas kesabaran anda dengan kerja ini.",
+        "zh": "谢谢你对装修的包容。",
+        "ta": "வேலையின் போது உங்கள் பொறுமைக்கு நன்றி.",
+    },
+    "starts_tomorrow": {
+        "en": "The contractor starts tomorrow morning. Noisy work stays within the hours in the notice.",
+        "ms": "Kontraktor mula esok pagi. Kerja bising hanya dalam waktu yang dinyatakan dalam notis.",
+        "zh": "承包商明天早上开工，吵的工程只会在通知里的时段进行。",
+        "ta": "ஒப்பந்ததாரர் நாளை காலை தொடங்குவார். சத்தமான வேலை அறிவிப்பில் உள்ள நேரத்துக்குள் மட்டுமே.",
+    },
+    "sorry_noise": {
+        "en": "Sorry about the noise today. Tell me if it gets too much.",
+        "ms": "Maaf atas bunyi bising hari ini. Beritahu saya jika terlalu mengganggu.",
+        "zh": "今天吵到你了，不好意思。太吵的话告诉我。",
+        "ta": "இன்றைய சத்தத்துக்கு மன்னிக்கவும். அதிகமாக இருந்தால் சொல்லுங்கள்.",
+    },
+    "done_for_today": {
+        "en": "That's all the noisy work for today.",
+        "ms": "Kerja bising untuk hari ini sudah selesai.",
+        "zh": "今天吵的工程做完了。",
+        "ta": "இன்றைய சத்தமான வேலை முடிந்தது.",
+    },
+    "send_photo": {
+        "en": "If anything on your side changes, send me a photo and we'll look at it together.",
+        "ms": "Jika ada apa-apa berubah di pihak anda, hantar foto dan kita lihat bersama.",
+        "zh": "你那边有任何变化，拍张照给我，我们一起看看。",
+        "ta": "உங்கள் பக்கத்தில் ஏதாவது மாறினால், படம் அனுப்புங்கள்; ஒன்றாகப் பார்ப்போம்.",
+    },
+}
+
 CONCERN_CATEGORIES: dict[str, str] = {
     "noise_hours": "Noise outside the agreed hours",
     "debris": "Debris, dust or blocked drains",
@@ -134,8 +170,14 @@ def official_sounding(text: str) -> bool:
     return bool(_OFFICIAL_RE.search(text))
 
 
+def is_quick(key: str | None) -> bool:
+    """A quick reply from either side of the wall."""
+    return key in QUICK_REPLIES or key in OWNER_REPLIES
+
+
 def quick_text(key: str, lang: str) -> str:
-    return QUICK_REPLIES[key].get(lang) or QUICK_REPLIES[key]["en"]
+    texts = QUICK_REPLIES.get(key) or OWNER_REPLIES[key]
+    return texts.get(lang) or texts["en"]
 
 
 # ---------- WhatsApp alerts ----------

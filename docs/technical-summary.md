@@ -21,7 +21,7 @@
 - **One codebase, two modes.** Demo mode (judges): cast switcher, guide, sample photos, reset; the server trusts the unit number in a request. Pilot mode (`KEYNECTION_DEMO_MODE=0`): passkey sign-in, the server decides identity on every request, no fictional data, no reset.
 - **No network needed to demo.** Fonts, icons and QR generation are bundled; the AI is optional and the app works without it.
 - **Refusals.** Every refusal the server gives (an HTTP 4xx, including a form that fails its own checks) is `{code, message, values}`: the app says the code in the interface language (`err.<code>` in `i18n.tsx`, 148 codes), the English sentence is the record and the fallback. A test checks that no server code is without wording in the app.
-- **Sizes.** 106 API endpoints, 32 tables, 18 screens, about 790 KB of front-end bundle (251 KB gzipped; the 8 MB wake-word engine loads only when hands-free is switched on), 420 server tests.
+- **Sizes.** 106 API endpoints, 32 tables, 18 screens, about 790 KB of front-end bundle (251 KB gzipped; the 8 MB wake-word engine loads only when hands-free is switched on), 424 server tests.
 - **Why SQLite and one container.** A pilot is one phase on one server; backups are a file copy; SDP IT can run it with Docker in an afternoon (`docs/pilot-deployment.md`). It is not built for many townships on one database, and says so.
 
 ## 2. Four state machines
