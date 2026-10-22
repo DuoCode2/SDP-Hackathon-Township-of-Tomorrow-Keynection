@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Camera, ChevronLeft, CircleCheck, Hammer, Lock, Sparkles } from 'lucide-react'
 import type { Directory, UnitInfo } from '../api'
 import type { TabId } from '../guide'
@@ -37,6 +37,9 @@ export default function Tour({ me, circle, onClose, onIntro, onGo }: {
   const last = 3
   const go = (tab: TabId) => { onClose(); onGo(tab) }
   const wall = joined.find((n) => SURFACE[n.relation])
+  // Each card opens at its top, even after card one was scrolled on a short screen.
+  const root = useRef<HTMLDivElement>(null)
+  useEffect(() => { root.current?.closest('.sheet')?.scrollTo({ top: 0 }) }, [step])
 
   const cards = [
     <div key="hello" className="welcome">
@@ -93,7 +96,7 @@ export default function Tour({ me, circle, onClose, onIntro, onGo }: {
 
   return (
     <Sheet open onClose={onClose} wide>
-      <div className="tour" aria-label={t('tour.name')}>
+      <div ref={root} className="tour" aria-label={t('tour.name')}>
         <div className="tour-top">
           <span className="tour-dots" role="tablist" aria-label={t('tour.step', { n: step + 1, m: last + 1 })}>
             {cards.map((_, i) => <button key={i} role="tab" aria-selected={i === step} className={i === step ? 'on' : ''} onClick={() => setStep(i)} aria-label={t('tour.step', { n: i + 1, m: last + 1 })} />)}

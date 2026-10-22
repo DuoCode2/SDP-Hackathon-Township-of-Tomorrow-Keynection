@@ -58,6 +58,9 @@ def test_quick_replies_arrive_translated_into_the_readers_language(client):
     assert zh["quick_replies"] and all(q["text"] == talk.quick_text(q["key"], "zh") for q in zh["quick_replies"])
     assert all(q["arrives"] == talk.quick_text(q["key"], "ms") for q in zh["quick_replies"])
     assert [i["text"] for i in zh["items"]] == ["Terima kasih, Aiman", talk.quick_text("quiet_nap", "zh")]
+    # Siti on English screens tapped an English button: her own message is not shown to her as a translation.
+    mine = client.get("/api/units/T-11/conversations/T-12?lang=en").json()["items"][-1]
+    assert mine["text"] == talk.quick_text("quiet_nap", "en") and mine["translated"] is False and mine["original"] is None
     listed = next(c for c in client.get("/api/units/T-12/conversations?lang=zh").json() if c["id"] == "T-11")
     assert listed["last"] == talk.quick_text("quiet_nap", "zh")
     assert client.get("/api/units/T-12/conversations/T-11?lang=xx").status_code == 422
