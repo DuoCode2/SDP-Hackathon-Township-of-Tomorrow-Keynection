@@ -1764,7 +1764,8 @@ def _message_json(row: sqlite3.Row, viewer_lang: str, reactions: list[dict[str, 
         # Written ahead in every language, so it can follow the screen's language (quick_lang) at no cost.
         shown = quick_lang or viewer_lang
         out["text"] = talk.quick_text(row["quick_key"], shown)
-        out["translated"] = shown != row["lang"]
+        # The sender tapped it in the language they see it in: only the other side's is marked as translated.
+        out["translated"] = shown != row["lang"] and viewer != row["from_unit_id"]
         out["original"] = row["body"] if out["translated"] else None
     # A typed message reaches its reader in Claude's translation; the sender sees their own words.
     translated = json.loads(row["translations"] or "{}").get(viewer_lang) if row["kind"] == "text" and viewer == row["to_unit_id"] else None

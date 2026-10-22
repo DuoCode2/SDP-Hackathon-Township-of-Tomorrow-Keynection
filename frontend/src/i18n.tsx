@@ -240,7 +240,7 @@ const D: Record<string, Entry> = {
   // introduce yourself
   'intro.steps.who': ['Who', 'Siapa', '对象'], 'intro.steps.message': ['Message', 'Mesej', '讯息'], 'intro.steps.share': ['What you share', 'Apa dikongsi', '分享哪些资料'],
   'intro.title': ['Say hello to your circle', 'Sapa bulatan anda', '跟邻里圈打招呼'],
-  'intro.lead': ['Your circle is the homes that share a wall, a slab or a road frontage with you. Pick who to greet: those you haven’t met are ticked.', 'Bulatan anda ialah rumah yang berkongsi dinding, lantai atau hadapan jalan dengan anda. Pilih siapa yang mahu ditegur: yang belum dikenali sudah ditanda.', '邻里圈就是跟你共用墙、楼板或面对面的住户。选择要打招呼的人：还没认识的已经帮你勾好。'],
+  'intro.lead': ['Your circle is the homes that share a wall, a slab or a road frontage with you. Pick who to greet: those you haven’t met are ticked.', 'Bulatan anda ialah rumah yang berkongsi dinding, lantai atau hadapan jalan dengan anda. Pilih siapa yang mahu disapa: yang belum dikenali sudah ditanda.', '邻里圈就是跟你共用墙、楼板或面对面的住户。选择要打招呼的人：还没认识的已经帮你勾好。'],
   'intro.met': ['already met', 'sudah kenal', '已认识'],
   'intro.further': ['Someone further along your lorong or block? Tap their home on the plan to send a contact request instead.', 'Seseorang lebih jauh di lorong atau blok anda? Ketik rumah mereka pada pelan untuk menghantar permintaan.', '想联系同一条 lorong 或同一栋更远的住户？在地图上点他们的房子发联系请求。'],
   'intro.language': ['Language', 'Bahasa', '语言'],
@@ -486,7 +486,7 @@ const D: Record<string, Entry> = {
   'me.subtitle': ['How your neighbours see you, and how reachable you want to be.', 'Bagaimana jiran melihat anda, dan sejauh mana anda mahu dihubungi.', '邻居看到的你，以及你愿意被联系到什么程度。'],
   'me.noBio': ['No bio yet', 'Belum ada bio', '还没有自我介绍'],
   'me.bioField': ['About you · one line, shown only to your circle and accepted contacts', 'Tentang anda · satu baris, hanya untuk bulatan dan kenalan anda', '关于你 · 一句话，只给邻里圈和已接受的联系人看'],
-  'me.bioPlaceholder': ['e.g. Two kids and a cat. Say hi at the playground!', 'cth. Dua anak dan seekor kucing. Tegurlah di taman permainan!', '例如：两个小孩和一只猫，在游乐场见到请打招呼！'],
+  'me.bioPlaceholder': ['e.g. Two kids and a cat. Say hi at the playground!', 'cth. Dua anak dan seekor kucing. Sapalah kami di taman permainan!', '例如：两个小孩和一只猫，在游乐场见到请打招呼！'],
   'me.bioFoot': ['{n}/80 · Don’t share schedules, travel dates or your children’s school.', '{n}/80 · Jangan kongsi jadual, tarikh perjalanan atau sekolah anak anda.', '{n}/80 · 不要写作息、出远门日期或孩子的学校。'],
   'me.saved': ['Profile saved', 'Profil disimpan', '已保存'],
   'me.langField': ['Language you read · neighbours’ messages and alerts arrive in it', 'Bahasa bacaan · mesej jiran dan makluman sampai dalam bahasa ini', '阅读语言 · 邻居的讯息和提醒用这个语言送达'], 'me.langSaved': ['Language updated', 'Bahasa dikemas kini', '已更新语言'],
