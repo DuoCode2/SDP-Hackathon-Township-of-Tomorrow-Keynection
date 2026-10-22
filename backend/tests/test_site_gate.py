@@ -227,3 +227,66 @@ def test_the_server_log_never_shows_the_password_from_a_link():
     plain = logging.LogRecord("uvicorn.access", logging.INFO, __file__, 0, '%s - "%s %s HTTP/%s" %d',
                               ("203.0.113.9:50000", "GET", "/api/units?monkey=1", "1.1", 200), None)
     assert _HideSiteKey().filter(plain) and plain.getMessage().endswith('"GET /api/units?monkey=1 HTTP/1.1" 200')
+
+
+# POST /api/site-password: a new password from anywhere, kept in a file next to the database. The server's own
+# (KEYNECTION_SITE_PASSWORD) is the fallback, and what the site goes back to when the file is deleted.
+NEW = "kopi-peng-2027x"
+
+
+def _change(client, current: str, new: str):
+    return client.post("/api/site-password", json={"current": current, "new": new}, headers=_basic("team", current))
+
+
+def test_the_password_can_be_changed_with_the_one_in_use(gated, tmp_path):
+    r = _change(gated, PASSWORD, NEW)
+    assert r.status_code == 200 and r.json() == {"status": "changed"}
+    assert (tmp_path / "site-password").read_text() == NEW + "\n"
+    assert not (tmp_path / "site-password.tmp").exists()
+    assert _sign_in(gated, PASSWORD).status_code == 401  # the old one is out
+    assert gated.get(f"/?key={PASSWORD}", follow_redirects=False).status_code == 401  # and so is its link
+    assert gated.get(f"/?key={NEW}", follow_redirects=False).status_code == 303  # the judges' link, remade
+    assert gated.get("/api/units", headers=_basic("judge", NEW)).status_code == 200
+    assert _sign_in(gated, NEW).status_code == 303
+
+
+def test_changing_it_signs_every_browser_out(gated):
+    assert _sign_in(gated, PASSWORD).status_code == 303
+    assert gated.get("/api/units").status_code == 200  # the test client sends the cookie back
+    assert _change(gated, PASSWORD, NEW).status_code == 200
+    assert gated.get("/api/units").status_code == 401  # the cookie is a keyed hash of the old password
+    assert gated.get("/", headers={"Accept": "text/html"}).status_code == 401
+
+
+def test_a_signed_in_browser_cannot_change_it_without_the_password(gated):
+    assert _sign_in(gated, PASSWORD).status_code == 303
+    r = gated.post("/api/site-password", json={"current": "guess", "new": NEW})  # the cookie alone
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "site_password_wrong"
+    assert _sign_in(gated, PASSWORD).status_code == 303  # unchanged
+    assert _sign_in(gated, NEW).status_code == 401
+
+
+def test_a_new_password_must_be_plain_and_long_enough(gated):
+    for bad in ("short", " spaced", "spaced ", "全角密码不行aaaa", "a" * 65, "tab\tinside"):
+        assert _change(gated, PASSWORD, bad).status_code == 422, bad
+    assert _sign_in(gated, PASSWORD).status_code == 303
+    assert _change(gated, PASSWORD, "Symbols-are_fine!42").status_code == 200
+
+
+def test_without_a_site_password_there_is_nothing_to_change(client, tmp_path):
+    r = client.post("/api/site-password", json={"current": "x", "new": NEW})
+    assert r.status_code == 404 and r.json()["detail"]["code"] == "site_open"
+    assert not (tmp_path / "site-password").exists()
+    (tmp_path / "site-password").write_text(NEW + "\n")  # a leftover file cannot close an open server either
+    assert client.get("/api/units").status_code == 200
+
+
+def test_a_stored_password_outlives_a_restart_and_an_empty_file_does_not(gated, tmp_path):
+    (tmp_path / "site-password").write_text("from-before-2027\n")  # written by an earlier run of the server
+    assert _sign_in(gated, PASSWORD).status_code == 401
+    assert _sign_in(gated, "from-before-2027").status_code == 303
+    (tmp_path / "site-password").write_text("")
+    assert _sign_in(gated, PASSWORD).status_code == 303  # back to the server's own
+    (tmp_path / "site-password").unlink()
+    assert _sign_in(gated, PASSWORD).status_code == 303
+

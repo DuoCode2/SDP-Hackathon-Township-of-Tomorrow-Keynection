@@ -332,10 +332,26 @@ SITE_LOGIN_MAX_BYTES = 4096  # a one-field form; anything bigger is not a person
 SITE_KEY = "key"  # …/?key=<password>: a link that opens the demo by itself (see _site_key_login)
 
 
+SITE_PASSWORD_FILE = "site-password"  # next to the database: a password set later with POST /api/site-password
+
+
+def _site_password_file() -> Path:
+    return Path(db_path()).parent / SITE_PASSWORD_FILE
+
+
 def _site_password() -> str | None:
     """Online the prototype sits behind one shared password: it has no sign-in, so without this anyone with the
-    link could reset the demo or upload files. Not set (local runs): the site is open, as before."""
-    return setting("SITE_PASSWORD") or None
+    link could reset the demo or upload files. Not set (local runs): the site is open, as before. A password set
+    later with POST /api/site-password (kept in a file next to the database, so it outlives a restart) replaces the
+    server's own; delete the file to go back to it."""
+    password = setting("SITE_PASSWORD") or None
+    if not password:
+        return None  # an open site stays open: a stored password cannot close a server that has none
+    try:
+        stored = _site_password_file().read_text(encoding="utf-8").rstrip("\r\n")
+    except OSError:  # no file: the server's own password
+        return password
+    return stored or password
 
 
 def _site_token(password: str, context: bytes = b"keynection-site-v1") -> str:
@@ -780,6 +796,7 @@ VALIDATION: dict[str, tuple[str, dict[str, Any]]] = {
     "break_outside": ("a quiet break must sit inside the noisy hours", {}),
     "breaks_overlap": ("quiet breaks overlap", {}),
     "message_or_quick": ("send either a message or a quick reply", {}),
+    "site_password_plain": ("the new password must be 8 to 64 plain English characters, with no spaces at the ends", {}),
     **{code: (text, values) for code, (text, values) in quiet.PROBLEMS.items()},
 }
 
@@ -3468,6 +3485,38 @@ def home_history(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> 
     events = db.unit_events(conn, unit_id)
     ok, bad_index = ledger.verify_chain(events)
     return {"unit_id": unit_id, "events": events, "chain_ok": ok, "first_bad_index": bad_index}
+
+
+class SitePasswordIn(BaseModel):
+    current: str  # the password in use, typed again: a browser that is merely signed in (its cookie) cannot do this
+    new: str = Field(min_length=8, max_length=64)
+
+    @model_validator(mode="after")
+    def plain(self) -> "SitePasswordIn":
+        # Letters, digits and ASCII symbols only, nothing at the ends that a form or a chat would trim or cut:
+        # the password also travels in the judges' /?key= link.
+        if not (self.new.isascii() and self.new.isprintable()) or self.new != self.new.strip():
+            raise ValueError("site_password_plain")
+        return self
+
+
+@app.post("/api/site-password")
+async def change_site_password(body: SitePasswordIn) -> dict[str, str]:
+    """Change the site password without a shell on the server: the new one goes into a file next to the database
+    and is in force at once, so every browser is signed out and every /?key= link made with the old one stops
+    working. The password in use must be typed again (the site cookie alone is not enough). Nothing is logged."""
+    password = _site_password()
+    if not password:
+        raise refuse(404, "site_open", "this server has no site password")
+    if not secrets.compare_digest(body.current.encode(), password.encode()):
+        await asyncio.sleep(0.5)  # as for a wrong password on the page
+        raise refuse(403, "site_password_wrong", "the current password is not right")
+    path = _site_password_file()
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(body.new + "\n", encoding="utf-8")
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, path)  # whole or not at all: never a half-written password
+    return {"status": "changed"}
 
 
 class DemoResetIn(BaseModel):
