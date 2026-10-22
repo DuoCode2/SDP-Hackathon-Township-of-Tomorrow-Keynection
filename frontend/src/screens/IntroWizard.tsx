@@ -2,11 +2,18 @@ import { useState } from 'react'
 import { Check, EyeOff, Hand, Languages, Lock, Send, UserRound } from 'lucide-react'
 import { api, type Neighbour, type UnitInfo } from '../api'
 import { LANGS, introTemplate, type Lang } from '../messages'
-import { useT } from '../i18n'
+import { useT, type Translate } from '../i18n'
 import { useHelper } from '../helper'
 import { Avatar, Sheet, Steps, useToast } from '../ui'
 
 type Member = Neighbour & { known: boolean; hello_sent?: boolean }
+
+// The same words as the Neighbours card ("Shares your wall", "Directly across"), so the sheet and the card agree.
+const SHARES: Record<string, string> = {
+  left: 'share.wall', right: 'share.wall', above: 'share.above', below: 'share.below',
+  'across-left': 'rel.across-left', across: 'rel.across', 'across-right': 'rel.across-right',
+}
+const shares = (t: Translate, relation: string) => t(SHARES[relation] ?? `rel.${relation}`)
 
 /** Say hello, step by step. Only the homes in the circle; anyone else needs a contact request. */
 export default function IntroWizard({ open, onClose, me, circle, onSent, pick }: {
@@ -81,7 +88,7 @@ export default function IntroWizard({ open, onClose, me, circle, onSent, pick }:
                 <Avatar name={n.resident_name} size={32} />
                 <span className="grow">
                   <b>{n.joined ? <>{n.resident_name} <i>· {n.label}</i></> : n.label}</b>
-                  <small>{t(`rel.${n.relation}`)}{!n.joined ? ` · ${t('nj.status')}` : n.known ? ` · ${t('intro.met')}` : n.hello_sent ? ` · ${t('story.helloSent')}` : ''}</small>
+                  <small>{shares(t, n.relation)}{!n.joined ? ` · ${t('nj.status')}` : n.known ? ` · ${t('intro.met')}` : n.hello_sent ? ` · ${t('story.helloSent')}` : ''}</small>
                 </span>
               </button>
             ))}

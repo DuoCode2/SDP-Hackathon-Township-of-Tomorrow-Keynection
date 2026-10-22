@@ -9,7 +9,7 @@ import { Avatar, Badge, ScreenTitle, Skeleton } from '../ui'
 // The page speaks the language the screens are in; the two phones show what the household itself would see, so they
 // are in its reading language (WhatsApp alerts arrive in it; the SDP App illustration uses it, English for Tamil).
 const TIME_LOCALE: Record<Lang, string> = { en: 'en-MY', ms: 'ms-MY', zh: 'zh-CN', ta: 'ta-MY' }
-const timeIn = (lang: Lang, iso: string) => new Date(iso).toLocaleTimeString(TIME_LOCALE[lang], { hour: '2-digit', minute: '2-digit' })
+const timeIn = (lang: Lang, iso: string) => new Date(iso).toLocaleTimeString(TIME_LOCALE[lang], { hour: '2-digit', minute: '2-digit', hour12: lang === 'ms' ? false : undefined })
 
 /** A chat's last line on the SDP App illustration, in the phone's language. */
 function lastLine(tr: Translate, p: Preview | null, me: string, record: string | null): string {

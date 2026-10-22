@@ -71,6 +71,7 @@ const D: Record<string, Entry> = {
   'circle.subtitle': ['The homes beside and opposite yours. Tap anyone to say hi.', 'Rumah di sebelah dan bertentangan dengan rumah anda. Ketik sesiapa untuk bertegur sapa.', '你左右和对面的住户。点任何人打个招呼。'],
   'circle.people': ['People', 'Orang', '名单'], 'circle.map': ['Map', 'Peta', '地图'],
   'story.renovating': ['Renovating', 'Ubah suai', '装修中'], 'story.sayHi': ['Say hi', 'Sapa', '打招呼'], 'story.helloSent': ['Hello sent', 'Sudah disapa', '已打招呼'],
+  'story.wavedYou': ['Waved at you', 'Melambai kepada anda', '跟你打了招呼'],
   'story.known': ['Known', 'Kenal', '已认识'],
   'req.title': ['{n} request(s) to connect', '{n} permintaan untuk berhubung', '{n} 个联系请求'],
   'req.sub': ['From your lorong or block. You see their unit, not their name, until you accept.', 'Dari lorong atau blok anda. Anda nampak unit mereka, bukan nama, sehingga anda terima.', '来自同一条 lorong 或同一栋。接受之前只看得到门牌，看不到名字。'],
@@ -169,6 +170,7 @@ const D: Record<string, Entry> = {
   'plan.ownNote': ['Using your own hours: neighbours whose quiet times they cross are told so in the notice.', 'Menggunakan waktu anda sendiri: jiran yang waktu senyapnya terjejas dimaklumkan dalam notis.', '用你自己的时段：会碰到安静时间的邻居，通知里会写明。'],
   'plan.double': ['Another neighbour’s works already reach {n} home(s) on this list on some of these days: noise from two sides at once.','{n} rumah yang menerima notis ini sudah ada kerja daripada jiran lain pada beberapa hari yang sama: bising dari dua arah serentak.', '收到这份通知的 {n} 户，这几天已经有另一边的邻居在施工：会两边同时吵。'],
   'plan.moveTo': ['Start on {date} instead', 'Mula pada {date}', '改成 {date} 开工'],
+  'plan.moved': ['You wrote {from}–{to}; the hours become {pfrom}–{pto} because a neighbour’s quiet time falls inside them. Keep my own hours is below if you need it.', 'Anda tulis {from}–{to}; waktunya menjadi {pfrom}–{pto} kerana waktu senyap seorang jiran jatuh dalam waktu itu. Kekalkan waktu saya ada di bawah jika perlu.', '你写的是 {from}–{to}，改成了 {pfrom}–{pto}：有邻居的安静时间落在那段里。需要的话下面可以选「用我自己的时段」。'],
   'quiet.avoided': ['Noisy hours planned around your quiet time', 'Waktu bising dirancang mengelak waktu senyap anda', '吵闹时段已避开你的安静时间'],
   'quiet.overlap': ['These hours cross your quiet time: you can ask in this chat', 'Waktu ini bertembung dengan waktu senyap anda: anda boleh bertanya dalam sembang ini', '这个时段碰到你的安静时间，可以在这个聊天里问对方'],
   'timing.within_hours': ['Raised during the agreed noisy hours', 'Dibangkitkan dalam waktu bising yang dipersetujui', '反映时在约定的吵闹时段内'],
@@ -890,7 +892,7 @@ const D: Record<string, Entry> = {
   'wk.eyebrow': ['{label} · renovation around you', '{label} · ubah suai di sekeliling anda', '{label} · 你附近的装修'],
   'wk.subtitle': ['Who is renovating near you, and when noisy work is allowed.', 'Siapa yang mengubah suai berhampiran anda, dan bila kerja bising dibenarkan.', '附近谁在装修、什么时候可以吵。'],
   'wk.pill.noisy': ['Noisy work allowed now', 'Kerja bising dibenarkan sekarang', '现在允许吵闹施工'],
-  'wk.pill.quiet': ['No noisy work now', 'Tiada kerja bising sekarang', '现在不能吵闹施工'],
+  'wk.pill.quiet': ['No noisy work now', 'Tiada kerja bising sekarang', '现在没有吵闹施工'],
   'wk.register': ['Register renovation', 'Daftar ubah suai', '登记装修'],
   'wk.quickExample': ['Quick example', 'Contoh pantas', '快速示例'],
   'wk.tab.schedule': ['Schedule', 'Jadual', '时间表'], 'wk.tab.passes': ['Contractor passes', 'Pas kontraktor', '承包商通行证'],
@@ -913,7 +915,7 @@ const D: Record<string, Entry> = {
   'wk.nextStartMine': ['Your works start {date}', 'Kerja anda bermula {date}', '你家的工程 {date} 开工'],
   'wk.noneInCircle': ['No renovation registered in your circle', 'Tiada ubah suai didaftarkan dalam lingkungan anda', '你的邻里圈没有登记装修'],
   'wk.rules': ['House rules', 'Peraturan rumah', '屋规'],
-  'wk.gateHours': ['Contractors may enter {open}–{close}, Monday to Saturday', 'Kontraktor boleh masuk {open}–{close}, Isnin hingga Sabtu', '承包商进出时间：星期一至六 {open}–{close}'],
+  'wk.gateHours': ['Contractors may enter {open}–{close} and noisy work runs {nfrom}–{nto}, Monday to Saturday', 'Kontraktor boleh masuk {open}–{close} dan kerja bising {nfrom}–{nto}, Isnin hingga Sabtu', '星期一至六：承包商可进出 {open}–{close}，吵闹施工 {nfrom}–{nto}'],
   'rule.noisy_hours_only': ['Noisy work only within the hours in the renovation notice', 'Kerja bising hanya dalam waktu yang dinyatakan dalam notis ubah suai', '吵闹施工只能在装修通知写的时段内进行'],
   'rule.no_sundays': ['No work on Sundays and public holidays', 'Tiada kerja pada hari Ahad dan cuti umum', '星期日和公共假期不能施工'],
   'rule.debris': ['Debris goes into the booked skip, never the drains or open land', 'Sisa binaan dimasukkan ke dalam tong besar yang ditempah, bukan ke longkang atau tanah lapang', '建筑垃圾要放进预订的垃圾箱，不能倒进沟渠或空地'],
@@ -1212,7 +1214,8 @@ export function useDates() {
       day,
       range: (start: string, end: string) => `${dayMonth(start)} – ${dayMonth(end)}`,
       weekday: (d: Date) => d.toLocaleDateString(loc, { weekday: 'short', day: 'numeric', month: 'short' }),
-      time: (d: Date) => d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' }),
+      // Malay: the 24-hour clock, as Malaysians write it; the locale's own 'PTG' reads as afternoon at 9 at night.
+      time: (d: Date) => d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit', hour12: lang === 'ms' ? false : undefined }),
     }
   }, [lang])
 }

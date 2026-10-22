@@ -1785,6 +1785,8 @@ button.ring-row:hover { background: var(--surface-2); }
   .assistant-fab { right: 10px; bottom: calc(78px + env(safe-area-inset-bottom)); height: 44px; min-width: 44px; }
   .assistant-fab .orb { width: 44px; height: 44px; }
   .assistant-fab.on { width: 44px; }
+  .assistant-fab { transition: translate 220ms var(--ease, ease); }
+  .assistant-fab.tucked { translate: 0 140px; pointer-events: none; }
   .content { padding-bottom: 150px; }
 }
 @media (min-width: 900px) { .assistant-fab { right: 24px; bottom: 24px; } }

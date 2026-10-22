@@ -91,6 +91,8 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
   // says whose they are). The owner can keep their own hours instead; the notice then says whose quiet time it crosses.
   const [plan, setPlan] = useState<QuietPlan | null>(null)
   const [usePlan, setUsePlan] = useState(true)
+  // Whether the owner has already said hello to anyone in the circle: then the notice skips the second introduction.
+  const [greeted, setGreeted] = useState(false)
   const [reno, setReno] = useState<Renovation>({
     scope: t('works.wet.scope'),
     start: daysFromToday(7),
@@ -112,6 +114,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
     let live = true
     setZone(null)
     api.impact(me.id, works).then((z) => live && setZone(z))
+    api.directory(me.id).then((d) => live && setGreeted(d.circle.some((n) => n.hello_sent || n.known))).catch(() => {})
     return () => {
       live = false
     }
@@ -146,7 +149,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
     permit_ref: reno.council_permit === 'not_needed' ? null : reno.permit_ref || null,
     management_approval: strata ? reno.management_approval || null : null,
   }
-  const message = draft ?? introTemplate(lang, me.resident_name, me.label, full)
+  const message = draft ?? introTemplate(lang, me.resident_name, me.label, full, { greeted })
   const set = (k: keyof Renovation) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setReno({ ...reno, [k]: e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value })
     setDraft(null)
@@ -365,7 +368,13 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
           {/* The house rule's hours (LEGAL_FROM/LEGAL_TO in quiet.py): the server refuses a notice outside them.
               Planned hours replace the owner's own inputs, so only one set of hours is on screen. */}
           {planned ? (
-            <HoursBar plan={planned} legend={t('plan.avoids', { hours: noisyHours(t, { ...reno, ...planned }), n: planned.avoided })} />
+            <>
+              <HoursBar plan={planned} legend={t('plan.avoids', { hours: noisyHours(t, { ...reno, ...planned }), n: planned.avoided })} />
+              {/* The owner's own hours were moved: say so, or "9 to 5" turning into 11:00–17:00 looks like a misreading. */}
+              {(planned.noisy_from !== (reno.noisy_from ?? '09:00') || planned.noisy_to !== (reno.noisy_to ?? '17:00')) && (
+                <small className="muted">{t('plan.moved', { from: reno.noisy_from ?? '09:00', to: reno.noisy_to ?? '17:00', pfrom: planned.noisy_from, pto: planned.noisy_to })}</small>
+              )}
+            </>
           ) : (
             <div className="grid-2">
               <label className="field">{t('reno.noisyFrom')}<input type="time" value={reno.noisy_from} min="09:00" max="18:00" onChange={set('noisy_from')} /></label>

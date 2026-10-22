@@ -94,6 +94,8 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
 
   const selected = peer ?? (wide ? convos?.[0]?.id ?? ESTATE : undefined)
   const latest = official?.notices[0]
+  // One rule for every row: today shows the time, any other day the date.
+  const when = (iso: string) => (new Date(iso).toDateString() === new Date().toDateString() ? dates.time(new Date(iso)) : dates.date(iso))
 
   return (
     <section ref={root} className={`chat ${wide ? 'wide' : ''} ${selected ? 'has-thread' : ''}`}>
@@ -111,7 +113,7 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
           <span className="grow">
             <span className="chat-row-top">
               <b>{t('estate.name')} <BadgeCheck size={13} className="verified" /></b>
-              {latest && <small>{dates.date(latest.created_at)}</small>}
+              {latest && <small>{when(latest.created_at)}</small>}
             </span>
             <span className="chat-row-rel">{t('estate.readonly')}</span>
             <span className="chat-row-last">{latest ? latest.title : t('estate.none')}</span>
@@ -130,7 +132,7 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
             <span className="grow">
               <span className="chat-row-top">
                 <b>{c.resident_name} <i>· {c.label}</i></b>
-                {c.last_at && <small>{dates.time(new Date(c.last_at))}</small>}
+                {c.last_at && <small>{when(c.last_at)}</small>}
               </span>
               <span className="chat-row-rel">{t(`rel.${c.relation}`)}{c.relation === 'left' || c.relation === 'right' ? ` · ${t('share.wallShort')}` : c.relation === 'above' || c.relation === 'below' ? ` · ${t('share.slab')}` : ''}</span>
               <span className="chat-row-last">{c.blocked ? t('chats.blocked') : previewText(t, c.last_preview, { [c.id]: c.resident_name }, me.id) ?? c.last ?? t('chats.sayHello')}</span>
@@ -278,6 +280,11 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   useLayoutEffect(() => {
     if (body.current) body.current.scrollTop = body.current.scrollHeight
   }, [t?.items.length])
+
+  // On a phone the page itself can sit scrolled from the list; the thread then opens with its head under the top bar.
+  useEffect(() => {
+    document.querySelector('.content')?.scrollTo({ top: 0 })
+  }, [other])
 
   useEffect(() => {
     if (!menu) return
