@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { CircleCheck, HardDrive, Stethoscope, TriangleAlert } from 'lucide-react'
 import { api, type PilotStatus } from '../api'
-import { Card, CardHead, count, formatDate } from '../ui'
-
-const when = (iso: string) => `${formatDate(iso)}, ${new Date(iso).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' })}`
+import { useDates, useT } from '../i18n'
+import { Card, CardHead } from '../ui'
 
 /** Pilot, for staff: is the pilot healthy? What setup still needs, the last backup, sign-ups. Numbers only. */
 export default function PilotHealth({ version }: { version: number }) {
+  const t = useT()
+  const { date, time } = useDates()
   const [s, setS] = useState<PilotStatus | null>(null)
   useEffect(() => {
     let live = true
@@ -14,20 +15,21 @@ export default function PilotHealth({ version }: { version: number }) {
     return () => { live = false }
   }, [version])
   if (!s) return null
+  const when = (iso: string) => `${date(iso)}, ${time(new Date(iso))}`
   return (
     <Card className="pilot-health">
-      <CardHead icon={<Stethoscope size={16} />} tone={s.checks.length ? 'amber' : 'brand'} title="Pilot health"
-        sub={s.checks.length ? `${count(s.checks.length, 'thing')} to sort out` : 'Set up and running'} />
+      <CardHead icon={<Stethoscope size={16} />} tone={s.checks.length ? 'amber' : 'brand'} title={t('sdp.health.title')}
+        sub={s.checks.length ? t('sdp.health.todo', { n: s.checks.length }) : t('sdp.health.ok')} />
       {s.checks.length > 0 ? (
         <ul className="health-checks">{s.checks.map((c) => <li key={c}><TriangleAlert size={14} /> {c}</li>)}</ul>
-      ) : <div className="import-ok"><CircleCheck size={15} /> Nothing left to set up.</div>}
+      ) : <div className="import-ok"><CircleCheck size={15} /> {t('sdp.health.nothing')}</div>}
       <dl className="health-grid">
-        <div><dt><HardDrive size={12} /> Last backup</dt><dd>{s.last_backup ? `${when(s.last_backup)} · ${s.backups} kept` : 'None yet'}</dd></div>
-        <div><dt>Old records cleared</dt><dd>{s.records_swept_at ? when(s.records_swept_at) : 'Not yet'}</dd></div>
-        <div><dt>Homes joined</dt><dd>{s.joined} of {s.homes}</dd></div>
-        <div><dt>Phones with notifications</dt><dd>{s.phones}</dd></div>
-        <div><dt>AI translation</dt><dd>{s.ai ? 'On' : 'Off (no key set)'}</dd></div>
-        <div><dt>Address</dt><dd className="mono">{s.origin ?? 'Not set'}</dd></div>
+        <div><dt><HardDrive size={12} /> {t('sdp.health.backup')}</dt><dd>{s.last_backup ? t('sdp.health.backupKept', { when: when(s.last_backup), n: s.backups }) : t('sdp.health.none')}</dd></div>
+        <div><dt>{t('sdp.health.swept')}</dt><dd>{s.records_swept_at ? when(s.records_swept_at) : t('sdp.health.notYet')}</dd></div>
+        <div><dt>{t('sdp.health.joined')}</dt><dd>{t('sdp.health.of', { a: s.joined, b: s.homes })}</dd></div>
+        <div><dt>{t('sdp.health.phones')}</dt><dd>{s.phones}</dd></div>
+        <div><dt>{t('join.p5t')}</dt><dd>{s.ai ? t('sdp.health.on') : t('sdp.health.off')}</dd></div>
+        <div><dt>{t('sdp.health.address')}</dt><dd className="mono">{s.origin ?? t('sdp.health.notSet')}</dd></div>
       </dl>
     </Card>
   )

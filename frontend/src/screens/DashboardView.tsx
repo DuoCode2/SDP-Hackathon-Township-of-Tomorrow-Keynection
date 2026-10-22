@@ -6,15 +6,16 @@ import ConcernCard from '../components/ConcernCard'
 import FrontDesk from '../components/FrontDesk'
 import PilotHealth from '../components/PilotHealth'
 import WarrantyClock from '../components/WarrantyClock'
-import { Badge, Card, CardHead, count, CountUp, Empty, formatDate, Ring, ScreenTitle, Segmented, Skeleton, useToast } from '../ui'
+import { Badge, Card, CardHead, CountUp, Empty, Ring, ScreenTitle, Segmented, Skeleton, useToast } from '../ui'
 import { ticketBadge } from './RepairView'
-import { tEn } from '../i18n'
+import { useDates, useT, type Translate } from '../i18n'
 import { replayOpening } from '../welcome'
 
 const SUBCONTRACTORS = ['Jaya Plaster Sdn Bhd', 'Kemas Waterproofing', 'Bina Teguh Builders']
 
 export default function DashboardView({ version, onChange, onViewAs }: { version: number; onChange: () => void; onViewAs?: (unitId: string) => void }) {
   const toast = useToast()
+  const t = useT()
   const pilot = usePilot()
   const place = usePlace()
   const rehearsal = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('rehearsal')
@@ -42,7 +43,7 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
 
   async function reset() {
     // The demo is shared: whoever else is in it starts over too.
-    if (!window.confirm('Reset the demo data? Everyone using this demo starts over from the fictional phase as seeded.')) return
+    if (!window.confirm(t('sdp.dash.reset.confirm'))) return
     await api.resetDemo()
     try {
       Object.keys(sessionStorage).filter((k) => k.startsWith('keynection.pass:') || k.startsWith('keynection.join:')).forEach((k) => sessionStorage.removeItem(k))
@@ -50,7 +51,7 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
     } catch {
       /* storage blocked */
     }
-    toast('Demo data reset')
+    toast(t('sdp.dash.reset.done'))
     onChange()
   }
 
@@ -58,54 +59,54 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
 
   return (
     <section className="screen">
-      <ScreenTitle eyebrow={`SDP · ${place.name}`} title="Command view" subtitle="What SDP's handover, warranty and estate teams would see in PACC."
-        aside={d && <div className="live-pill quiet"><span className="pulse" /> LIVE · {d.households} households</div>} />
+      <ScreenTitle eyebrow={t('sdp.dash.eyebrow', { place: place.name })} title={t('nav.sdp')} subtitle={t('sdp.dash.subtitle')}
+        aside={d && <div className="live-pill quiet"><span className="pulse" /> {t('sdp.dash.live', { n: d.households })}</div>} />
       {pilot && <PilotHealth version={version} />}
       {!d ? (
         <Skeleton lines={6} />
       ) : (
         <>
           <div className="kpi-strip">
-            <Kpi icon={<UserCheck size={14} />} label="Joined Keynection" value={d.households_joined} sub={`of ${d.households} homes · ${count(d.paper_notices_pending, 'paper notice')} to deliver`} />
-            <Kpi icon={<House size={14} />} label="Know a neighbour" value={d.households_with_a_known_neighbour} sub={`of ${d.households} homes`} />
-            <Kpi icon={<MessagesSquare size={14} />} label="Messages" value={d.messages_sent} sub={`${d.intros_sent} intros · ${d.contact_requests_accepted}/${d.contact_requests} requests accepted`} />
-            <Kpi icon={<Handshake size={14} />} label="Settled by neighbours" value={d.concerns_settled_by_neighbours} sub={`of ${d.concerns_raised} concerns`} />
-            <Kpi icon={<Building2 size={14} />} label="With estate team" value={d.concerns_with_estate} sub={`${d.concerns_escalated} escalated in total`} />
-            <Kpi icon={<Clock4 size={14} />} label="Repairs overdue" value={d.warranty_overdue} sub={`${d.warranty_open} open · ${d.warranty_closed} closed`} />
-            {SHOW_CONTRACTOR_PASSES && <Kpi icon={<KeyRound size={14} />} label="Gate scans" value={d.gate_allowed + d.gate_denied} sub={`${d.gate_denied} refused`} />}
+            <Kpi icon={<UserCheck size={14} />} label={t('sdp.dash.kpi.joined')} value={d.households_joined} sub={t('sdp.dash.kpi.joined.sub', { n: d.households, m: d.paper_notices_pending })} />
+            <Kpi icon={<House size={14} />} label={t('sdp.dash.kpi.know')} value={d.households_with_a_known_neighbour} sub={t('sdp.dash.kpi.ofHomes', { n: d.households })} />
+            <Kpi icon={<MessagesSquare size={14} />} label={t('sdp.dash.kpi.messages')} value={d.messages_sent} sub={t('sdp.dash.kpi.messages.sub', { a: d.intros_sent, b: d.contact_requests_accepted, c: d.contact_requests })} />
+            <Kpi icon={<Handshake size={14} />} label={t('sdp.dash.kpi.settled')} value={d.concerns_settled_by_neighbours} sub={t('sdp.dash.kpi.settled.sub', { n: d.concerns_raised })} />
+            <Kpi icon={<Building2 size={14} />} label={t('sdp.dash.kpi.estate')} value={d.concerns_with_estate} sub={t('sdp.dash.kpi.estate.sub', { n: d.concerns_escalated })} />
+            <Kpi icon={<Clock4 size={14} />} label={t('sdp.dash.kpi.overdue')} value={d.warranty_overdue} sub={t('sdp.dash.kpi.overdue.sub', { a: d.warranty_open, b: d.warranty_closed })} />
+            {SHOW_CONTRACTOR_PASSES && <Kpi icon={<KeyRound size={14} />} label={t('sdp.dash.kpi.gate')} value={d.gate_allowed + d.gate_denied} sub={t('sdp.dash.kpi.gate.sub', { n: d.gate_denied })} />}
           </div>
 
           <div className="cols">
             <div className="col">
               <Segmented value={desk} onChange={setDesk} options={[
-                { id: 'warranty', label: `Warranty · ${d.warranty_open}` },
-                { id: 'estate', label: `Estate · ${d.concerns_with_estate}` },
-                { id: 'safety', label: `Safety · ${d.reports_open}` },
-                { id: 'notices', label: 'Notices' },
-                { id: 'frontdesk', label: `Front desk · ${d.households - d.households_joined + d.paper_notices_pending}` },
+                { id: 'warranty', label: t('sdp.dash.tab.warranty', { n: d.warranty_open }) },
+                { id: 'estate', label: t('sdp.dash.tab.estate', { n: d.concerns_with_estate }) },
+                { id: 'safety', label: t('sdp.dash.tab.safety', { n: d.reports_open }) },
+                { id: 'notices', label: t('sdp.dash.tab.notices') },
+                { id: 'frontdesk', label: t('sdp.dash.tab.frontdesk', { n: d.households - d.households_joined + d.paper_notices_pending }) },
               ]} />
               {desk === 'warranty' && (
                 <Card>
-                  <CardHead icon={<Wrench size={16} />} tone="blue" title="Warranty queue" sub="Building-defect decisions land here with the photos attached"
-                    right={<div className="head-badges"><Badge tone="blue">{d.warranty_open} open</Badge><Badge tone="brand">{d.warranty_closed} closed</Badge></div>} />
+                  <CardHead icon={<Wrench size={16} />} tone="blue" title={t('sdp.dash.wq.title')} sub={t('sdp.dash.wq.sub')}
+                    right={<div className="head-badges"><Badge tone="blue">{t('sdp.dash.wq.open', { n: d.warranty_open })}</Badge><Badge tone="brand">{t('sdp.dash.wq.closed', { n: d.warranty_closed })}</Badge></div>} />
                   {pilot && queue.length > 0 && <ToProcore queue={queue} onChange={onChange} />}
                   {queue.length === 0 ? (
-                    <Empty art="inbox" icon={<Inbox size={22} />} title="No tickets yet">When neighbours agree a change is a building defect, the ticket appears here automatically.</Empty>
+                    <Empty art="inbox" icon={<Inbox size={22} />} title={t('sdp.dash.wq.empty')}>{t('sdp.dash.wq.emptyBody')}</Empty>
                   ) : (
-                    queue.map((t) => <QueueItem key={t.id} ticket={t} onChange={onChange} />)
+                    queue.map((tk) => <QueueItem key={tk.id} ticket={tk} onChange={onChange} />)
                   )}
-                  {d.repairs_rejected > 0 && <div className="mono muted">{d.repairs_rejected} REPAIR(S) SENT BACK BY OWNERS</div>}
+                  {d.repairs_rejected > 0 && <div className="mono muted">{t('sdp.dash.wq.sentBack', { n: d.repairs_rejected })}</div>}
                 </Card>
               )}
               {desk === 'estate' && (
                 <Card>
-                  <CardHead icon={<Building2 size={16} />} tone="red" title="Estate team: neighbour concerns" sub="Only concerns a neighbour escalated. Everything else stays between the two homes." />
+                  <CardHead icon={<Building2 size={16} />} tone="red" title={t('sdp.dash.est.title')} sub={t('sdp.dash.est.sub')} />
                   {concerns.length === 0 ? (
-                    <Empty art="handshake" icon={<Handshake size={22} />} title="No concerns">Concerns start between neighbours. Only the ones they can't settle are escalated here.</Empty>
+                    <Empty art="handshake" icon={<Handshake size={22} />} title={t('sdp.dash.est.empty')}>{t('sdp.dash.est.emptyBody')}</Empty>
                   ) : (
                     concerns.map((c) => (
                       <div key={c.id} className="estate-item">
-                        <div className="mono muted">{c.scope} · {count(c.concerns_on_renovation ?? 0, 'concern')} on this renovation</div>
+                        <div className="mono muted">{t('sdp.dash.est.onReno', { scope: c.scope ?? '', n: c.concerns_on_renovation ?? 0 })}</div>
                         <ConcernCard concern={c} estate onChanged={onChange} />
                       </div>
                     ))
@@ -114,9 +115,9 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
               )}
               {desk === 'safety' && (
                 <Card>
-                  <CardHead icon={<Flag size={16} />} tone="amber" title="Reported messages" sub="Review within one working day. Reporters stay anonymous; warnings go only to the sender." />
+                  <CardHead icon={<Flag size={16} />} tone="amber" title={t('sdp.dash.rep.title')} sub={t('sdp.dash.rep.sub')} />
                   {reports.length === 0 ? (
-                    <Empty art="shield" icon={<ShieldCheck size={22} />} title="Nothing reported">Residents can report any message sent to them from the chat.</Empty>
+                    <Empty art="shield" icon={<ShieldCheck size={22} />} title={t('sdp.dash.rep.empty')}>{t('sdp.dash.rep.emptyBody')}</Empty>
                   ) : (
                     reports.map((r) => <ReportItem key={r.id} report={r} onChange={onChange} />)
                   )}
@@ -128,44 +129,44 @@ export default function DashboardView({ version, onChange, onViewAs }: { version
 
             <div className="col sticky">
               <Card>
-                <CardHead icon={<Activity size={16} />} title="Community health" sub="Live from resident activity" />
+                <CardHead icon={<Activity size={16} />} title={t('sdp.dash.health.title')} sub={t('sdp.dash.health.sub')} />
                 <div className="rings">
-                  <Ring value={d.reply_rate} label="Reply rate" />
-                  <Ring value={ratio(d.renovations_with_prework_photos, d.renovations_registered)} label="Pre-work photo coverage" />
-                  <Ring value={ratio(d.warranty_closed, d.warranty_closed + d.warranty_open)} label="Closed by owner" />
-                  <Ring value={ratio(d.concerns_settled_by_neighbours, d.concerns_raised)} label="Settled without SDP" />
+                  <Ring value={d.reply_rate} label={t('sdp.dash.ring.reply')} />
+                  <Ring value={ratio(d.renovations_with_prework_photos, d.renovations_registered)} label={t('sdp.dash.ring.photos')} />
+                  <Ring value={ratio(d.warranty_closed, d.warranty_closed + d.warranty_open)} label={t('sdp.dash.ring.closed')} />
+                  <Ring value={ratio(d.concerns_settled_by_neighbours, d.concerns_raised)} label={t('sdp.dash.ring.settled')} />
                 </div>
               </Card>
 
               <Card>
-                <CardHead icon={<HeartHandshake size={16} />} title="Neighbour relationships" sub="Counts only, never who or what was said" />
+                <CardHead icon={<HeartHandshake size={16} />} title={t('sdp.dash.bond.title')} sub={t('sdp.dash.bond.sub')} />
                 <div className="bond">
-                  <Ring value={ratio(d.known_pairs, d.circle_pairs)} label="Next-door pairs who know each other" />
+                  <Ring value={ratio(d.known_pairs, d.circle_pairs)} label={t('sdp.dash.bond.ring')} />
                   <dl className="bond-facts">
-                    <div><dt>Pairs that know each other</dt><dd>{d.known_pairs} / {d.circle_pairs}</dd></div>
-                    <div><dt>Keys to first hello</dt><dd>{d.days_to_first_hello === null ? '—' : `${d.days_to_first_hello} days`}</dd></div>
-                    <div><dt>Households that reached out</dt><dd>{d.households_reached_out} / {d.households}</dd></div>
-                    <div><dt>Active circles · 30 days</dt><dd>{d.active_circles_30d}</dd></div>
-                    <div><dt>Quiet times kept by renovation notices</dt><dd>{d.quiet_times_kept} / {d.quiet_times_kept + d.quiet_times_missed}</dd></div>
-                    <div><dt>Noise concerns</dt><dd>{d.noise_concerns}</dd></div>
+                    <div><dt>{t('sdp.dash.bond.pairs')}</dt><dd>{d.known_pairs} / {d.circle_pairs}</dd></div>
+                    <div><dt>{t('sdp.dash.bond.hello')}</dt><dd>{d.days_to_first_hello === null ? '—' : t('sdp.dash.bond.days', { n: d.days_to_first_hello })}</dd></div>
+                    <div><dt>{t('sdp.dash.bond.reached')}</dt><dd>{d.households_reached_out} / {d.households}</dd></div>
+                    <div><dt>{t('sdp.dash.bond.active')}</dt><dd>{d.active_circles_30d}</dd></div>
+                    <div><dt>{t('sdp.dash.bond.quiet')}</dt><dd>{d.quiet_times_kept} / {d.quiet_times_kept + d.quiet_times_missed}</dd></div>
+                    <div><dt>{t('sdp.dash.bond.noise')}</dt><dd>{d.noise_concerns}</dd></div>
                   </dl>
                 </div>
-                <div className="mono muted">FOR HANDOVER PLANNING · NOT FOR MARKETING OR PROFILING RESIDENTS</div>
+                <div className="mono muted">{t('sdp.dash.bond.foot')}</div>
               </Card>
 
               <Card className="glow">
                 <div className="card-row">
                   <ShieldCheck size={22} color="var(--accent)" />
                   <div className="grow">
-                    <div className="card-title" style={{ fontSize: 14 }}>Home logs consistent · {d.home_histories_verified}/{d.households}</div>
-                    <div className="muted small">Every home's chain links up (server check; owner receipts come with the pilot).</div>
+                    <div className="card-title" style={{ fontSize: 14 }}>{t('sdp.dash.logs.title', { a: d.home_histories_verified, b: d.households })}</div>
+                    <div className="muted small">{t('sdp.dash.logs.body')}</div>
                   </div>
                 </div>
               </Card>
 
               {/* Rehearsals only: the demo is shared, so a judge must not be able to start everyone over. Open the site
                   with ?rehearsal=1 to see it (docs/test-plan.md); the shared demo still resets itself after 20 quiet minutes. */}
-              {!pilot && rehearsal && <button className="link" onClick={reset}><RotateCcw size={12} style={{ verticalAlign: -2 }} /> Reset demo data (for rehearsals)</button>}
+              {!pilot && rehearsal && <button className="link" onClick={reset}><RotateCcw size={12} style={{ verticalAlign: -2 }} /> {t('sdp.dash.reset')}</button>}
             </div>
           </div>
         </>
@@ -187,6 +188,7 @@ function Kpi({ icon, label, value, sub }: { icon: ReactNode; label: string; valu
 /** Pilot: the warranty team takes tickets into Procore (a punch list and the photos), then writes the item number back. */
 function ToProcore({ queue, onChange }: { queue: WarrantyTicket[]; onChange: () => void }) {
   const toast = useToast()
+  const t = useT()
   const [which, setWhich] = useState<'new' | 'open' | 'all'>('new')
   const [busy, setBusy] = useState(false)
   async function download() {
@@ -201,25 +203,25 @@ function ToProcore({ queue, onChange }: { queue: WarrantyTicket[]; onChange: () 
       a.click()
       a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 2000)
-      toast('Downloaded: a punch list and the photos, ready for Procore')
+      toast(t('sdp.dash.procore.downloaded'))
       onChange()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not prepare the download', 'error')
+      toast(e instanceof Error ? e.message : t('sdp.dash.procore.failed'), 'error')
     } finally {
       setBusy(false)
     }
   }
-  const open = queue.filter((t) => t.status !== 'closed').length
+  const open = queue.filter((x) => x.status !== 'closed').length
   return (
     <div className="to-procore">
-      <div className="small"><b>To Procore</b> · a punch list (CSV) with each ticket's photos. Copy the columns into your project's Procore import template, then type each item's number on its ticket below.</div>
+      <div className="small"><b>{t('sdp.dash.procore.title')}</b> · {t('sdp.dash.procore.body')}</div>
       <div className="btn-row">
-        <select value={which} onChange={(e) => setWhich(e.target.value as 'new' | 'open' | 'all')} aria-label="Which tickets">
-          <option value="new">New since the last download</option>
-          <option value="open">All open ({open})</option>
-          <option value="all">All ({queue.length})</option>
+        <select value={which} onChange={(e) => setWhich(e.target.value as 'new' | 'open' | 'all')} aria-label={t('sdp.dash.procore.which')}>
+          <option value="new">{t('sdp.dash.procore.new')}</option>
+          <option value="open">{t('sdp.dash.procore.allOpen', { n: open })}</option>
+          <option value="all">{t('sdp.dash.procore.all', { n: queue.length })}</option>
         </select>
-        <button className="btn btn-sm btn-primary" disabled={busy} onClick={download}><Download size={14} /> Download for Procore</button>
+        <button className="btn btn-sm btn-primary" disabled={busy} onClick={download}><Download size={14} /> {t('sdp.dash.procore.download')}</button>
       </div>
     </div>
   )
@@ -228,29 +230,31 @@ function ToProcore({ queue, onChange }: { queue: WarrantyTicket[]; onChange: () 
 /** Pilot: the Procore item number, written on the ticket (the owner's home log shows SDP logged it). */
 function ProcoreNumber({ ticket, onChange }: { ticket: WarrantyTicket; onChange: () => void }) {
   const toast = useToast()
+  const t = useT()
   const pilot = usePilot()
   const [ref, setRef] = useState(ticket.procore_ref ?? '')
   async function save() {
     try {
       await api.linkProcore(ticket.id, ref.trim(), pilot?.me.name ?? '')
-      toast(`Procore item ${ref.trim()} linked to ticket #${String(ticket.id).padStart(3, '0')}`)
+      toast(t('sdp.dash.procore.linked', { ref: ref.trim(), id: String(ticket.id).padStart(3, '0') }))
       onChange()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not save', 'error')
+      toast(e instanceof Error ? e.message : t('df.couldNotSave'), 'error')
     }
   }
   return (
     <div className="procore-number">
-      <label className="field">Procore item no.
-        <input value={ref} maxLength={40} placeholder="e.g. 457" onChange={(e) => setRef(e.target.value)} />
+      <label className="field">{t('sdp.dash.procore.no')}
+        <input value={ref} maxLength={40} placeholder={t('sdp.dash.procore.eg')} onChange={(e) => setRef(e.target.value)} />
       </label>
-      <button className="btn btn-sm" disabled={!ref.trim() || ref.trim() === (ticket.procore_ref ?? '')} onClick={save}><Link2 size={14} /> Link</button>
+      <button className="btn btn-sm" disabled={!ref.trim() || ref.trim() === (ticket.procore_ref ?? '')} onClick={save}><Link2 size={14} /> {t('sdp.dash.procore.link')}</button>
     </div>
   )
 }
 
 function QueueItem({ ticket, onChange }: { ticket: WarrantyTicket; onChange: () => void }) {
   const toast = useToast()
+  const t = useT()
   const pilot = usePilot()
   const [sub, setSub] = useState(pilot ? '' : SUBCONTRACTORS[0])
   const [busy, setBusy] = useState(false)
@@ -259,11 +263,11 @@ function QueueItem({ ticket, onChange }: { ticket: WarrantyTicket; onChange: () 
   async function upload(file: File) {
     setBusy(true)
     try {
-      const t = await api.submitRepair(ticket.id, sub.trim(), file)
-      toast(t.repair_check?.verdict === 'restored' ? 'Repair submitted · matches pre-work photo' : 'Repair submitted · marks still detected')
+      const done = await api.submitRepair(ticket.id, sub.trim(), file)
+      toast(done.repair_check?.verdict === 'restored' ? t('sdp.dash.q.matches') : t('sdp.dash.q.marks'))
       onChange()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not submit', 'error')
+      toast(e instanceof Error ? e.message : t('sdp.dash.q.failed'), 'error')
     } finally {
       setBusy(false)
     }
@@ -273,11 +277,11 @@ function QueueItem({ ticket, onChange }: { ticket: WarrantyTicket; onChange: () 
   async function submit(quality: 'good' | 'poor') {
     setBusy(true)
     try {
-      const t = await api.submitDemoRepair(ticket.id, `${ceiling ? 'ceiling' : 'wall'}_repair_${quality}`, sub)
-      toast(t.repair_check?.verdict === 'restored' ? 'Repair submitted · matches pre-work photo' : 'Repair submitted · marks still detected')
+      const done = await api.submitDemoRepair(ticket.id, `${ceiling ? 'ceiling' : 'wall'}_repair_${quality}`, sub)
+      toast(done.repair_check?.verdict === 'restored' ? t('sdp.dash.q.matches') : t('sdp.dash.q.marks'))
       onChange()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not submit', 'error')
+      toast(e instanceof Error ? e.message : t('sdp.dash.q.failed'), 'error')
     } finally {
       setBusy(false)
     }
@@ -288,11 +292,11 @@ function QueueItem({ ticket, onChange }: { ticket: WarrantyTicket; onChange: () 
       <div className="card-row">
         <img className="thumb" style={{ width: 64, height: 48 }} src={(ticket.repair_photo ?? ticket.defect_photo).thumb_url} alt="" loading="lazy" />
         <div className="grow">
-          <div className="mono muted">#{String(ticket.id).padStart(3, '0')} · {ticket.unit_label}{ticket.procore_ref ? ` · ${ticket.procore_ref}${ticket.procore_demo ? ' (demo)' : ''}` : ''}</div>
+          <div className="mono muted">#{String(ticket.id).padStart(3, '0')} · {ticket.unit_label}{ticket.procore_ref ? ` · ${ticket.procore_ref}${ticket.procore_demo ? t('sdp.dash.q.demo') : ''}` : ''}</div>
           <div className="card-title" style={{ fontSize: 14 }}>{ticket.subject}</div>
-          {ticket.reopen_count > 0 && <div className="small" style={{ color: 'var(--red)' }}>Owner rejected: “{ticket.owner_note}”</div>}
+          {ticket.reopen_count > 0 && <div className="small" style={{ color: 'var(--red)' }}>{t('sdp.dash.q.rejected', { note: ticket.owner_note ?? '' })}</div>}
         </div>
-        {ticketBadge(tEn, ticket.status)}
+        {ticketBadge(t, ticket.status)}
       </div>
       <WarrantyClock clock={ticket.clock} closed={ticket.status === 'closed'} compact />
       {pilot && <ProcoreNumber key={ticket.procore_ref ?? ''} ticket={ticket} onChange={onChange} />}
@@ -300,45 +304,47 @@ function QueueItem({ ticket, onChange }: { ticket: WarrantyTicket; onChange: () 
         <>
           {pilot ? (
             <>
-              <label className="field">Subcontractor
-                <input value={sub} maxLength={80} onChange={(e) => setSub(e.target.value)} placeholder="Company that did the repair" />
+              <label className="field">{t('sdp.dash.q.sub')}
+                <input value={sub} maxLength={80} onChange={(e) => setSub(e.target.value)} placeholder={t('sdp.dash.q.company')} />
               </label>
               <label className={`btn btn-sm btn-primary file-btn ${!sub.trim() || busy ? 'disabled' : ''}`}>
-                <Camera size={13} /> Upload the repair photo
+                <Camera size={13} /> {t('sdp.dash.q.upload')}
                 <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" disabled={!sub.trim() || busy}
                   onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) upload(f) }} />
               </label>
             </>
           ) : (
             <>
-              <label className="field">Subcontractor (Procore)
+              <label className="field">{t('sdp.dash.q.subProcore')}
                 <select value={sub} onChange={(e) => setSub(e.target.value)}>{SUBCONTRACTORS.map((s) => <option key={s}>{s}</option>)}</select>
               </label>
               <div className="btn-row">
-                <button className="btn btn-sm" onClick={() => submit('poor')} disabled={busy}><Sparkles size={13} /> Sample: poor patch</button>
-                <button className="btn btn-sm" onClick={() => submit('good')} disabled={busy}><Sparkles size={13} /> Sample: proper repair</button>
+                <button className="btn btn-sm" onClick={() => submit('poor')} disabled={busy}><Sparkles size={13} /> {t('sdp.dash.q.samplePoor')}</button>
+                <button className="btn btn-sm" onClick={() => submit('good')} disabled={busy}><Sparkles size={13} /> {t('sdp.dash.q.sampleGood')}</button>
               </div>
             </>
           )}
-          <div className="mono muted">SDP CAN SUBMIT A REPAIR · ONLY THE OWNER CAN CLOSE IT</div>
+          <div className="mono muted">{t('sdp.dash.q.onlyOwner')}</div>
         </>
       )}
       {ticket.status === 'repair_submitted' && (
         <div className="small dim" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {ticket.repair_check?.verdict === 'restored' ? <ShieldCheck size={14} color="var(--accent)" /> : <ShieldX size={14} color="var(--red)" />}
-          Waiting for {ticket.resident_name} to confirm · auto-check: {ticket.repair_check?.verdict.replace('_', ' ')}
+          {t('sdp.dash.q.waiting', { name: ticket.resident_name, verdict: ticket.repair_check?.verdict.replace('_', ' ') ?? '' })}
         </div>
       )}
-      {ticket.status === 'closed' && <Badge tone="brand">Closed by {ticket.resident_name}</Badge>}
+      {ticket.status === 'closed' && <Badge tone="brand">{t('sdp.dash.q.closedBy', { name: ticket.resident_name })}</Badge>}
     </div>
   )
 }
 
 function ReportItem({ report: r, onChange }: { report: ModerationReport; onChange: () => void }) {
   const toast = useToast()
+  const t = useT()
+  const { date } = useDates()
   async function review(outcome: 'warned' | 'dismissed') {
     await api.reviewReport(r.id, outcome)
-    toast(outcome === 'warned' ? `${r.message.from_name} warned privately` : 'Report dismissed')
+    toast(outcome === 'warned' ? t('sdp.dash.report.warnedToast', { name: r.message.from_name }) : t('sdp.dash.report.dismissedToast'))
     onChange()
   }
   return (
@@ -346,27 +352,27 @@ function ReportItem({ report: r, onChange }: { report: ModerationReport; onChang
       <div className="card-row">
         <Flag size={16} color="var(--amber)" />
         <div className="grow">
-          <div className="mono muted">#{String(r.id).padStart(3, '0')} · {r.reason.toUpperCase()} · reported {formatDate(r.created_at)}</div>
-          <div className="small">From {r.message.from_name} ({r.message.from_label})</div>
+          <div className="mono muted">{t('sdp.dash.report.meta', { id: String(r.id).padStart(3, '0'), reason: r.reason.toUpperCase(), date: date(r.created_at) })}</div>
+          <div className="small">{t('sdp.dash.report.from', { name: r.message.from_name, label: r.message.from_label })}</div>
         </div>
-        <Badge tone={r.status === 'open' ? 'amber' : r.status === 'warned' ? 'red' : 'neutral'}>{r.status}</Badge>
+        <Badge tone={r.status === 'open' ? 'amber' : r.status === 'warned' ? 'red' : 'neutral'}>{t(`sdp.dash.report.${r.status}`)}</Badge>
       </div>
       {r.message.kind === 'voice' ? (
         r.message.voice_url ? (
           <div className="report-voice">
-            <span className="mono muted">VOICE · {r.message.duration ?? '?'}S · KEPT UNTIL REVIEWED</span>
+            <span className="mono muted">{t('sdp.dash.report.voice', { n: r.message.duration ?? '?' })}</span>
             <audio controls preload="none" src={r.message.voice_url} />
           </div>
         ) : (
-          <div className="voice-gone"><MicOff size={14} /> Voice message deleted after review (30-day rule)</div>
+          <div className="voice-gone"><MicOff size={14} /> {t('sdp.dash.report.voiceGone')}</div>
         )
       ) : (
         <blockquote className="report-quote">“{r.message.text}”</blockquote>
       )}
       {r.status === 'open' && (
         <div className="btn-row">
-          <button className="btn btn-sm" onClick={() => review('dismissed')}>Dismiss</button>
-          <button className="btn btn-sm btn-danger" onClick={() => review('warned')}>Warn sender privately</button>
+          <button className="btn btn-sm" onClick={() => review('dismissed')}>{t('sdp.dash.report.dismiss')}</button>
+          <button className="btn btn-sm btn-danger" onClick={() => review('warned')}>{t('sdp.dash.report.warn')}</button>
         </div>
       )}
     </div>
@@ -374,47 +380,49 @@ function ReportItem({ report: r, onChange }: { report: ModerationReport; onChang
 }
 
 /** Who a notice goes to, from the phase's own streets and blocks. */
-function audiences(place: Place): Record<string, string> {
-  return Object.fromEntries([['phase', 'Whole township'], ...place.streets.map((s) => [`street:${s}`, s]),
-    ...place.blocks.map((b) => [`block:${b}`, `Block ${b}`])])
+function audiences(t: Translate, place: Place): Record<string, string> {
+  return Object.fromEntries([['phase', t('audience.phase')], ...place.streets.map((s) => [`street:${s}`, s]),
+    ...place.blocks.map((b) => [`block:${b}`, t('place.block', { b })])])
 }
 
 /** Ring 3: one-way notices to a street, a block or the whole township. Residents can't reply-all. */
 function NoticeDesk({ notices, onChange }: { notices: Notice[]; onChange: () => void }) {
   const toast = useToast()
-  const AUDIENCE = audiences(usePlace())
+  const t = useT()
+  const { date } = useDates()
+  const AUDIENCE = audiences(t, usePlace())
   const [audience, setAudience] = useState(() => Object.keys(AUDIENCE).find((k) => k.startsWith('block:')) ?? 'phase')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   async function post() {
     try {
       await api.postNotice(audience, title, body)
-      toast(`Notice posted to ${AUDIENCE[audience]}`)
+      toast(t('sdp.dash.nd.posted', { audience: AUDIENCE[audience] }))
       setTitle('')
       setBody('')
       onChange()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not post', 'error')
+      toast(e instanceof Error ? e.message : t('sdp.dash.nd.failed'), 'error')
     }
   }
   return (
     <Card>
-      <CardHead icon={<Megaphone size={16} />} tone="blue" title="Community notices" sub="One-way, to a street, a block or the whole township. No replies to everyone, so no group arguments." />
+      <CardHead icon={<Megaphone size={16} />} tone="blue" title={t('sdp.dash.nd.title')} sub={t('sdp.dash.nd.sub')} />
       <div className="grid-2">
-        <label className="field">Audience
+        <label className="field">{t('sdp.dash.nd.audience')}
           <select value={audience} onChange={(e) => setAudience(e.target.value)}>
             {Object.entries(AUDIENCE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </label>
-        <label className="field">Title<input value={title} maxLength={80} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Lift servicing" /></label>
+        <label className="field">{t('sdp.dash.nd.titleField')}<input value={title} maxLength={80} onChange={(e) => setTitle(e.target.value)} placeholder={t('sdp.dash.nd.titleEg')} /></label>
       </div>
-      <textarea className="input" rows={3} maxLength={400} value={body} onChange={(e) => setBody(e.target.value)} placeholder="What, where, when, and what residents should do" />
-      <button className="btn btn-primary" disabled={title.trim().length < 3 || body.trim().length < 3} onClick={post}><Send size={14} /> Post notice</button>
+      <textarea className="input" rows={3} maxLength={400} value={body} onChange={(e) => setBody(e.target.value)} placeholder={t('sdp.dash.nd.bodyPh')} />
+      <button className="btn btn-primary" disabled={title.trim().length < 3 || body.trim().length < 3} onClick={post}><Send size={14} /> {t('sdp.dash.nd.post')}</button>
       {notices.map((n) => (
         <div key={n.id} className="notice-item">
           <div className="notice-item-top"><b>{n.title}</b><span className="mono muted">{AUDIENCE[n.audience] ?? n.audience}</span></div>
           <p>{n.body}</p>
-          <small>{n.author} · {formatDate(n.created_at)}</small>
+          <small>{n.author} · {date(n.created_at)}</small>
         </div>
       ))}
     </Card>

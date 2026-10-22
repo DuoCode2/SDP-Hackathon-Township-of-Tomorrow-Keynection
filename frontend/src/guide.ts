@@ -315,8 +315,8 @@ export const PAGES: Record<TabId, PageGuide> = {
         '数据：多少不满在邻居之间就解决了、回覆率、开工前照片覆盖率、屋主关单比例',
         '邻里关系：隔壁之间互相认识的比例、从交屋到第一次打招呼的天数、30 天内活跃的邻里圈（只有数字，看不到谁跟谁聊、聊什么）',
         '讯息审核也能播放被检举的语音（检举的语音会保留到审核完，其他语音 30 天自动删除）',
-        '物业柜台（Front desk）：交屋时发一次性加入码（QR）、列印给未加入住户的纸本通知并记录送达、替偏好纸本的屋主登记装修（职员名字记录在案）',
-        '页底「Reset demo data」：彩排前清空示范资料（只在网址加上 ?rehearsal=1 时显示）',
+        '「柜台」：交屋时发一次性加入码（QR）、列印给未加入住户的纸本通知并记录送达、替偏好纸本的屋主登记装修（职员名字记录在案）',
+        '页底「重置演示资料」：彩排前清空演示资料（只在网址加上 ?rehearsal=1 时显示）',
       ],
       en: [
         'Warranty queue: every ticket has a 30-day statutory clock and turns red when overdue; repair photos are checked automatically',
@@ -361,7 +361,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         '已封锁名单，可以解除封锁',
         '家人代办：屋主可以授权最多 2 位家人（例如替长辈操作），他们做的每件事都会以他们的名字记录；按「以 Adam 的身份使用」即可示范',
         '下载我的资料（PDPA）：一个档案包含 Keynection 保存的所有关于这户的资料，其他住户只显示门牌',
-        '介面语言：顶栏 EN / BM / 中 切换住户页面的语言',
+        '介面语言：顶栏 EN / BM / 中 切换所有页面的语言，SDP 的页面也一样',
         '简易模式：字和按钮更大、选项更少（只有自己看得到这个设定）；WhatsApp 通知开关（通知里不会有讯息内容）',
         '捷径：我的屋历',
       ],
@@ -372,7 +372,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Blocked neighbours, with unblock',
         'Family helpers: the owner can add up to two family members (for example to help an elderly parent); everything they do is recorded under their name. Tap "Use the app as Adam" to demo it',
         'Download my data (PDPA): one file with everything Keynection holds about the household; other residents appear by unit only',
-        'Interface language: EN / BM / 中 in the top bar switches the resident screens',
+        'Interface language: EN / BM / 中 in the top bar switches every screen, SDP’s included',
         'Easy mode: bigger text and buttons, fewer options (private to the household); WhatsApp alerts on or off (alerts never include message content)',
         'Shortcut to your home log',
       ],
@@ -383,7 +383,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Jiran yang disekat, dengan nyahsekat',
         'Pembantu keluarga: pemilik boleh menambah sehingga dua ahli keluarga (contohnya untuk membantu ibu bapa warga emas); semua yang mereka lakukan direkodkan atas nama mereka. Ketik "Guna app sebagai Adam" untuk demo',
         'Muat turun data saya (PDPA): satu fail dengan semua yang disimpan Keynection tentang isi rumah; penduduk lain muncul mengikut unit sahaja',
-        'Bahasa antara muka: EN / BM / 中 di bar atas menukar skrin penduduk',
+        'Bahasa antara muka: EN / BM / 中 di bar atas menukar setiap skrin, termasuk skrin SDP',
         'Mod mudah: teks dan butang lebih besar, pilihan lebih sedikit (peribadi kepada isi rumah); makluman WhatsApp hidup atau mati (makluman tidak pernah mengandungi kandungan mesej)',
         'Pintasan ke log rumah anda',
       ],
@@ -697,17 +697,17 @@ export const ROUTE: RouteStep[] = [
   {
     tab: 'sdp',
     text: {
-      zh: '保修队列看 30 天法定时钟 → Sample: poor patch（系统发现裂缝还在）',
+      zh: '保修待办看 30 天法定时钟 →「示范：粗糙修补」（系统发现裂缝还在）',
       en: 'Warranty queue: note the 30-day clock → Sample: poor patch (crack still detected)',
-      ms: 'Barisan waranti: perhatikan jam 30 hari → Sample: poor patch (retak masih dikesan)',
+      ms: 'Giliran waranti: perhatikan jam 30 hari → Contoh: tampalan buruk (retak masih dikesan)',
     },
   },
   {
     tab: 'evidence', unit: 'T-11',
     text: {
-      zh: 'Siti 驳回（「没修好」）→ SDP 按 Sample: proper repair → Siti 按「接受」关单',
+      zh: 'Siti 驳回（「没修好」）→ SDP 按「示范：妥善修复」→ Siti 按「接受」关单',
       en: 'Siti rejects (Not fixed) → SDP submits Sample: proper repair → Siti accepts and closes it',
-      ms: 'Siti menolak (Belum dibaiki) → SDP menekan Sample: proper repair → Siti menerima dan menutupnya',
+      ms: 'Siti menolak (Belum dibaiki) → SDP menekan Contoh: pembaikan sempurna → Siti menerima dan menutupnya',
     },
   },
   {
@@ -721,9 +721,9 @@ export const ROUTE: RouteStep[] = [
   {
     tab: 'sdp',
     text: {
-      zh: '（加入与纸本，可选）SDP 后台 → Front desk：Aiman 的装修通知里 No. 23 还没加入 → 按 Print 看纸本通知 → Delivered；再为 No. 23 按 Issue code → 用演示按钮打开加入页 → 选名字、语言、同意隐私声明',
+      zh: '（加入与纸本，可选）SDP 后台 →「柜台」：Aiman 的装修通知里 No. 23 还没加入 → 按「列印」看纸本通知 →「已送达」；再为 No. 23 按「发码」→ 用演示按钮打开加入页 → 选名字、语言、同意隐私声明',
       en: '(Joining and paper, optional) Command view → Front desk: No. 23 isn’t on Keynection, so Aiman’s notice is on paper → Print → Delivered; then Issue code for No. 23 → open the join page (demo) → name, language, privacy consent',
-      ms: '(Menyertai dan kertas, pilihan) Paparan kawalan → Front desk: No. 23 tiada dalam Keynection, jadi notis Aiman di atas kertas → Print → Delivered; kemudian Issue code untuk No. 23 → buka halaman sertai (demo) → nama, bahasa, persetujuan privasi',
+      ms: '(Menyertai dan kertas, pilihan) Paparan kawalan → Kaunter hadapan: No. 23 tiada dalam Keynection, jadi notis Aiman di atas kertas → Cetak → Sudah dihantar; kemudian Keluarkan kod untuk No. 23 → buka halaman sertai (demo) → nama, bahasa, persetujuan privasi',
     },
   },
   {

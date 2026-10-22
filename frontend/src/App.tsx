@@ -68,8 +68,9 @@ type PaneState = { me: string; tab: TabId; peer?: string }
 
 // Two faces: people screens are warm; records (works, evidence, log, SDP) keep the blueprint look.
 const WARM: TabId[] = ['circle', 'chats', 'me']
-// SDP's side stays in English on purpose; every resident screen follows the chosen language.
-const ENGLISH_TABS: TabId[] = ['sdp', 'planner', 'impact', 'channels', 'safeguards']
+// Every screen follows the chosen language, SDP's included. The command view shows records as written (ticket
+// subjects, notices, what people typed), so a note there says why those stay English.
+const RECORD_TABS: TabId[] = ['sdp']
 // Pilot mode: a signed-in household sees its own screens only; SDP's screens belong to the staff shell.
 const RESIDENT_TABS: TabId[] = ['circle', 'chats', 'works', 'evidence', 'log', 'me']
 // A household that hasn't joined sees the join page on these; its home log (the property's record) stays viewable.
@@ -636,7 +637,7 @@ function Pane({ index, pane, units, active, split, version, onChange, onFocus, o
           <button className="btn btn-sm" onClick={() => setActing(null)}>{t('helpers.stop')}</button>
         </div>
       )}
-      {lang !== 'en' && ENGLISH_TABS.includes(pane.tab) && !(me && !me.joined && NEEDS_JOIN.includes(pane.tab)) && <div className="records-note"><Languages size={14} /> {t('records.english')}</div>}
+      {lang !== 'en' && RECORD_TABS.includes(pane.tab) && !(me && !me.joined && NEEDS_JOIN.includes(pane.tab)) && <div className="records-note"><Languages size={14} /> {t('records.english')}</div>}
       {!me.joined && NEEDS_JOIN.includes(pane.tab) ? <JoinView me={me} onJoined={onChange} /> : <>
       {pane.tab === 'circle' && <CircleView me={me} units={units} version={version} onChange={onChange}
         onViewAs={(id) => onUpdate({ me: id })} onOpenChat={(peer) => onUpdate({ tab: 'chats', peer })} onOpenEvidence={() => tab('evidence')} onGo={tab} />}
@@ -644,12 +645,12 @@ function Pane({ index, pane, units, active, split, version, onChange, onFocus, o
       {pane.tab === 'works' && <WorksView me={me} units={units} version={version} onChange={onChange} onOpenEvidence={() => tab('evidence')} />}
       {pane.tab === 'evidence' && <EvidenceView me={me} version={version} onChange={onChange} />}
       {pane.tab === 'log' && <HistoryView me={me} units={units} version={version} />}
-      {/* SDP's side stays in English, including the resident components it reuses (clock, comparison, concerns). */}
-      {pane.tab === 'sdp' && <EnglishOnly><DashboardView version={version} onChange={onChange} onViewAs={(id) => onUpdate({ me: id, tab: 'circle', peer: undefined })} /></EnglishOnly>}
-      {pane.tab === 'planner' && <EnglishOnly><PlannerView /></EnglishOnly>}
-      {pane.tab === 'impact' && <EnglishOnly><ImpactView /></EnglishOnly>}
-      {pane.tab === 'channels' && <EnglishOnly><ChannelsView me={me} version={version} onGo={(tab, peer) => onUpdate({ tab, peer })} /></EnglishOnly>}
-      {pane.tab === 'safeguards' && <EnglishOnly><SafeguardsView onGo={tab} /></EnglishOnly>}
+      {/* SDP's side follows the interface language too (i18n-sdp.ts); its records stay as written. */}
+      {pane.tab === 'sdp' && <DashboardView version={version} onChange={onChange} onViewAs={(id) => onUpdate({ me: id, tab: 'circle', peer: undefined })} />}
+      {pane.tab === 'planner' && <PlannerView />}
+      {pane.tab === 'impact' && <ImpactView />}
+      {pane.tab === 'channels' && <ChannelsView me={me} version={version} onGo={(tab, peer) => onUpdate({ tab, peer })} />}
+      {pane.tab === 'safeguards' && <SafeguardsView onGo={tab} />}
       {pane.tab === 'me' && <MeView me={me} version={version} onChange={onChange} onGo={tab} />}
       </>}
     </div>

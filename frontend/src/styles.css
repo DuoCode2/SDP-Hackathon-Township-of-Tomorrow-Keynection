@@ -1581,6 +1581,8 @@ button.ring-row:hover { background: var(--surface-2); }
 .phones { display: flex; flex-wrap: wrap; justify-content: center; gap: 28px; }
 .phone-wrap { margin: 0; width: min(330px, 100%); display: flex; flex-direction: column; gap: 12px; }
 .phone-wrap > .badge { align-self: flex-start; }
+/* Whose phone it is and in which language: the phone speaks the household's language, the page the reader's. */
+.phone-wrap > .phone-lang { margin-top: -6px; font-size: 12px; color: var(--muted); }
 .phone-wrap figcaption { font-size: 12.5px; line-height: 1.55; color: var(--text-2); }
 .phone-wrap figcaption b { display: block; font-size: 14px; color: var(--ink); }
 .phone { height: 600px; display: flex; flex-direction: column; overflow: hidden; border-radius: 36px; border: 10px solid #1d2430; background: #f6f7f9; box-shadow: 0 30px 60px -30px rgba(13, 34, 64, 0.55); }

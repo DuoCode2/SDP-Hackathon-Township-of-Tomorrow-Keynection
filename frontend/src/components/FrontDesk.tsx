@@ -2,12 +2,11 @@ import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { ClipboardPen, Eye, KeyRound, Printer, QrCode, Send, Smartphone, UserCheck, UserPlus, UserX } from 'lucide-react'
 import { api, type FrontDesk as Desk, type PaperNotice, type UnitInfo, type WelcomeCard } from '../api'
-import { EnglishOnly } from '../i18n'
+import { EnglishOnly, useDates, useT } from '../i18n'
 import { usePilot } from '../features'
-import { count } from '../ui'
 import { joinKey } from '../screens/JoinView'
 import RenovationWizard from '../screens/RenovationWizard'
-import { Badge, Card, CardHead, Empty, formatDate, Sheet, shortRange, Skeleton, useToast } from '../ui'
+import { Badge, Card, CardHead, Empty, Sheet, Skeleton, useToast } from '../ui'
 import PaperNoticeSheet from './PaperNotice'
 import WelcomeSheet from './WelcomeSheet'
 import { NotificationsCard } from './Notifications'
@@ -17,15 +16,18 @@ function storedStaff(): string {
   return remembered('staff') || 'Aishah'
 }
 
+// The label is a key in i18n-sdp-fd.ts, looked up with t inside the component.
 const PAPER_BADGE: Record<PaperNotice['status'], { tone: 'amber' | 'blue' | 'brand' | 'neutral'; label: string }> = {
-  to_print: { tone: 'amber', label: 'To print' },
-  printed: { tone: 'blue', label: 'Printed' },
-  delivered: { tone: 'brand', label: 'Delivered' },
-  superseded: { tone: 'neutral', label: 'Now in the app' },
+  to_print: { tone: 'amber', label: 'sdp.fd.badge.toPrint' },
+  printed: { tone: 'blue', label: 'sdp.fd.badge.printed' },
+  delivered: { tone: 'brand', label: 'sdp.fd.badge.delivered' },
+  superseded: { tone: 'neutral', label: 'sdp.fd.badge.inApp' },
 }
 
 /** The estate office counter: join codes at handover, paper notices, and help for owners who aren't online. */
 export default function FrontDesk({ version, onChange, onViewAs }: { version: number; onChange: () => void; onViewAs?: (unitId: string) => void }) {
+  const t = useT()
+  const { date, range } = useDates()
   const toast = useToast()
   const pilot = usePilot()
   const [desk, setDesk] = useState<Desk | null>(null)
@@ -79,7 +81,7 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
       setCode({ kind: 'join', unit, label, token: r.token, expires: r.expires_at, qr: await qrFor('join', r.token) })
       onChange()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not issue a code', 'error')
+      toast(e instanceof Error ? e.message : t('sdp.fd.toast.issue'), 'error')
     }
   }
 
@@ -92,7 +94,7 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
       setCode({ kind: 'reentry', unit: unit.id, label: unit.label, token: r.token, expires: r.expires_at, qr: await qrFor('code', r.token) })
       setLost('')
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not issue a code', 'error')
+      toast(e instanceof Error ? e.message : t('sdp.fd.toast.issue'), 'error')
     }
   }
 
@@ -102,7 +104,7 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
       setCode({ kind: 'staff', unit: '', label: colleague.trim(), token: r.token, expires: r.expires_at, qr: await qrFor('code', r.token) })
       setColleague('')
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not add a colleague', 'error')
+      toast(e instanceof Error ? e.message : t('sdp.fd.toast.colleague'), 'error')
     }
   }
 
@@ -116,10 +118,10 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
   async function step(n: PaperNotice, s: 'printed' | 'delivered') {
     try {
       await api.paperStep(n.id, s, staff.trim())
-      toast(s === 'delivered' ? `Delivery to ${n.unit_label} recorded in both home logs` : 'Marked as printed')
+      toast(s === 'delivered' ? t('sdp.fd.toast.delivered', { label: n.unit_label }) : t('sdp.fd.toast.printed'))
       onChange()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not update', 'error')
+      toast(e instanceof Error ? e.message : t('sdp.fd.toast.update'), 'error')
     }
   }
 
@@ -130,7 +132,7 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
       setSheet(r)
       onChange()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not make the cards', 'error')
+      toast(e instanceof Error ? e.message : t('sdp.fd.toast.cards'), 'error')
     }
   }
 
@@ -139,13 +141,13 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
     if (!unit) return
     try {
       await api.estateCloseAccount(unit.id, staff.trim(), idChecked)
-      toast(`${unit.label}: account closed. Records stay by unit until their time is up.`)
+      toast(t('sdp.fd.toast.closed', { label: unit.label }))
       setClosing('')
       setIdChecked(false)
       setConfirmClose(false)
       onChange()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not close the account', 'error')
+      toast(e instanceof Error ? e.message : t('sdp.fd.toast.close'), 'error')
     }
   }
 
@@ -154,13 +156,15 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
   const owners = units.filter((u) => u.joined)
   const ownerUnit = units.find((u) => u.id === (owner || owners[0]?.id))
   const names = Object.fromEntries(units.map((u) => [u.id, u.resident_name]))
+  // The staff name sits in bold inside the sentence, wherever the language puts it.
+  const [signedBefore, signedAfter] = t('sdp.fd.signedIn', { staff: '\u0000' }).split('\u0000')
 
   return (
     <>
       <Card>
-        <CardHead icon={<UserCheck size={16} />} tone="blue" title="Front desk" sub={`${desk.joined} of ${desk.households} households have joined. Staff actions are recorded under your name.`} />
-        {pilot ? <div className="small">Signed in as <b>{staff}</b>: actions here are recorded under this name.</div> : (
-          <label className="field">Staff on duty
+        <CardHead icon={<UserCheck size={16} />} tone="blue" title={t('sdp.fd.title')} sub={t('sdp.fd.sub', { joined: desk.joined, n: desk.households })} />
+        {pilot ? <div className="small">{signedBefore}<b>{staff}</b>{signedAfter}</div> : (
+          <label className="field">{t('sdp.fd.onDuty')}
             <input value={typedStaff} maxLength={40} onChange={(e) => saveStaff(e.target.value)} />
           </label>
         )}
@@ -169,54 +173,54 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
 
       {pilot && (
         <Card>
-          <CardHead icon={<Printer size={16} />} title="Welcome packs"
-            sub="A card for every home still to join: the owner's own QR code, valid once until two weeks after their keys." />
+          <CardHead icon={<Printer size={16} />} title={t('sdp.fd.packs.title')}
+            sub={t('sdp.fd.packs.sub')} />
           <div className="grid-2">
-            <label className="field">Keys handed over from<input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setConfirmPacks(false) }} /></label>
-            <label className="field">Until<input type="date" value={to} onChange={(e) => { setTo(e.target.value); setConfirmPacks(false) }} /></label>
+            <label className="field">{t('sdp.fd.packs.from')}<input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setConfirmPacks(false) }} /></label>
+            <label className="field">{t('sdp.fd.packs.until')}<input type="date" value={to} onChange={(e) => { setTo(e.target.value); setConfirmPacks(false) }} /></label>
           </div>
           {confirmPacks ? (
             <div className="confirm-row">
-              <span className="small">New codes for {count(packs, 'home')}. Any card printed before for these homes stops working.</span>
+              <span className="small">{t('sdp.fd.packs.confirm', { n: packs })}</span>
               <span className="btn-row">
-                <button className="btn btn-sm btn-primary" onClick={makePacks}><Printer size={14} /> Make {count(packs, 'card')}</button>
-                <button className="btn btn-sm" onClick={() => setConfirmPacks(false)}>Cancel</button>
+                <button className="btn btn-sm btn-primary" onClick={makePacks}><Printer size={14} /> {t('sdp.fd.packs.make', { n: packs })}</button>
+                <button className="btn btn-sm" onClick={() => setConfirmPacks(false)}>{t('btn.cancel')}</button>
               </span>
             </div>
           ) : (
             <button className="btn btn-sm btn-primary" disabled={packs === 0} onClick={() => setConfirmPacks(true)}>
-              <Printer size={14} /> {packs === 0 ? 'No home still to join in these dates' : `Make welcome-pack cards (${packs})`}
+              <Printer size={14} /> {packs === 0 ? t('sdp.fd.packs.none') : t('sdp.fd.packs.button', { n: packs })}
             </button>
           )}
         </Card>
       )}
 
       <Card>
-        <CardHead icon={<KeyRound size={16} />} title="Handover · join codes" sub="One-time code for the welcome pack. Valid 14 days; a new code cancels the old one." />
-        {desk.not_joined.length === 0 ? <div className="small muted">Every household has joined.</div> : desk.not_joined.map((u) => (
+        <CardHead icon={<KeyRound size={16} />} title={t('sdp.fd.join.title')} sub={t('sdp.fd.join.sub')} />
+        {desk.not_joined.length === 0 ? <div className="small muted">{t('sdp.fd.join.all')}</div> : desk.not_joined.map((u) => (
           <div key={u.id} className="desk-row">
             <span className="unit-chip">{u.label.replace('No. ', '')}</span>
-            <span className="grow"><b>{u.label}</b><small>{u.code_expires_at ? `Code issued · valid until ${formatDate(u.code_expires_at)}` : 'No code yet'}</small></span>
-            <button className="btn btn-sm" onClick={() => issue(u.id, u.label)}><QrCode size={14} /> {u.code_expires_at ? 'New code' : 'Issue code'}</button>
+            <span className="grow"><b>{u.label}</b><small>{u.code_expires_at ? t('sdp.fd.join.issued', { date: date(u.code_expires_at) }) : t('sdp.fd.join.none')}</small></span>
+            <button className="btn btn-sm" onClick={() => issue(u.id, u.label)}><QrCode size={14} /> {t(u.code_expires_at ? 'sdp.fd.join.new' : 'sdp.fd.join.issue')}</button>
           </div>
         ))}
       </Card>
 
       <Card>
-        <CardHead icon={<Printer size={16} />} title="Paper notices" sub="Renovation notices for households not on Keynection. Delivery goes into both home logs." />
+        <CardHead icon={<Printer size={16} />} title={t('sdp.fd.paper.title')} sub={t('sdp.fd.paper.sub')} />
         {desk.paper_notices.length === 0 ? (
-          <Empty art="inbox" title="Nothing to deliver">When a renovation notice includes a household that hasn't joined, it appears here to print.</Empty>
+          <Empty art="inbox" title={t('sdp.fd.paper.emptyTitle')}>{t('sdp.fd.paper.emptyBody')}</Empty>
         ) : desk.paper_notices.map((n) => (
           <div key={n.id} className="desk-row paper-row">
             <span className="grow">
-              <b>To {n.unit_label} · from {n.from_name} ({n.from_label})</b>
-              <small>{n.renovation ? `${n.renovation.scope} · ${shortRange(n.renovation.start, n.renovation.end)}` : 'Notice'}{n.delivered_by ? ` · ${n.delivered_by}` : ''}</small>
+              <b>{t('sdp.fd.paper.row', { label: n.unit_label, name: n.from_name, from: n.from_label })}</b>
+              <small>{n.renovation ? `${n.renovation.scope} · ${range(n.renovation.start, n.renovation.end)}` : t('sdp.fd.paper.notice')}{n.delivered_by ? ` · ${n.delivered_by}` : ''}</small>
             </span>
-            <Badge tone={PAPER_BADGE[n.status].tone}>{PAPER_BADGE[n.status].label}</Badge>
+            <Badge tone={PAPER_BADGE[n.status].tone}>{t(PAPER_BADGE[n.status].label)}</Badge>
             {(n.status === 'to_print' || n.status === 'printed') && (
               <span className="btn-row">
-                <button className="btn btn-sm" onClick={() => setPrinting(n)}><Printer size={14} /> Print</button>
-                <button className="btn btn-sm btn-primary" disabled={!staffOk} onClick={() => step(n, 'delivered')}><Send size={14} /> Delivered</button>
+                <button className="btn btn-sm" onClick={() => setPrinting(n)}><Printer size={14} /> {t('sdp.fd.paper.print')}</button>
+                <button className="btn btn-sm btn-primary" disabled={!staffOk} onClick={() => step(n, 'delivered')}><Send size={14} /> {t('sdp.fd.paper.delivered')}</button>
               </span>
             )}
           </div>
@@ -224,85 +228,85 @@ export default function FrontDesk({ version, onChange, onViewAs }: { version: nu
       </Card>
 
       <Card>
-        <CardHead icon={<ClipboardPen size={16} />} title="Register a renovation for an owner" sub="For owners who prefer paper. Same rules as the app: everyone affected is told, and your name goes on record." />
+        <CardHead icon={<ClipboardPen size={16} />} title={t('sdp.fd.reno.title')} sub={t('sdp.fd.reno.sub')} />
         <div className="grid-2">
-          <label className="field">Owner
+          <label className="field">{t('sdp.ch.app.owner')}
             <select value={ownerUnit?.id ?? ''} onChange={(e) => setOwner(e.target.value)}>
               {owners.map((u) => <option key={u.id} value={u.id}>{u.label} · {u.resident_name}</option>)}
             </select>
           </label>
-          <label className="switch-row consent desk-signed"><input type="checkbox" checked={signed} onChange={(e) => setSigned(e.target.checked)} /> The owner signed the paper renovation form</label>
+          <label className="switch-row consent desk-signed"><input type="checkbox" checked={signed} onChange={(e) => setSigned(e.target.checked)} /> {t('sdp.fd.reno.signed')}</label>
         </div>
-        <button className="btn btn-sm btn-primary" disabled={!signed || !staffOk || !ownerUnit} onClick={() => setWizard(true)}><ClipboardPen size={14} /> Open the form</button>
-        <div className="small muted">Households that haven't joined must join first: Keynection needs their consent before it holds their renovation.</div>
+        <button className="btn btn-sm btn-primary" disabled={!signed || !staffOk || !ownerUnit} onClick={() => setWizard(true)}><ClipboardPen size={14} /> {t('sdp.fd.reno.open')}</button>
+        <div className="small muted">{t('sdp.fd.reno.mustJoin')}</div>
       </Card>
 
       {pilot && (
         <Card>
-          <CardHead icon={<Smartphone size={16} />} title="Lost phone · re-entry code" sub="Check the owner's ID first. The code works once, for a week, and retires every old key of that home." />
+          <CardHead icon={<Smartphone size={16} />} title={t('sdp.fd.lost.title')} sub={t('sdp.fd.lost.sub')} />
           <div className="grid-2">
-            <label className="field">Household
+            <label className="field">{t('sdp.fd.household')}
               <select value={lost} onChange={(e) => setLost(e.target.value)}>
-                <option value="">Choose…</option>
+                <option value="">{t('reno.choose')}</option>
                 {owners.map((u) => <option key={u.id} value={u.id}>{u.label}{u.resident_name ? ` · ${u.resident_name}` : ''}</option>)}
               </select>
             </label>
-            <button className="btn btn-sm btn-primary desk-signed" disabled={!lost} onClick={reentry}><KeyRound size={14} /> Issue re-entry code</button>
+            <button className="btn btn-sm btn-primary desk-signed" disabled={!lost} onClick={reentry}><KeyRound size={14} /> {t('sdp.fd.lost.issue')}</button>
           </div>
         </Card>
       )}
       {pilot && (
         <Card>
-          <CardHead icon={<UserX size={16} />} tone="red" title="Close an account (owner's request)"
-            sub="Check the owner's ID first. Their name, messages, photos, keys and notifications are deleted; records stay by unit until their time is up. Recorded under your name." />
+          <CardHead icon={<UserX size={16} />} tone="red" title={t('sdp.fd.close.title')}
+            sub={t('sdp.fd.close.sub')} />
           <div className="grid-2">
-            <label className="field">Household
+            <label className="field">{t('sdp.fd.household')}
               <select value={closing} onChange={(e) => { setClosing(e.target.value); setConfirmClose(false) }}>
-                <option value="">Choose…</option>
+                <option value="">{t('reno.choose')}</option>
                 {owners.map((u) => <option key={u.id} value={u.id}>{u.label}{u.resident_name ? ` · ${u.resident_name}` : ''}</option>)}
               </select>
             </label>
-            <label className="switch-row consent desk-signed"><input type="checkbox" checked={idChecked} onChange={(e) => setIdChecked(e.target.checked)} /> I checked the owner's ID</label>
+            <label className="switch-row consent desk-signed"><input type="checkbox" checked={idChecked} onChange={(e) => setIdChecked(e.target.checked)} /> {t('sdp.fd.close.idChecked')}</label>
           </div>
           {confirmClose ? (
             <div className="confirm-row">
-              <span className="small">This can't be undone. The household can join again later with a new join code.</span>
+              <span className="small">{t('sdp.fd.close.confirm')}</span>
               <span className="btn-row">
-                <button className="btn btn-sm btn-danger" onClick={closeAccount}><UserX size={14} /> Close this account</button>
-                <button className="btn btn-sm" onClick={() => setConfirmClose(false)}>Cancel</button>
+                <button className="btn btn-sm btn-danger" onClick={closeAccount}><UserX size={14} /> {t('sdp.fd.close.button')}</button>
+                <button className="btn btn-sm" onClick={() => setConfirmClose(false)}>{t('btn.cancel')}</button>
               </span>
             </div>
           ) : (
-            <button className="btn btn-sm" disabled={!closing || !idChecked} onClick={() => setConfirmClose(true)}><UserX size={14} /> Close account…</button>
+            <button className="btn btn-sm" disabled={!closing || !idChecked} onClick={() => setConfirmClose(true)}><UserX size={14} /> {t('sdp.fd.close.open')}</button>
           )}
         </Card>
       )}
       {pilot && (
         <Card>
-          <CardHead icon={<UserPlus size={16} />} title="Add a colleague" sub="They get a one-time code for their first sign-in, then make their own digital key." />
+          <CardHead icon={<UserPlus size={16} />} title={t('sdp.fd.colleague.title')} sub={t('sdp.fd.colleague.sub')} />
           <div className="grid-2">
-            <label className="field">Name<input value={colleague} maxLength={40} onChange={(e) => setColleague(e.target.value)} /></label>
-            <label className="field">Role
+            <label className="field">{t('helpers.name')}<input value={colleague} maxLength={40} onChange={(e) => setColleague(e.target.value)} /></label>
+            <label className="field">{t('sdp.fd.colleague.role')}
               <select value={role} onChange={(e) => setRole(e.target.value as 'estate' | 'sdp')}>
-                <option value="estate">Estate office</option>
+                <option value="estate">{t('sdp.fd.colleague.estate')}</option>
                 <option value="sdp">SDP</option>
               </select>
             </label>
           </div>
-          <button className="btn btn-sm btn-primary" disabled={colleague.trim().length < 2} onClick={addColleague}><UserPlus size={14} /> Add and show their code</button>
+          <button className="btn btn-sm btn-primary" disabled={colleague.trim().length < 2} onClick={addColleague}><UserPlus size={14} /> {t('sdp.fd.colleague.add')}</button>
         </Card>
       )}
 
       {code && (
         <Sheet open onClose={() => setCode(null)}>
-          <div className="eyebrow">{code.kind === 'join' ? 'Join code' : code.kind === 'reentry' ? 'Re-entry code' : 'First sign-in code'} · {code.label}</div>
-          <div className="pass-qr"><img src={code.qr} alt={`One-time code for ${code.label}`} /></div>
+          <div className="eyebrow">{t(code.kind === 'join' ? 'join.paste' : code.kind === 'reentry' ? 'sdp.fd.code.reentry' : 'sdp.fd.code.staff')} · {code.label}</div>
+          <div className="pass-qr"><img src={code.qr} alt={t('sdp.fd.code.alt', { label: code.label })} /></div>
           <div className="small muted">
-            {code.kind === 'join' ? 'Shown once: print it into the welcome pack. ' : 'Shown once: let them scan it with their phone camera now. '}
-            Valid once, until {formatDate(code.expires)}.
+            {t(code.kind === 'join' ? 'sdp.fd.code.shownJoin' : 'sdp.fd.code.shownScan')}
+            {t('sdp.fd.code.valid', { date: date(code.expires) })}
           </div>
           {pilot && <div className="mono small code-text">{code.token}</div>}
-          {!pilot && code.kind === 'join' && <button className="btn btn-primary btn-block" onClick={openAsResident}><Eye size={15} /> Open the join page as {code.label} (demo)</button>}
+          {!pilot && code.kind === 'join' && <button className="btn btn-primary btn-block" onClick={openAsResident}><Eye size={15} /> {t('sdp.fd.code.openAs', { label: code.label })}</button>}
         </Sheet>
       )}
       {sheet && <WelcomeSheet phase={sheet.phase} cards={sheet.codes} onClose={() => setSheet(null)} />}
