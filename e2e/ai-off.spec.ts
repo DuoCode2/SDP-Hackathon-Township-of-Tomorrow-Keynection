@@ -31,7 +31,7 @@ test('AI off: an example fills the notice in without AI, and a terrace starts on
   await expect(sheet.getByLabel('Just say it in one sentence')).toHaveCount(0)
   await expect(sheet.getByRole('button', { name: 'Fill it in for me' })).toHaveCount(0)
 
-  await sheet.getByRole('button', { name: 'Bahasa Melayu' }).click()
+  await sheet.getByRole('button', { name: 'Kitchen hacking · said in Malay' }).click()
   await expect(sheet.locator('.works-card.on')).toContainText('Hacking, drilling or removing tiles')
   await expect(sheet.getByLabel(/Describe the work/)).toHaveValue('Pecah jubin dapur dan gerudi dinding')
   await expect(sheet.locator('.ai-note')).toContainText('Example filled in')

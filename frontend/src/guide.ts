@@ -287,7 +287,7 @@ export const PAGES: Record<TabId, PageGuide> = {
       ],
       ms: [
         'Setiap blok menunjukkan cap jarinya sendiri dan cap jari sebelumnya',
-        'Suntingan senyap pada rekod lama (tanpa mengira semula semua selepasnya) memutuskan rantaian; sepanduk bertukar daripada CHAIN CHECKED kepada amaran',
+        'Suntingan senyap pada rekod lama (tanpa mengira semula semua selepasnya) memutuskan rantaian; sepanduk bertukar daripada RANTAI DISEMAK kepada amaran',
         'Dikatakan terus terang: hari ini pelayan yang sama menyimpan dan menyemaknya; perintis menambah resit bertandatangan kepada pemilik bagi setiap rekod dan cap masa luar setiap hari',
         'Hanya langkah app sendiri menulis ke log rumah; tiada siapa boleh menambah rekod secara manual',
         'Rekod foto menunjukkan imej kecil',
@@ -336,7 +336,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Hubungan jiran: bahagian pasangan sebelah-menyebelah yang saling kenal, hari dari kunci ke ucapan pertama, bulatan aktif dalam 30 hari (kiraan sahaja, bukan siapa atau apa)',
         'Penyederhanaan boleh memainkan mesej suara yang dilaporkan (suara yang dilaporkan disimpan sehingga disemak; semua suara lain dipadam selepas 30 hari)',
         'Kaunter hadapan: kod sertai sekali guna (QR) semasa penyerahan kunci, notis bercetak untuk isi rumah yang tiada dalam Keynection dengan penghantaran direkodkan, dan ubah suai didaftarkan bagi pemilik yang memilih kertas (nama kakitangan direkodkan)',
-        '"Reset demo data" di bahagian bawah mengosongkan semuanya sebelum raptai (hanya ditunjukkan apabila alamat berakhir dengan ?rehearsal=1)',
+        '"Set semula data demo" di bahagian bawah mengosongkan semuanya sebelum raptai (hanya ditunjukkan apabila alamat berakhir dengan ?rehearsal=1)',
       ],
     },
     why: {
@@ -715,7 +715,7 @@ export const ROUTE: RouteStep[] = [
     text: {
       zh: '屋历：不满、升级、保修、维修、屋主确认全部在链上，显示「链条已检查」',
       en: 'Home log: concern, escalation, warranty, repair and sign-off are all chained; CHAIN CHECKED',
-      ms: 'Log rumah: kebimbangan, naik taraf, waranti, pembaikan dan pengesahan semuanya berantai; RANTAI DISEMAK',
+      ms: 'Log rumah: kebimbangan, dibawa kepada pasukan estet, waranti, pembaikan dan pengesahan semuanya berantai; RANTAI DISEMAK',
     },
   },
   {

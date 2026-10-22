@@ -61,7 +61,7 @@ test('K16: only the owner closes a warranty ticket, and the demo marks its Proco
     await lang.getByRole('button', { name: 'BM', exact: true }).click()
     await expect(main.getByText(/Procore PC-\d+ \(nombor demo\)/)).toBeVisible()
     await lang.getByRole('button', { name: '中', exact: true }).click()
-    await expect(main.getByText(/Procore PC-\d+（示范编号）/)).toBeVisible()
+    await expect(main.getByText(/Procore PC-\d+（演示编号）/)).toBeVisible()
     await lang.getByRole('button', { name: 'EN', exact: true }).click()
     await expect(main.getByText(/Procore PC-\d+ \(demo number\)/)).toBeVisible()
     await main.locator('textarea').first().fill('Still a crack along the top')

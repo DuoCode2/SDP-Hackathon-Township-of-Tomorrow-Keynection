@@ -44,7 +44,7 @@ QUICK_REPLIES: dict[str, dict[str, str]] = {
         "en": "Could the contractor's lorry avoid blocking our gate? Thanks!",
         "ms": "Boleh minta lori kontraktor tidak menghalang pagar rumah kami? Terima kasih!",
         "zh": "可以请承包商的罗里不要挡住我们的门口吗？谢谢！",
-        "ta": "ஒப்பந்ததாரரின் லாரி எங்கள் வாசலை மறைக்காமல் நிறுத்த முடியுமா? நன்றி!",
+        "ta": "ஒப்பந்ததாரரின் லாரி எங்கள் வாசலை மறிக்காமல் நிறுத்த முடியுமா? நன்றி!",
     },
     "will_fix": {
         "en": "Sorry about that, we'll sort it out today.",
@@ -151,9 +151,14 @@ _HOSTILE = [
     r"\bsoh?hai\b", r"\bkan? ?ni+ ?na+\b", r"\bknn\b", r"\bkns\b", r"\bkana ?sai\b", r"\bc(i|hi|hee)\s?b(ai|ye)\b",
     r"\bccb\b", r"\blan\s?jiao\b", r"\bdiu\b", r"\bna\s?bei\b",
     # Malay
-    r"\bbodoh?\b", r"\bbabi\b", r"\bsial(an)?\b", r"\bcelaka\b", r"\bbangang\b", r"\bbengap\b", r"\bbangsat\b",
+    r"\bbodoh?\b", r"\bcelaka\b",
+    # babi, sial, sengal and mati only when aimed at a person: "babi hutan masuk kawasan kita", "nasib sial, paip
+    # pecah", "badan saya sengal-sengal" and "lampu jalan depan rumah awak mati" are everyday neighbour talk
+    r"\b(kau|ko|engkau|awak|lu|hang|kamu|dia|jiran) (ni |tu |memang )?babi\b", r"\bbabi (kau|ko|engkau|awak|lu|hang|kamu|betul|punya)\b", r"\b(anak|macam) babi\b",
+    r"\bsialan\b", r"\b(kau|ko|engkau|awak|lu|hang|kamu|jiran|kontraktor) (ni |tu |memang )?sial\b", r"\bsial (la|lah|kau|ko|engkau|awak|lu|hang|kamu|punya)\b", r"\bbangang\b", r"\bbengap\b", r"\bbangsat\b",
     r"\bpuki\w*", r"\bkimak\b", r"\bpantat\b", r"\bbutoh\b", r"\btolol\b", r"\bdungu\b", r"\bbahlul\b", r"\bbengong\b",
-    r"\bgoblok\b", r"\bsengal\b", r"\bmampus\b", r"\b(kau|ko|engkau|awak|lu|hang|kamu) (pergi )?mati\b",
+    r"\bgoblok\b", r"\b(kau|ko|engkau|awak|lu|hang|kamu) (ni |tu )?sengal\b", r"\bmampus\b",
+    r"\b(kau|ko|engkau|awak|lu|hang|kamu) pergi mati\b", r"\bpergi mati(lah)?\b", r"^\W*(kau|ko|engkau|awak|lu|hang|kamu) mati(lah)?\W*$", r"\bmati(lah)? (kau|ko|engkau|awak|lu|hang|kamu)\b",
     r"\botak udang\b", r"\bkepala (otak|hotak|bapak|butoh)\b", r"\blahanat\b", r"\blaknat\b", r"\bjahanam\b",
     r"\bharam jadah\b", r"\bsundal\b", r"\bpelacur\b", r"\bjalang\b",
     # Chinese: no word boundaries, so each entry must be abuse wherever it appears (妈的 only when nothing precedes it,
