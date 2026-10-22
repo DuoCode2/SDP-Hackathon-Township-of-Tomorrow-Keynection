@@ -101,7 +101,7 @@ def test_renovating_owner_cannot_ask_an_inspector_before_being_blamed(client):
     # Nothing has been proposed yet: the case is still the reporter's to decide.
     refused = _decide(client, case["id"], "T-12", "inspect")
     assert refused.status_code == 403
-    assert "neighbour" in refused.json()["detail"]
+    assert "neighbour" in refused.json()["detail"]["message"]
     assert client.get("/api/units/T-11/incidents").json()[0]["status"] == "open"
     # The refused attempt does not lock the reporter out of their own choices.
     r = _decide(client, case["id"], "T-11", "warranty").json()

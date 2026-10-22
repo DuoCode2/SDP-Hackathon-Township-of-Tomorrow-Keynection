@@ -119,7 +119,7 @@ def test_a_photo_can_be_linked_to_a_renovation_notice_but_never_to_a_hello(clien
     assert any(i["id"] == hello_id for i in client.get("/api/units/T-11/inbox").json())
 
     r = _demo(client, "T-11", "wall_before", "baseline", hello_id)
-    assert r.status_code == 422 and "renovation notice" in r.json()["detail"]
+    assert r.status_code == 422 and "renovation notice" in r.json()["detail"]["message"]
     assert _demo(client, "T-11", "wall_after_crack", "followup", hello_id).status_code == 422
     assert client.get("/api/units/T-11/evidence").json()["photos"] == []
 
@@ -136,7 +136,7 @@ def test_follow_up_cannot_point_the_case_at_a_different_renovation(client):
 
     other = _demo(client, "T-11", "wall_after_crack", "followup", second).json()
     r = client.post("/api/incidents", json={"reporter_unit_id": "T-11", "baseline_photo_id": baseline["id"], "followup_photo_id": other["id"]})
-    assert r.status_code == 400 and "different renovation" in r.json()["detail"]
+    assert r.status_code == 400 and "different renovation" in r.json()["detail"]["message"]
     assert client.get("/api/units/T-11/incidents").json() == []
 
     # The same notice on the follow-up is accepted, and the case keeps the pre-work photo's renovation.

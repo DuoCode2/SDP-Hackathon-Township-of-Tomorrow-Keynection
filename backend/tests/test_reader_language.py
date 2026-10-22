@@ -143,3 +143,57 @@ def test_a_typed_bio_is_translated_and_new_words_start_over(client, claude):
 def test_the_bio_keeps_the_language_it_was_written_in(client):
     client.put("/api/units/T-11/profile", json={"lang": "en"})  # Siti switches her reading language later
     assert _neighbour(client, "T-12", "T-11")["bio_lang"] == "ms"  # her bio is still the Malay she wrote
+
+
+# ---------- every refusal can be said in the reader's language ----------
+
+def _codes_in_app() -> set[str]:
+    """Every code the server can answer with: refuse(...), the form checks, and the hand-written code dicts."""
+    import re
+    from pathlib import Path
+
+    from app import main
+
+    source = Path(main.__file__).read_text(encoding="utf-8")
+    codes = set(re.findall(r'refuse\(\d+, "([a-z_]+)"', source))
+    codes |= {c for pair in re.findall(r'refuse\(\d+, "([a-z_]+)" if .+? else "([a-z_]+)"', source, re.S) for c in pair}
+    codes |= set(re.findall(r'HTTPException\(\d+, \{"code": "([a-z_]+)"', source))
+    codes |= set(main.VALIDATION) | {f"photo_{k}" for k in main.PHOTO_ERRORS} | {"invalid"}
+    return codes
+
+
+def _codes_the_app_can_say() -> set[str]:
+    import re
+    from pathlib import Path
+
+    i18n = Path(__file__).resolve().parents[2] / "frontend" / "src" / "i18n.tsx"
+    return set(re.findall(r"'err\.([a-z_]+)'", i18n.read_text(encoding="utf-8")))
+
+
+def test_every_refusal_code_has_wording_in_the_app():
+    missing = _codes_in_app() - _codes_the_app_can_say() - {"tryAgain"}
+    assert not missing, f"the app has no wording (err.<code>) for: {sorted(missing)}"
+
+
+def test_a_refusal_carries_a_code_its_values_and_the_english_record(client):
+    for _ in range(11):  # past the daily cap on waves
+        client.post("/api/waves", json={"from_unit_id": "T-12", "to_unit_id": "T-11"})
+        client.post("/api/waves", json={"from_unit_id": "T-12", "to_unit_id": "T-13"})
+    r = client.post("/api/waves", json={"from_unit_id": "T-12", "to_unit_id": "T-11"})
+    assert r.status_code in (409, 429)
+    d = r.json()["detail"]
+    assert d["code"] in ("waved_today", "wave_cap") and d["message"] and (d["code"] != "wave_cap" or d["values"]["n"] >= 10)
+    gone = client.get("/api/units/T-99/card").json()["detail"]
+    assert gone == {"code": "unit_not_found", "message": "unit T-99 not found", "values": {"unit": "T-99"}}
+
+
+def test_a_form_that_fails_its_own_check_answers_with_a_code_too(client):
+    r = client.put("/api/units/T-12/quiet-times", json={"windows": [{"start": "15:00", "end": "13:00"}]})
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "quiet_order"
+    r = client.put("/api/units/T-12/quiet-times", json={"windows": [{"start": "09:00", "end": "13:30"}]})
+    assert r.json()["detail"] == {"code": "quiet_total", "message": "Quiet times can add up to 3 hours a day, so neighbours can still renovate.", "values": {"hours": 3}}
+    r = client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11"})
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "message_or_quick"
+    r = client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "x" * 600})
+    d = r.json()["detail"]  # a field rule: pydantic's own wording, still in the same shape
+    assert r.status_code == 422 and d["code"] == "invalid" and d["values"]["field"] == "body" and "600" in d["message"] or "500" in d["message"]

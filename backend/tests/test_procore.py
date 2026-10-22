@@ -69,7 +69,7 @@ def test_staff_download_new_tickets_as_a_punch_list_with_photos(client, ticket):
 def test_an_export_marks_tickets_so_the_next_one_has_only_new_ones(client, ticket):
     assert _export(client).status_code == 200
     again = _export(client)
-    assert again.status_code == 409 and "Nothing new" in again.json()["detail"]
+    assert again.status_code == 409 and "Nothing new" in again.json()["detail"]["message"]
     _, rows = _rows(_export(client, "open"))
     assert len(rows) == 1  # still open: it can be downloaded again on purpose
 

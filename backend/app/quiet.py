@@ -41,15 +41,25 @@ def _length(spans: list[tuple[int, int]]) -> int:
     return sum(b - a for a, b in spans)
 
 
+# Why a household's quiet times can't be kept, by code: the sentence is the record, the values are what the screen
+# needs to say it in the reader's language.
+PROBLEMS: dict[str, tuple[str, dict[str, Any]]] = {
+    "quiet_cap": (f"At most {MAX_QUIET_WINDOWS} quiet times.", {"n": MAX_QUIET_WINDOWS}),
+    "quiet_order": ("A quiet time must end after it starts.", {}),
+    "quiet_total": (f"Quiet times can add up to {MAX_QUIET_MINUTES // 60} hours a day, so neighbours can still renovate.",
+                    {"hours": MAX_QUIET_MINUTES // 60}),
+}
+
+
 def check_windows(windows: list[dict[str, Any]]) -> str | None:
-    """Why a household's quiet times can't be kept, or None if they can."""
+    """Why a household's quiet times can't be kept, as a code from PROBLEMS, or None if they can."""
     if len(windows) > MAX_QUIET_WINDOWS:
-        return f"At most {MAX_QUIET_WINDOWS} quiet times."
+        return "quiet_cap"
     spans = [(minutes(w["start"]), minutes(w["end"])) for w in windows]
     if any(a >= b for a, b in spans):
-        return "A quiet time must end after it starts."
+        return "quiet_order"
     if _length(_merge(spans)) > MAX_QUIET_MINUTES:
-        return f"Quiet times can add up to {MAX_QUIET_MINUTES // 60} hours a day, so neighbours can still renovate."
+        return "quiet_total"
     return None
 
 

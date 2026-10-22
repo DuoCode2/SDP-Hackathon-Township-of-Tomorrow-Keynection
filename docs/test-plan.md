@@ -1,8 +1,8 @@
 # Manual test plan: the judge route and the safety boundaries
 
-> **给队员的中文摘要**：这是人能读的测试清单，和 `evidence/device-check/README.md` 用同一套编号（K00–K15 是评审 3 分钟路线，每一步一条；K16–K21 是六条安全边界；K22–K23 是没开 AI 时的替代走法和共用演示的自动重置）。每一条写明怎么做、应该看到什么、在哪台设备核对过。评审看不懂 417 个自动测试，但看得懂这一页。做法：开始前清掉浏览器里这个网站的储存资料（或用无痕模式），这样看到的才是评审第一眼的样子。
+> **给队员的中文摘要**：这是人能读的测试清单，和 `evidence/device-check/README.md` 用同一套编号（K00–K15 是评审 3 分钟路线，每一步一条；K16–K21 是六条安全边界；K22–K23 是没开 AI 时的替代走法和共用演示的自动重置）。每一条写明怎么做、应该看到什么、在哪台设备核对过。评审看不懂 420 个自动测试，但看得懂这一页。做法：开始前清掉浏览器里这个网站的储存资料（或用无痕模式），这样看到的才是评审第一眼的样子。
 
-Keynection has 417 automated server tests (`testing-overview.md`). This page is the part a person walks through: the 3-minute judge route step by step, then the boundaries that protect residents. The numbering is shared with the real-device record in `evidence/device-check/README.md`, so one table serves both.
+Keynection has 420 automated server tests (`testing-overview.md`). This page is the part a person walks through: the 3-minute judge route step by step, then the boundaries that protect residents. The numbering is shared with the real-device record in `evidence/device-check/README.md`, so one table serves both.
 
 ## Before you start
 
