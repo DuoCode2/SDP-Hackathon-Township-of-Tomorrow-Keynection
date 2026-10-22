@@ -45,8 +45,9 @@ const NAV = [
     items: [
       { id: 'sdp', icon: LayoutDashboard, dock: false },
       { id: 'planner', icon: Grid3x3, dock: false },
-      { id: 'impact', icon: Calculator, dock: true },
-      { id: 'channels', icon: Smartphone, dock: true },
+      // SDP's pages are not a resident's: on a phone they are reached from the guide's steps and from Me, not the dock.
+      { id: 'impact', icon: Calculator, dock: false },
+      { id: 'channels', icon: Smartphone, dock: false },
     ],
   },
   { group: 'trust', items: [{ id: 'safeguards', icon: ShieldHalf, dock: false }] },
@@ -662,9 +663,12 @@ function LiveClock() {
     const id = setInterval(() => setNow(new Date()), 30_000)
     return () => clearInterval(id)
   }, [])
+  const pilot = usePilot()
+  // The demo is shared and starts over after 20 quiet minutes: the top bar says so, where "LIVE" meant nothing to a
+  // resident; a pilot's bar says the prototype is live.
   return (
-    <span className="clock desktop-only" title={t('top.liveTitle')}>
-      <span className="pulse" /> {t('top.live')} · {dates.time(now)}
+    <span className="clock desktop-only" title={t(pilot ? 'top.liveTitle' : 'top.demoTitle')}>
+      <span className="pulse" /> {t(pilot ? 'top.live' : 'top.demo')} · {dates.time(now)}
     </span>
   )
 }

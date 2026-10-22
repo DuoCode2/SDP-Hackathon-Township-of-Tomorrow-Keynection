@@ -87,8 +87,8 @@ def test_nobody_can_pose_as_the_service():
 
 def test_every_message_a_resident_receives_has_a_tamil_version():
     assert "ta" in talk.LANGS and talk.LANG_NAME["ta"] == "தமிழ்"
-    tables = {"quick reply": talk.QUICK_REPLIES, "alert": talk.WA_TEMPLATES, "button": talk.WA_BUTTONS,
-              "category": talk.CATEGORY_LABELS}
+    tables = {"quick reply": talk.QUICK_REPLIES, "owner's reply": talk.OWNER_REPLIES, "alert": talk.WA_TEMPLATES,
+              "button": talk.WA_BUTTONS, "category": talk.CATEGORY_LABELS}
     for kind, table in tables.items():
         for key, langs in table.items():
             ta = langs.get("ta", "")

@@ -45,10 +45,11 @@ export const UI: Record<string, Text> = {
   },
   notesForJudges: { zh: '给评委的说明', en: 'Notes for judges', ms: 'Nota untuk juri' },
   about: {
-    zh: 'Keynection：每一把钥匙都附送五户邻居。从交钥匙那天起，帮屋主认识左右和对面这 5 户；装修季是邻居变朋友还是变仇人的关键期，所以装修通知就是第一次自我介绍。万一出了裂缝漏水，公平的记录、分流和保修在背后撑着。',
-    en: 'Keynection: every key comes with five neighbours. From the day they get their keys, owners meet the five homes beside and opposite them. Renovation season decides whether neighbours become friends or enemies, so the renovation notice doubles as the first introduction. If a crack or leak appears, a fair record, triage and the warranty back it up.',
-    ms: 'Keynection: setiap kunci datang dengan lima jiran. Dari hari mereka menerima kunci, pemilik mengenali lima rumah di sebelah dan bertentangan. Musim ubah suai menentukan sama ada jiran menjadi kawan atau musuh, jadi notis ubah suai juga menjadi perkenalan pertama. Jika muncul retak atau kebocoran, rekod yang adil, triaj dan waranti menyokongnya.',
+    zh: '每一把钥匙都附送五户邻居：交钥匙起认识左右和对面，装修通知就是第一次打招呼，出了裂缝有公平的照片记录。',
+    en: 'Every key comes with five neighbours: owners meet the homes beside and opposite from key day, the renovation notice is the first hello, and a fair photo record backs it up if a crack appears.',
+    ms: 'Setiap kunci datang dengan lima jiran: pemilik mengenali rumah di sebelah dan bertentangan dari hari kunci, notis ubah suai ialah sapaan pertama, dan rekod foto yang adil menyokongnya jika muncul retak.',
   },
+  more: { zh: '详细步骤', en: 'Details', ms: 'Butiran' },
   fictional: { zh: '所有住户、门牌和照片都是虚构的示范资料。', en: 'All residents, units and photos are fictional demo data.', ms: 'Semua penduduk, unit dan foto adalah data demo rekaan.' },
   aiOn: {
     zh: 'AI 已开启：打字自动翻译、太冲先劝、一句话写装修通知',
@@ -538,6 +539,9 @@ export interface RouteStep {
   // Both sides of the shared wall at once (Aiman left, Siti right), and the thread to open on the focused side.
   split?: boolean
   peer?: string
+  /** One line on the button: what to do here. The judge route has one; the full route shows `text` instead. */
+  brief?: Text
+  /** The step in full, under "Details" when there is a brief. */
   text: Text
 }
 
@@ -545,6 +549,11 @@ export interface RouteStep {
 export const JUDGE_ROUTE: RouteStep[] = [
   {
     tab: 'circle', unit: 'T-12',
+    brief: {
+      zh: '交钥匙：Aiman（No. 12）的首页是左右和对面 5 户 → 对 Siti 按 👋',
+      en: 'Key day: Aiman (No. 12) sees the five homes beside and opposite → 👋 Wave at Siti',
+      ms: 'Hari kunci: Aiman (No. 12) nampak lima rumah di sebelah dan bertentangan → 👋 Lambai kepada Siti',
+    },
     text: {
       zh: '交钥匙那天：Aiman（No. 12）刚交屋，首页就是左右和对面这 5 户邻居（共用墙、对面）→ 对 Siti 按「👋 Wave」',
       en: 'Key day: Aiman (No. 12) has just moved in, and his home screen is the five homes beside and opposite him (shared walls, across the road) → 👋 Wave at Siti',
@@ -553,6 +562,11 @@ export const JUDGE_ROUTE: RouteStep[] = [
   },
   {
     tab: 'works', unit: 'T-12',
+    brief: {
+      zh: 'Works → Register renovation → 打一句话 → Fill it in for me → 时段自动避开邻居的安静时间 → 发送',
+      en: 'Works → Register renovation → type one sentence → Fill it in for me → the hours avoid the neighbours’ quiet times → Send',
+      ms: 'Ubah suai → Daftar ubah suai → taip satu ayat → Isikan untuk saya → waktu mengelak waktu senyap jiran → Hantar',
+    },
     text: {
       zh: '快捷方式：按右下角的麦克风，直接说「Retiling the master bathroom from next Monday…」→ 单子填好停在复核页。一步步来：装修通知就是自我介绍：Works →「Register renovation」→ 在「一句话说清楚」打「Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6」（中文、马来文也行）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 →「时间」那一步系统已按邻居作息排好：避开 Siti 宝宝午睡（13–15 点）和对面 Hafiz 夜班后补眠（9–11 点），但不说是谁 → 检查后发送（还没加入的 No. 23 由物业送纸本）',
       en: 'Shortcut: press the mic at the bottom right and just say "Retiling the master bathroom from next Monday…" → the notice is filled in and waits on Review. Step by step: the renovation notice is the introduction: Works → Register renovation → in "Just say it in one sentence" type "Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6" (Malay or Chinese work too) → Fill it in for me → AI picks the type of work and the plan marks who is told → at "When" the hours are already planned around the neighbours: clear of Siti’s baby nap (1–3pm) and Hafiz’s sleep after night shifts (9–11am), without saying whose → check and send (No. 23, not on the app yet, gets it on paper)',
@@ -561,6 +575,11 @@ export const JUDGE_ROUTE: RouteStep[] = [
   },
   {
     tab: 'channels', unit: 'T-13',
+    brief: {
+      zh: '触达管道：Kumar（No. 13）在 WhatsApp 收到淡米尔文通知，另有两条自动提醒',
+      en: 'Channels: Kumar (No. 13) gets the notice on WhatsApp in Tamil, plus two reminders that send themselves',
+      ms: 'Saluran: Kumar (No. 13) menerima notis di WhatsApp dalam bahasa Tamil, dengan dua peringatan automatik',
+    },
     text: {
       zh: '隔壁 Kumar（No. 13）读淡米尔文：触达管道里看到他在 WhatsApp 收到的是淡米尔文装修通知，连 Aiman 写的工程说明也由 AI 翻好；下面还排好两条会自己发出的提醒：开工前 3 天提醒拍照、完工后一天问有没有变化',
       en: 'Kumar next door (No. 13) reads Tamil: Channels shows Aiman’s notice reaching him on WhatsApp in Tamil, down to the work Aiman described, translated by AI; below it, two reminders that go out by themselves: photograph three days before the works, and a check the day after they end',
@@ -569,6 +588,11 @@ export const JUDGE_ROUTE: RouteStep[] = [
   },
   {
     tab: 'chats', unit: 'T-11', split: true, peer: 'T-12',
+    brief: {
+      zh: 'Siti 那边：「吵闹时段已避开你的安静时间」→ 回挥手 → 打一句冲的马来文 → AI 给平和说法 → Aiman 看到英文',
+      en: 'Siti’s side: “Noisy hours planned around your quiet time” → wave back → type something sharp in Malay → AI offers a calmer line → Aiman reads it in English',
+      ms: 'Pihak Siti: “Waktu bising dirancang mengelakkan waktu senyap anda” → lambai balik → taip ayat tajam dalam bahasa Melayu → AI tawarkan ayat lebih tenang → Aiman membacanya dalam bahasa Inggeris',
+    },
     text: {
       zh: 'Siti 打开 Aiman 的通知，看到「吵闹时段已避开你的安静时间」，宝宝午睡不用她开口 → 回 👋 → 再用马来文打一句冲的话（例：「Rumah awak bising macam kilang! Tak reti hormat jiran ke?」）→ AI 先给她平和的说法 → Aiman 看到的是英文，原文点一下就有',
       en: 'Siti opens Aiman’s notice: "Noisy hours planned around your quiet time", so she never had to ask about the baby’s nap → she waves back → then types something sharp in Malay ("Rumah awak bising macam kilang! Tak reti hormat jiran ke?") → AI offers her a calmer wording → Aiman reads it in English, the original one tap away',
@@ -577,6 +601,11 @@ export const JUDGE_ROUTE: RouteStep[] = [
   },
   {
     tab: 'evidence', unit: 'T-11',
+    brief: {
+      zh: '照片：Siti 封存开工前照片（Use sample）→ Sample crack → 开工前就有：走保修，不怪 Aiman',
+      en: 'Photos: Siti seals a pre-work photo (Use sample) → Sample crack → it was there before the works: warranty, not Aiman',
+      ms: 'Foto: Siti memeterai foto sebelum kerja (Guna sampel) → Sampel retak → sudah ada sebelum kerja: waranti, bukan Aiman',
+    },
     text: {
       zh: '万一出事：Siti 按 Use sample 封存开工前照片 → Sample crack → 系统说明裂缝开工前就有，属于保修，不是装修造成',
       en: 'If something goes wrong: Siti seals a pre-work photo (Use sample) → Sample crack → the crack was there before the works, so it goes to the warranty, not to Aiman',
@@ -585,6 +614,11 @@ export const JUDGE_ROUTE: RouteStep[] = [
   },
   {
     tab: 'impact',
+    brief: {
+      zh: '影响估算：2020 普查同一题（雪兰莪 13.2% 一个月没跟邻居说过话），试点前后对比',
+      en: 'Impact: the 2020 census question (Selangor: 13.2% had no neighbour contact in a month), asked before and after the pilot',
+      ms: 'Impak: soalan banci 2020 (Selangor: 13.2% tiada hubungan jiran dalam sebulan), ditanya sebelum dan selepas perintis',
+    },
     text: {
       zh: 'SDP 怎么检查效果：影响估算用 2020 年普查同一题（雪兰莪 13.2% 一个月没跟邻居说过话），试点前后一比就知道；后台还会算隔壁互相认识的比例',
       en: 'How SDP checks it works: the Impact model uses the 2020 census question (Selangor: 13.2% had no neighbour contact in a month), asked before and after the pilot; the command view also counts next-door pairs who know each other',

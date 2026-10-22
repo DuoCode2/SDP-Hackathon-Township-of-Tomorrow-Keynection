@@ -54,8 +54,25 @@ def test_quick_replies_arrive_translated_into_the_readers_language(client):
 
 
 def test_every_quick_reply_exists_in_every_language():
-    for key, texts in talk.QUICK_REPLIES.items():
+    for key, texts in {**talk.QUICK_REPLIES, **talk.OWNER_REPLIES}.items():
         assert set(texts) == set(talk.LANGS), key
+    assert not set(talk.QUICK_REPLIES) & set(talk.OWNER_REPLIES)
+
+
+def test_the_renovating_side_gets_its_own_quick_replies(client):
+    # Before any works, both sides get the neighbour's lines (everyone in the demo got their keys the same day, so
+    # "Welcome to the neighbourhood" is fair from either side).
+    assert [q["key"] for q in _thread(client, "T-12", "T-11")["quick_replies"]] == list(talk.QUICK_REPLIES)
+    client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi",  # Aiman's notice reaches Siti
+                                     "renovation": {"scope": "Retile the bathroom", "start": "2099-10-15", "end": "2099-10-30"}})
+    owner = _thread(client, "T-12", "T-11")["quick_replies"]
+    assert [q["key"] for q in owner] == list(talk.OWNER_REPLIES)
+    assert owner[0]["text"] == talk.quick_text("thanks_patience", "en") and owner[0]["arrives"] == talk.quick_text("thanks_patience", "ms")
+    # Siti, who received it, still gets the neighbour's lines; and an owner's line sent by Aiman reaches her in Malay.
+    assert [q["key"] for q in _thread(client, "T-11", "T-12")["quick_replies"]] == list(talk.QUICK_REPLIES)
+    assert _send(client, "T-12", "T-11", quick_key="sorry_noise").status_code == 201
+    for_siti = _thread(client, "T-11", "T-12")["items"][-1]
+    assert for_siti["text"] == talk.quick_text("sorry_noise", "ms") and for_siti["translated"] is True
 
 
 def test_nap_quick_reply_thanks_rather_than_asks():

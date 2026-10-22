@@ -142,7 +142,7 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
         </linearGradient>
       </defs>
 
-      {view === 'terrace' ? <TerraceFrame backLane={t('plan.backLane')} /> : <BlockFrame stackPos={me.kind === 'apartment' ? me.pos : null} />}
+      {view === 'terrace' ? <TerraceFrame rowB={t('plan.rowB')} lane={t('plan.lane')} scale={t('plan.scale')} /> : <BlockFrame stackPos={me.kind === 'apartment' ? me.pos : null} />}
 
       {shown.map((u) => {
         const b = box(u)
@@ -214,8 +214,8 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
               <text x={c.x} y={c.y + 13} className="home-name behind-note">
                 {twoLines(t('plan.behind')).map((line, i) => <tspan key={i} x={c.x} dy={i ? 10 : 0}>{line}</tspan>)}
               </text>
-            ) : <text x={c.x} y={tall ? c.y + 15 : c.y + 13} className="home-name">{isMe ? 'YOU' : names[u.id] ?? ''}</text>}
-            {worksAt.has(u.id) && !previewing && <text x={b.x + b.w - 6} y={b.y + 12} className="home-tag">WORKS</text>}
+            ) : <text x={c.x} y={tall ? c.y + 15 : c.y + 13} className="home-name">{isMe ? t('plan.you') : names[u.id] ?? ''}</text>}
+            {worksAt.has(u.id) && !previewing && <text x={b.x + b.w - 6} y={b.y + 12} className="home-tag">{t('plan.works')}</text>}
           </g>
         )
       })}
@@ -243,14 +243,14 @@ function twoLines(text: string): string[] {
   return [text.slice(0, cut), text.slice(cut + 1)]
 }
 
-function TerraceFrame({ backLane }: { backLane: string }) {
+function TerraceFrame({ rowB, lane, scale }: { rowB: string; lane: string; scale: string }) {
   const right = X0 + 6 * W
   return (
     <g className="frame" pointerEvents="none">
       <line className="dim" x1={X0} y1="30" x2={right} y2="30" />
       <line className="dim" x1={X0} y1="24" x2={X0} y2="36" />
       <line className="dim" x1={right} y1="24" x2={right} y2="36" />
-      <text className="dim-text" x={(X0 + right) / 2} y="24">TERRACE ROW B · NO. 20–25</text>
+      <text className="dim-text" x={(X0 + right) / 2} y="24">{rowB}</text>
       <line className="setback" x1={X0} y1="148" x2={right} y2="148" />
       <rect className="road" x="20" y="158" width="680" height="54" />
       <line className="road-centre" x1="24" y1="185" x2="696" y2="185" />
@@ -259,12 +259,12 @@ function TerraceFrame({ backLane }: { backLane: string }) {
       {/* behind row A: the back lane and its drain, then row C, which faces Jalan Demo 2 */}
       <rect className="back-lane" x="20" y="322" width="680" height="16" />
       <line className="drain" x1="24" y1="335" x2="696" y2="335" />
-      <text className="dim-text lane-text" x={(X0 + right) / 2} y="333">ROW A · NO. 10–15 ▲ · {backLane} · ▼ ROW C · NO. 30–35</text>
+      <text className="dim-text lane-text" x={(X0 + right) / 2} y="333">{lane}</text>
       <line className="setback" x1={X0} y1="436" x2={right} y2="436" />
       <rect className="road" x="20" y="444" width="680" height="34" />
       <text className="road-name" x="360" y="465">JALAN DEMO 2</text>
       <NorthArrow />
-      <ScaleBar label="PLAN · 1:400" y={TERRACE_H - 20} />
+      <ScaleBar label={scale} y={TERRACE_H - 20} />
     </g>
   )
 }

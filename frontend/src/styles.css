@@ -207,7 +207,7 @@ h1, h2, h3, p { margin: 0; }
 .metric-brand b { color: var(--accent-text); }
 .metric-amber { background: var(--amber-bg); border-color: var(--amber-line); }
 .metric-amber b { color: var(--amber); }
-.live-pill { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 10px; font-weight: 700; font-size: 13px; border: 1px solid; box-shadow: var(--shadow-1); white-space: nowrap; }
+.live-pill { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 999px; font-weight: 700; font-size: 13px; border: 1px dashed; white-space: nowrap; cursor: default; }
 .live-pill .pulse { width: 7px; height: 7px; }
 .live-pill.quiet { color: var(--accent-text); background: var(--ok-bg); border-color: var(--accent-line); }
 .live-pill.noisy { color: var(--works-text); background: var(--works-bg); border-color: var(--works-line); }
@@ -453,6 +453,9 @@ h1, h2, h3, p { margin: 0; }
 .chat-list-head .eyebrow { margin-bottom: 2px; }
 .chat-privacy { display: flex; gap: 6px; margin: 0 12px 8px; padding: 8px 10px; border-radius: 8px; font-size: 11.5px; line-height: 1.45; color: var(--text-2); background: var(--surface-2); border: 1px dashed var(--line-2); }
 .chat-privacy svg { flex: none; margin-top: 2px; color: var(--accent-text); }
+.chat-list-label { padding: 10px 12px 4px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); border-top: 1px solid var(--line); }
+.chat-list-label + .chat-row { border-top: 0; }
+.case-meaning { color: var(--text-2); line-height: 1.4; margin-top: 2px; }
 .chat-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; text-align: left; border: 0; border-top: 1px solid var(--line); background: none; transition: background 160ms; }
 .chat-row:hover { background: var(--surface-2); }
 .chat-row.on { background: var(--sel-bg); box-shadow: inset 3px 0 0 var(--sel); }
@@ -1122,7 +1125,13 @@ button.ring-row:hover { background: var(--surface-2); }
 .quiet-chip { padding: 4px 10px; border-radius: 999px; background: var(--ok-bg); border: 1px solid var(--ok-line); color: var(--ok-text); font-size: 12.5px; font-weight: 600; }
 .quiet-edit { display: flex; flex-direction: column; gap: 8px; }
 .quiet-row { display: grid; grid-template-columns: 1fr 1fr 1.6fr auto; gap: 8px; align-items: end; }
-@media (max-width: 560px) { .quiet-row { grid-template-columns: 1fr 1fr auto; } .quiet-row .field:nth-child(3) { grid-column: 1 / -1; grid-row: 2; } }
+@media (max-width: 560px) {
+  .quiet-row { grid-template-columns: 1fr 1fr auto; } .quiet-row .field:nth-child(3) { grid-column: 1 / -1; grid-row: 2; }
+  /* the words keep a readable column; the button drops under them when the two cannot share the row */
+  .quiet-card .card-head { flex-wrap: wrap; }
+  .quiet-card .card-head > .grow { flex: 1 1 220px; }
+  .quiet-card .card-head > .btn { margin-left: auto; }
+}
 .guide-scope { display: grid; gap: 8px; justify-items: start; margin: 14px 0 10px; padding: 12px 14px; border-radius: 10px; border: 1px dashed var(--line-2); background: var(--surface); }
 .guide-scope .guide-hint { margin: 0; }
 .route { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -1148,9 +1157,12 @@ button.ring-row:hover { background: var(--surface-2); }
 @media (max-width: 899.98px) {
   .desktop-only { display: none !important; }
 }
+@media (max-width: 899.98px) {
+  .cast-panel { position: fixed; left: 10px; right: 10px; top: 62px; width: auto; max-height: calc(100dvh - 80px); }
+}
 @media (max-width: 420px) {
-  .cast-chip { max-width: 170px; }
-  .cast-who small { display: none; }
+  .cast-chip { max-width: 150px; }
+  .cast-who small, .cast-who i { display: none; }
 }
 @media (min-width: 900px) {
   .mobile-only, .dock { display: none !important; }
@@ -1439,6 +1451,7 @@ button.ring-row:hover { background: var(--surface-2); }
 .person-card.off { border-style: dashed; background: var(--surface-2); box-shadow: none; }
 .person-card.off .avatar { filter: grayscale(1); opacity: 0.6; }
 .person-card.off .person-status { color: var(--muted); }
+.person-card.off .person-bio { display: block; -webkit-line-clamp: unset; overflow: visible; }
 .welcome-door.off .avatar { filter: grayscale(1); opacity: 0.6; box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--line-2); }
 .welcome-nj { max-width: 460px; font-size: 12.5px; color: var(--text-2); line-height: 1.5; }
 .pick:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -1732,6 +1745,12 @@ button.ring-row:hover { background: var(--surface-2); }
 .easy .msg-tool:not(.report) { display: none !important; }
 /* The guide's notes for judges fold away under the route steps. */
 .guide-notes summary { cursor: pointer; font-size: 12px; font-weight: 700; color: var(--text-2); }
+/* A step's full text and a page's feature list stay one tap away, so the panel reads as a list of short lines. */
+.route-more { margin: 2px 0 0 32px; }
+.route-more summary { cursor: pointer; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.route-more p { margin-top: 6px; font-size: 12px; line-height: 1.55; color: var(--text-2); }
+.guide-more { align-self: stretch; display: flex; flex-direction: column; gap: 8px; }
+.guide-more summary { cursor: pointer; list-style: revert; }
 .guide-notes summary ~ p { margin-top: 8px; }
 /* "Introduce yourself" is a text link now: the banner keeps its words without a box, so the Wave buttons lead. */
 .say-hi, .face-warm .say-hi { background: none; border-color: transparent; }

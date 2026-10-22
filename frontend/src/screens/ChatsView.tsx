@@ -71,6 +71,10 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
   const root = useRef<HTMLElement>(null)
   const [wide, setWide] = useState(false)
   const [convos, setConvos] = useState<Conversation[] | null>(null)
+  // The circle first (newest talk first within it), then homes only a renovation notice connects you with, then
+  // contacts by request: each group under its own label on the list.
+  const rank = (c: Conversation) => (c.relation === 'behind' ? 1 : c.relation === 'contact' ? 2 : 0)
+  const ordered = convos ? [...convos].sort((a, b) => rank(a) - rank(b)) : null
   const [official, setOfficial] = useState<Official | null>(null)
   const reads = readLang(useLang().lang, me)  // the estate notices arrive in the language the screens are in
 
@@ -117,7 +121,11 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
         </button>
 
         {!convos && <div style={{ padding: 14 }}><Skeleton lines={5} /></div>}
-        {convos?.map((c) => (
+        {/* The circle first; then homes a renovation notice connects you with (behind the back fence), then contacts
+            by request: the list says why each person is here, so it never contradicts the five on Neighbours. */}
+        {ordered?.map((c, i) => [
+          i === ordered.findIndex((x) => x.relation === 'behind') && <div key="told" className="chat-list-label">{t('chats.alsoTold')}</div>,
+          i === ordered.findIndex((x) => x.relation === 'contact') && <div key="req" className="chat-list-label">{t('chats.byRequest')}</div>,
           <button key={c.id} className={`chat-row ${c.id === selected ? 'on' : ''}`} onClick={() => onPeer(c.id)}>
             <Avatar name={c.resident_name} size={38} />
             <span className="grow">
@@ -134,8 +142,8 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
               {c.open_concerns > 0 && <MessageSquareWarning size={13} className="flag-concern" aria-label={t('chat.openConcern')} />}
               {c.contact === 'mutual' && <Phone size={12} className="flag-phone" aria-label="Numbers shared" />}
             </span>
-          </button>
-        ))}
+          </button>,
+        ])}
       </aside>
 
       <div className="chat-main">

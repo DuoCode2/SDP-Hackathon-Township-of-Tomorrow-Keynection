@@ -34,8 +34,26 @@ def test_neighbour_sees_renovation_task_with_wall_subject(client):
     intro_id = _renovation_by_12(client)
     ev = client.get("/api/units/T-11/evidence").json()
     task = ev["renovations"][0]
-    assert task["intro_id"] == intro_id and task["needs_photo"] is True
+    assert task["intro_id"] == intro_id and task["needs_photo"] is True and task["mine"] is False
     assert task["suggested_subject"] == "Shared wall with No. 12" and task["baseline"] is None
+
+
+def test_the_renovating_owner_photographs_their_own_side_first(client):
+    assert client.get("/api/units/T-12/evidence").json()["renovations"] == []
+    intro_id = _renovation_by_12(client)
+    [task] = client.get("/api/units/T-12/evidence").json()["renovations"]
+    assert task["intro_id"] == intro_id and task["mine"] is True and task["relation_to_me"] == "self"
+    assert task["needs_photo"] is True and task["from_unit_id"] == "T-12" and task["baseline"] is None
+    assert task["suggested_subject"] == "Your side of the shared walls, before the works"
+    sealed = client.post("/api/units/T-12/photos/demo", json={
+        "name": "wall_before", "kind": "baseline", "subject": task["suggested_subject"], "renovation_intro_id": intro_id})
+    assert sealed.status_code == 201
+    [task] = client.get("/api/units/T-12/evidence").json()["renovations"]
+    assert task["baseline"]["id"] == sealed.json()["id"]
+    # Works that have ended are past photographing: no task for them.
+    client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Done long ago",
+                                     "renovation": {"scope": "Old works", "start": "2020-01-01", "end": "2020-01-10"}})
+    assert [t["intro_id"] for t in client.get("/api/units/T-12/evidence").json()["renovations"]] == [intro_id]
 
 
 def test_full_flow_baseline_followup_compare_and_decide(client):

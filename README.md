@@ -61,7 +61,7 @@ For scale (21 Oct 2026): 18 screens, 106 API endpoints, 3 interface languages pl
 
 ## Beyond the main story
 
-The demo opens on the six screens of the judge route. The Guide's *Show every feature* switch reveals the rest, one line each here:
+The demo opens on the main story: a resident's five screens (Neighbours, Chats, Works, Photos & repairs, Me; on a phone these are the dock) and, for judges, SDP's Impact model and Channels in the sidebar and from the Guide's steps. The Guide's *Show every feature* switch reveals the rest, one line each here:
 
 - **Home log**: one SHA-256 chain per home (handover, notices, passes, photos, cases, decisions, repairs, owner confirmations); only the app's own steps can write to it; "Chain checked" means the server re-computed the chain and found no silent edit.
 - **Me**: reading language, quiet mode, easy mode, blocked list, up to two family helpers, *Download my data* (PDPA: one JSON file, other residents shown as unit numbers only), close the account.

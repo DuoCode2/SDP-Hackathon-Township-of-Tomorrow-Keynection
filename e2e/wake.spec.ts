@@ -102,15 +102,14 @@ async function heardTheReply(page: Page, chat: ReturnType<Page['getByRole']>, sp
   await expect(chat.locator('.voice-panel.speaking')).toBeHidden({ timeout: 15_000 })
 }
 
-/** Turn hands-free on from the chat's own offer, made once under the greeting the first time the chat opens (the tap
- *  that lets the page start audio), wait until it listens, close the chat. */
+/** Turn hands-free on from the ear button in the chat's header (the tap that lets the page start audio), wait until
+ *  it listens, close the chat. The chat's own offer card appears only after the microphone was first used by hand,
+ *  so a household is never asked for the microphone before it has asked for anything. */
 async function handsFreeOn(page: Page) {
   await page.getByRole('button', { name: 'Ask the assistant' }).click()
   const chat = page.getByRole('dialog', { name: 'Keynection assistant' })
-  const offer = chat.locator('.assistant-offer')
-  await expect(offer).toContainText('Go hands-free?')
-  await offer.getByRole('button', { name: 'Turn on hands-free' }).click()
-  await expect(offer).toBeHidden()
+  await expect(chat.locator('.assistant-offer')).toBeHidden()  // not before the microphone was used by hand
+  await chat.getByRole('button', { name: TOGGLE }).click()
   // 8 MB the first time; over a slow or broken connection the engine is fetched once more.
   await expect(chat.getByRole('status').filter({ hasText: LISTENING })).toBeVisible({ timeout: REMOTE ? 200_000 : 90_000 })
   await expect(chat.getByRole('button', { name: TOGGLE })).toHaveAttribute('aria-pressed', 'true')
