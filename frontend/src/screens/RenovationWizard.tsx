@@ -401,7 +401,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
 
       {step === 3 && (
         <div className="wizard-body">
-          <label className="field">{t('reno.contractor')}<input value={reno.contractor ?? ''} onChange={set('contractor')} maxLength={80} placeholder="e.g. ABC Renovation" /></label>
+          <label className="field">{t('reno.contractor')}<input value={reno.contractor ?? ''} onChange={set('contractor')} maxLength={80} placeholder={t('reno.contractorEg')} /></label>
           <label className="switch-row"><input type="checkbox" checked={!!reno.contractor_cidb_registered} onChange={set('contractor_cidb_registered')} /> {t('reno.cidb')}</label>
           {strata && (
             <label className="field">{t('reno.jmb')}
@@ -429,7 +429,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
               </select>
             </label>
             <label className="field">{t('reno.permitRef')}
-              <input value={reno.permit_ref ?? ''} onChange={set('permit_ref')} maxLength={40} disabled={reno.council_permit === 'not_needed'} placeholder="e.g. PBT/2026/0412" />
+              <input value={reno.permit_ref ?? ''} onChange={set('permit_ref')} maxLength={40} disabled={reno.council_permit === 'not_needed'} placeholder={t('reno.permitEg')} />
             </label>
           </div>
           {!strata && reno.council_permit === 'not_needed' && works !== 'light' && (
@@ -458,7 +458,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
               </select>
             </label>
             <div className="wa-preview">
-              <textarea value={message} maxLength={1000} onChange={(e) => setDraft(e.target.value)} aria-label="Notice message" />
+              <textarea value={message} maxLength={1000} onChange={(e) => setDraft(e.target.value)} aria-label={t('reno.messageLabel')} />
               <span className="wa-preview-meta">{message.length}/1000</span>
             </div>
           </div>

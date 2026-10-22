@@ -1751,7 +1751,7 @@ def _system_message(conn: sqlite3.Connection, to_unit: str, thread_with: str, te
 
 
 def _message_json(row: sqlite3.Row, viewer_lang: str, reactions: list[dict[str, Any]] | None = None,
-                  viewer: str | None = None) -> dict[str, Any]:
+                  viewer: str | None = None, quick_lang: str | None = None) -> dict[str, Any]:
     out = {"type": "message", "id": row["id"], "kind": row["kind"], "from_unit_id": row["from_unit_id"],
            "to_unit_id": row["to_unit_id"], "author": row["author"], "text": row["body"], "lang": row["lang"],
            "translated": False, "by_ai": False, "original": None, "created_at": row["created_at"], "read_at": row["read_at"],
@@ -1761,8 +1761,10 @@ def _message_json(row: sqlite3.Row, viewer_lang: str, reactions: list[dict[str, 
     if row["kind"] == "voice":
         out["text"] = "Voice message"
     if row["kind"] == "quick" and talk.is_quick(row["quick_key"]):
-        out["text"] = talk.quick_text(row["quick_key"], viewer_lang)
-        out["translated"] = viewer_lang != row["lang"]
+        # Written ahead in every language, so it can follow the screen's language (quick_lang) at no cost.
+        shown = quick_lang or viewer_lang
+        out["text"] = talk.quick_text(row["quick_key"], shown)
+        out["translated"] = shown != row["lang"]
         out["original"] = row["body"] if out["translated"] else None
     # A typed message reaches its reader in Claude's translation; the sender sees their own words.
     translated = json.loads(row["translations"] or "{}").get(viewer_lang) if row["kind"] == "text" and viewer == row["to_unit_id"] else None
@@ -1794,7 +1796,8 @@ def _concern_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
             "resolved_at": row["resolved_at"], "escalated_at": row["escalated_at"], "closed_at": row["closed_at"]}
 
 
-def _thread_items(conn: sqlite3.Connection, me: str, other: str, viewer_lang: str) -> list[dict[str, Any]]:
+def _thread_items(conn: sqlite3.Connection, me: str, other: str, viewer_lang: str,
+                  quick_lang: str | None = None) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for r in conn.execute(
         "SELECT i.*, r.unit_id AS to_unit_id, r.acked_at, r.quiet FROM intros i JOIN intro_recipients r ON r.intro_id = i.id"
@@ -1821,7 +1824,7 @@ def _thread_items(conn: sqlite3.Connection, me: str, other: str, viewer_lang: st
             continue  # sent while I had them blocked
         if r["private"] and r["to_unit_id"] != me:
             continue
-        items.append(_message_json(r, viewer_lang, _reactions(conn, r["id"]), viewer=me))
+        items.append(_message_json(r, viewer_lang, _reactions(conn, r["id"]), viewer=me, quick_lang=quick_lang))
     for r in conn.execute("SELECT * FROM waves WHERE (from_unit_id = ? AND to_unit_id = ?) OR (from_unit_id = ? AND to_unit_id = ?)",
                           (me, other, other, me)):
         items.append({"type": "wave", "id": r["id"], "from_unit_id": r["from_unit_id"], "to_unit_id": r["to_unit_id"],
@@ -1876,13 +1879,13 @@ def _preview_data(item: dict[str, Any] | None) -> dict[str, Any] | None:
 
 
 @app.get("/api/units/{unit_id}/conversations")
-def conversations(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+def conversations(unit_id: str, lang: ReadLang | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
     me = _unit_row(conn, unit_id)
     _expire_voice(conn)
     today = _today()
     out = []
     for n in _talk_partners(conn, unit_id):
-        items = _thread_items(conn, unit_id, n["id"], me["lang"])
+        items = _thread_items(conn, unit_id, n["id"], me["lang"], quick_lang=lang)
         last = items[-1] if items else None
         unread = conn.execute(
             "SELECT COUNT(*) FROM messages WHERE to_unit_id = ? AND read_at IS NULL AND withheld = 0"
@@ -1900,13 +1903,17 @@ def conversations(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) ->
 
 
 @app.get("/api/units/{unit_id}/conversations/{other_id}")
-def thread(unit_id: str, other_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+def thread(unit_id: str, other_id: str, lang: ReadLang | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     n = _require_neighbours(conn, unit_id, other_id)
     me = _unit_row(conn, unit_id)
-    return {"neighbour": n, "my_lang": me["lang"], "items": _thread_items(conn, unit_id, other_id, me["lang"]),
+    # `lang` is the language the screens are in. Quick replies are written ahead in every language, so the buttons and
+    # the quick messages in the thread follow it; typed messages and notices stay in the household's reading language,
+    # the one they were translated into when sent.
+    shown = lang or me["lang"]
+    return {"neighbour": n, "my_lang": me["lang"], "items": _thread_items(conn, unit_id, other_id, me["lang"], quick_lang=shown),
             "contact": _contact_state(conn, unit_id, other_id), "blocked": _blocked(conn, unit_id, other_id),
             "their_renovations": _renovations_from(conn, other_id, unit_id),
-            "quick_replies": [{"key": k, "text": talk.quick_text(k, me["lang"]), "arrives": talk.quick_text(k, n["lang"])}
+            "quick_replies": [{"key": k, "text": talk.quick_text(k, shown), "arrives": talk.quick_text(k, n["lang"])}
                               for k in _quick_keys(conn, me, n)],
             "concern_categories": talk.CONCERN_CATEGORIES}
 

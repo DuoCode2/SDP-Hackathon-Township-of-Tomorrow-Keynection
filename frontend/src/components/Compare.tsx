@@ -41,9 +41,9 @@ export default function Compare({ before, after, overlay, regions, leftLabel, ri
         </div>
       </div>
       <div ref={frame} className="compare" style={{ ['--cut' as string]: '42%' }}>
-        <img src={before} alt="Before" decoding="async" />
+        <img src={before} alt={t('cmp.before')} decoding="async" />
         <div className="after-layer">
-          <img src={highlight ? overlay : after} alt="After, aligned to the before photo" decoding="async" />
+          <img src={highlight ? overlay : after} alt={t('cmp.after')} decoding="async" />
           {highlight &&
             !scanning &&
             regions.map((r, i) => (
@@ -74,7 +74,7 @@ export default function Compare({ before, after, overlay, regions, leftLabel, ri
             <div className="scan-label">{t('cmp.aligning')}</div>
           </>
         )}
-        <input type="range" min={0} max={100} defaultValue={42} aria-label="Drag to compare before and after"
+        <input type="range" min={0} max={100} defaultValue={42} aria-label={t('cmp.slider')}
           onInput={(e) => move((e.target as HTMLInputElement).value)} />
       </div>
     </div>

@@ -109,4 +109,6 @@
 | Preview, nothing is sent | 预览，未发送 | The label on simulated phones |
 | Stand-in AI | 替身 AI | A local fake used in tests and local checks; answers marked `[stand-in]` |
 | Judge route | 评审路线 | The six steps at the top of the Guide, about 3 minutes |
+| Guide | 导览（面板） | The judges' panel behind the compass button: the route, notes, this page |
+| First-day tour | 入住介绍（Pengenalan hari pertama） | The resident's four cards on first opening; not the Guide, so it has its own name in Chinese and Malay |
 | Show every feature | 显示全部功能 | The guide switch that reveals the screens outside the main story |

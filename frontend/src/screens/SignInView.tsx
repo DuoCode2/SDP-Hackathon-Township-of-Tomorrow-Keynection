@@ -77,7 +77,7 @@ export default function SignInView({ initialJoin, initialCode, onSignedIn }: {
   return (
     <div className="signin">
       <section className="screen join">
-        <div className="signin-lang lang-switch" role="group" aria-label="Language">
+        <div className="signin-lang lang-switch" role="group" aria-label={t('top.lang')}>
           {UI_LANGS.map((l) => (
             <button key={l.code} className={lang === l.code ? 'on' : ''} aria-pressed={lang === l.code} onClick={() => setLang(l.code)} title={l.name}>{l.tag}</button>
           ))}
