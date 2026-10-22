@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from . import ledger
-from .seed import BIOS, CONSENT_VERSION, bio_texts, EASY_MODE, NOT_JOINED, PHASE, QUIET_TIMES, SEED_HELPERS, demo_notices, demo_units, handover_date
+from .seed import BIOS, CONSENT_VERSION, bio_texts, EASY_MODE, NOT_JOINED, PHASE, QUIET_TIMES, SEED_HELPERS, demo_notices, demo_units, handover_date, handover_date_for
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS phases (
@@ -437,9 +437,9 @@ def _upgrade_in_place(conn: sqlite3.Connection) -> None:
 
 def _seed(conn: sqlite3.Connection) -> None:
     conn.execute("INSERT INTO phases (id, name, note) VALUES (?, ?, ?)", (PHASE["id"], PHASE["name"], PHASE["note"]))
-    handover = handover_date()
     for u in demo_units():
         joined = u["id"] not in NOT_JOINED
+        handover = handover_date_for(u["id"])  # the story's lead got the keys today; the rest of the phase earlier
         conn.execute(
             "INSERT INTO units (id, phase_id, kind, label, resident_name, street, terrace_row, facing_row, back_row, block, floor,"
             " pos, lang, handover_date, record_name, joined_at, consent_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",

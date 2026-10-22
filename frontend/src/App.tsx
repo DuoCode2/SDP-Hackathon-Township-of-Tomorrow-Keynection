@@ -369,7 +369,12 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
 
   if (opening) {
     return <OpeningView units={units} onPick={(id) => setPanes([{ me: id, tab: 'circle' }])}
-      onDone={() => { remember('opening.done', '1'); setOpening(false) }}
+      onDone={(waved) => {
+        remember('opening.done', '1')
+        setOpening(false)
+        // A new owner who stays with the neighbours gets the first-day tour: from Works onwards after a wave, from the start otherwise.
+        if (waved !== undefined) replayWelcome(panes[0].me, waved ? 1 : 0)
+      }}
       onNext={() => { remember('opening.done', '1'); setOpening(false); setPanes((ps) => [{ ...ps[0], tab: 'works', peer: undefined }]) }} />
   }
 

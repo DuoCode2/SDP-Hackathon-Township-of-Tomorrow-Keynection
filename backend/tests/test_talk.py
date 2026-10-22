@@ -73,9 +73,10 @@ def test_every_quick_reply_exists_in_every_language():
 
 
 def test_the_renovating_side_gets_its_own_quick_replies(client):
-    # Before any works, both sides get a first hello (everyone in the demo got their keys the same day, so
-    # "Welcome to the neighbourhood" is fair from either side): never "thanks for the notice" with no notice.
-    assert [q["key"] for q in _thread(client, "T-12", "T-11")["quick_replies"]] == list(talk.HELLO_REPLIES)
+    # Before any works, both sides get a first hello: never "thanks for the notice" with no notice. Aiman got his
+    # keys today and Siti two weeks ago, so she may welcome him and he does not welcome her.
+    assert [q["key"] for q in _thread(client, "T-12", "T-11")["quick_replies"]] == [k for k in talk.HELLO_REPLIES if k != "welcome"]
+    assert [q["key"] for q in _thread(client, "T-11", "T-12")["quick_replies"]] == list(talk.HELLO_REPLIES)
     client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi",  # Aiman's notice reaches Siti
                                      "renovation": {"scope": "Retile the bathroom", "start": "2099-10-15", "end": "2099-10-30"}})
     owner = _thread(client, "T-12", "T-11")["quick_replies"]
@@ -224,8 +225,10 @@ def test_units_carry_language_and_handover_date(client):
     from app.seed import HANDOVER_DAYS_AGO, today_my
 
     units = {u["id"]: u for u in client.get("/api/units").json()}
-    handed_over = date.fromisoformat(units["T-12"]["handover_date"])
+    handed_over = date.fromisoformat(units["T-11"]["handover_date"])
     assert units["T-11"]["lang"] == "ms" and handed_over == today_my() - timedelta(days=HANDOVER_DAYS_AGO)
+    # The story's lead collects the keys today: the opening's "key day" and the welcome's "keys received" agree.
+    assert date.fromisoformat(units["T-12"]["handover_date"]) == today_my()
 
 
 def test_renovation_keeps_council_permit(client):
@@ -282,14 +285,14 @@ def test_a_first_hello_has_no_notice_lines_and_every_hello_line_is_in_four_langu
     """A fresh thread offers hello lines; once the other side's notice reaches me, the neighbour's lines; and
     a hello line tapped in English reaches a Malay reader in Malay."""
     keys = [q["key"] for q in _thread(client, "T-12", "T-11")["quick_replies"]]
-    assert "thanks_notice" not in keys and "just_moved" in keys
+    assert "thanks_notice" not in keys and "just_moved" in keys and "welcome" not in keys  # Siti was here first
     for key, texts in talk.HELLO_REPLIES.items():
         assert set(texts) == set(talk.LANGS), key
     assert _send(client, "T-12", "T-11", quick_key="just_moved").status_code == 201
     got = _thread(client, "T-11", "T-12")["items"][-1]
     assert got["text"] == talk.quick_text("just_moved", "ms")
-    _reno(client, "T-11")  # Siti's notice reaches Aiman: now he answers a notice
-    assert [q["key"] for q in _thread(client, "T-12", "T-11")["quick_replies"]] == list(talk.QUICK_REPLIES)
+    _reno(client, "T-11")  # Siti's notice reaches Aiman: now he answers a notice (still without welcoming her)
+    assert [q["key"] for q in _thread(client, "T-12", "T-11")["quick_replies"]] == [k for k in talk.QUICK_REPLIES if k != "welcome"]
 
 
 def test_the_owner_states_the_permit_later_from_works(client):

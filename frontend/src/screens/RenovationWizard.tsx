@@ -412,11 +412,16 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
               </select>
             </label>
           )}
+          {/* One line says whether this work needs a permit; the guideline itself is a fold away. */}
           <div className="wizard-note permit-guide">
             <Landmark size={13} />
             <div>
-              <b>{t('permit.guide.title')}</b> {t(`permit.guide.${works}`)} {t('permit.guide.how')}{' '}
-              <a href={GUIDELINE_URL} target="_blank" rel="noreferrer">{t('permit.guide.link')}</a>
+              <b>{t(`permit.verdict.${works}`)}</b>
+              <details className="permit-guide-more">
+                <summary>{t('permit.guide.more')}</summary>
+                <p><b>{t('permit.guide.title')}</b> {t(`permit.guide.${works}`)} {t('permit.guide.how')}{' '}
+                  <a href={GUIDELINE_URL} target="_blank" rel="noreferrer">{t('permit.guide.link')}</a></p>
+              </details>
             </div>
           </div>
           <div className="grid-2">

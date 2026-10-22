@@ -199,12 +199,10 @@ function Schedule({ me, data, all, noisy, onChange, onOpenEvidence }: { me: Unit
               <div className="mono" style={{ color: noisy.length ? 'var(--amber)' : 'var(--accent-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="pulse" /> {t('wk.live', { time: dates.time(now) })}
               </div>
+              {/* The pill in the header already says quiet or noisy: this card says what comes next, and when. */}
               <div className="card-title" style={{ marginTop: 4 }}>
-                {noisy.length ? t('wk.noisyAt', { where: noisy.map((w) => w.from_label).join(', ') }) : t('wk.quietTitle')}
-              </div>
-              <div className="small dim" style={{ marginTop: 2 }}>
                 {noisy.length
-                  ? t('wk.until', { time: noisy[0].renovation.noisy_to ?? '17:00' })
+                  ? t('wk.noisyAt', { where: noisy.map((w) => w.from_label).join(', ') })
                   : ongoing.length
                     ? t('wk.ongoing', { n: ongoing.length })
                     : upcoming
@@ -212,6 +210,9 @@ function Schedule({ me, data, all, noisy, onChange, onOpenEvidence }: { me: Unit
                         ? t('wk.nextStartMine', { date: dates.date(upcoming.renovation.start) })
                         : t('wk.nextStart', { date: dates.date(upcoming.renovation.start), where: upcoming.from_label })
                       : t('wk.noneInCircle')}
+              </div>
+              <div className="small dim" style={{ marginTop: 2 }}>
+                {noisy.length ? t('wk.until', { time: noisy[0].renovation.noisy_to ?? '17:00' }) : t('wk.quietTitle')}
               </div>
             </div>
           </div>

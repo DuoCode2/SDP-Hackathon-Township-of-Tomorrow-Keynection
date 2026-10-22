@@ -21,19 +21,23 @@ const SURFACE: Record<string, string> = { left: 'subj.wall', right: 'subj.wall',
  *  example of its screen, one tap from that screen. A pilot household sees it once; anyone can open it again from Me
  *  or the Guide. Card one knows whether the hello is already out, so it never asks twice. The buttons stay at the foot
  *  of the sheet on any phone, and the sheet keeps one height from card to card. */
-export default function Tour({ me, circle, onClose, onIntro, onGo }: {
+export default function Tour({ me, circle, start = 0, onClose, onIntro, onGo }: {
   me: UnitInfo
   circle: Member[]
+  /** The card to open on (the end of the opening starts at Works, the neighbours having just been met). */
+  start?: number
   onClose: () => void
   onIntro: () => void
   onGo: (tab: TabId) => void
 }) {
   const t = useT()
   const dates = useDates()
-  const [step, setStep] = useState(0)
+  const [step, setStep] = useState(() => Math.min(Math.max(start, 0), 3))
   const joined = circle.filter((n) => n.joined)
   const greeted = joined.filter((n) => n.known || n.hello_sent).length
+  const fresh = joined.length - greeted
   const helloOut = joined.length > 0 && greeted === joined.length
+  const partOut = greeted > 0 && fresh > 0  // some have the hello, some not yet: the card says which
   const last = 3
   const go = (tab: TabId) => { onClose(); onGo(tab) }
   const wall = joined.find((n) => SURFACE[n.relation])
@@ -46,7 +50,7 @@ export default function Tour({ me, circle, onClose, onIntro, onGo }: {
       <div className="welcome-logo"><Logo size={44} /></div>
       <div className="eyebrow">{t('welcome.eyebrow')}</div>
       <h1>{t(helloOut ? 'welcome.sentTitle' : 'welcome.title', { name: me.resident_name })}</h1>
-      <p>{helloOut ? t('welcome.sentBody', { n: greeted }) : t('welcome.body', { label: me.label, date: dates.date(me.handover_date), n: circle.length })}</p>
+      <p>{helloOut ? t('welcome.sentBody', { n: greeted }) : partOut ? t('welcome.partBody', { m: greeted, k: fresh }) : t('welcome.body', { label: me.label, date: dates.date(me.handover_date), n: circle.length })}</p>
       <div className="welcome-doors">
         {circle.map((n, i) => (
           <div key={n.id} className={`welcome-door ${n.joined ? '' : 'off'}`} style={{ ['--i' as string]: i }}>
@@ -88,7 +92,7 @@ export default function Tour({ me, circle, onClose, onIntro, onGo }: {
   ]
   // The card's own action: say hello (none once it is out), open the screen the card is about, or ask.
   const action = [
-    helloOut ? null : <button key="a0" className="btn btn-primary" onClick={() => { onClose(); onIntro() }}>👋 {t('welcome.hello')}</button>,
+    helloOut ? null : <button key="a0" className="btn btn-primary" onClick={() => { onClose(); onIntro() }}>👋 {t(partOut ? 'welcome.helloRest' : 'welcome.hello', { k: fresh })}</button>,
     <button key="a1" className="btn btn-primary" onClick={() => go('works')}><Hammer size={15} /> {t('tour.works.go')}</button>,
     <button key="a2" className="btn btn-primary" onClick={() => go('evidence')}><Camera size={15} /> {t('tour.photos.go')}</button>,
     <button key="a3" className="btn btn-primary" onClick={() => { onClose(); openAssistant() }}><Sparkles size={15} /> {t('tour.ask.go')}</button>,
