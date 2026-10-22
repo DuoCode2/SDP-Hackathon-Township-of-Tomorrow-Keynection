@@ -14,7 +14,8 @@ export default function OpeningView({ units, onPick, onDone, onNext }: {
   units: UnitInfo[]
   /** The household the judge picked: the app opens as them. */
   onPick: (unitId: string) => void
-  onDone: () => void
+  /** Leaving the opening: `waved` says whether the hello went out (the tour then starts on its second card), undefined for Skip (no tour). */
+  onDone: (waved?: boolean) => void
   /** After the first wave: straight to the renovation notice, the route's second step. */
   onNext: () => void
 }) {
@@ -60,7 +61,7 @@ export default function OpeningView({ units, onPick, onDone, onNext }: {
 
   return (
     <div className="opening" role="dialog" aria-modal aria-label={t('open.label')}>
-      <button className="btn btn-sm opening-skip" onClick={onDone}>{t('open.skip')}</button>
+      <button className="btn btn-sm opening-skip" onClick={() => onDone()}>{t('open.skip')}</button>
 
       {step === 'card' && (
         <div className="opening-step">
@@ -113,7 +114,7 @@ export default function OpeningView({ units, onPick, onDone, onNext }: {
           </div>
           <div className="opening-actions">
             <button className="btn btn-primary" onClick={onNext}>{t('open.nextGo')} <ArrowRight size={16} /></button>
-            <button className="btn" onClick={onDone}>{t('open.nextStay')}</button>
+            <button className="btn" onClick={() => onDone(true)}>{t('open.nextStay')}</button>
           </div>
         </div>
       )}
@@ -131,7 +132,7 @@ export default function OpeningView({ units, onPick, onDone, onNext }: {
               <b>{t(me.kind === 'apartment' ? 'open.hiApartment' : 'open.hi', { name: me.resident_name, n: dir.circle.length })}</b>
               <div className="opening-actions">
                 {first && <button className="btn btn-primary" onClick={wave}>{t('open.wave', { name: first.resident_name })}</button>}
-                <button className={`btn ${first ? '' : 'btn-primary'}`} onClick={onDone}>{t('welcome.later')}</button>
+                <button className={`btn ${first ? '' : 'btn-primary'}`} onClick={() => onDone(false)}>{t('welcome.later')}</button>
               </div>
             </div>
           )}

@@ -11,7 +11,7 @@ import IntroWizard from './IntroWizard'
 import QuietTimesCard from '../components/QuietTimes'
 import { usePilot, useShowAll } from '../features'
 import { NotificationsAsk } from '../components/Notifications'
-import { markWelcomeSeen, welcomeDue } from '../welcome'
+import { markWelcomeSeen, tourStart, welcomeDue } from '../welcome'
 
 interface Props {
   me: UnitInfo
@@ -106,9 +106,12 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
   const names: Record<string, string> = { [me.id]: me.resident_name }
   circle.forEach((n) => { names[n.id] = n.resident_name })
   nearby.forEach((n) => { if (n.resident_name) names[n.id] = n.resident_name })
-  const unknown = circle.filter((n) => n.joined && !n.known).length
-  // Every neighbour not yet known has already had my hello: the banner says so instead of asking again.
-  const waiting = unknown > 0 && circle.every((n) => !n.joined || n.known || n.hello_sent)
+  // Homes still without my hello (a wave counts), and homes that have it but haven't replied: the banner counts the
+  // first and mentions the second, so "4 you haven't met" never includes someone just waved at.
+  const fresh = circle.filter((n) => n.joined && !n.known && !n.hello_sent).length
+  const sent = circle.filter((n) => n.joined && !n.known && n.hello_sent).length
+  const unknown = fresh + sent
+  const waiting = unknown > 0 && fresh === 0
   const pendingIn = reqs?.incoming.filter((r) => r.status === 'pending') ?? []
 
   async function wave(n: Member) {
@@ -182,7 +185,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
           {unknown > 0 && (
             <div className="say-hi">
               <span className="say-hi-hand" aria-hidden>👋</span>
-              <div className="grow"><b>{t(waiting ? 'sayhi.waiting' : 'sayhi.title', { n: unknown })}</b><small>{t(waiting ? 'sayhi.waitingSub' : 'sayhi.sub')}</small></div>
+              <div className="grow"><b>{t(waiting ? 'sayhi.waiting' : 'sayhi.title', { n: waiting ? sent : fresh })}</b><small>{waiting ? t('sayhi.waitingSub') : sent > 0 ? t('sayhi.partSub', { m: sent }) : t('sayhi.sub')}</small></div>
               {!waiting && <button className="link" onClick={() => setIntroOpen(true)}>{t('btn.introduce')}</button>}
             </div>
           )}
@@ -295,7 +298,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
       )}
       {introOpen && <IntroWizard open onClose={() => setIntroOpen(false)} me={me} circle={circle} onSent={() => { celebrate('👋', t('celebrate.hello')); onChange() }} />}
       {welcome && dir && (
-        <Tour me={me} circle={circle} onClose={() => { markWelcomeSeen(me.id); setWelcome(false) }} onIntro={() => setIntroOpen(true)} onGo={onGo} />
+        <Tour me={me} circle={circle} start={tourStart(me.id)} onClose={() => { markWelcomeSeen(me.id); setWelcome(false) }} onIntro={() => setIntroOpen(true)} onGo={onGo} />
       )}
       {requestFor && <RequestSheet home={requestFor} me={me} onClose={() => setRequestFor(null)} onSent={onChange} />}
     </section>

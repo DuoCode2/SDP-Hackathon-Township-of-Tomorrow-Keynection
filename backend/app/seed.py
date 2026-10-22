@@ -44,6 +44,15 @@ def handover_date() -> str:
     return (today_my() - timedelta(days=HANDOVER_DAYS_AGO)).isoformat()
 
 
+# The story's lead collects the keys today: the opening says "key day", the welcome says "keys received" today, and
+# the neighbours (here two weeks already) are the ones who welcome him.
+KEY_DAY_UNITS = ("T-12",)
+
+
+def handover_date_for(unit_id: str) -> str:
+    return today_my().isoformat() if unit_id in KEY_DAY_UNITS else handover_date()
+
+
 def _next(weekday: int, after: date) -> date:
     """The first given weekday (Mon=0) at least three days after `after`, so residents get notice."""
     d = after + timedelta(days=3)

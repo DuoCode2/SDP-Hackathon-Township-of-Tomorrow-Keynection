@@ -294,6 +294,9 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   if (!t) return <div style={{ padding: 18 }}><Skeleton lines={6} /></div>
   const n = t.neighbour
   const wavedToday = t.items.some((i) => i.type === 'wave' && i.from_unit_id === me.id && Date.now() - new Date(i.created_at).getTime() < DAY)
+  // Their wave or notice is already offering "Wave back" in the thread: the header's hand would be a third copy.
+  const openIntro = t.items.some((i) => i.type === 'intro' && i.from_unit_id !== me.id && !i.acked_at)  // their notice, not yet answered
+  const waveBackShown = !wavedToday && !t.blocked && (openIntro || t.items.some((i) => i.type === 'wave' && i.from_unit_id !== me.id))
 
   async function send(msg: { body?: string; quick_key?: string; keep_tone?: boolean }) {
     setSending(true)
@@ -329,8 +332,11 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
     onChange()
   }
 
+  // One "Wave back" answers both their notice and their wave: the notice is acknowledged, and a wave goes back too
+  // (unless one went today, or they turned waves off: then the acknowledgement alone is the answer).
   async function ackIntro(introId: number) {
     await api.waveBack(introId, me.id)
+    if (!wavedToday) await api.wave(me.id, other).catch(() => undefined)
     toast(tr('wave.backDone'))
     onChange()
   }
@@ -367,7 +373,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
           <b>{n.resident_name} <i>· {n.label}</i></b>
           <small><Languages size={11} /> {tr('thread.reads', { lang: langName(tr, n.lang) })} · {tr(`rel.${n.relation}`)}</small>
         </div>
-        <button className="icon-btn wave-btn" onClick={waveAt} disabled={wavedToday || t.blocked} aria-label={wavedToday ? tr('thread.wavedToday') : tr('btn.wave')} title={wavedToday ? tr('thread.wavedToday') : tr('thread.waveAt', { name: n.resident_name })}>👋</button>
+        {!waveBackShown && <button className="icon-btn wave-btn" onClick={waveAt} disabled={wavedToday || t.blocked} aria-label={wavedToday ? tr('thread.wavedToday') : tr('btn.wave')} title={wavedToday ? tr('thread.wavedToday') : tr('thread.waveAt', { name: n.resident_name })}>👋</button>}
         {t.contact === 'mutual' ? (
           <span className="contact-ok"><PhoneCall size={13} /> {tr('thread.numbersShared')}</span>
         ) : t.contact === 'requested_by_me' ? (
@@ -402,7 +408,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
           const wrap = (node: ReactNode) => <Fragment key={key}>{sep}{node}</Fragment>
           if (item.type === 'concern') return wrap(<ConcernCard concern={item} viewer={me.id} onChanged={onChange} />)
           if (item.type === 'intro') return wrap(<IntroCard item={item} mine={item.from_unit_id === me.id} waved={wavedToday} onWave={() => ackIntro(item.id)} />)
-          if (item.type === 'wave') return wrap(<WaveItem item={item} mine={item.from_unit_id === me.id} name={n.resident_name} canWaveBack={!wavedToday && !t.blocked} onWaveBack={waveAt} />)
+          if (item.type === 'wave') return wrap(<WaveItem item={item} mine={item.from_unit_id === me.id} name={n.resident_name} canWaveBack={!wavedToday && !t.blocked && !openIntro} onWaveBack={waveAt} />)
           if (item.kind === 'system') {
             return wrap(
               <div className="sys-msg">

@@ -4,7 +4,7 @@ import { forget, remember, remembered } from './storage'
 // brings it back. The demo never opens it by itself, so a judge lands on the five homes. In both modes the Me page
 // shows it again. (A private window remembers nothing, so in a pilot it shows once per page load there.)
 const seenThisLoad = new Set<string>()
-const asked = new Set<string>()  // homes that asked for it on the Me page
+const asked = new Map<string, number>()  // homes that asked for it (Me, the Guide, the end of the opening) → the card to start on
 
 function seenHomes(): string[] {
   try {
@@ -23,6 +23,11 @@ export function welcomeDue(unitId: string, pilot: boolean): boolean {
   return asked.has(unitId) || (pilot && !welcomeSeen(unitId))
 }
 
+/** Which card the tour opens on for this home: the one asked for, else the first. */
+export function tourStart(unitId: string): number {
+  return asked.get(unitId) ?? 0
+}
+
 export function markWelcomeSeen(unitId: string) {
   seenThisLoad.add(unitId)
   asked.delete(unitId)
@@ -31,10 +36,10 @@ export function markWelcomeSeen(unitId: string) {
 
 /** Forget who has seen the welcome (after joining, or a home asking for its tour again). Given a home, it opens for
  *  that home next, demo too. The demo's key-day opening is left alone: asking for the tour is not asking to start over. */
-export function replayWelcome(unitId?: string) {
+export function replayWelcome(unitId?: string, start = 0) {
   seenThisLoad.clear()
   forget('welcome.seen')
-  if (unitId) asked.add(unitId)
+  if (unitId) asked.set(unitId, start)
 }
 
 /** A demo reset: the welcome and the key-day opening both come back on the next page load. */
