@@ -45,12 +45,22 @@ def test_only_households_in_the_circle_can_message(client):
 
 def test_quick_replies_arrive_translated_into_the_readers_language(client):
     # Siti reads Malay, Aiman reads English (seed data).
+    _send(client, "T-11", "T-12", body="Terima kasih, Aiman")
     _send(client, "T-11", "T-12", quick_key="quiet_nap")
-    for_aiman = _thread(client, "T-12", "T-11")["items"][0]
+    for_aiman = _thread(client, "T-12", "T-11")["items"][-1]
     assert for_aiman["text"] == talk.quick_text("quiet_nap", "en")
     assert for_aiman["translated"] is True and for_aiman["original"] == talk.quick_text("quiet_nap", "ms")
-    for_siti = _thread(client, "T-11", "T-12")["items"][0]
+    for_siti = _thread(client, "T-11", "T-12")["items"][-1]
     assert for_siti["text"] == talk.quick_text("quiet_nap", "ms") and for_siti["translated"] is False
+    # Aiman's screens switched to Chinese: the reply buttons, the quick message and the chat list follow the screens;
+    # what reaches Siti is still Malay, and typed words keep the household's translation (none here, AI is off).
+    zh = client.get("/api/units/T-12/conversations/T-11?lang=zh").json()
+    assert zh["quick_replies"] and all(q["text"] == talk.quick_text(q["key"], "zh") for q in zh["quick_replies"])
+    assert all(q["arrives"] == talk.quick_text(q["key"], "ms") for q in zh["quick_replies"])
+    assert [i["text"] for i in zh["items"]] == ["Terima kasih, Aiman", talk.quick_text("quiet_nap", "zh")]
+    listed = next(c for c in client.get("/api/units/T-12/conversations?lang=zh").json() if c["id"] == "T-11")
+    assert listed["last"] == talk.quick_text("quiet_nap", "zh")
+    assert client.get("/api/units/T-12/conversations/T-11?lang=xx").status_code == 422
 
 
 def test_every_quick_reply_exists_in_every_language():

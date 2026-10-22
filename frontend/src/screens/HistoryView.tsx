@@ -153,7 +153,7 @@ export default function HistoryView({ me, units, version }: { me: UnitInfo; unit
             {technical && (
               <>
                 <Card>
-                  <CardHead icon={<Link2 size={16} />} title={data.chain_ok ? 'CHAIN CHECKED' : 'CHAIN BROKEN'} sub={t('log.tech.chainSub')} />
+                  <CardHead icon={<Link2 size={16} />} title={t(data.chain_ok ? 'log.tech.chainOk' : 'log.tech.chainBad')} sub={t('log.tech.chainSub')} />
                   <div className="chain-viz" aria-hidden>
                     {data.events.map((e, i) => (
                       <span key={e.id} className="chain-node" style={{ ['--i' as string]: i }}>

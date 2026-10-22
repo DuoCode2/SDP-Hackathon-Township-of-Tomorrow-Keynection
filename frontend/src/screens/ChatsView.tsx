@@ -79,7 +79,7 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
   const reads = readLang(useLang().lang, me)  // the estate notices arrive in the language the screens are in
 
   const load = useCallback(() => {
-    api.conversations(me.id).then(setConvos).catch(() => setConvos([]))
+    api.conversations(me.id, reads).then(setConvos).catch(() => setConvos([]))
     api.official(me.id, reads).then(setOfficial).catch(() => setOfficial(null))
   }, [me.id, reads])
   useEffect(() => { load() }, [load, version])
@@ -139,7 +139,7 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
               {c.unread > 0 && <span className="unread">{c.unread}</span>}
               {c.renovating && <Hammer size={13} className="flag-works" aria-label={t('chat.renovating')} />}
               {c.open_concerns > 0 && <MessageSquareWarning size={13} className="flag-concern" aria-label={t('chat.openConcern')} />}
-              {c.contact === 'mutual' && <Phone size={12} className="flag-phone" aria-label="Numbers shared" />}
+              {c.contact === 'mutual' && <Phone size={12} className="flag-phone" aria-label={t('thread.numbersShared')} />}
             </span>
           </button>,
         ])}
@@ -234,6 +234,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   const helper = useHelper(me.id)
   const ai = useAi()
   const pilot = usePilot()
+  const reads = readLang(useLang().lang, me)  // quick replies follow the screens' language
   const [t, setT] = useState<Thread | null>(null)
   const [text, setText] = useState('')
   const [tone, setTone] = useState<string | null>(null)
@@ -262,7 +263,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
 
   useEffect(() => {
     let live = true
-    api.thread(me.id, other).then((x) => {
+    api.thread(me.id, other, reads).then((x) => {
       if (!live) return
       setT(x)
       // Something was just read: tell the app, so the sender's pane (in the split view) turns its tick into two.
@@ -272,7 +273,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
     return () => {
       live = false
     }
-  }, [me.id, other, version, onRead])
+  }, [me.id, other, version, onRead, reads])
 
   useLayoutEffect(() => {
     if (body.current) body.current.scrollTop = body.current.scrollHeight
@@ -377,7 +378,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
           </button>
         )}
         <div className="menu-wrap" ref={menuBox}>
-          <button className="icon-btn" onClick={() => setMenu((m) => !m)} aria-label="More" aria-expanded={menu}><MoreHorizontal size={16} /></button>
+          <button className="icon-btn" onClick={() => setMenu((m) => !m)} aria-label={tr('btn.more')} aria-expanded={menu}><MoreHorizontal size={16} /></button>
           {menu && (
             <div className="menu">
               <button onClick={() => { setMenu(false); if (theirLast) setReporting(theirLast as ChatMessage) }} disabled={!theirLast}>
@@ -478,7 +479,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
             <div className="tone-check">
               <TriangleAlert size={15} />
               <div><b>{tr(`${tone}.title`)}</b>{tr(`${tone}.body`)}</div>
-              <button className="icon-btn" onClick={() => setTone(null)} aria-label="Dismiss">×</button>
+              <button className="icon-btn" onClick={() => setTone(null)} aria-label={tr('btn.dismiss')}>×</button>
             </div>
           )}
           {calmer && (
@@ -486,7 +487,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
               <div className="calmer-head">
                 <Sparkles size={15} />
                 <b>{tr(calmer.hard ? 'tone.title' : 'calmer.title')}</b>
-                <button className="icon-btn" onClick={() => setCalmer(null)} aria-label="Dismiss">×</button>
+                <button className="icon-btn" onClick={() => setCalmer(null)} aria-label={tr('btn.dismiss')}>×</button>
               </div>
               {calmer.hard && <p>{tr('tone.body')}</p>}
               <small>{tr(calmer.hard ? 'tone.suggest' : 'calmer.body')}</small>
@@ -522,7 +523,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
                 onChange={(e) => { setText(e.target.value); setTone(null); setCalmer(null) }}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && text.trim() && !sending) { e.preventDefault(); send({ body: text }) } }} />
               {text.trim() ? (
-                <button className="send-btn" disabled={sending} onClick={() => send({ body: text })} aria-label="Send"><SendHorizontal size={17} /></button>
+                <button className="send-btn" disabled={sending} onClick={() => send({ body: text })} aria-label={tr('btn.send')}><SendHorizontal size={17} /></button>
               ) : (
                 <button className="send-btn mic" onClick={rec.begin} aria-label={tr('thread.record')} title={tr('thread.recordTitle')}><Mic size={17} /></button>
               )}

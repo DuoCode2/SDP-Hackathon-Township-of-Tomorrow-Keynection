@@ -42,3 +42,9 @@ export function replayOpening() {
   replayWelcome()
   forget('opening.done')
 }
+
+/** The tour's "Ask now": the assistant's chat opens as if its orb were tapped (there is one assistant per screen). */
+export const ASK_EVENT = 'keynection:ask'
+export function openAssistant() {
+  window.dispatchEvent(new Event(ASK_EVENT))
+}

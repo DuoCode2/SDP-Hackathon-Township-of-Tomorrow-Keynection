@@ -8,6 +8,7 @@ import { useCelebrate, useToast } from '../ui'
 import RenovationWizard from '../screens/RenovationWizard'
 import IntroWizard from '../screens/IntroWizard'
 import { forget, remember, remembered } from '../storage'
+import { ASK_EVENT } from '../welcome'
 import { WAKE_PHRASE, WakeWord, chime, holdWake, recordSentence, wakeSupported, withoutWakePhrase, type WakeState } from '../wake'
 import { canSpeak, speak, type Speaking } from '../speech'
 
@@ -139,6 +140,12 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
     const t = window.setTimeout(() => setNamed(false), NAME_MS)
     return () => window.clearTimeout(t)
   }, [named])
+  // The first-day tour's "Ask now" opens the chat, the same as tapping the orb.
+  useEffect(() => {
+    const ask = () => setOpen(true)
+    window.addEventListener(ASK_EVENT, ask)
+    return () => window.removeEventListener(ASK_EVENT, ask)
+  }, [])
   useEffect(() => {
     if (wake === 'listening' && announce.current) {
       announce.current = false

@@ -349,7 +349,7 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
     const repair = i.id === 'evidence' && pending > 0
     return (
       <button key={i.id} className={on ? 'active' : ''} onClick={() => setTab(i.id)} aria-current={on ? 'page' : undefined}
-        aria-label={repair ? `${label} · Repair waiting for you` : label}>
+        aria-label={repair ? `${label} · ${t('nav.repairWaiting')}` : label}>
         {compact ? <Icon size={19} strokeWidth={on ? 2.4 : 1.9} /> : <span className="nav-no">{i.no}</span>}
         {!compact && <Icon size={17} strokeWidth={on ? 2.3 : 1.9} className="nav-lead" />}
         {compact ? label : (

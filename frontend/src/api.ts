@@ -956,8 +956,9 @@ export const api = {
   linkProcore: (ticketId: number, ref: string, staffName: string) =>
     request<WarrantyTicket>(`/api/warranty/${ticketId}/procore`, json('POST', { ref, staff_name: staffName })),
   officialRead: (unitId: string) => request(`/api/units/${unitId}/official/read`, { method: 'POST' }),
-  conversations: (unitId: string) => request<Conversation[]>(`/api/units/${unitId}/conversations`),
-  thread: (unitId: string, otherId: string) => request<Thread>(`/api/units/${unitId}/conversations/${otherId}`),
+  /** `lang`: the language the screens are in, which quick replies follow (typed messages keep the household's). */
+  conversations: (unitId: string, lang?: Lang) => request<Conversation[]>(`/api/units/${unitId}/conversations${lang ? `?lang=${lang}` : ''}`),
+  thread: (unitId: string, otherId: string, lang?: Lang) => request<Thread>(`/api/units/${unitId}/conversations/${otherId}${lang ? `?lang=${lang}` : ''}`),
   /** Marks the other side's messages read; `marked` is how many were newly read (0 when nothing changed). */
   markRead: (unitId: string, otherId: string) => request<{ ok: boolean; marked: number }>(`/api/units/${unitId}/conversations/${otherId}/read`, { method: 'POST' }),
   aiStatus: () => request<AiStatus>('/api/ai'),

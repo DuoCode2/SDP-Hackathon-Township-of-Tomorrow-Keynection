@@ -62,6 +62,8 @@ export { replayWelcome } from '../welcome'
 export default function CircleView({ me, units, version, onChange, onViewAs, onOpenChat, onOpenEvidence, onGo }: Props) {
   const t = useT()
   const reads = readLang(useLang().lang, me)  // bios arrive in this language
+  // The street or block beyond the circle, named in the reader's language ("A 栋"); a street keeps its own name.
+  const nearPlace = me.kind === 'terrace' ? me.street ?? '' : t('place.block', { b: me.block ?? '' })
   const showAll = useShowAll()  // contact requests beyond the five homes are an extra, shown on request
   const toast = useToast()
   const celebrate = useCelebrate()
@@ -230,7 +232,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
           <QuietTimesCard unitId={me.id} />
 
           {showAll && <>
-          <div className="section-label ring2-label">{t('section.ring2', { place: dir.ring2_label })}</div>
+          <div className="section-label ring2-label">{t('section.ring2', { place: nearPlace })}</div>
           <p className="ring2-note"><Lock size={12} /> {t('ring2.note')}</p>
           {nearbyHidden > 0 && <div className="section-sub">{t('ring2.nearLevels')}</div>}
           <div className="nearby-grid">
@@ -268,7 +270,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
             <div className="legend">
               <span><i className="lg-me" />{t('legend.you')}</span>
               <span><i className="lg-circle" />{t('legend.circle')}</span>
-              <span><i className="lg-ring2" />{dir.ring2_label}</span>
+              <span><i className="lg-ring2" />{nearPlace}</span>
               <span><i className="lg-wall" />{t('legend.wall')}</span>
               <span><i className="lg-works" />{t('legend.works')}</span>
             </div>

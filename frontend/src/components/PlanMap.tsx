@@ -126,7 +126,7 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
       </div>
     )}
     <div className="plan-scroll" ref={scroller}>
-    <svg className={`plan ${previewing ? 'previewing' : ''} ${entry} ${view === 'apartment' ? 'axo' : ''} ${rule ? `works-${rule}` : ''}`} viewBox={`0 0 720 ${view === 'terrace' ? TERRACE_H : BLOCK_H}`} role="group" aria-label={view === 'terrace' ? 'Plan of Jalan Demo 1' : 'Section through Block A'}>
+    <svg className={`plan ${previewing ? 'previewing' : ''} ${entry} ${view === 'apartment' ? 'axo' : ''} ${rule ? `works-${rule}` : ''}`} viewBox={`0 0 720 ${view === 'terrace' ? TERRACE_H : BLOCK_H}`} role="group" aria-label={t(view === 'terrace' ? 'plan.ariaTerrace' : 'plan.ariaBlock')}>
       <defs>
         <pattern id="hatch-works" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <line x1="0" y1="0" x2="0" y2="7" style={{ stroke: 'var(--works)' }} strokeWidth="2" opacity="0.45" />
@@ -142,14 +142,14 @@ export default function PlanMap({ units, me, circle, ring2 = [], names, works = 
         </linearGradient>
       </defs>
 
-      {view === 'terrace' ? <TerraceFrame rowB={t('plan.rowB')} lane={t('plan.lane')} scale={t('plan.scale')} /> : <BlockFrame stackPos={me.kind === 'apartment' ? me.pos : null} />}
+      {view === 'terrace' ? <TerraceFrame rowB={t('plan.rowB')} lane={t('plan.lane')} scale={t('plan.scale')} /> : <BlockFrame stackPos={me.kind === 'apartment' ? me.pos : null} stack={t('plan.stack')} hidden={t('plan.levelsHidden')} scale={t('plan.section')} />}
 
       {shown.map((u) => {
         const b = box(u)
         return (
           <g key={u.id} className={`home ${cls(u)} ${selected === u.id ? 'selected' : ''} ${onSelect ? '' : 'static'} ${wetPath.includes(u) ? 'wet-path' : ''} ${shaken.includes(u) ? 'shaken' : ''}`}
             role={onSelect ? 'button' : undefined} tabIndex={onSelect ? 0 : undefined} style={order(u)}
-            aria-label={`${u.label}${names[u.id] ? `, ${names[u.id]}` : ''}${worksAt.has(u.id) ? ', renovating' : ''}`}
+            aria-label={`${u.label}${names[u.id] ? `, ${names[u.id]}` : ''}${worksAt.has(u.id) ? `, ${t('plan.ariaWorks')}` : ''}`}
             onClick={() => onSelect?.(u.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onSelect?.(u.id)}>
             <rect className="home-fill" x={b.x} y={b.y} width={b.w} height={b.h} />
             {(worksAt.has(u.id) || (previewing && u.id === me.id)) && <rect className="home-works" x={b.x} y={b.y} width={b.w} height={b.h} />}
@@ -269,7 +269,7 @@ function TerraceFrame({ rowB, lane, scale }: { rowB: string; lane: string; scale
   )
 }
 
-function BlockFrame({ stackPos }: { stackPos: number | null }) {
+function BlockFrame({ stackPos, stack, hidden, scale }: { stackPos: number | null; stack: string; hidden: string; scale: string }) {
   const right = AX0 + 4 * AW
   const bottom = AY0 + FLOORS * AH
   return (
@@ -277,7 +277,7 @@ function BlockFrame({ stackPos }: { stackPos: number | null }) {
       {stackPos && (
         <>
           <rect className="stack" x={AX0 + (stackPos - 1) * AW - 6} y={AY0 - 20} width={AW + 12} height={FLOORS * AH + 28} rx="6" />
-          <text className="stack-label" x={AX0 + (stackPos - 0.5) * AW} y={AY0 - 24}>YOUR STACK</text>
+          <text className="stack-label" x={AX0 + (stackPos - 0.5) * AW} y={AY0 - 24}>{stack}</text>
         </>
       )}
       {/* the block in depth: the side of every floor, each rising with its floor, and the roof on top */}
@@ -293,8 +293,8 @@ function BlockFrame({ stackPos }: { stackPos: number | null }) {
         <text key={i} className="level" x={AX0 - 22} y={AY0 + i * AH + AH / 2 + 4}>L{TOP_FLOOR - i}</text>
       ))}
       <path className="break" d={`M${AX0 - 12} ${bottom + 14} l40 0 l8 -9 l8 18 l8 -9 l${4 * AW - 40} 0`} />
-      <text className="dim-text" x={(AX0 + right) / 2} y={bottom + 36}>LEVELS 1–10 NOT SHOWN</text>
-      <ScaleBar label="SECTION · 1:300" y={BLOCK_H - 20} />
+      <text className="dim-text" x={(AX0 + right) / 2} y={bottom + 36}>{hidden}</text>
+      <ScaleBar label={scale} y={BLOCK_H - 20} />
     </g>
   )
 }

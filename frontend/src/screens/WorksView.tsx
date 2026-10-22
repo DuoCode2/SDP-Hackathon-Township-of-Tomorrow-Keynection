@@ -263,7 +263,7 @@ function PermitSheet({ me, item, onClose, onSaved }: { me: UnitInfo; item: Item;
         </select>
       </label>
       <label className="field">{t('reno.permitRef')}
-        <input value={ref} maxLength={40} disabled={status === 'not_needed'} onChange={(e) => setRef(e.target.value)} placeholder="e.g. PBT/2026/0412" />
+        <input value={ref} maxLength={40} disabled={status === 'not_needed'} onChange={(e) => setRef(e.target.value)} placeholder={t('reno.permitEg')} />
       </label>
       <div className="sheet-actions">
         <button className="btn" onClick={onClose}>{t('btn.cancel')}</button>

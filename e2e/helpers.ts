@@ -26,15 +26,15 @@ export async function judgeStep(page: Page, n: number) {
   await expect(step).toHaveClass(/here/)
 }
 
-/** The welcome card: a sheet over Neighbours, once per pilot household; the demo never opens it by itself. Close it
- *  if it is there (after a photo). */
+/** The first-day tour: a sheet over Neighbours, once per pilot household; the demo never opens it by itself. Close
+ *  it if it is there (after a photo). */
 export async function dismissWelcome(page: Page, shotName?: string) {
   // The sheet appears once the directory has loaded, a moment after the screen; give it that moment.
   const welcome = page.getByRole('dialog').filter({ hasText: /meet your neighbours/i })
   await welcome.waitFor({ state: 'visible', timeout: 4000 }).catch(() => null)
   if (!(await welcome.isVisible().catch(() => false))) return
   if (shotName) await shot(page, shotName)
-  await welcome.getByRole('button', { name: 'Look around first' }).click()
+  await welcome.getByRole('button', { name: 'Skip the tour' }).click()
   await expect(welcome).toBeHidden()
 }
 
