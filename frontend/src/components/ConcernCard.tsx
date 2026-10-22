@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { BellRing, Building2, Check, CircleCheck, Clock3, HandHeart, MessageSquareWarning, Send } from 'lucide-react'
 import { api, type Concern } from '../api'
-import { byWho, tEn, useDates, useT } from '../i18n'
+import { byWho, useDates, useT } from '../i18n'
 import { Stamp, useToast } from '../ui'
 
 const TONE: Record<Concern['status'], 'amber' | 'blue' | 'brand' | 'red' | 'ink'> = {
@@ -15,9 +15,8 @@ export default function ConcernCard({ concern: c, viewer, estate = false, onChan
   estate?: boolean
   onChanged: () => void
 }) {
-  const local = useT()
-  const t = estate ? tEn : local // the estate desk is a records screen: English
-  const dates = useDates() // SDP's screens wrap this in English, so dates follow the same rule
+  const t = useT()  // the estate desk follows the interface language too; the concern's own words stay as written
+  const dates = useDates()
   const toast = useToast()
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -32,7 +31,7 @@ export default function ConcernCard({ concern: c, viewer, estate = false, onChan
       setNote('')
       onChanged()
     } catch (e) {
-      toast(e instanceof Error ? e.message : local('err.tryAgain'), 'error')
+      toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     } finally {
       setBusy(false)
     }

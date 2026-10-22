@@ -18,6 +18,7 @@
 | Five homes beside and opposite, from the site plan (terrace and apartment), three layers | Live | Neighbours, Map | — |
 | 👋 Wave, hello (Introduce yourself), one-to-one chat with sent/read ticks, reactions, voice notes | Live | Neighbours, Chats | — |
 | Quick replies pre-translated into English, Malay, Chinese, Tamil; the buttons follow the screens' language, the neighbour gets their own | Live | Chats | Native speaker's review of Tamil |
+| SDP's screens (command view and front desk, phase setup, impact model, channels, safeguards) follow the top bar's EN / BM / 中 too; records and typed words stay as written, and the command view says why | Live | Top bar | Native speaker's review of the Malay |
 | Renovation notice: type of work → who is told (not the owner's choice) → hours → approvals → review | Live | Works → Register renovation | — |
 | Noisy hours planned around neighbours' private quiet times; two-sided works warning | Live (plain rules, no AI) | Step 3 "When"; Neighbours → Your quiet times | — |
 | One sentence → notice fields (type of work, dates, hours, contractor), approvals never filled by AI | Live with a key | Step 1 "Just say it in one sentence" | A key on the server; a data-processing agreement for a pilot |

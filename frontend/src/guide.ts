@@ -59,9 +59,9 @@ export const UI: Record<string, Text> = {
     ms: 'AI hidup: perkataan yang ditaip diterjemah, yang panas ditenangkan, notis ditulis daripada satu ayat',
   },
   aiOff: {
-    zh: 'AI 没开（服务器没有 AI 金钥）：路线照样能走。打的字照原文送；装修通知的三句示例仍可按，会填入现成的内容（浴室那句按「English」），或保留第一张「浴室、厨房或水管」卡自己逐步填',
-    en: 'AI off (no AI key on the server): the route still works. Typed words go as written; the three renovation examples still fill the notice in from a ready-made preset (the bathroom story is the "English" one), or keep the first card, "Bathroom, kitchen or plumbing", and fill in the steps yourself',
-    ms: 'AI mati (tiada kunci AI pada pelayan): laluan tetap berjalan. Perkataan yang ditaip dihantar seperti ditulis; tiga contoh ubah suai masih mengisi notis daripada pratetap sedia ada (cerita bilik air ialah yang "English"), atau kekalkan kad pertama, "Bilik air, dapur atau paip", dan isi langkah-langkahnya sendiri',
+    zh: 'AI 没开（服务器没有 AI 金钥）：路线照样能走。打的字照原文送；装修通知的三句示例仍可按，会填入现成的内容（浴室那句是「换浴室瓷砖 · 英文说」），或保留第一张「浴室、厨房或水管」卡自己逐步填',
+    en: 'AI off (no AI key on the server): the route still works. Typed words go as written; the three renovation examples still fill the notice in from a ready-made preset (the bathroom story is "Bathroom retile · said in English"), or keep the first card, "Bathroom, kitchen or plumbing", and fill in the steps yourself',
+    ms: 'AI mati (tiada kunci AI pada pelayan): laluan tetap berjalan. Perkataan yang ditaip dihantar seperti ditulis; tiga contoh ubah suai masih mengisi notis daripada pratetap sedia ada (cerita bilik air ialah "Tukar jubin bilik air · dalam bahasa Inggeris"), atau kekalkan kad pertama, "Bilik air, dapur atau paip", dan isi langkah-langkahnya sendiri',
   },
   showAll: { zh: '显示全部功能', en: 'Show every feature', ms: 'Tunjukkan semua ciri' },
   showAllHint: {
@@ -92,11 +92,11 @@ export const PAGES: Record<TabId, PageGuide> = {
     features: {
       zh: [
         '顶部一排头像（像 IG 限时动态）：橙圈＋🔨 是正在装修，蓝点是还没认识，绿圈是已经认识；点头像看小档案',
-        '邻居卡片：名字、门牌、跟你的关系（共用墙、楼上楼下）、语言、一句自我介绍，按「Message」或「👋 Wave」',
-        '「Introduce yourself」：一次跟还没认识的邻居打招呼（三步流程，要勾同意才能发）',
-        '同一条 lorong 或同一栋（像「你可能认识的人」）：只看到门牌，按「Request」写原因，对方接受才看到名字、才能聊',
+        '邻居卡片：名字、门牌、跟你的关系（共用墙、楼上楼下）、语言、一句自我介绍，按「发讯息」或「👋 打招呼」',
+        '「自我介绍」：一次跟还没认识的邻居打招呼（三步流程，要勾同意才能发）',
+        '同一条 lorong 或同一栋（像「你可能认识的人」）：只看到门牌，按「请求」写原因，对方接受才看到名字、才能聊',
         '右上角切到「地图」：建筑蓝图平面图，公寓有楼层剖面图和「你家这一列」',
-        '没有住户名册、没有大群组；物业公告移到 Chats 里的官方帐号',
+        '没有住户名册、没有大群组；物业公告移到「聊天」里的官方帐号',
         '还没加入的邻居（No. 23）只显示门牌、不能传讯息；装修通知由物业办公室印纸本送过去',
         '「你的安静时间」：设一次（例如宝宝 13–15 点午睡），以后邻居装修就会自动避开；只有你自己看得到',
       ],
@@ -179,7 +179,7 @@ export const PAGES: Record<TabId, PageGuide> = {
       zh: [
         '最上面实时显示「现在是不是安静时段」',
         '未来 4 周的装修日历和屋规',
-        '右上角「Register renovation」：按工程类型自动算出要通知哪几户（不能删掉任何人），图上标出每户被通知的原因',
+        '右上角「登记装修」：按工程类型自动算出要通知哪几户（不能删掉任何人），图上标出每户被通知的原因',
         '「一句话说清楚」：用任何语言说要做什么，AI 判断工程类型（决定通知谁）、日期、吵闹时段和承包商，屋主逐步检查再发；批准和 CIDB 仍由屋主自己确认',
         '吵闹时段按邻居的安静时间自动排好（宝宝午睡、夜班补眠），不说是谁、为什么；屋主每天至少保留 4 小时能施工，也可以用自己的时段，被碰到的邻居会在通知里看到',
         '如果收到通知的某户这几天另一边也在施工，系统会提醒并建议改到哪天开工',
@@ -202,7 +202,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Status langsung "waktu senyap sekarang?" di bahagian atas',
         'Kalendar ubah suai empat minggu dan peraturan rumah',
         'Daftar ubah suai: jenis kerja menentukan rumah mana yang diberitahu (tiada siapa boleh dibuang), dan pelan menunjukkan sebab setiap satu',
-        '"Cakap saja dalam satu ayat": terangkan kerja dalam apa-apa bahasa dan AI mengisi jenis kerja (yang menentukan siapa diberitahu), tarikh, waktu bising dan kontraktor untuk disemak pemilik; kelulusan dan tanda CIDB kekal milik pemilik',
+        '"Cakap dalam satu ayat sahaja": terangkan kerja dalam apa-apa bahasa dan AI mengisi jenis kerja (yang menentukan siapa diberitahu), tarikh, waktu bising dan kontraktor untuk disemak pemilik; kelulusan dan tanda CIDB kekal milik pemilik',
         'Waktu bising dirancang mengelakkan waktu senyap jiran (tidur siang bayi, tidur selepas syif malam) tanpa menyebut milik siapa atau sebabnya; pemilik mengekalkan sekurang-kurangnya 4 jam sehari, atau boleh kekalkan waktunya sendiri dan jiran yang terkesan diberitahu dalam notis',
         'Jika rumah yang menerima notis sudah ada kerja di sebelah satu lagi pada hari-hari itu, pemilik diberi amaran dan ditawarkan tarikh mula yang mengelakkannya',
         'Peringatan keluar dengan sendirinya: ambil foto tiga hari sebelum kerja bermula, dan semakan sehari selepas ia tamat; kebimbangan bunyi merekodkan sama ada ia berlaku dalam waktu yang dipersetujui, rehat senyap atau di luarnya',
@@ -230,9 +230,9 @@ export const PAGES: Record<TabId, PageGuide> = {
         '跟进照片自动对齐，扫描后用红框标出新裂缝或水渍',
         '按公开规则给建议（装修造成 / 建筑瑕疵 / 请检查员 / 没有变化 / 请重拍），由人来决定；开工前就拍到的变化不会算到装修头上',
         '「装修造成」只是提出：装修户同意才定案，不同意就请 SDP 检查员；住户不能自称检查员',
-        '选「Building defect」会自动开 SDP 保修单（这是屋主自己的权利，不用邻居同意）',
+        '选「建筑瑕疵」会自动开 SDP 保修单（这是屋主自己的权利，不用邻居同意）',
         'SDP 修好后，系统拿维修照片跟开工前照片核对',
-        '只有屋主能按 Accept 关单；按 Not fixed 驳回，保修单会重开',
+        '只有屋主能按「接受」关单；按「没修好」驳回，保修单会重开',
         '保修单显示《房屋发展法》时钟：交屋后 24 个月保修期内，发展商要在 30 天内修好；驳回也不会重新计时',
       ],
       en: [
@@ -273,7 +273,7 @@ export const PAGES: Record<TabId, PageGuide> = {
     features: {
       zh: [
         '每一块都带自己的指纹和上一块的指纹',
-        '偷偷改动旧的一笔（又没把后面全部重算），链就会断，最上面会从 CHAIN CHECKED 变成警告',
+        '偷偷改动旧的一笔（又没把后面全部重算），链就会断，最上面会从「链条已检查」变成警告',
         '老实说明：目前由同一台服务器保存和检查；试点会给屋主每笔的签章收据，再每天把指纹盖上外部时间戳',
         '只有 app 自己的步骤能写进屋历，没有人能手动加纪录',
         '照片记录直接显示缩图',
@@ -315,8 +315,8 @@ export const PAGES: Record<TabId, PageGuide> = {
         '数据：多少不满在邻居之间就解决了、回覆率、开工前照片覆盖率、屋主关单比例',
         '邻里关系：隔壁之间互相认识的比例、从交屋到第一次打招呼的天数、30 天内活跃的邻里圈（只有数字，看不到谁跟谁聊、聊什么）',
         '讯息审核也能播放被检举的语音（检举的语音会保留到审核完，其他语音 30 天自动删除）',
-        '物业柜台（Front desk）：交屋时发一次性加入码（QR）、列印给未加入住户的纸本通知并记录送达、替偏好纸本的屋主登记装修（职员名字记录在案）',
-        '页底「Reset demo data」：彩排前清空示范资料（只在网址加上 ?rehearsal=1 时显示）',
+        '「柜台」：交屋时发一次性加入码（QR）、列印给未加入住户的纸本通知并记录送达、替偏好纸本的屋主登记装修（职员名字记录在案）',
+        '页底「重置演示资料」：彩排前清空演示资料（只在网址加上 ?rehearsal=1 时显示）',
       ],
       en: [
         'Warranty queue: every ticket has a 30-day statutory clock and turns red when overdue; repair photos are checked automatically',
@@ -357,11 +357,11 @@ export const PAGES: Record<TabId, PageGuide> = {
       zh: [
         '一句自我介绍（80 字以内），只有影响圈和已接受联系的人看得到；会提醒不要写作息或出远门的日期',
         '阅读语言：邻居的讯息和 WhatsApp 提醒用这个语言送达',
-        '开关：接受联系请求、接受 👋 Wave、安静模式（邻居不能发讯息，但装修通知和不满仍会送达）',
+        '开关：接受联系请求、接受 👋 打招呼、安静模式（邻居不能发讯息，但装修通知和不满仍会送达）',
         '已封锁名单，可以解除封锁',
         '家人代办：屋主可以授权最多 2 位家人（例如替长辈操作），他们做的每件事都会以他们的名字记录；按「以 Adam 的身份使用」即可示范',
         '下载我的资料（PDPA）：一个档案包含 Keynection 保存的所有关于这户的资料，其他住户只显示门牌',
-        '介面语言：顶栏 EN / BM / 中 切换住户页面的语言',
+        '介面语言：顶栏 EN / BM / 中 切换所有页面的语言，SDP 的页面也一样',
         '简易模式：字和按钮更大、选项更少（只有自己看得到这个设定）；WhatsApp 通知开关（通知里不会有讯息内容）',
         '捷径：我的屋历',
       ],
@@ -372,7 +372,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Blocked neighbours, with unblock',
         'Family helpers: the owner can add up to two family members (for example to help an elderly parent); everything they do is recorded under their name. Tap "Use the app as Adam" to demo it',
         'Download my data (PDPA): one file with everything Keynection holds about the household; other residents appear by unit only',
-        'Interface language: EN / BM / 中 in the top bar switches the resident screens',
+        'Interface language: EN / BM / 中 in the top bar switches every screen, SDP’s included',
         'Easy mode: bigger text and buttons, fewer options (private to the household); WhatsApp alerts on or off (alerts never include message content)',
         'Shortcut to your home log',
       ],
@@ -383,7 +383,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Jiran yang disekat, dengan nyahsekat',
         'Pembantu keluarga: pemilik boleh menambah sehingga dua ahli keluarga (contohnya untuk membantu ibu bapa warga emas); semua yang mereka lakukan direkodkan atas nama mereka. Ketik "Guna app sebagai Adam" untuk demo',
         'Muat turun data saya (PDPA): satu fail dengan semua yang disimpan Keynection tentang isi rumah; penduduk lain muncul mengikut unit sahaja',
-        'Bahasa antara muka: EN / BM / 中 di bar atas menukar skrin penduduk',
+        'Bahasa antara muka: EN / BM / 中 di bar atas menukar setiap skrin, termasuk skrin SDP',
         'Mod mudah: teks dan butang lebih besar, pilihan lebih sedikit (peribadi kepada isi rumah); makluman WhatsApp hidup atau mati (makluman tidak pernah mengandungi kandungan mesej)',
         'Pintasan ke log rumah anda',
       ],
@@ -557,7 +557,7 @@ export const JUDGE_ROUTE: RouteStep[] = [
       ms: 'Hari kunci: Aiman (No. 12) nampak lima rumah di sebelah dan bertentangan → 👋 Lambai kepada Siti',
     },
     text: {
-      zh: '交钥匙那天：Aiman（No. 12）刚交屋，首页就是左右和对面这 5 户邻居（共用墙、对面）→ 对 Siti 按「👋 Wave」',
+      zh: '交钥匙那天：Aiman（No. 12）刚交屋，首页就是左右和对面这 5 户邻居（共用墙、对面）→ 对 Siti 按「👋 打招呼」',
       en: 'Key day: Aiman (No. 12) has just moved in, and his home screen is the five homes beside and opposite him (shared walls, across the road) → 👋 Wave at Siti',
       ms: 'Hari kunci: Aiman (No. 12) baru sahaja berpindah masuk, dan skrin utamanya ialah lima rumah di sebelah dan bertentangan dengannya (dinding kongsi, seberang jalan) → 👋 Lambai kepada Siti',
     },
@@ -565,14 +565,14 @@ export const JUDGE_ROUTE: RouteStep[] = [
   {
     tab: 'works', unit: 'T-12',
     brief: {
-      zh: 'Works → Register renovation → 打一句话 → Fill it in for me → 时段自动避开邻居的安静时间 → 发送',
+      zh: '装修 → 登记装修 → 打一句话 → 帮我填好 → 时段自动避开邻居的安静时间 → 发送',
       en: 'Works → Register renovation → type one sentence → Fill it in for me → the hours avoid the neighbours’ quiet times → Send',
       ms: 'Ubah suai → Daftar ubah suai → taip satu ayat → Isikan untuk saya → waktu mengelak waktu senyap jiran → Hantar',
     },
     text: {
-      zh: '快捷方式：按右下角的麦克风，直接说「Retiling the master bathroom from next Monday…」→ 单子填好停在复核页。一步步来：装修通知就是自我介绍：Works →「Register renovation」→ 在「一句话说清楚」打「Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6」（中文、马来文也行）→「Fill it in for me」→ AI 判断工程类型，图上标出谁会收到 →「时间」那一步系统已按邻居作息排好：避开 Siti 宝宝午睡（13–15 点）和对面 Hafiz 夜班后补眠（9–11 点），但不说是谁 → 检查后发送（还没加入的 No. 23 由物业送纸本）',
+      zh: '快捷方式：按右下角的麦克风，直接说「我下周一开始换主浴室瓷砖，ABC Renovation，大概两个星期」（介面是中文时麦克风听中文）→ 单子填好停在「确认」那一步。一步步来：装修通知就是自我介绍：「装修」→「登记装修」→ 在「一句话说清楚就好」打「Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6」（中文、马来文也行）→「帮我填好」→ AI 判断工程类型，图上标出谁会收到 →「时间」那一步系统已按邻居作息排好：避开 Siti 宝宝午睡（13–15 点）和对面 Hafiz 夜班后补眠（9–11 点），但不说是谁 → 检查后发送（还没加入的 No. 23 由物业送纸本）',
       en: 'Shortcut: press the mic at the bottom right and just say "Retiling the master bathroom from next Monday…" → the notice is filled in and waits on Review. Step by step: the renovation notice is the introduction: Works → Register renovation → in "Just say it in one sentence" type "Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6" (Malay or Chinese work too) → Fill it in for me → AI picks the type of work and the plan marks who is told → at "When" the hours are already planned around the neighbours: clear of Siti’s baby nap (1–3pm) and Hafiz’s sleep after night shifts (9–11am), without saying whose → check and send (No. 23, not on the app yet, gets it on paper)',
-      ms: 'Pintasan: tekan mikrofon di kanan bawah dan sebut sahaja "Retiling the master bathroom from next Monday…" → notis diisi dan menunggu di Semakan. Langkah demi langkah: notis ubah suai ialah perkenalan: Ubah suai → Daftar ubah suai → dalam "Cakap saja dalam satu ayat" taip "Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6" (bahasa Melayu atau Cina pun boleh) → Isikan untuk saya → AI memilih jenis kerja dan pelan menandakan siapa diberitahu → di "Bila" waktu sudah dirancang mengikut jiran: mengelakkan tidur siang bayi Siti (1–3 petang) dan tidur Hafiz selepas syif malam (9–11 pagi), tanpa menyebut milik siapa → semak dan hantar (No. 23, belum dalam app, menerimanya di atas kertas)',
+      ms: 'Pintasan: tekan mikrofon di kanan bawah dan sebut sahaja "Isnin depan saya nak tukar jubin bilik air utama, ABC Renovation, dua minggu" (skrin dalam bahasa Melayu, jadi mikrofon mendengar bahasa Melayu) → notis diisi dan menunggu di langkah Semak. Langkah demi langkah: notis ubah suai ialah perkenalan: Ubah suai → Daftar ubah suai → dalam "Cakap dalam satu ayat sahaja" taip "Retiling the master bathroom from next Monday for two weeks, weekdays 9 to 6" (bahasa Melayu atau Cina pun boleh) → Isikan untuk saya → AI memilih jenis kerja dan pelan menandakan siapa diberitahu → di "Bila" waktu sudah dirancang mengikut jiran: mengelakkan tidur siang bayi Siti (1–3 petang) dan tidur Hafiz selepas syif malam (9–11 pagi), tanpa menyebut milik siapa → semak dan hantar (No. 23, belum dalam app, menerimanya di atas kertas)',
     },
   },
   {
@@ -604,14 +604,14 @@ export const JUDGE_ROUTE: RouteStep[] = [
   {
     tab: 'evidence', unit: 'T-11',
     brief: {
-      zh: '照片：Siti 封存开工前照片（Use sample）→ Sample crack → 开工前就有：走保修，不怪 Aiman',
+      zh: '照片：Siti 封存开工前照片（「用示范照片」）→「示范裂缝」→ 开工前就有：走保修，不怪 Aiman',
       en: 'Photos: Siti seals a pre-work photo (Use sample) → Sample crack → it was there before the works: warranty, not Aiman',
-      ms: 'Foto: Siti memeterai foto sebelum kerja (Guna sampel) → Sampel retak → sudah ada sebelum kerja: waranti, bukan Aiman',
+      ms: 'Foto: Siti memeterai foto sebelum kerja (Guna contoh) → Contoh retak → sudah ada sebelum kerja: waranti, bukan Aiman',
     },
     text: {
-      zh: '万一出事：Siti 按 Use sample 封存开工前照片 → Sample crack → 系统说明裂缝开工前就有，属于保修，不是装修造成',
+      zh: '万一出事：Siti 按「用示范照片」封存开工前照片 →「示范裂缝」→ 系统说明裂缝开工前就有，属于保修，不是装修造成',
       en: 'If something goes wrong: Siti seals a pre-work photo (Use sample) → Sample crack → the crack was there before the works, so it goes to the warranty, not to Aiman',
-      ms: 'Jika berlaku masalah: Siti memeterai foto sebelum kerja (Guna sampel) → Sampel retak → retak itu sudah ada sebelum kerja, jadi ia pergi ke waranti, bukan kepada Aiman',
+      ms: 'Jika berlaku masalah: Siti memeterai foto sebelum kerja (Guna contoh) → Contoh retak → retak itu sudah ada sebelum kerja, jadi ia pergi ke waranti, bukan kepada Aiman',
     },
   },
   {
@@ -633,7 +633,7 @@ export const ROUTE: RouteStep[] = [
   {
     tab: 'circle', unit: 'T-12',
     text: {
-      zh: 'Aiman（No. 12）：看顶部头像和邻居卡片 → 对 Siti 按「👋 Wave」→ 切到「Map」→ 点 No. 15 →「Request to connect」',
+      zh: 'Aiman（No. 12）：看顶部头像和邻居卡片 → 对 Siti 按「👋 打招呼」→ 切到「地图」→ 点 No. 15 →「请求联系」',
       en: 'Aiman (No. 12): see the faces and cards → 👋 Wave at Siti → switch to Map → tap No. 15 → Request to connect',
       ms: 'Aiman (No. 12): lihat wajah dan kad → 👋 Lambai kepada Siti → tukar ke Peta → ketik No. 15 → Minta untuk berhubung',
     },
@@ -641,9 +641,9 @@ export const ROUTE: RouteStep[] = [
   {
     tab: 'works', unit: 'T-12',
     text: {
-      zh: 'Aiman：Works 右上角「Register renovation」→ 用一句话说要做什么让 AI 填（或自己选 Extension）→ 图上标出谁会被通知 → 填完发送',
+      zh: 'Aiman：「装修」页右上角「登记装修」→ 用一句话说要做什么让 AI 填（或自己选「扩建或改动结构」）→ 图上标出谁会被通知 → 填完发送',
       en: 'Aiman: Works → Register renovation → say it in one sentence for AI to fill in (or pick Extension yourself) → the plan marks who is told → send',
-      ms: 'Aiman: Ubah suai → Daftar ubah suai → sebut dalam satu ayat untuk AI isi (atau pilih Sambungan sendiri) → pelan menandakan siapa diberitahu → hantar',
+      ms: 'Aiman: Ubah suai → Daftar ubah suai → sebut dalam satu ayat untuk AI isi (atau pilih "Tambahan atau ubah struktur" sendiri) → pelan menandakan siapa diberitahu → hantar',
     },
   },
   {
@@ -657,7 +657,7 @@ export const ROUTE: RouteStep[] = [
   {
     tab: 'circle', unit: 'A-15-3',
     text: {
-      zh: '（公寓，可选）Sofia（A-15-3）：Works →「Register renovation」→ 浴室 → 剖面图显示楼下两层也被通知，A-13-3 名字隐藏',
+      zh: '（公寓，可选）Sofia（A-15-3）：「装修」→「登记装修」→「浴室、厨房或水管」→ 剖面图显示楼下两层也被通知，A-13-3 名字隐藏',
       en: '(Apartment, optional) Sofia (A-15-3): Works → Register renovation → Bathroom → two floors below are told; A-13-3 stays anonymous',
       ms: '(Pangsapuri, pilihan) Sofia (A-15-3): Ubah suai → Daftar ubah suai → Bilik air → dua tingkat di bawah diberitahu; A-13-3 kekal tanpa nama',
     },
@@ -665,15 +665,15 @@ export const ROUTE: RouteStep[] = [
   {
     tab: 'chats', unit: 'T-11', split: true, peer: 'T-12',
     text: {
-      zh: 'Siti 在 Chats 回 👋、按表情 ❤️、按快捷回复「宝宝午睡」→ 左边 Aiman 看到英文翻译；也可以按麦克风录语音',
+      zh: 'Siti 在「聊天」回 👋、按表情 ❤️、按快捷回复「宝宝午睡」→ 左边 Aiman 那边标着「译自马来文」；也可以按麦克风录语音',
       en: 'Siti waves back, reacts ❤️ and taps the baby-nap quick reply → Aiman sees it in English; the mic records a voice note',
-      ms: 'Siti melambai balik, bereaksi ❤️ dan mengetik balasan pantas tidur siang bayi → Aiman melihatnya dalam bahasa Inggeris; mikrofon merakam nota suara',
+      ms: 'Siti melambai balik, bereaksi ❤️ dan mengetik balasan pantas tidur siang bayi → Aiman menerimanya serta-merta (dengan skrin EN, dalam bahasa Inggeris dan ditanda "Translated from Bahasa Melayu"); mikrofon merakam nota suara',
     },
   },
   {
     tab: 'chats', unit: 'T-11',
     text: {
-      zh: 'Siti 按「Raise a concern」→ 选晚上施工 → 发送；Aiman 回复；Siti 再升级给 SDP 物业团队',
+      zh: 'Siti 按「反映问题」→ 选晚上施工 → 发送；Aiman 回复；Siti 再升级给 SDP 物业团队',
       en: 'Siti → Raise a concern → noise outside hours → send; Aiman replies; Siti escalates to the SDP estate team',
       ms: 'Siti → Luahkan kebimbangan → bunyi di luar waktu → hantar; Aiman membalas; Siti menaikkan kepada pasukan estet SDP',
     },
@@ -689,41 +689,41 @@ export const ROUTE: RouteStep[] = [
   {
     tab: 'evidence', unit: 'T-11',
     text: {
-      zh: 'Siti：Use sample 封存开工前照片 → Sample crack → 选 Building defect → Record decision',
+      zh: 'Siti：按「用示范照片」封存开工前照片 →「示范裂缝」→ 选「建筑瑕疵」→「记录决定」',
       en: 'Siti: Use sample to seal a pre-work photo → Sample crack → Building defect → Record decision',
-      ms: 'Siti: Guna sampel untuk memeterai foto sebelum kerja → Sampel retak → Kecacatan bangunan → Rekod keputusan',
+      ms: 'Siti: Guna contoh untuk memeterai foto sebelum kerja → Contoh retak → Kecacatan bangunan → Rekod keputusan',
     },
   },
   {
     tab: 'sdp',
     text: {
-      zh: '保修队列看 30 天法定时钟 → Sample: poor patch（系统发现裂缝还在）',
+      zh: '保修待办看 30 天法定时钟 →「示范：粗糙修补」（系统发现裂缝还在）',
       en: 'Warranty queue: note the 30-day clock → Sample: poor patch (crack still detected)',
-      ms: 'Barisan waranti: perhatikan jam 30 hari → Sampel: tampalan buruk (retak masih dikesan)',
+      ms: 'Giliran waranti: perhatikan jam 30 hari → Contoh: tampalan buruk (retak masih dikesan)',
     },
   },
   {
     tab: 'evidence', unit: 'T-11',
     text: {
-      zh: 'Siti 驳回（Not fixed）→ SDP 按 Sample: proper repair → Siti 按 Accept 关单',
+      zh: 'Siti 驳回（「没修好」）→ SDP 按「示范：妥善修复」→ Siti 按「接受」关单',
       en: 'Siti rejects (Not fixed) → SDP submits Sample: proper repair → Siti accepts and closes it',
-      ms: 'Siti menolak (Belum dibaiki) → SDP menghantar Sampel: pembaikan sempurna → Siti menerima dan menutupnya',
+      ms: 'Siti menolak (Belum dibaiki) → SDP menekan Contoh: pembaikan sempurna → Siti menerima dan menutupnya',
     },
   },
   {
     tab: 'log', unit: 'T-11',
     text: {
-      zh: '屋历：不满、升级、保修、维修、屋主确认全部在链上，显示 CHAIN CHECKED',
+      zh: '屋历：不满、升级、保修、维修、屋主确认全部在链上，显示「链条已检查」',
       en: 'Home log: concern, escalation, warranty, repair and sign-off are all chained; CHAIN CHECKED',
-      ms: 'Log rumah: kebimbangan, naik taraf, waranti, pembaikan dan pengesahan semuanya berantai; CHAIN CHECKED',
+      ms: 'Log rumah: kebimbangan, naik taraf, waranti, pembaikan dan pengesahan semuanya berantai; RANTAI DISEMAK',
     },
   },
   {
     tab: 'sdp',
     text: {
-      zh: '（加入与纸本，可选）SDP 后台 → Front desk：Aiman 的装修通知里 No. 23 还没加入 → 按 Print 看纸本通知 → Delivered；再为 No. 23 按 Issue code → 用演示按钮打开加入页 → 选名字、语言、同意隐私声明',
+      zh: '（加入与纸本，可选）SDP 后台 →「柜台」：Aiman 的装修通知里 No. 23 还没加入 → 按「列印」看纸本通知 →「已送达」；再为 No. 23 按「发码」→ 用演示按钮打开加入页 → 选名字、语言、同意隐私声明',
       en: '(Joining and paper, optional) Command view → Front desk: No. 23 isn’t on Keynection, so Aiman’s notice is on paper → Print → Delivered; then Issue code for No. 23 → open the join page (demo) → name, language, privacy consent',
-      ms: '(Menyertai dan kertas, pilihan) Paparan kawalan → Kaunter hadapan: No. 23 tiada dalam Keynection, jadi notis Aiman di atas kertas → Cetak → Dihantar; kemudian Keluarkan kod untuk No. 23 → buka halaman sertai (demo) → nama, bahasa, persetujuan privasi',
+      ms: '(Menyertai dan kertas, pilihan) Paparan kawalan → Kaunter hadapan: No. 23 tiada dalam Keynection, jadi notis Aiman di atas kertas → Cetak → Sudah dihantar; kemudian Keluarkan kod untuk No. 23 → buka halaman sertai (demo) → nama, bahasa, persetujuan privasi',
     },
   },
   {

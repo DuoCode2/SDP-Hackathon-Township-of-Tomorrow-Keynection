@@ -21,11 +21,6 @@ export function Avatar({ name, size = 36 }: { name: string; size?: number }) {
   )
 }
 
-/** "1 card", "3 cards": for SDP's English-only screens. Resident screens use t(), which reads "home(s)" the same way. */
-export function count(n: number, noun: string, plural = `${noun}s`): string {
-  return `${n.toLocaleString('en-MY')} ${n === 1 ? noun : plural}`
-}
-
 export function Skeleton({ lines = 3 }: { lines?: number }) {
   return (
     <div className="skeleton-group" aria-hidden>
@@ -181,14 +176,6 @@ export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' })
 }
 
-export function shortRange(start: string, end: string): string {
-  const s = new Date(start)
-  const e = new Date(end)
-  const month = (d: Date) => d.toLocaleDateString('en-MY', { month: 'short' })
-  return s.getMonth() === e.getMonth()
-    ? `${s.getDate()}–${e.getDate()} ${month(e)}`
-    : `${s.getDate()} ${month(s)} – ${e.getDate()} ${month(e)}`
-}
 
 // ---------- toasts ----------
 

@@ -1,0 +1,86 @@
+import type { SdpEntry } from './i18n-sdp'
+
+// The front desk and the welcome-pack sheet, in the three interface languages.
+export const FD_TEXT: Record<string, SdpEntry> = {
+  // ---------- the counter (FrontDesk) ----------
+  'sdp.fd.title': ['Front desk', 'Kaunter hadapan', '柜台'],
+  'sdp.fd.sub': ['{joined} of {n} households have joined. Staff actions are recorded under your name.', '{joined} daripada {n} isi rumah sudah menyertai. Tindakan kakitangan direkodkan atas nama anda.', '{n} 户里已有 {joined} 户加入。职员的操作都记录在你的名字下。'],
+  'sdp.fd.signedIn': ['Signed in as {staff}: actions here are recorded under this name.', 'Log masuk sebagai {staff}: tindakan di sini direkodkan atas nama ini.', '以 {staff} 身份登入：这里的操作都记录在这个名字下。'],
+  'sdp.fd.onDuty': ['Staff on duty', 'Kakitangan bertugas', '值班职员'],
+  // ---------- welcome packs ----------
+  'sdp.fd.packs.title': ['Welcome packs', 'Pek alu-aluan', '欢迎礼包'],
+  'sdp.fd.packs.sub': ["A card for every home still to join: the owner's own QR code, valid once until two weeks after their keys.", 'Satu kad untuk setiap rumah yang belum menyertai: kod QR pemilik sendiri, sah sekali guna hingga dua minggu selepas serahan kunci mereka.', '还没加入的每一户各一张卡：屋主专属的 QR 码，只能用一次，有效至交屋后两周。'],
+  'sdp.fd.packs.from': ['Keys handed over from', 'Kunci diserahkan dari', '交屋日期从'],
+  'sdp.fd.packs.until': ['Until', 'Hingga', '到'],
+  'sdp.fd.packs.confirm': ['New codes for {n} home(s). Any card printed before for these homes stops working.', 'Kod baharu untuk {n} rumah. Mana-mana kad yang dicetak sebelum ini untuk rumah-rumah ini tidak lagi berfungsi.', '为 {n} 户发新码。这些住户之前印过的卡片都会失效。'],
+  'sdp.fd.packs.make': ['Make {n} card(s)', 'Buat {n} kad', '制作 {n} 张卡'],
+  'sdp.fd.packs.none': ['No home still to join in these dates', 'Tiada rumah yang belum menyertai dalam tarikh ini', '这段日期内没有还没加入的住户'],
+  'sdp.fd.packs.button': ['Make welcome-pack cards ({n})', 'Buat kad pek alu-aluan ({n})', '制作欢迎礼包卡片（{n}）'],
+  // ---------- handover · join codes ----------
+  'sdp.fd.join.title': ['Handover · join codes', 'Serahan kunci · kod penyertaan', '交屋 · 加入码'],
+  'sdp.fd.join.sub': ['One-time code for the welcome pack. Valid 14 days; a new code cancels the old one.', 'Kod sekali guna untuk pek alu-aluan. Sah 14 hari; kod baharu membatalkan kod lama.', '放进欢迎礼包的一次性码。有效 14 天；发新码后旧码作废。'],
+  'sdp.fd.join.all': ['Every household has joined.', 'Semua isi rumah sudah menyertai.', '所有住户都已加入。'],
+  'sdp.fd.join.issued': ['Code issued · valid until {date}', 'Kod dikeluarkan · sah hingga {date}', '已发码 · 有效至 {date}'],
+  'sdp.fd.join.none': ['No code yet', 'Belum ada kod', '还没发码'],
+  'sdp.fd.join.new': ['New code', 'Kod baharu', '发新码'],
+  'sdp.fd.join.issue': ['Issue code', 'Keluarkan kod', '发码'],
+  // ---------- paper notices ----------
+  'sdp.fd.paper.title': ['Paper notices', 'Notis bercetak', '纸本通知'],
+  'sdp.fd.paper.sub': ['Renovation notices for households not on Keynection. Delivery goes into both home logs.', 'Notis ubah suai untuk isi rumah yang tiada dalam Keynection. Penghantaran direkodkan dalam log kedua-dua rumah.', '给还没加入 Keynection 的住户的装修通知。送达会写进双方屋历。'],
+  'sdp.fd.paper.emptyTitle': ['Nothing to deliver', 'Tiada apa untuk dihantar', '没有要送达的通知'],
+  'sdp.fd.paper.emptyBody': ["When a renovation notice includes a household that hasn't joined, it appears here to print.", 'Apabila notis ubah suai melibatkan isi rumah yang belum menyertai, ia akan muncul di sini untuk dicetak.', '装修通知里有还没加入的住户时，通知会出现在这里等着列印。'],
+  'sdp.fd.paper.row': ['To {label} · from {name} ({from})', 'Kepada {label} · daripada {name} ({from})', '致 {label} · 来自 {name}（{from}）'],
+  'sdp.fd.paper.notice': ['Notice', 'Notis', '通知'],
+  'sdp.fd.paper.print': ['Print', 'Cetak', '列印'],
+  'sdp.fd.paper.delivered': ['Delivered', 'Sudah dihantar', '已送达'],
+  'sdp.fd.badge.toPrint': ['To print', 'Untuk dicetak', '待列印'],
+  'sdp.fd.badge.printed': ['Printed', 'Dicetak', '已列印'],
+  'sdp.fd.badge.delivered': ['Delivered', 'Dihantar', '已送达'],
+  'sdp.fd.badge.inApp': ['Now in the app', 'Kini dalam app', '已在 app 里'],
+  // ---------- register a renovation for an owner ----------
+  'sdp.fd.reno.title': ['Register a renovation for an owner', 'Daftarkan ubah suai bagi pihak pemilik', '替屋主登记装修'],
+  'sdp.fd.reno.sub': ['For owners who prefer paper. Same rules as the app: everyone affected is told, and your name goes on record.', 'Untuk pemilik yang lebih suka kertas. Peraturan sama seperti app: semua yang terkesan diberitahu, dan nama anda direkodkan.', '给偏好纸本的屋主。规则跟 app 一样：受影响的每一户都会收到通知，你的名字会记录在案。'],
+  'sdp.fd.reno.signed': ['The owner signed the paper renovation form', 'Pemilik telah menandatangani borang ubah suai bercetak', '屋主已在纸本装修表格上签名'],
+  'sdp.fd.reno.open': ['Open the form', 'Buka borang', '打开表格'],
+  'sdp.fd.reno.mustJoin': ["Households that haven't joined must join first: Keynection needs their consent before it holds their renovation.", 'Isi rumah yang belum menyertai perlu menyertai dahulu: Keynection memerlukan persetujuan mereka sebelum menyimpan ubah suai mereka.', '还没加入的住户要先加入：Keynection 要先得到他们的同意，才能保存他们的装修。'],
+  // ---------- lost phone · re-entry code ----------
+  'sdp.fd.household': ['Household', 'Isi rumah', '住户'],
+  'sdp.fd.lost.title': ['Lost phone · re-entry code', 'Telefon hilang · kod masuk semula', '手机遗失 · 补发码'],
+  'sdp.fd.lost.sub': ["Check the owner's ID first. The code works once, for a week, and retires every old key of that home.", 'Semak ID pemilik dahulu. Kod ini berfungsi sekali, selama seminggu, dan membatalkan setiap kunci lama rumah itu.', '先核对屋主的身份证。这个码只能用一次，有效一周，并会让那一户的所有旧钥匙失效。'],
+  'sdp.fd.lost.issue': ['Issue re-entry code', 'Keluarkan kod masuk semula', '发出补发码'],
+  // ---------- close an account (owner's request) ----------
+  'sdp.fd.close.title': ["Close an account (owner's request)", 'Tutup akaun (atas permintaan pemilik)', '关闭帐户（应屋主要求）'],
+  'sdp.fd.close.sub': ["Check the owner's ID first. Their name, messages, photos, keys and notifications are deleted; records stay by unit until their time is up. Recorded under your name.", 'Semak ID pemilik dahulu. Nama, mesej, foto, kunci dan pemberitahuan mereka dipadam; rekod kekal mengikut unit sehingga tempohnya tamat. Direkodkan atas nama anda.', '先核对屋主的身份证。他们的名字、讯息、照片、钥匙和通知都会删除；纪录按门牌保留到期满。记录在你的名字下。'],
+  'sdp.fd.close.idChecked': ["I checked the owner's ID", 'Saya sudah semak ID pemilik', '我已核对屋主的身份证'],
+  'sdp.fd.close.confirm': ["This can't be undone. The household can join again later with a new join code.", 'Ini tidak boleh dibatalkan. Isi rumah ini boleh menyertai semula kemudian dengan kod penyertaan baharu.', '这个操作无法撤销。这户之后可以用新的加入码重新加入。'],
+  'sdp.fd.close.button': ['Close this account', 'Tutup akaun ini', '关闭这个帐户'],
+  'sdp.fd.close.open': ['Close account…', 'Tutup akaun…', '关闭帐户…'],
+  // ---------- add a colleague ----------
+  'sdp.fd.colleague.title': ['Add a colleague', 'Tambah rakan sekerja', '添加同事'],
+  'sdp.fd.colleague.sub': ['They get a one-time code for their first sign-in, then make their own digital key.', 'Mereka mendapat kod sekali guna untuk log masuk pertama, kemudian membuat kunci digital sendiri.', '他们会拿到一个一次性码做第一次登入，然后建立自己的数字钥匙。'],
+  'sdp.fd.colleague.role': ['Role', 'Peranan', '角色'],
+  'sdp.fd.colleague.estate': ['Estate office', 'Pejabat estet', '物业办公室'],
+  'sdp.fd.colleague.add': ['Add and show their code', 'Tambah dan tunjukkan kod mereka', '添加并显示他们的码'],
+  // ---------- the code sheet (join, re-entry and first sign-in codes) ----------
+  'sdp.fd.code.reentry': ['Re-entry code', 'Kod masuk semula', '补发码'],
+  'sdp.fd.code.staff': ['First sign-in code', 'Kod log masuk pertama', '首次登入码'],
+  'sdp.fd.code.alt': ['One-time code for {label}', 'Kod sekali guna untuk {label}', '{label} 的一次性码'],
+  'sdp.fd.code.shownJoin': ['Shown once: print it into the welcome pack. ', 'Dipaparkan sekali sahaja: cetak ke dalam pek alu-aluan. ', '只显示一次：请印进欢迎礼包。'],
+  'sdp.fd.code.shownScan': ['Shown once: let them scan it with their phone camera now. ', 'Dipaparkan sekali sahaja: minta mereka imbas dengan kamera telefon sekarang. ', '只显示一次：请他们现在就用手机相机扫描。'],
+  'sdp.fd.code.valid': ['Valid once, until {date}.', 'Sah sekali guna, hingga {date}.', '只能用一次，有效至 {date}。'],
+  'sdp.fd.code.openAs': ['Open the join page as {label} (demo)', 'Buka halaman sertai sebagai {label} (demo)', '以 {label} 的身份打开加入页（演示）'],
+  // ---------- toasts ----------
+  'sdp.fd.toast.issue': ['Could not issue a code', 'Tidak dapat mengeluarkan kod', '无法发码'],
+  'sdp.fd.toast.colleague': ['Could not add a colleague', 'Tidak dapat menambah rakan sekerja', '无法添加同事'],
+  'sdp.fd.toast.delivered': ['Delivery to {label} recorded in both home logs', 'Penghantaran kepada {label} direkodkan dalam log kedua-dua rumah', '送达 {label} 已写进双方屋历'],
+  'sdp.fd.toast.printed': ['Marked as printed', 'Ditandakan sebagai dicetak', '已标记为已列印'],
+  'sdp.fd.toast.update': ['Could not update', 'Tidak dapat mengemas kini', '无法更新'],
+  'sdp.fd.toast.cards': ['Could not make the cards', 'Tidak dapat membuat kad', '无法制作卡片'],
+  'sdp.fd.toast.closed': ['{label}: account closed. Records stay by unit until their time is up.', '{label}: akaun ditutup. Rekod kekal mengikut unit sehingga tempohnya tamat.', '{label}：帐户已关闭。纪录按门牌保留到期满。'],
+  'sdp.fd.toast.close': ['Could not close the account', 'Tidak dapat menutup akaun', '无法关闭帐户'],
+  // ---------- welcome-pack cards to print (WelcomeSheet): the on-screen bar only; the printed card is already in three languages ----------
+  'sdp.ws.dialog': ['Welcome-pack cards', 'Kad pek alu-aluan', '欢迎礼包卡片'],
+  'sdp.ws.count': ['{n} welcome-pack card(s) · {phase}', '{n} kad pek alu-aluan · {phase}', '{n} 张欢迎礼包卡片 · {phase}'],
+  'sdp.ws.once': ['Each code works once. Print now: the codes are not shown again.', 'Setiap kod berfungsi sekali sahaja. Cetak sekarang: kod tidak akan dipaparkan lagi.', '每个码只能用一次。请现在列印：这些码不会再显示。'],
+  'sdp.ws.alt': ['Join code for {label}', 'Kod penyertaan untuk {label}', '{label} 的加入码'],
+}

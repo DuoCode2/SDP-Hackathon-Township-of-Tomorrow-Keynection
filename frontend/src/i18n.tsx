@@ -1,15 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, onErrorText, type Lang } from './api'
 import { remember, remembered } from './storage'
+import { SDP_TEXT } from './i18n-sdp'
 
-// Interface language for the resident screens: English, Bahasa Melayu, 中文. That includes Evidence (photos, cases,
-// repairs), where residents make decisions. Works, the home log and SDP's screens are still English. Whatever the
-// screen language, what is stored stays as written, so the record reads the same for SDP and the Tribunal.
+// Interface language for every screen: English, Bahasa Melayu, 中文. That includes Evidence (photos, cases, repairs),
+// where residents make decisions, and SDP's own screens (i18n-sdp.ts). Whatever the screen language, what is stored
+// stays as written, so the record reads the same for SDP and the Tribunal.
 
 export type UiLang = 'en' | 'ms' | 'zh'
 type Entry = [en: string, ms: string, zh: string]
 
 const D: Record<string, Entry> = {
+  ...SDP_TEXT,  // SDP's screens: i18n-sdp.ts
   // navigation and chrome
   'group.resident': ['Resident', 'Penduduk', '住户'],
   'group.trust': ['Trust', 'Kepercayaan', '信任'],
@@ -87,6 +89,7 @@ const D: Record<string, Entry> = {
   'ring2.more': ['Show all {n} homes on {place}', 'Tunjukkan semua {n} rumah di {place}', '显示 {place} 全部 {n} 户'], 'ring2.less': ['Show the nearest levels only', 'Tunjukkan tingkat terdekat sahaja', '只显示最近的楼层'],
   'ring2.nearLevels': ['Your level and the ones above and below', 'Tingkat anda serta di atas dan di bawah', '你这层和上下各一层'],
   'status.requested': ['Requested', 'Sudah diminta', '已请求'], 'status.wantsConnect': ['Wants to connect', 'Mahu berhubung', '想联系你'], 'status.closed': ['Closed', 'Ditutup', '已关闭'],
+  'place.demoPhase': ['Taman Demo · Phase 1', 'Taman Demo · Fasa 1', 'Taman Demo · 第 1 期'],
   'map.sub': ['Tap a home to see what you may do', 'Ketik rumah untuk lihat apa yang boleh dibuat', '点房子看你可以做什么'],
   'legend.you': ['You', 'Anda', '你'], 'legend.circle': ['Circle', 'Bulatan', '邻里圈'], 'legend.wall': ['Shared wall / slab', 'Dinding / lantai berkongsi', '共用墙／楼板'],
   'legend.works': ['Works you were told about', 'Kerja yang dimaklumkan', '通知过你的装修'],
@@ -501,9 +504,9 @@ const D: Record<string, Entry> = {
   'me.seeNobody': ['Nobody', 'Tiada sesiapa', '没有人'], 'me.seeNobodyBody': ['Surname, phone, email, unless you both agree to exchange numbers', 'Nama keluarga, telefon, e-mel, kecuali anda berdua bersetuju menukar nombor', '姓氏、电话、电邮（除非双方同意交换号码）'],
   'me.blocked': ['Blocked', 'Disekat', '已封锁'], 'me.blockedSub': ['They aren’t told. Formal notices and concerns stay on record.', 'Mereka tidak diberitahu. Notis rasmi dan kebimbangan tetap direkodkan.', '对方不会知道，正式通知和问题照样留下纪录。'],
   'me.noneBlocked': ['Nobody blocked.', 'Tiada yang disekat.', '没有封锁任何人。'], 'me.unblocked': ['{name} is unblocked', '{name} dinyahsekat', '已解除封锁 {name}'],
-  'me.shortcuts': ['Shortcuts', 'Pintasan', '捷径'], 'me.myLog': ['My home log', 'Log rumah saya', '我的屋历'], 'me.safe': ['How Keynection keeps you safe', 'Bagaimana Keynection melindungi anda (dalam bahasa Inggeris)', 'Keynection 怎样保护你（英文）'],
-  'me.welcomeAgain': ['Show the first-day tour again', 'Tunjuk pengenalan hari pertama semula', '再看一次入住介绍'], 'me.sdp': ['SDP command view (demo)', 'Paparan kawalan SDP (demo, bahasa Inggeris)', 'SDP 管理后台（演示，英文）'],
-  'me.impact': ['SDP impact model (demo)', 'Model impak SDP (demo, bahasa Inggeris)', 'SDP 影响估算（演示，英文）'], 'me.channels': ['How Keynection reaches residents (demo)', 'Cara Keynection sampai kepada penduduk (demo, bahasa Inggeris)', 'Keynection 怎么触达住户（演示，英文）'],
+  'me.shortcuts': ['Shortcuts', 'Pintasan', '捷径'], 'me.myLog': ['My home log', 'Log rumah saya', '我的屋历'], 'me.safe': ['How Keynection keeps you safe', 'Bagaimana Keynection melindungi anda', 'Keynection 怎样保护你'],
+  'me.welcomeAgain': ['Show the first-day tour again', 'Tunjuk pengenalan hari pertama semula', '再看一次入住介绍'], 'me.sdp': ['SDP command view (demo)', 'Paparan kawalan SDP (demo)', 'SDP 管理后台（演示）'],
+  'me.impact': ['SDP impact model (demo)', 'Model impak SDP (demo)', 'SDP 影响估算（演示）'], 'me.channels': ['How Keynection reaches residents (demo)', 'Cara Keynection sampai kepada penduduk (demo)', 'Keynection 怎么触达住户（演示）'],
   'helpers.title': ['Family helpers', 'Pembantu keluarga', '家人代办'],
   'helpers.sub': ['Let a family member use Keynection for you. Everything they do is recorded under their name.', 'Benarkan ahli keluarga menggunakan Keynection untuk anda. Semua tindakan mereka direkodkan atas nama mereka.', '授权家人替你使用 Keynection，他们做的每件事都会以他们的名字记录。'],
   'helpers.none': ['No helpers yet.', 'Belum ada pembantu.', '还没有代办人。'], 'helpers.max': ['Up to 2 helpers.', 'Sehingga 2 pembantu.', '最多 2 位。'],
@@ -522,7 +525,7 @@ const D: Record<string, Entry> = {
   'data.note': ['Other residents appear by unit only. Voice messages are deleted after 30 days.', 'Penduduk lain dipaparkan mengikut unit sahaja. Mesej suara dipadam selepas 30 hari.', '其他住户只以门牌显示；语音讯息会在 30 天后删除。'],
   'data.leave': ['Leaving Keynection removes your profile and chats; the home log stays with the unit as part of the property’s record.', 'Meninggalkan Keynection membuang profil dan sembang anda; log rumah kekal bersama unit sebagai rekod hartanah.', '退出 Keynection 会删除你的资料和聊天；屋历会留在这间房子，作为房产纪录。'],
 
-  // new SDP pages (nav only: the pages themselves are records screens, in English)
+  // SDP's pages (their own text is in i18n-sdp.ts)
   'group.sdp': ['Sime Darby Property', 'Sime Darby Property', 'Sime Darby Property'],
   'nav.planner': ['Phase setup', 'Tetapan fasa', '新 phase 设定'], 'nav.planner.sub': ['Circles from the site plan', 'Bulatan daripada pelan tapak', '从平面图算出邻里圈'], 'nav.planner.short': ['Setup', 'Tetapan', '设定'],
   'nav.impact': ['Impact model', 'Model impak', '影响估算'], 'nav.impact.sub': ['Assumptions you can change', 'Andaian yang boleh diubah', '可以调整的假设'], 'nav.impact.short': ['Impact', 'Impak', '影响'],
@@ -1259,7 +1262,7 @@ export function refusal(e: unknown): string | null {
 /** A translator fixed to one language, e.g. a printed notice in the recipient's language. */
 export const tIn = (lang: Lang): Translate => (k, v) => translate(lang, k, v)
 
-/** English only: for the records screens and the SDP side, whatever the interface language. */
+/** English only: for the records screens, whatever the interface language. */
 export const tEn: Translate = (k, v) => translate('en', k, v)
 
 /** "Adam (child)" from the server, with the relationship in the reader's language. */
@@ -1299,7 +1302,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
   return <LangContext.Provider value={{ lang, setLang, t }}>{children}</LangContext.Provider>
 }
 
-/** SDP-side screens that reuse a resident component (e.g. the renovation form at the front desk) stay in English. */
+/** A records form reused by the estate office (the renovation form at the front desk) stays in English. */
 export function EnglishOnly({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({ lang: 'en' as UiLang, setLang: () => {}, t: tEn }), [])
   return <LangContext.Provider value={value}>{children}</LangContext.Provider>
