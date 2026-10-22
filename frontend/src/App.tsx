@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Building2, Calculator, Camera, CalendarClock, CircleUserRound, Columns2, Compass, Grid3x3, HandHeart, Hexagon, Languages, LayoutDashboard, LogOut, MessagesSquare, Network, ShieldHalf, Smartphone } from 'lucide-react'
+import { Building2, Calculator, Camera, CalendarClock, CircleUserRound, Columns2, Compass, Grid3x3, HandHeart, Hexagon, Languages, LayoutDashboard, LogOut, MessagesSquare, Network, ShieldHalf, Smartphone, Type } from 'lucide-react'
 import { api, onReachability, setPhaseId, type AuthMe, type PhaseInfo, type UnitInfo } from './api'
 import { forgetThisPhone, onOpenTab, syncPush } from './push'
 import { remember, remembered } from './storage'
@@ -178,6 +178,12 @@ function Gate() {
   )
 }
 
+// The screen the demo was on, if it is one a pane can show.
+function storedTab(): TabId | null {
+  const kept = remembered('tab')
+  return kept && ALL.some((i) => i.id === kept) ? (kept as TabId) : null
+}
+
 const PHASE = 'keynection.phase'
 function storedPhase(): string | null {
   try {
@@ -192,7 +198,7 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
   const place = usePlace()
   const dates = useDates()
   const [units, setUnits] = useState<UnitInfo[]>([])
-  const [panes, setPanes] = useState<PaneState[]>([{ me: pinned ?? embed ?? 'T-12', tab: 'circle' }])
+  const [panes, setPanes] = useState<PaneState[]>(() => [{ me: pinned ?? embed ?? remembered('me') ?? 'T-12', tab: (!pinned && !embed && storedTab()) || 'circle' }])
   const [active, setActive] = useState(0)
   const [offline, setOffline] = useState(false)
   const [guideOpen, setGuideOpen] = useState(() => !pinned && !embed && window.matchMedia(WIDE).matches)
@@ -213,6 +219,19 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
   useEffect(() => {
     api.units().then((u) => setUnits(u)).catch(() => {})
   }, [version])
+  // Demo: the household and screen in the focused pane are remembered, so a reload (a cold start, a judge's refresh)
+  // comes back where they were instead of at Aiman's neighbours. A pilot's sign-in fixes the household anyway.
+  const focused = panes[Math.min(active, panes.length - 1)]
+  useEffect(() => {
+    if (pinned || embed) return
+    remember('me', focused.me)
+    remember('tab', focused.tab)
+  }, [pinned, embed, focused.me, focused.tab])
+  // A remembered household that no longer exists (another phase's data) falls back to the story's lead.
+  useEffect(() => {
+    if (pinned || embed || units.length === 0) return
+    setPanes((ps) => (ps.every((p) => units.some((u) => u.id === p.me)) ? ps : [{ me: 'T-12', tab: 'circle' }]))
+  }, [units, pinned, embed])
   // Pilot: a tapped notification opens its screen.
   useEffect(() => {
     if (!pinned) return
@@ -348,7 +367,8 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
 
   if (opening) {
     return <OpeningView units={units} onPick={(id) => setPanes([{ me: id, tab: 'circle' }])}
-      onDone={() => { remember('opening.done', '1'); setOpening(false) }} />
+      onDone={() => { remember('opening.done', '1'); setOpening(false) }}
+      onNext={() => { remember('opening.done', '1'); setOpening(false); setPanes((ps) => [{ ...ps[0], tab: 'works', peer: undefined }]) }} />
   }
 
   return (
@@ -379,7 +399,7 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
             <Avatar name={curUnit.resident_name} size={40} />
             <span className="grow">
               <small>{t('side.home')}</small>
-              <b>{curUnit.resident_name} · {curUnit.label}</b>
+              <b>{curUnit.joined ? `${curUnit.resident_name} · ${curUnit.label}` : curUnit.label}</b>
               <em>{t('side.keys', { date: dates.date(curUnit.handover_date) })}</em>
             </span>
           </button>
@@ -603,6 +623,11 @@ function Pane({ index, pane, units, active, split, version, onChange, onFocus, o
   const tab = (t: TabId) => onUpdate({ tab: t, peer: undefined })
   const screen = me && (
     <div key={`${pane.tab}-${pane.me}`} className={`screen-wrap ${easy ? 'easy' : ''}`}>
+      {easy && (
+        <button className="easy-tag" onClick={() => tab('me')} title={t('easy.tagSub')}>
+          <Type size={14} /> <b>{t('easy.tag')}</b> <small>{t('easy.tagSub')}</small>
+        </button>
+      )}
       {helper && (
         <div className="helper-banner" role="status">
           <HandHeart size={17} />

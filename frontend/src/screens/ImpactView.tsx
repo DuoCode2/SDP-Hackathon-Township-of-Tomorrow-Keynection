@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Calculator, Clock4, Info, MessageSquareWarning, Scale, Users, Wallet } from 'lucide-react'
+import { api } from '../api'
 import { Card, CardHead, ScreenTitle } from '../ui'
 import { PLANNER_HOMES } from './PlannerView'
 import { remembered } from '../storage'
@@ -22,7 +23,7 @@ const CENSUS = [
 type Input = { key: string; label: string; unit: string; value: number; min: number; max: number; step: number; note: string }
 
 const INPUTS: Input[] = [
-  { key: 'homes', label: 'Homes in the phase', unit: 'homes', value: 1000, min: 10, max: 5000, step: 10, note: 'From Phase setup, or type your own' },
+  { key: 'homes', label: 'Homes in the phase', unit: 'homes', value: 1000, min: 10, max: 5000, step: 10, note: 'The phase on screen, or the last Phase setup; type your own to size a bigger one' },
   { key: 'cut', label: 'Cut in "no contact with a neighbour"', unit: '%', value: 50, min: 0, max: 100, step: 5, note: 'Pilot target, to be replaced by the survey result; checked with the census question at handover and six months later' },
   { key: 'disputes', label: 'Defect claims where the cause is disputed, per 100 homes', unit: 'claims', value: 3, min: 0, max: 50, step: 1, note: 'Assumption: “my neighbour’s works or a building defect?”' },
   { key: 'disputeHours', label: 'Staff time per disputed claim', unit: 'hours', value: 8, min: 0, max: 80, step: 1, note: 'Assumption' },
@@ -55,6 +56,16 @@ const num = (n: number) => Math.round(n).toLocaleString('en-MY')
 /** What Keynection changes in a phase's first two years: neighbour connection first, then what it could save SDP. */
 export default function ImpactView() {
   const [v, setV] = useState<Record<string, number>>(initial)
+  // Without a Phase setup to go by, the model sizes itself to the phase on screen, so its household counts match the
+  // command view (Taman Demo: 42 homes) instead of an example thousand.
+  useEffect(() => {
+    if (remembered(PLANNER_HOMES)) return
+    let live = true
+    api.units().then((u) => { if (live && u.length > 0) setV((x) => ({ ...x, homes: u.length })) }).catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [])
   const [state, setState] = useState<(typeof CENSUS)[number]['key']>('selangor')
   const p = (k: string) => v[k] / 100
   const census = CENSUS.find((c) => c.key === state) ?? CENSUS[0]

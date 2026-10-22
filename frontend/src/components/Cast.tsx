@@ -77,7 +77,9 @@ export default function CastPicker({ units, me, onPick, compact = false }: {
           <div className="cast-title">{t('cast.others')}</div>
           <div className="cast-grid">
             {units.filter((u) => !CAST.includes(u.id)).map((u) => (
-              <button key={u.id} className={u.id === me ? 'on' : ''} onClick={() => pick(u.id)} title={`${u.label} · ${u.resident_name}`}>
+              // A home that hasn't joined has no screens to look at (the story says No. 23 gets paper notices): greyed, not pickable.
+              <button key={u.id} className={`${u.id === me ? 'on' : ''} ${u.joined ? '' : 'off'}`} onClick={() => pick(u.id)} disabled={!u.joined}
+                title={u.joined ? `${u.label} · ${u.resident_name}` : t('cast.notJoinedPick')} aria-label={u.joined ? `${u.label} · ${u.resident_name}` : `${u.label} · ${t('cast.notJoined')}`}>
                 {u.kind === 'terrace' ? u.label.replace('No. ', '') : u.label.slice(2)}
                 <small>{u.joined ? u.resident_name : t('cast.notJoined')}</small>
               </button>

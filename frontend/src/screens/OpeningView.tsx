@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
-import { ScanLine } from 'lucide-react'
+import { ArrowRight, Hammer, ScanLine } from 'lucide-react'
 import { api, type Directory, type UnitInfo } from '../api'
 import { CAST, roleOf } from '../components/Cast'
 import { Logo } from '../components/Art'
@@ -10,16 +10,18 @@ import { Avatar, useCelebrate, useToast } from '../ui'
 
 /** Key day, the demo's first minute: the card that came with the keys, who you are, and the homes around you lighting
  *  up on the plan. Shown once per browser (opening.done); Skip is always there. A pilot has the real join page instead. */
-export default function OpeningView({ units, onPick, onDone }: {
+export default function OpeningView({ units, onPick, onDone, onNext }: {
   units: UnitInfo[]
   /** The household the judge picked: the app opens as them. */
   onPick: (unitId: string) => void
   onDone: () => void
+  /** After the first wave: straight to the renovation notice, the route's second step. */
+  onNext: () => void
 }) {
   const t = useT()
   const toast = useToast()
   const celebrate = useCelebrate()
-  const [step, setStep] = useState<'card' | 'who' | 'reveal'>('card')
+  const [step, setStep] = useState<'card' | 'who' | 'reveal' | 'next'>('card')
   const [qr, setQr] = useState<string | null>(null)
   const [me, setMe] = useState<UnitInfo | null>(null)
   const [dir, setDir] = useState<Directory | null>(null)
@@ -52,7 +54,8 @@ export default function OpeningView({ units, onPick, onDone }: {
     } catch (e) {
       toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     }
-    onDone()
+    // The hello is sent; one card says where the story goes next, so nobody has to find the Guide to learn it.
+    setStep('next')
   }
 
   return (
@@ -97,6 +100,20 @@ export default function OpeningView({ units, onPick, onDone }: {
                 </button>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {step === 'next' && me && (
+        <div className="opening-step">
+          <div className="opening-next">
+            <span className="opening-next-icon"><Hammer size={22} /></span>
+            <h1>{t('open.next')}</h1>
+            <p className="muted">{t('open.nextSub')}</p>
+          </div>
+          <div className="opening-actions">
+            <button className="btn btn-primary" onClick={onNext}>{t('open.nextGo')} <ArrowRight size={16} /></button>
+            <button className="btn" onClick={onDone}>{t('open.nextStay')}</button>
           </div>
         </div>
       )}

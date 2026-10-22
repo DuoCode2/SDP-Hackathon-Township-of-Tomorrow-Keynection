@@ -82,6 +82,8 @@ const D: Record<string, Entry> = {
   'wave.off': ['Waves turned off', 'Lambaian dimatikan', '对方关闭了打招呼'],
   'section.ring2': ['On {place} · by request', 'Di {place} · melalui permintaan', '{place} · 需要请求'],
   'ring2.note': ['Not in your circle, so names stay private. Ask to connect with a reason; you can talk once they accept.', 'Bukan dalam bulatan anda, jadi nama dirahsiakan. Minta untuk berhubung dengan alasan; anda boleh berbual selepas mereka terima.', '不在你的邻里圈，所以名字保密。写原因请求联系，对方接受后才能聊天。'],
+  'ring2.more': ['Show all {n} homes on {place}', 'Tunjukkan semua {n} rumah di {place}', '显示 {place} 全部 {n} 户'], 'ring2.less': ['Show the nearest levels only', 'Tunjukkan tingkat terdekat sahaja', '只显示最近的楼层'],
+  'ring2.nearLevels': ['Your level and the ones above and below', 'Tingkat anda serta di atas dan di bawah', '你这层和上下各一层'],
   'status.requested': ['Requested', 'Sudah diminta', '已请求'], 'status.wantsConnect': ['Wants to connect', 'Mahu berhubung', '想联系你'], 'status.closed': ['Closed', 'Ditutup', '已关闭'],
   'map.sub': ['Tap a home to see what you may do', 'Ketik rumah untuk lihat apa yang boleh dibuat', '点房子看你可以做什么'],
   'legend.you': ['You', 'Anda', '你'], 'legend.circle': ['Circle', 'Bulatan', '邻里圈'], 'legend.wall': ['Shared wall / slab', 'Dinding / lantai berkongsi', '共用墙／楼板'],
@@ -195,6 +197,9 @@ const D: Record<string, Entry> = {
   'open.hi': ['Hi {name}, these {n} homes share a wall or a road with yours', 'Hai {name}, {n} rumah ini berkongsi dinding atau jalan dengan rumah anda', '{name} 你好，这 {n} 户跟你家共用墙或同一条路'],
   'open.hiApartment': ['Hi {name}, these {n} homes share a wall, a floor or a ceiling with yours', 'Hai {name}, {n} rumah ini berkongsi dinding, lantai atau siling dengan rumah anda', '{name} 你好，这 {n} 户跟你家共用墙、地板或天花板'],
   'open.wave': ['👋 Wave at {name}', '👋 Lambai kepada {name}', '👋 跟 {name} 打招呼'],
+  'open.next': ['Next: your renovation notice is your first introduction', 'Seterusnya: notis ubah suai anda ialah perkenalan pertama', '下一步：你的装修通知就是第一次自我介绍'],
+  'open.nextSub': ['Say what you are doing in one sentence. The plan decides who is told, and the noisy hours are planned around their quiet times.', 'Nyatakan apa yang anda buat dalam satu ayat. Pelan menentukan siapa diberitahu, dan waktu bising dirancang mengikut waktu senyap mereka.', '一句话说清楚你要做什么。图纸决定通知谁，吵闹时段会避开他们的安静时间。'],
+  'open.nextGo': ['Go to Works', 'Pergi ke Ubah suai', '去装修页'], 'open.nextStay': ['Stay with my neighbours', 'Kekal dengan jiran saya', '先留在邻居页'],
   'welcome.later': ['Look around first', 'Lihat-lihat dahulu', '先看看'], 'welcome.hello': ['Say hello to them', 'Tegur mereka', '跟他们打招呼'],
   'welcome.privacy': ['Only these neighbours see your first name. Your phone number stays private.', 'Hanya jiran ini nampak nama pertama anda. Nombor telefon anda kekal rahsia.', '只有这些邻居看得到你的名字，你的电话号码保密。'],
 
@@ -371,6 +376,10 @@ const D: Record<string, Entry> = {
   'thread.quick': ['Quick reply', 'Balasan pantas', '快捷回复'], 'thread.sentBy': ['sent by {who}', 'dihantar oleh {who}', '由 {who} 代发'],
   'thread.voiceExpired': ['Voice message deleted after 30 days', 'Mesej suara dipadam selepas 30 hari', '语音讯息已在 30 天后删除'],
   'thread.exchanged': ['Numbers exchanged', 'Nombor telah ditukar', '已交换号码'], 'thread.willAsk': ['{name} will be asked to agree', '{name} akan diminta bersetuju', '会请 {name} 同意'],
+  'thread.exchangeAsk': ['Ask {name} to exchange numbers?', 'Minta {name} tukar nombor?', '要请 {name} 交换电话号码吗？'],
+  'thread.exchangeAskBody': ['Nothing is sent until you confirm. {name} is asked to agree; numbers appear to both of you only after that, and either of you can stop sharing later from Me.', 'Tiada apa yang dihantar sehingga anda sahkan. {name} akan diminta bersetuju; nombor muncul kepada anda berdua hanya selepas itu, dan sesiapa boleh berhenti berkongsi kemudian dari Saya.', '确认前不会发出任何请求。会先请 {name} 同意，之后你们才看得到彼此的号码；以后任何一方都可以在「我」里停止分享。'],
+  'thread.exchangeGo': ['Ask {name}', 'Minta {name}', '请 {name} 同意'],
+  'thread.reportLast': ['Report a message from {name}', 'Laporkan mesej daripada {name}', '检举 {name} 的讯息'], 'thread.reportNone': ['Nothing from {name} to report yet', 'Tiada mesej daripada {name} untuk dilaporkan', '{name} 还没有可检举的讯息'],
   'thread.blockedToast': ['{name} is blocked. They won’t be told.', '{name} disekat. Mereka tidak akan diberitahu.', '已封锁 {name}，对方不会知道。'],
   'thread.youBlocked':['You blocked {name}.', 'Anda menyekat {name}.', '你封锁了 {name}。'],
   'private.title': ['Keep contact details private', 'Rahsiakan butiran hubungan', '联系方式请保密'],
@@ -489,6 +498,7 @@ const D: Record<string, Entry> = {
   'nj.paper': ['Not on Keynection: the estate office delivers a paper notice', 'Belum di Keynection: pejabat estet menghantar notis bercetak', '还没加入：由物业办公室送纸本通知'],
   'nj.welcome': ['{n} of these homes isn’t on Keynection yet. The estate office gives them your notices on paper.', '{n} daripada rumah ini belum di Keynection. Pejabat estet menyampaikan notis anda secara bercetak.', '其中 {n} 户还没加入 Keynection，物业办公室会把你的通知印出来交给他们。'],
   'cast.notJoined': ['Not joined yet', 'Belum menyertai', '还没加入'],
+  'cast.notJoinedPick': ['Not on Keynection yet, so there is nothing to see as them. The estate office gives them notices on paper.', 'Belum di Keynection, jadi tiada apa untuk dilihat sebagai mereka. Pejabat estet memberi mereka notis bercetak.', '还没加入 Keynection，所以没有他们的画面可看。物业办公室会把通知印给他们。'],
 
   // joining at handover
   'join.eyebrow': ['Welcome to {phase}', 'Selamat datang ke {phase}', '欢迎来到 {phase}'],
@@ -591,6 +601,7 @@ const D: Record<string, Entry> = {
   'me.easy': ['Easy mode', 'Mod mudah', '简易模式'],
   'me.easySub': ['Bigger text and buttons, fewer options. Only you see this setting.', 'Teks dan butang lebih besar, pilihan lebih sedikit. Hanya anda nampak tetapan ini.', '字和按钮更大、选项更少，只有你看得到这个设定。'],
   'me.easyOn': ['Easy mode on', 'Mod mudah dihidupkan', '已开启简易模式'], 'me.easyOff': ['Easy mode off', 'Mod mudah dimatikan', '已关闭简易模式'],
+  'easy.tag': ['Easy mode', 'Mod mudah', '简易模式'], 'easy.tagSub': ['Bigger text, fewer options · change it in Me', 'Teks lebih besar, pilihan lebih sedikit · tukar di Saya', '字更大、选项更少 · 到「我」里更改'],
   'me.wa': ['WhatsApp alerts', 'Notifikasi WhatsApp', 'WhatsApp 通知'],
   'me.waSub': ['Short alerts from the Keynection account. What neighbours write stays in Keynection.', 'Notifikasi ringkas daripada akaun Keynection. Apa yang ditulis jiran kekal dalam Keynection.', '来自 Keynection 帐号的简短通知，邻居写的内容留在 Keynection。'],
 

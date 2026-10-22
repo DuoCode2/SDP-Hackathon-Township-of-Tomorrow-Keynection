@@ -91,6 +91,12 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
 
   const circle = (dir?.circle ?? []) as Member[]
   const nearby = dir?.nearby ?? []
+  // A block lists every other home on it (Sofia sees 19): the nearest levels first, the rest behind one button.
+  // Anyone already in touch stays in view. A terrace row is short enough to show whole.
+  const [allNearby, setAllNearby] = useState(false)
+  const nearLevel = (h: NearbyHome) => me.kind !== 'apartment' || h.contact !== 'none' || (h.floor != null && me.floor != null && Math.abs(h.floor - me.floor) <= 1)
+  const nearbyShown = allNearby ? nearby : nearby.filter(nearLevel)
+  const nearbyHidden = nearby.length - nearbyShown.length
   const works = new Set(dir?.works ?? [])
   const names: Record<string, string> = { [me.id]: me.resident_name }
   circle.forEach((n) => { names[n.id] = n.resident_name })
@@ -223,8 +229,9 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
           {showAll && <>
           <div className="section-label ring2-label">{t('section.ring2', { place: dir.ring2_label })}</div>
           <p className="ring2-note"><Lock size={12} /> {t('ring2.note')}</p>
+          {nearbyHidden > 0 && <div className="section-sub">{t('ring2.nearLevels')}</div>}
           <div className="nearby-grid">
-            {nearby.map((h) => (
+            {nearbyShown.map((h) => (
               <div key={h.id} className={`nearby ${h.contact}`}>
                 <span className="unit-chip">{h.kind === 'terrace' ? h.label.replace('No. ', '') : `${h.floor}-${h.pos}`}</span>
                 <span className="grow">
@@ -239,6 +246,11 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
               </div>
             ))}
           </div>
+          {(nearbyHidden > 0 || (allNearby && me.kind === 'apartment' && nearby.some((h) => !nearLevel(h)))) && (
+            <button className="btn btn-sm nearby-more" onClick={() => setAllNearby((v) => !v)} aria-expanded={allNearby}>
+              {allNearby ? t('ring2.less') : t('ring2.more', { n: nearby.length, place: dir.ring2_label })}
+            </button>
+          )}
           </>}
         </>
       ) : (
