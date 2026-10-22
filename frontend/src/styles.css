@@ -1453,7 +1453,6 @@ button.ring-row:hover { background: var(--surface-2); }
 .person-card.off .person-status { color: var(--muted); }
 .person-card.off .person-bio { display: block; -webkit-line-clamp: unset; overflow: visible; }
 .welcome-door.off .avatar { filter: grayscale(1); opacity: 0.6; box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--line-2); }
-.welcome-nj { max-width: 460px; font-size: 12.5px; color: var(--text-2); line-height: 1.5; }
 .pick:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* ---------- joining at handover ---------- */
@@ -2032,25 +2031,42 @@ button.ring-row:hover { background: var(--surface-2); }
 .nearby-more { align-self: flex-start; }
 
 /* ---------- the first-day tour ---------- */
-.tour { display: flex; flex-direction: column; gap: 10px; }
+/* One height for all four cards, and the buttons pinned to the bottom of the sheet: on a screen too short for a card,
+   the card scrolls under them instead of pushing them off the screen. The sheet's bottom padding moves into the footer. */
+.sheet.tour-sheet { height: min(88%, 720px); padding-bottom: 0; }
+.tour { flex: 1 0 auto; display: flex; flex-direction: column; gap: 10px; }
 .tour-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .tour-dots { display: inline-flex; gap: 6px; }
 .tour-dots button { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 50%; background: var(--line-2); transition: background 160ms, transform 160ms; }
 .tour-dots button.on { background: var(--accent); transform: scale(1.25); }
 .tour-skip { font-size: 12.5px; color: var(--muted); }
-.tour-card { animation: enter 220ms var(--ease) both; }
+.tour-card { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; animation: enter 220ms var(--ease) both; }
 .tour-plain { padding-top: 18px; padding-bottom: 10px; }
 .tour-plain > p { max-width: 460px; }
 .tour-icon { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 22px; color: #fff; animation: pop 400ms var(--ease) both; }
 .tour-icon.works { background: linear-gradient(135deg, var(--works-2), var(--works)); box-shadow: 0 12px 24px -12px color-mix(in srgb, var(--works) 70%, transparent); }
 .tour-icon.photos { background: var(--grad-strong); box-shadow: var(--glow); }
 .tour-icon.ask { background: var(--brand-grad); box-shadow: var(--brand-glow); }
-.tour-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--line); }
+.tour-foot { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 0 calc(18px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--paper); }
 .tour-foot > .small { flex: 1; text-align: center; }
 .tour-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 @media (max-width: 599.98px) {
   .tour-foot > .small { display: none; }
   .tour-actions { margin-left: auto; }
+  /* Back is an arrow on a phone, so Back, the card's own button and Next stay on one line in Malay too. */
+  .tour-foot .btn { padding: 0 14px; }
+  .tour-foot .tour-back { width: 42px; padding: 0; }
+  .tour-back span { display: none; }
+  /* Card one on a phone: the doors in one row (in two, the second one hid under the buttons, No. 23's note with it). */
+  .tour .welcome-doors { flex-wrap: nowrap; gap: 6px; margin: 4px 0 2px; }
+  .tour .welcome-door { width: auto; flex: 1 1 0; min-width: 0; }
+  .tour .welcome-door .avatar { zoom: 0.75; }
+  .tour .welcome-door b { font-size: 12.5px; }
+  .tour .welcome-door small { font-size: 10.5px; }
+}
+@media (min-width: 900px) {
+  .sheet.tour-sheet { height: min(88vh, 600px); }
 }
 
 /* the Guide's door to the resident's tour */

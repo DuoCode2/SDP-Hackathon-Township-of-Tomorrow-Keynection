@@ -18,7 +18,7 @@ export interface PageGuide {
 export const UI: Record<string, Text> = {
   guide: { zh: '功能导览', en: 'Guide', ms: 'Panduan' },
   thisPage: { zh: '这一页', en: 'This page', ms: 'Halaman ini' },
-  tourBtn: { zh: '打开住户的第一天导览', en: 'Open the resident’s first-day tour', ms: 'Buka lawatan hari pertama penduduk' },
+  tourBtn: { zh: '打开住户的入住介绍', en: 'Open the resident’s first-day tour', ms: 'Buka pengenalan hari pertama penduduk' },
   residentTour: { zh: '新住户在手机上看到的那四张卡：邻居、装修、拍照、助手', en: 'The four cards a new owner sees on their phone: neighbours, works, the photo, the assistant', ms: 'Empat kad yang dilihat pemilik baharu di telefon: jiran, kerja, foto, pembantu' },
   features: { zh: '可以做什么', en: 'What you can do', ms: 'Apa yang boleh dibuat' },
   why: { zh: '为什么重要', en: 'Why it matters', ms: 'Mengapa ia penting' },
@@ -95,7 +95,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         '邻居卡片：名字、门牌、跟你的关系（共用墙、楼上楼下）、语言、一句自我介绍，按「Message」或「👋 Wave」',
         '「Introduce yourself」：一次跟还没认识的邻居打招呼（三步流程，要勾同意才能发）',
         '同一条 lorong 或同一栋（像「你可能认识的人」）：只看到门牌，按「Request」写原因，对方接受才看到名字、才能聊',
-        '右上角切到「Map」：建筑蓝图平面图，公寓有楼层剖面图和「YOUR STACK」',
+        '右上角切到「地图」：建筑蓝图平面图，公寓有楼层剖面图和「你家这一列」',
         '没有住户名册、没有大群组；物业公告移到 Chats 里的官方帐号',
         '还没加入的邻居（No. 23）只显示门牌、不能传讯息；装修通知由物业办公室印纸本送过去',
         '「你的安静时间」：设一次（例如宝宝 13–15 点午睡），以后邻居装修就会自动避开；只有你自己看得到',
@@ -115,7 +115,7 @@ export const PAGES: Record<TabId, PageGuide> = {
         'Kad jiran: nama, unit, hubungan dengan anda (dinding kongsi, tingkat atas), bahasa dan satu baris pengenalan, dengan Mesej dan 👋 Lambai',
         '"Perkenalkan diri": satu ucapan kepada semua yang belum anda kenali (tiga langkah, persetujuan diperlukan)',
         'Lorong atau blok anda (seperti "orang yang mungkin anda kenal"): nombor unit sahaja; Minta dengan alasan, nama dan sembang selepas diterima',
-        'Tukar ke "Peta" untuk pelan lukisan; pangsapuri mendapat keratan tingkat dengan "YOUR STACK"',
+        'Tukar ke "Peta" untuk pelan lukisan; pangsapuri mendapat keratan tingkat dengan "LAJUR UNIT ANDA"',
         'Tiada direktori penduduk, tiada sembang kumpulan; notis estet berada dalam akaun rasmi di Sembang',
         'Jiran yang belum menyertai (No. 23) ditunjukkan sebagai nombor unit dan tidak boleh dimesej; pejabat estet menyampaikan notis ubah suai mereka secara bercetak',
         '"Waktu senyap anda": tetapkan sekali (contohnya tidur siang bayi 1–3 petang) dan setiap ubah suai berhampiran dirancang mengelakkannya; hanya anda yang dapat melihatnya',
@@ -138,7 +138,7 @@ export const PAGES: Record<TabId, PageGuide> = {
     features: {
       zh: [
         '用什么语言打字都行：对方收到的是 AI 翻好的他的语言（设计上用 Claude；网上演示可能用 Gemini），标着「AI 翻译」，原文点一下就看到',
-        '快捷回复不用上网也会翻：Siti 用马来文按，Aiman 看到英文；隔壁 Kumar 读淡米尔文',
+        '快捷回复预先翻好，不用上网：跟着顶栏 EN / BM / 中 切换，隔壁 Kumar 读淡米尔文；鼠标停在快捷回复上，看得到对方收到的说法',
         '「提出不满」：先私下告诉装修户 → 对方回复或处理 → 不行再升级给 SDP 物业团队；每一步写进两户屋历',
         '语气检查：AI 觉得太冲时，先给一个意思不变、比较平和的说法，你自己选发哪个；辱骂一律发不出去，也不能坚持原文：英巫华三语词表先拦，AI 开着时再加上 AI 的判断',
         '检举讯息给 SDP 审核（对方不知道是谁检举），也可以静默封锁',
@@ -146,7 +146,7 @@ export const PAGES: Record<TabId, PageGuide> = {
       ],
       en: [
         'Type in any language: your neighbour reads it in theirs, translated by AI (Claude by design; the online demo may use Gemini), marked "Translated by AI", with the original one tap away',
-        'Quick replies are translated even offline: Siti taps in Malay, Aiman reads English, Kumar next door reads Tamil',
+        'Quick replies are pre-translated, so they work offline: they follow the EN / BM / 中 switch, Kumar next door reads Tamil, and hovering one shows the other side’s wording',
         '"Raise a concern": tell the renovating neighbour privately → they reply or fix it → if not, escalate to SDP’s estate team; every step goes into both home logs',
         'Tone check: when AI thinks a message sounds heated, it offers a calmer wording with the same facts and you choose which to send; an insult is never sent and cannot be sent anyway: a word list in English, Malay and Chinese, then AI’s own judgement when it is on',
         'Report a message for SDP review (the sender never learns who reported), or block silently',
@@ -154,7 +154,7 @@ export const PAGES: Record<TabId, PageGuide> = {
       ],
       ms: [
         'Taip dalam apa-apa bahasa: jiran anda membacanya dalam bahasa mereka, diterjemah oleh AI (Claude mengikut reka bentuk; demo dalam talian mungkin menggunakan Gemini), ditanda "Diterjemah oleh AI", dengan teks asal satu ketikan sahaja',
-        'Balasan pantas diterjemah walaupun luar talian: Siti mengetik dalam bahasa Melayu, Aiman membaca bahasa Inggeris, Kumar di sebelah membaca bahasa Tamil',
+        'Balasan pantas sudah diterjemah awal, jadi berfungsi tanpa talian: ia mengikut suis EN / BM / 中, Kumar di sebelah membaca bahasa Tamil, dan menuding padanya menunjukkan kata-kata yang diterima pihak sebelah',
         '"Luahkan kebimbangan": beritahu jiran yang mengubah suai secara peribadi → mereka membalas atau membaikinya → jika tidak, naikkan kepada pasukan estet SDP; setiap langkah masuk ke kedua-dua log rumah',
         'Semakan nada: apabila AI merasakan mesej berbunyi panas, ia menawarkan ayat yang lebih tenang dengan fakta yang sama dan anda memilih yang mana untuk dihantar; penghinaan tidak pernah dihantar dan memang tidak boleh dihantar: senarai perkataan dalam bahasa Inggeris, Melayu dan Cina, kemudian pertimbangan AI sendiri apabila ia hidup',
         'Laporkan mesej untuk semakan SDP (penghantar tidak tahu siapa yang melaporkan), atau sekat secara senyap',
@@ -356,7 +356,7 @@ export const PAGES: Record<TabId, PageGuide> = {
     features: {
       zh: [
         '一句自我介绍（80 字以内），只有影响圈和已接受联系的人看得到；会提醒不要写作息或出远门的日期',
-        '阅读语言：快捷回复会翻成这个语言',
+        '阅读语言：邻居打的字和 WhatsApp 通知会翻成这个语言',
         '开关：接受联系请求、接受 👋 Wave、安静模式（邻居不能发讯息，但装修通知和不满仍会送达）',
         '已封锁名单，可以解除封锁',
         '家人代办：屋主可以授权最多 2 位家人（例如替长辈操作），他们做的每件事都会以他们的名字记录；按「以 Adam 的身份使用」即可示范',
@@ -367,7 +367,7 @@ export const PAGES: Record<TabId, PageGuide> = {
       ],
       en: [
         'A one-line bio (80 characters), visible only to your circle and accepted contacts; a reminder not to share schedules or travel dates',
-        'Reading language: quick replies are translated into it',
+        'Reading language: what neighbours type, and WhatsApp alerts, are translated into it',
         'Switches: accept contact requests, accept 👋 waves, quiet mode (no chats, but renovation notices and concerns still arrive)',
         'Blocked neighbours, with unblock',
         'Family helpers: the owner can add up to two family members (for example to help an elderly parent); everything they do is recorded under their name. Tap "Use the app as Adam" to demo it',
@@ -378,7 +378,7 @@ export const PAGES: Record<TabId, PageGuide> = {
       ],
       ms: [
         'Satu baris pengenalan (80 aksara), hanya kelihatan kepada bulatan anda dan kenalan yang diterima; peringatan supaya tidak berkongsi jadual atau tarikh perjalanan',
-        'Bahasa bacaan: balasan pantas diterjemah ke dalamnya',
+        'Bahasa bacaan: apa yang jiran taip, dan makluman WhatsApp, diterjemah ke dalamnya',
         'Suis: terima permintaan hubungan, terima 👋 lambaian, mod senyap (tiada sembang, tetapi notis ubah suai dan kebimbangan tetap tiba)',
         'Jiran yang disekat, dengan nyahsekat',
         'Pembantu keluarga: pemilik boleh menambah sehingga dua ahli keluarga (contohnya untuk membantu ibu bapa warga emas); semua yang mereka lakukan direkodkan atas nama mereka. Ketik "Guna app sebagai Adam" untuk demo',

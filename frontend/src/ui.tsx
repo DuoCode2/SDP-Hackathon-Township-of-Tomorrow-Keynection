@@ -153,7 +153,7 @@ export function Ring({ value, label }: { value: number | null; label: string }) 
   )
 }
 
-export function Sheet({ open, onClose, children, wide = false }: { open: boolean; onClose: () => void; children: ReactNode; wide?: boolean }) {
+export function Sheet({ open, onClose, children, wide = false, className = '' }: { open: boolean; onClose: () => void; children: ReactNode; wide?: boolean; className?: string }) {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -164,7 +164,7 @@ export function Sheet({ open, onClose, children, wide = false }: { open: boolean
   // Rendered at the top of the app so it covers the navigation and isn't trapped inside the animated screen.
   return createPortal(
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className={`sheet ${wide ? 'wide' : ''}`} role="dialog" aria-modal onClick={(e) => e.stopPropagation()}>
+      <div className={`sheet ${wide ? 'wide' : ''} ${className}`} role="dialog" aria-modal onClick={(e) => e.stopPropagation()}>
         <div className="sheet-grip" />
         {children}
       </div>

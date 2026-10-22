@@ -31,6 +31,9 @@ const HANDS_FREE_WAIT_MS = 8000  // after "Hello Neighbour", how long the browse
 const FOLLOW_UP_WAIT_MS = 5000  // after a spoken reply, how long it keeps listening for the next question, no wake word
 const WAKE_TO_LISTEN_MS = 350  // the chime and the ripple first, so the listening doesn't start on the chime
 const NAME_MS = 5000  // how long the corner orb says its name before folding back into the orb
+// Another screen opens the chat with an event, so it needs none of the chat's state (the first-day tour's last card).
+const OPEN_EVENT = 'keynection:assistant'
+export const openAssistant = () => window.dispatchEvent(new Event(OPEN_EVENT))
 
 // The browser's speech recognition, where there is one (Chrome and Edge call it webkitSpeechRecognition).
 type Recognition = {
@@ -163,6 +166,11 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
+  useEffect(() => {
+    const show = () => setOpen(true)
+    window.addEventListener(OPEN_EVENT, show)
+    return () => window.removeEventListener(OPEN_EVENT, show)
+  }, [])
 
   const update = (id: number, patch: Partial<Extract<Msg, { who: 'assistant' }>>) =>
     setChat((c) => c.map((m) => (m.id === id && m.who === 'assistant' ? { ...m, ...patch } : m)))

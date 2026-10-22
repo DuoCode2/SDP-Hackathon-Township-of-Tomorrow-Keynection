@@ -34,7 +34,7 @@ export async function dismissWelcome(page: Page, shotName?: string) {
   await welcome.waitFor({ state: 'visible', timeout: 4000 }).catch(() => null)
   if (!(await welcome.isVisible().catch(() => false))) return
   if (shotName) await shot(page, shotName)
-  await welcome.getByRole('button', { name: 'Look around first' }).click()
+  await welcome.getByRole('button', { name: 'Skip the tour' }).click()
   await expect(welcome).toBeHidden()
 }
 

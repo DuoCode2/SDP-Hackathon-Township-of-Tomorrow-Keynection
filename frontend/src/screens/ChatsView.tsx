@@ -79,7 +79,7 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
   const reads = readLang(useLang().lang, me)  // the estate notices arrive in the language the screens are in
 
   const load = useCallback(() => {
-    api.conversations(me.id).then(setConvos).catch(() => setConvos([]))
+    api.conversations(me.id, reads).then(setConvos).catch(() => setConvos([]))
     api.official(me.id, reads).then(setOfficial).catch(() => setOfficial(null))
   }, [me.id, reads])
   useEffect(() => { load() }, [load, version])
@@ -228,6 +228,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   onBack?: () => void
 }) {
   const tr = useT()
+  const reads = readLang(useLang().lang, me)  // quick replies come in the language the screens are in
   const dates = useDates()
   const toast = useToast()
   const celebrate = useCelebrate()
@@ -262,7 +263,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
 
   useEffect(() => {
     let live = true
-    api.thread(me.id, other).then((x) => {
+    api.thread(me.id, other, reads).then((x) => {
       if (!live) return
       setT(x)
       // Something was just read: tell the app, so the sender's pane (in the split view) turns its tick into two.
@@ -272,7 +273,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
     return () => {
       live = false
     }
-  }, [me.id, other, version, onRead])
+  }, [me.id, other, reads, version, onRead])
 
   useLayoutEffect(() => {
     if (body.current) body.current.scrollTop = body.current.scrollHeight

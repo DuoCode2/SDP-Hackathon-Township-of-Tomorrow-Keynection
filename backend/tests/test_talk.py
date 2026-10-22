@@ -53,6 +53,36 @@ def test_quick_replies_arrive_translated_into_the_readers_language(client):
     assert for_siti["text"] == talk.quick_text("quiet_nap", "ms") and for_siti["translated"] is False
 
 
+def test_quick_replies_follow_the_screens_language(client, monkeypatch):
+    """Aiman reads English. With his screens switched to Chinese, the quick replies on offer and one already in the
+    thread are in Chinese, and the chat list says the same; Siti still gets Malay, a typed message keeps its
+    translation into his reading language, and nothing stored changes."""
+    from app import ai
+    monkeypatch.setattr(ai, "provider", lambda: "anthropic")  # a stand-in for Claude, for the typed message
+    monkeypatch.setattr(ai, "_ask", lambda system, text, schema, **_: ai.MessageCheck(
+        insult=False, heated=False, calmer=None, calmer_translation=None, translation="Morning, Aiman!") if schema is ai.MessageCheck else None)
+    _send(client, "T-11", "T-12", body="Selamat pagi, Aiman!")
+    _send(client, "T-11", "T-12", quick_key="quiet_nap")
+    zh = client.get("/api/units/T-12/conversations/T-11", params={"lang": "zh"}).json()
+    assert zh["quick_replies"] and all(q["text"] == talk.quick_text(q["key"], "zh") and q["arrives"] == talk.quick_text(q["key"], "ms")
+                                       for q in zh["quick_replies"])
+    typed, quick = [i for i in zh["items"] if i["type"] == "message"]
+    assert typed["text"] == "Morning, Aiman!" and typed["by_ai"] and typed["original"] == "Selamat pagi, Aiman!"
+    assert quick["text"] == talk.quick_text("quiet_nap", "zh") and quick["translated"] and quick["original"] == talk.quick_text("quiet_nap", "ms")
+    siti = next(c for c in client.get("/api/units/T-12/conversations", params={"lang": "zh"}).json() if c["id"] == "T-11")
+    assert siti["last_preview"]["text"] == talk.quick_text("quiet_nap", "zh")
+    assert _thread(client, "T-11", "T-12")["items"][-1]["text"] == talk.quick_text("quiet_nap", "ms")  # Siti: as she sent it
+    # Without a language, his reading language as before; a language the app has no wording in is refused.
+    en = _thread(client, "T-12", "T-11")
+    assert en["items"][-1]["text"] == talk.quick_text("quiet_nap", "en")
+    assert all(q["text"] == talk.quick_text(q["key"], "en") for q in en["quick_replies"])
+    assert client.get("/api/units/T-12/conversations/T-11", params={"lang": "fr"}).status_code == 422
+    # His own quick reply is recorded in English but shown as he tapped it, not marked as a translation.
+    _send(client, "T-12", "T-11", quick_key="just_moved")
+    mine = client.get("/api/units/T-12/conversations/T-11", params={"lang": "zh"}).json()["items"][-1]
+    assert mine["text"] == talk.quick_text("just_moved", "zh") and mine["translated"] is False and mine["original"] is None
+
+
 def test_every_quick_reply_exists_in_every_language():
     for key, texts in {**talk.QUICK_REPLIES, **talk.OWNER_REPLIES}.items():
         assert set(texts) == set(talk.LANGS), key
