@@ -249,7 +249,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
       }
       if (plan.intent === 'set_quiet_time' && plan.quiet_window) await addQuiet(id, plan.quiet_window)
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not ask', 'error')
+      toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     } finally {
       setBusy(false)
     }
@@ -263,7 +263,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
       update(id, { quiet: { before, undone: false } })
       onChanged()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not save', 'error')  // more than two, or over three hours a day
+      toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')  // more than two, or over three hours a day
     }
   }
 
@@ -274,7 +274,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
       update(m.id, { quiet: { ...m.quiet, undone: true } })
       onChanged()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not save', 'error')
+      toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     }
   }
 
@@ -381,7 +381,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
       if (words && !cancelled.current) await ask(words, false, true, free)
     } catch (e) {
       if (e instanceof DOMException && e.name === 'NotAllowedError') toast(t('assistant.micBlocked'), 'error')
-      else toast(e instanceof ApiError || e instanceof Error ? e.message : 'Could not listen', 'error')
+      else toast(e instanceof ApiError || e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     } finally {
       recording.current = null
       setHeard(null)

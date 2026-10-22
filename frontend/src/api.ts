@@ -95,7 +95,7 @@ export interface NearbyHome extends Omit<UnitInfo, 'resident_name' | 'lang' | 'h
 }
 
 export interface Directory {
-  circle: (Neighbour & { known: boolean; hello_sent?: boolean; bio?: string; lang: Lang | null })[]
+  circle: (Neighbour & { known: boolean; hello_sent?: boolean; bio?: string; bio_lang?: Lang | null; bio_in?: Partial<Record<Lang, string>>; bio_by_ai?: boolean; lang: Lang | null })[]
   nearby: NearbyHome[]
   works: string[]
   ring2_label: string
@@ -122,6 +122,8 @@ export interface ContactRequest {
   mine: boolean
 }
 
+/** An estate notice as this household reads it: in its own language when that wording exists (the team's for the demo
+ *  notices, the AI's for one the estate team posts), with the English record as original. */
 export interface Notice {
   id: number
   audience: string
@@ -129,6 +131,9 @@ export interface Notice {
   body: string
   author: string
   created_at: string
+  translated: boolean
+  by_ai: boolean
+  original?: { title: string; body: string }
 }
 
 // Server text comes as English (the record) plus a code and values the app shows in the reader's language.
@@ -619,10 +624,20 @@ export interface Delegate {
   created_at: string
 }
 
+/** A refusal from the server: its code and values let the screen say it in the reader's language (errorText); the
+ *  message is the English record, shown when the app has no wording for the code. */
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public code?: string, public suggestion?: string) {
+  constructor(public status: number, message: string, public code?: string, public suggestion?: string,
+    public values?: Record<string, string | number>) {
     super(message)
   }
+}
+
+/** Turns a refusal's code and values into the reader's language. The language provider registers the real one;
+ *  until then (and for a code without wording) the English record is shown. */
+export let errorText: (code: string, values: Record<string, string | number> | undefined, record: string) => string = (_c, _v, record) => record
+export function onErrorText(fn: typeof errorText) {
+  errorText = fn
 }
 
 /** Demo or pilot mode, and in pilot mode who this phone is signed in as. */
@@ -802,7 +817,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     try {
       const body = await res.json()
       if (typeof body.detail === 'string') message = body.detail
-      else if (body.detail?.code) throw new ApiError(res.status, body.detail.message, body.detail.code, body.detail.suggestion)
+      else if (body.detail?.code) {
+        throw new ApiError(res.status, errorText(body.detail.code, body.detail.values, body.detail.message), body.detail.code,
+          body.detail.suggestion, body.detail.values)
+      }
       // pydantic prefixes a validator's own sentence with "Value error, "; the reader only needs the sentence.
       else message = Array.isArray(body.detail) ? (body.detail[0]?.msg?.replace(/^Value error, /, '') ?? message) : JSON.stringify(body.detail)
     } catch (e) {
@@ -887,7 +905,8 @@ export const api = {
   contactRequests: (unitId: string) => request<{ incoming: ContactRequest[]; outgoing: ContactRequest[] }>(`/api/units/${unitId}/contact-requests`),
   respondContact: (id: number, unitId: string, accept: boolean) =>
     request<ContactRequest>(`/api/contact-requests/${id}/respond`, json('POST', { unit_id: unitId, accept })),
-  notices: (unitId: string) => request<Notice[]>(`/api/units/${unitId}/notices`),
+  /** `lang`: the language the screens are in, when it differs from the household's reading language. */
+  notices: (unitId: string, lang?: Lang) => request<Notice[]>(`/api/units/${unitId}/notices${lang ? `?lang=${lang}` : ''}`),
   allNotices: () => request<Notice[]>(inPhase('/api/notices')),
   postNotice: (audience: string, title: string, body: string) => request<Notice>(inPhase('/api/notices'), json('POST', { audience, title, body })),
   wave: (from: string, to: string) => request('/api/waves', json('POST', { from_unit_id: from, to_unit_id: to })),
@@ -906,7 +925,7 @@ export const api = {
   profile: (unitId: string) => request<Profile>(`/api/units/${unitId}/profile`),
   updateProfile: (unitId: string, patch: Partial<Omit<Profile, 'unit_id' | 'blocked'>> & { name?: string }) =>
     request<Profile>(`/api/units/${unitId}/profile`, json('PUT', patch)),
-  official: (unitId: string) => request<Official>(`/api/units/${unitId}/official`),
+  official: (unitId: string, lang?: Lang) => request<Official>(`/api/units/${unitId}/official${lang ? `?lang=${lang}` : ''}`),
   delegates: (unitId: string) => request<Delegate[]>(`/api/units/${unitId}/delegates`),
   addDelegate: (unitId: string, name: string, relation: Delegate['relation'], consent: boolean) =>
     request<Delegate>(`/api/units/${unitId}/delegates`, json('POST', { name, relation, consent })),

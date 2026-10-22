@@ -129,7 +129,7 @@ def test_each_home_has_a_daily_allowance_and_others_keep_theirs(client, gateway)
     for _ in range(voice.CLIPS_PER_HOME_PER_DAY):
         assert _say(client).status_code == 200
     r = _say(client)
-    assert r.status_code == 429 and "Typing works" in r.json()["detail"]
+    assert r.status_code == 429 and "Typing works" in r.json()["detail"]["message"]
     assert len(gateway.sent) == voice.CLIPS_PER_HOME_PER_DAY  # the refused one never reached the gateway
     assert _say(client, unit="T-13").status_code == 200
 
@@ -199,7 +199,7 @@ def test_each_home_has_a_daily_allowance_for_spoken_replies(client, gateway):
     for i in range(voice.REPLIES_SPOKEN_PER_HOME_PER_DAY):
         assert _speak(client, text=f"Reply number {i}.").status_code == 200
     r = _speak(client, text="One more.")
-    assert r.status_code == 429 and "on screen" in r.json()["detail"]
+    assert r.status_code == 429 and "on screen" in r.json()["detail"]["message"]
     assert len(gateway.sent) == voice.REPLIES_SPOKEN_PER_HOME_PER_DAY
     assert _speak(client, text="Reply number 0.").status_code == 200  # already spoken: from memory, free
     assert _speak(client, text="One more.", unit="T-13").status_code == 200

@@ -20,7 +20,8 @@
 
 - **One codebase, two modes.** Demo mode (judges): cast switcher, guide, sample photos, reset; the server trusts the unit number in a request. Pilot mode (`KEYNECTION_DEMO_MODE=0`): passkey sign-in, the server decides identity on every request, no fictional data, no reset.
 - **No network needed to demo.** Fonts, icons and QR generation are bundled; the AI is optional and the app works without it.
-- **Sizes.** 106 API endpoints, 32 tables, 18 screens, about 790 KB of front-end bundle (251 KB gzipped; the 8 MB wake-word engine loads only when hands-free is switched on), 408 server tests.
+- **Refusals.** Every refusal the server gives (an HTTP 4xx, including a form that fails its own checks) is `{code, message, values}`: the app says the code in the interface language (`err.<code>` in `i18n.tsx`, 148 codes), the English sentence is the record and the fallback. A test checks that no server code is without wording in the app.
+- **Sizes.** 106 API endpoints, 32 tables, 18 screens, about 790 KB of front-end bundle (251 KB gzipped; the 8 MB wake-word engine loads only when hands-free is switched on), 420 server tests.
 - **Why SQLite and one container.** A pilot is one phase on one server; backups are a file copy; SDP IT can run it with Docker in an afternoon (`docs/pilot-deployment.md`). It is not built for many townships on one database, and says so.
 
 ## 2. Four state machines
@@ -80,7 +81,7 @@ Also: reports `open → warned | dismissed`; paper notices `to_print → printed
 | **Estate team (staff)** | Escalated concerns, notices it sent, the front desk, counts | Remind, close an escalated concern, send notices, issue join codes, print and log paper notices, register a renovation on paper | Read private chats; close a warranty ticket; see non-escalated concerns |
 | **Warranty / safety staff** | Tickets; reported messages (and a reported voice note) | Submit a repair; warn a sender or dismiss a report; export to Procore | Close a ticket; see who reported |
 | **Contractor pass (switched off)** | Works dates and hours | Show the QR at the guardhouse | See the owner's phone, neighbours' names, photos |
-| **AI service** | The text being written (and a name or unit only if the writer typed it); for the assistant, also the household’s own records and its neighbours’ unit numbers | Return structured fields: notice draft, translation, calmer wording, whether a message is abuse, what an assistant request asks for | See the directory or who writes to whom; its one decision, that a message is abuse, stops that message and nothing else |
+| **AI service** | The text being written: a message, a hello, a renovation notice, a resident’s one-line bio or an estate notice (and a name or unit only if the writer typed it); for the assistant, also the household’s own records and its neighbours’ unit numbers | Return structured fields: notice draft, translation, calmer wording, whether a message is abuse, what an assistant request asks for | See the directory or who writes to whom; its one decision, that a message is abuse, stops that message and nothing else |
 
 In the demo the household's identity is the unit number in the request (so judges can switch roles); in a pilot it is the passkey session, checked on every household endpoint (`test_signin.py`).
 

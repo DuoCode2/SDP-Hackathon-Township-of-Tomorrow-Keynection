@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import { ApiError, type Lang } from './api'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { ApiError, onErrorText, type Lang } from './api'
 import { remember, remembered } from './storage'
 
 // Interface language for the resident screens: English, Bahasa Melayu, 中文. That includes Evidence (photos, cases,
@@ -568,7 +568,7 @@ const D: Record<string, Entry> = {
   'push.staffTitle': ['Notifications on this device', 'Pemberitahuan di peranti ini', '这台装置的通知'],
   'push.staffOn': ['On: reported messages, concerns passed to the estate office and new warranty tickets reach this device.', 'Hidup: mesej yang dilaporkan, kebimbangan yang dibawa ke pejabat estet dan tiket waranti baharu sampai ke peranti ini.', '已开启：被检举的讯息、转交物业的问题和新的保修单会传到这台装置。'],
   'join.p5t': ['AI translation', 'Terjemahan AI', 'AI 翻译'],
-  'join.p5': ['So neighbours can read you in their own language, what you type to them is translated by an AI service (Claude, by Anthropic, processed outside Malaysia). Only the words you write are sent. When you ask the assistant, your own records (notices, warranty tickets, case status) and your neighbours’ unit numbers go to the AI with your request; your neighbours’ names and what they wrote do not. Your neighbour can always see your own words, and a calmer wording is only ever a suggestion. A message the AI judges to be abuse is refused and never sent.', 'Supaya jiran boleh membacanya dalam bahasa mereka sendiri, apa yang anda taip kepada mereka diterjemah oleh perkhidmatan AI (Claude, oleh Anthropic, diproses di luar Malaysia). Hanya perkataan yang anda tulis dihantar. Apabila anda bertanya kepada pembantu, rekod anda sendiri (notis, tiket waranti, status kes) dan nombor unit jiran anda dihantar kepada AI bersama permintaan anda; nama jiran dan apa yang mereka tulis tidak dihantar. Jiran anda sentiasa boleh melihat kata-kata asal anda, dan ayat yang lebih tenang hanyalah cadangan. Mesej yang dinilai AI sebagai cacian ditolak dan tidak dihantar.', '为了让邻居用自己的语言读你写的话，你打给他们的字会由 AI 服务（Anthropic 的 Claude，在马来西亚境外处理）翻译。只送出你写的文字。问助手时，你自己的记录（通知、保修单、案件状态）和邻居的门牌会随你的问题一起送去 AI；邻居的名字和他们写的话不会。邻居随时看得到你的原文；比较平和的说法永远只是建议。被 AI 判定为辱骂的讯息会被拒绝，不会送出。'],
+  'join.p5': ['So neighbours can read you in their own language, what you type to them is translated by an AI service (Claude, by Anthropic, processed outside Malaysia). Only the words you write are sent. When you ask the assistant, your own records (notices, warranty tickets, case status) and your neighbours’ unit numbers go to the AI with your request; your neighbours’ names and what they wrote do not. Your neighbour can always see your own words, and a calmer wording is only ever a suggestion. A message the AI judges to be abuse is refused and never sent. Your one-line introduction and the estate office’s notices are translated the same way, so every neighbour reads them in their own language.', 'Supaya jiran boleh membacanya dalam bahasa mereka sendiri, apa yang anda taip kepada mereka diterjemah oleh perkhidmatan AI (Claude, oleh Anthropic, diproses di luar Malaysia). Hanya perkataan yang anda tulis dihantar. Apabila anda bertanya kepada pembantu, rekod anda sendiri (notis, tiket waranti, status kes) dan nombor unit jiran anda dihantar kepada AI bersama permintaan anda; nama jiran dan apa yang mereka tulis tidak dihantar. Jiran anda sentiasa boleh melihat kata-kata asal anda, dan ayat yang lebih tenang hanyalah cadangan. Mesej yang dinilai AI sebagai cacian ditolak dan tidak dihantar. Pengenalan satu baris anda dan notis pejabat estet diterjemah dengan cara yang sama, supaya setiap jiran membacanya dalam bahasa mereka sendiri.', '为了让邻居用自己的语言读你写的话，你打给他们的字会由 AI 服务（Anthropic 的 Claude，在马来西亚境外处理）翻译。只送出你写的文字。问助手时，你自己的记录（通知、保修单、案件状态）和邻居的门牌会随你的问题一起送去 AI；邻居的名字和他们写的话不会。邻居随时看得到你的原文；比较平和的说法永远只是建议。被 AI 判定为辱骂的讯息会被拒绝，不会送出。你的一句自我介绍和物业办公室的公告也用同样的方式翻译，让每位邻居都能用自己的语言阅读。'],
   'join.p5.gemini': ['So neighbours can read you in their own language, what you type to them is translated by an AI service (Gemini, by Google, processed outside Malaysia). This demo uses Google’s free service, which may use what is sent to improve Google’s products: type only made-up details here. Only the words you write are sent. When you ask the assistant, your own records (notices, warranty tickets, case status) and your neighbours’ unit numbers go to the AI with your request; your neighbours’ names and what they wrote do not. Your neighbour can always see your own words, and a calmer wording is only ever a suggestion. A message the AI judges to be abuse is refused and never sent.', 'Supaya jiran boleh membacanya dalam bahasa mereka sendiri, apa yang anda taip kepada mereka diterjemah oleh perkhidmatan AI (Gemini, oleh Google, diproses di luar Malaysia). Demo ini menggunakan perkhidmatan percuma Google, yang mungkin menggunakan apa yang dihantar untuk menambah baik produk Google: taip butiran rekaan sahaja di sini. Hanya perkataan yang anda tulis dihantar. Apabila anda bertanya kepada pembantu, rekod anda sendiri (notis, tiket waranti, status kes) dan nombor unit jiran anda dihantar kepada AI bersama permintaan anda; nama jiran dan apa yang mereka tulis tidak dihantar. Jiran anda sentiasa boleh melihat kata-kata asal anda, dan ayat yang lebih tenang hanyalah cadangan. Mesej yang dinilai AI sebagai cacian ditolak dan tidak dihantar.', '为了让邻居用自己的语言读你写的话，你打给他们的字会由 AI 服务（Google 的 Gemini，在马来西亚境外处理）翻译。这个演示用的是 Google 的免费服务，送去的内容可能会被 Google 用来改进产品，所以这里只输入虚构的内容。只送出你写的文字。问助手时，你自己的记录（通知、保修单、案件状态）和邻居的门牌会随你的问题一起送去 AI；邻居的名字和他们写的话不会。邻居随时看得到你的原文；比较平和的说法永远只是建议。被 AI 判定为辱骂的讯息会被拒绝，不会送出。'],
   'join.consent': ['I have read this privacy notice ({version}) and agree to it.', 'Saya telah membaca notis privasi ini ({version}) dan bersetuju.', '我已阅读这份隐私声明（{version}）并同意。'],
   'join.wa': ['Send me short alerts on WhatsApp (never the content of messages)', 'Hantar notifikasi ringkas melalui WhatsApp (tanpa isi mesej)', '用 WhatsApp 发简短通知给我（不会有讯息内容）'],
@@ -895,6 +895,178 @@ const D: Record<string, Entry> = {
 
   'cmp.drag': ['Drag to compare', 'Seret untuk membanding', '拖动比较'], 'cmp.detect': ['Detect', 'Kesan', '标示'], 'cmp.raw': ['Raw', 'Asal', '原图'],
   'cmp.line': ['Line', 'Garis', '线'], 'cmp.patch': ['Patch', 'Tompok', '斑块'], 'cmp.aligning': ['Aligning · comparing', 'Menyelaras · membanding', '对齐 · 比较中'],
+  // chrome and fallbacks that used to be English whatever the interface language
+  'brand.sub': ['EVERY KEY · FIVE NEIGHBOURS', 'SETIAP KUNCI · LIMA JIRAN', '每一把钥匙 · 五户邻居'],
+  'top.live': ['LIVE', 'LANGSUNG', '实时'], 'top.liveTitle': ['Prototype running live', 'Prototaip sedang berjalan', '原型正在实时运行'],
+  'top.sheet': ['Sheet {n}', 'Helaian {n}', '第 {n} 页'], 'top.leftPane': ['left pane', 'anak tetingkap kiri', '左边'], 'top.rightPane': ['right pane', 'anak tetingkap kanan', '右边'],
+  'top.bothSidesTitle': ['See both sides of the shared wall at once', 'Lihat kedua-dua belah dinding kongsi serentak', '同时看共用墙的两边'],
+  'split.wall': ['SHARED WALL', 'DINDING KONGSI', '共用墙'],
+  'tb.label': ['Drawing title block', 'Blok tajuk lukisan', '图纸标题栏'], 'tb.project': ['Project', 'Projek', '项目'], 'tb.sheet': ['Sheet', 'Helaian', '页'], 'tb.rev': ['Rev', 'Sem', '版'],
+  'tb.viewingAs': ['Viewing as', 'Melihat sebagai', '目前视角'], 'tb.signedInAs': ['Signed in as', 'Log masuk sebagai', '登入身份'], 'tb.data': ['Data', 'Data', '资料'],
+  'tb.fictional': ['Fictional · runs offline', 'Rekaan · berjalan luar talian', '虚构 · 离线可用'], 'tb.pilot': ['Pilot · real households', 'Perintis · isi rumah sebenar', '试点 · 真实住户'],
+  'nav.repairDot': ['Repair waiting for you', 'Pembaikan menunggu anda', '有维修等你确认'],
+  'offline.demoHint': ['(Demo: is the backend running?)', '(Demo: adakah pelayan sedang berjalan?)', '（演示：后端服务器开着吗？）'],
+  'err.tryAgain': ['That did not go through. Please try again.', 'Tidak berjaya. Sila cuba lagi.', '没有成功，请再试一次。'],
+  'thread.back': ['Back to list', 'Kembali ke senarai', '返回列表'],
+  'chat.renovating': ['Renovating', 'Sedang ubah suai', '正在装修'], 'chat.openConcern': ['Open concern', 'Kebimbangan terbuka', '有未解决的问题'],
+  'voice.cancelRec': ['Cancel recording', 'Batal rakaman', '取消录音'], 'voice.send': ['Send voice message', 'Hantar mesej suara', '发送语音讯息'],
+  'voice.play': ['Play voice message', 'Main mesej suara', '播放语音讯息'], 'voice.pause': ['Pause', 'Jeda', '暂停'],
+  'voice.unsupported': ['Voice messages need a microphone and a browser that can record.', 'Mesej suara memerlukan mikrofon dan pelayar yang boleh merakam.', '语音讯息需要麦克风和能录音的浏览器。'],
+  'voice.noMic': ['Microphone permission was not given.', 'Kebenaran mikrofon tidak diberikan.', '没有获得麦克风权限。'],
+  'circle.list': ['Your circle', 'Bulatan anda', '你的邻里圈'], 'common.close': ['Close', 'Tutup', '关闭'],
+  // a neighbour's one-line bio shown in the reader's language: where it came from
+  'bio.translated': ['Translated from {lang}', 'Diterjemah daripada {lang}', '译自{lang}'], 'bio.byAi': ['Translated by AI from {lang}', 'Diterjemah oleh AI daripada {lang}', 'AI 译自{lang}'],
+
+  // Refusals from the server, by code (backend refuse(), VALIDATION and the code dicts): said in the interface
+  // language; the values come with the code. test_reader_language.py checks that every server code is here.
+  'err.staff_only': ['This is for the estate office and SDP staff.', 'Ini untuk pejabat estet dan kakitangan SDP.', '这是给物业办公室和 SDP 职员用的。'],
+  'err.too_large': ['That upload is too large. Photos must be under 12 MB.', 'Muat naik itu terlalu besar. Foto mesti kurang daripada 12 MB.', '上传的档案太大，照片要小于 12 MB。'],
+  'err.unit_not_found': ['Home {unit} was not found.', 'Rumah {unit} tidak dijumpai.', '找不到 {unit} 这户。'],
+  'err.not_joined': ['{label} isn’t on Keynection yet. The estate office delivers formal notices to them on paper.', '{label} belum menyertai Keynection. Pejabat estet menghantar notis rasmi kepada mereka secara bercetak.', '{label} 还没加入 Keynection，正式通知由物业办公室印纸本送达。'],
+  'err.photo_not_found': ['That photo was not found.', 'Foto itu tidak dijumpai.', '找不到那张照片。'],
+  'err.photo_not_notified': ['Only neighbours notified of this renovation can attach photos to it.', 'Hanya jiran yang diberitahu tentang ubah suai ini boleh melampirkan foto padanya.', '只有收到这项装修通知的邻居才能附上照片。'],
+  'err.photo_hello': ['Photos can only be attached to a renovation notice, not to a hello.', 'Foto hanya boleh dilampirkan pada notis ubah suai, bukan pada ucapan.', '照片只能附在装修通知上，不能附在打招呼上。'],
+  'err.photo_too_large': ['The photo is larger than 12 MB.', 'Foto lebih besar daripada 12 MB.', '照片超过 12 MB。'],
+  'err.photo_too_many_pixels': ['The photo’s resolution is too high.', 'Resolusi foto terlalu tinggi.', '照片的分辨率太高。'],
+  'err.photo_unsupported_format': ['Please use a JPEG, PNG or WebP photo.', 'Sila gunakan foto JPEG, PNG atau WebP.', '请用 JPEG、PNG 或 WebP 照片。'],
+  'err.photo_not_an_image': ['That file is not a readable photo.', 'Fail itu bukan foto yang boleh dibaca.', '这个档案不是可读取的照片。'],
+  'err.phase_not_found': ['That phase was not found.', 'Fasa itu tidak dijumpai.', '找不到那个 phase。'],
+  'err.no_phase': ['No phase yet: import SDP’s handover list in Phase setup.', 'Belum ada fasa: import senarai penyerahan SDP dalam Tetapan fasa.', '还没有 phase：请在「新 phase 设定」导入 SDP 的交屋名单。'],
+  'err.phase': ['Choose a phase.', 'Pilih fasa.', '请选一个 phase。'],
+  'err.dates_invalid': ['The start and end must be real calendar dates.', 'Tarikh mula dan tamat mesti tarikh kalendar yang sah.', '开始和结束日期必须是真实的日期。'],
+  'err.dates_order': ['The dates or the noisy hours are the wrong way round.', 'Tarikh atau waktu bising terbalik.', '日期或吵闹时段的先后反了。'],
+  'err.reno_too_long': ['A renovation notice can cover at most {n} days; send a new one after that.', 'Notis ubah suai boleh meliputi paling lama {n} hari; hantar yang baharu selepas itu.', '一份装修通知最多涵盖 {n} 天，之后请再发一份。'],
+  'err.noisy_order': ['The noisy hours end before they start.', 'Waktu bising tamat sebelum ia bermula.', '吵闹时段的结束时间早于开始时间。'],
+  'err.house_rule_hours': ['Noisy work is allowed {from}–{to}, Monday to Saturday.', 'Kerja bising dibenarkan {from}–{to}, Isnin hingga Sabtu.', '吵闹施工只能在星期一至六 {from}–{to} 进行。'],
+  'err.break_outside': ['A quiet break must sit inside the noisy hours.', 'Rehat senyap mesti berada dalam waktu bising.', '安静休息时段必须在吵闹时段之内。'],
+  'err.breaks_overlap': ['The quiet breaks overlap.', 'Rehat senyap bertindih.', '安静休息时段互相重叠。'],
+  'err.message_or_quick': ['Send either a message or a quick reply.', 'Hantar sama ada mesej atau balasan pantas.', '请发讯息或快捷回复，二选一。'],
+  'err.quiet_cap': ['At most {n} quiet times.', 'Paling banyak {n} waktu senyap.', '最多 {n} 个安静时间。'],
+  'err.quiet_order': ['A quiet time must end after it starts.', 'Waktu senyap mesti tamat selepas ia bermula.', '安静时间的结束必须晚于开始。'],
+  'err.quiet_total': ['Quiet times can add up to {hours} hours a day, so neighbours can still renovate.', 'Waktu senyap boleh berjumlah sehingga {hours} jam sehari, supaya jiran masih boleh mengubah suai.', '安静时间每天合计最多 {hours} 小时，这样邻居还能装修。'],
+  'err.invalid': ['{field}: {problem}', '{field}: {problem}', '{field}：{problem}'],
+  'err.ai_off': ['AI isn’t switched on here. Fill in the steps below.', 'AI tidak dihidupkan di sini. Isi langkah-langkah di bawah.', '这里没有开 AI，请自己填下面的步骤。'],
+  'err.ai_busy': ['The AI didn’t answer in time. Try again, or fill in the steps below.', 'AI tidak menjawab tepat pada masanya. Cuba lagi, atau isi langkah-langkah di bawah.', 'AI 没有及时回答。再试一次，或自己填下面的步骤。'],
+  'err.ai_cap': ['That’s all the AI help for today. Fill in the steps below.', 'Itu sahaja bantuan AI untuk hari ini. Isi langkah-langkah di bawah.', '今天的 AI 帮助用完了，请自己填下面的步骤。'],
+  'err.stt_off': ['Listening isn’t available here. Typing works just the same.', 'Mendengar tidak tersedia di sini. Menaip berfungsi sama sahaja.', '这里不能听语音，打字一样可以。'],
+  'err.stt_busy': ['Didn’t catch that. Try again, or type it.', 'Tidak dapat menangkapnya. Cuba lagi, atau taip.', '没听清楚。再说一次，或者打字。'],
+  'err.stt_cap': ['That’s all the listening for today. Typing works just the same.', 'Itu sahaja pendengaran untuk hari ini. Menaip berfungsi sama sahaja.', '今天的语音听写用完了，打字一样可以。'],
+  'err.tts_off': ['Replies are read on screen here.', 'Balasan dibaca di skrin di sini.', '这里的回答在屏幕上阅读。'],
+  'err.tts_lang': ['This language is read by the browser’s own voice.', 'Bahasa ini dibaca oleh suara pelayar sendiri.', '这个语言由浏览器自己的语音朗读。'],
+  'err.tts_busy': ['The reply couldn’t be spoken. It is on screen as always.', 'Balasan tidak dapat dituturkan. Ia ada di skrin seperti biasa.', '回答没能朗读，屏幕上照样看得到。'],
+  'err.tts_cap': ['That’s all the spoken replies for today. They are on screen as always.', 'Itu sahaja balasan bersuara untuk hari ini. Ia ada di skrin seperti biasa.', '今天的朗读回答用完了，屏幕上照样看得到。'],
+  'err.audio_type': ['Please send an audio recording.', 'Sila hantar rakaman audio.', '请发送音频录音。'],
+  'err.audio_too_long': ['Say it in up to {n} seconds.', 'Sebutkan dalam masa {n} saat.', '请在 {n} 秒内说完。'],
+  'err.audio_empty': ['That recording is empty.', 'Rakaman itu kosong.', '这段录音是空的。'],
+  'err.tone': ['This may come across as hostile. Try calmer words or a quick reply.', 'Ini mungkin kedengaran bermusuhan. Cuba kata-kata yang lebih tenang atau balasan pantas.', '这句话可能显得有敌意。试试平和一点的说法或快捷回复。'],
+  'err.private': ['Please don’t put phone numbers, emails or links here.', 'Sila jangan letak nombor telefon, e-mel atau pautan di sini.', '请不要在这里写电话、电邮或连结。'],
+  'err.calmer': ['This may sound sharper than you mean. Here is a calmer way to say the same thing.', 'Ini mungkin kedengaran lebih tajam daripada yang anda maksudkan. Ini cara yang lebih tenang untuk mengatakan perkara yang sama.', '这句话可能比你想的更冲。这里有一个意思不变、比较平和的说法。'],
+  'err.official': ['A name can’t look like SDP, the estate office or an official account.', 'Nama tidak boleh kelihatan seperti SDP, pejabat estet atau akaun rasmi.', '名字不能看起来像 SDP、物业办公室或官方帐号。'],
+  'err.notice_cap': ['At most {n} renovation notices a day. Try again tomorrow.', 'Paling banyak {n} notis ubah suai sehari. Cuba lagi esok.', '每天最多 {n} 份装修通知，明天再试。'],
+  'err.hello_cap': ['At most {n} hellos a day. Try again tomorrow.', 'Paling banyak {n} ucapan sehari. Cuba lagi esok.', '每天最多打 {n} 次招呼，明天再试。'],
+  'err.structural_approval': ['Structural work needs approval first: the council (PBT) permit, or the JMB/MC in a strata building.', 'Kerja struktur memerlukan kelulusan dahulu: permit majlis (PBT), atau JMB/MC di bangunan strata.', '结构工程要先获批准：地方政府（PBT）准证，公寓则是 JMB/MC。'],
+  'err.intro_outside_circle': ['An introduction can only go to the homes in your circle that are on Keynection.', 'Perkenalan hanya boleh dihantar kepada rumah dalam bulatan anda yang ada di Keynection.', '自我介绍只能发给邻里圈里已加入 Keynection 的住户。'],
+  'err.intro_nobody': ['Pick at least one neighbour.', 'Pilih sekurang-kurangnya seorang jiran.', '至少选一位邻居。'],
+  'err.intro_quiet': ['These neighbours have quiet mode on right now. Try again later.', 'Jiran ini sedang dalam mod senyap. Cuba lagi kemudian.', '这些邻居现在开着安静模式，稍后再试。'],
+  'err.intro_not_received': ['This home did not receive that introduction.', 'Rumah ini tidak menerima perkenalan itu.', '这户没有收到那份自我介绍。'],
+  'err.chat_outside': ['You can only talk with your circle, homes a renovation notice connects you with, or neighbours who accepted your contact request.', 'Anda hanya boleh berbual dengan bulatan anda, rumah yang dihubungkan oleh notis ubah suai, atau jiran yang menerima permintaan hubungan anda.', '你只能和邻里圈、装修通知牵连到的住户，或接受了你联系请求的邻居聊天。'],
+  'err.concern_not_found': ['That concern was not found.', 'Kebimbangan itu tidak dijumpai.', '找不到那个问题。'],
+  'err.quick_unknown': ['Unknown quick reply.', 'Balasan pantas tidak dikenali.', '没有这个快捷回复。'],
+  'err.message_not_found': ['That message was not found.', 'Mesej itu tidak dijumpai.', '找不到那条讯息。'],
+  'err.report_not_yours': ['You can only report messages sent to you.', 'Anda hanya boleh melaporkan mesej yang dihantar kepada anda.', '你只能检举发给你的讯息。'],
+  'err.numbers_unavailable': ['Contact sharing isn’t available with this neighbour.', 'Perkongsian hubungan tidak tersedia dengan jiran ini.', '不能和这位邻居交换联系方式。'],
+  'err.renovation_not_found': ['That renovation was not found.', 'Ubah suai itu tidak dijumpai.', '找不到那项装修。'],
+  'err.concern_not_notified': ['Only neighbours notified of this renovation can raise a concern about it.', 'Hanya jiran yang diberitahu tentang ubah suai ini boleh meluahkan kebimbangan tentangnya.', '只有收到这项装修通知的邻居才能提出问题。'],
+  'err.concern_cap': ['You already have {n} open concerns about this renovation.', 'Anda sudah ada {n} kebimbangan terbuka tentang ubah suai ini.', '你对这项装修已经有 {n} 个未解决的问题。'],
+  'err.concern_respond_owner': ['Only the renovating household can respond to this concern.', 'Hanya isi rumah yang mengubah suai boleh membalas kebimbangan ini.', '只有装修户能回复这个问题。'],
+  'err.concern_answered': ['This concern has already been answered.', 'Kebimbangan ini sudah dijawab.', '这个问题已经回复过了。'],
+  'err.concern_sorted_owner': ['Only the renovating household can mark this concern as sorted.', 'Hanya isi rumah yang mengubah suai boleh menandakan kebimbangan ini sebagai selesai.', '只有装修户能把这个问题标为已处理。'],
+  'err.concern_not_sortable': ['This concern can’t be marked as sorted now.', 'Kebimbangan ini tidak boleh ditandakan sebagai selesai sekarang.', '这个问题现在不能标为已处理。'],
+  'err.concern_escalate_raiser': ['Only the household that raised the concern can escalate it.', 'Hanya isi rumah yang meluahkan kebimbangan boleh menaikkannya.', '只有提出问题的住户能升级它。'],
+  'err.concern_already_escalated': ['This concern is already with the estate team or closed.', 'Kebimbangan ini sudah bersama pasukan estet atau ditutup.', '这个问题已交给物业团队或已结案。'],
+  'err.concern_wait': ['Give your neighbour {hours} hours to respond before escalating.', 'Beri jiran anda {hours} jam untuk membalas sebelum menaikkannya.', '先给邻居 {hours} 小时回复，再升级。'],
+  'err.concern_not_escalated': ['Only escalated concerns are handled by the estate team.', 'Hanya kebimbangan yang dinaikkan dikendalikan oleh pasukan estet.', '物业团队只处理已升级的问题。'],
+  'err.voice_not_found': ['That voice message was not found.', 'Mesej suara itu tidak dijumpai.', '找不到那条语音讯息。'],
+  'err.report_not_found': ['That report was not found.', 'Laporan itu tidak dijumpai.', '找不到那个检举。'],
+  'err.report_reviewed': ['This report has already been reviewed.', 'Laporan ini sudah disemak.', '这个检举已经审核过了。'],
+  'err.request_in_circle': ['This home is already in your circle: message them directly.', 'Rumah ini sudah dalam bulatan anda: hantar mesej terus kepada mereka.', '这户已在你的邻里圈，直接发讯息就好。'],
+  'err.request_too_far': ['Contact requests only reach your own lorong or block. For anything else, ask the estate office.', 'Permintaan hubungan hanya sampai ke lorong atau blok anda sendiri. Untuk yang lain, tanya pejabat estet.', '联系请求只能发给同一条 lorong 或同一栋的住户，其他请找物业办公室。'],
+  'err.request_declined_all': ['This household isn’t accepting requests.', 'Isi rumah ini tidak menerima permintaan.', '这户不接受联系请求。'],
+  'err.request_exists': ['There is already a request between you.', 'Sudah ada permintaan antara anda.', '你们之间已经有一个请求了。'],
+  'err.request_declined': ['This household declined your earlier request.', 'Isi rumah ini menolak permintaan anda sebelum ini.', '这户拒绝了你之前的请求。'],
+  'err.request_cap': ['At most {n} contact requests a day.', 'Paling banyak {n} permintaan hubungan sehari.', '每天最多 {n} 个联系请求。'],
+  'err.request_not_found': ['That request was not found.', 'Permintaan itu tidak dijumpai.', '找不到那个请求。'],
+  'err.request_answer_receiver': ['Only the household that received the request can answer it.', 'Hanya isi rumah yang menerima permintaan boleh menjawabnya.', '只有收到请求的住户能回答。'],
+  'err.request_answered': ['This request has already been answered.', 'Permintaan ini sudah dijawab.', '这个请求已经回答过了。'],
+  'err.notice_place': ['{place} isn’t a {kind} in {phase}.', '{place} bukan {kind} dalam {phase}.', '{phase} 里没有叫 {place} 的 {kind}。'],
+  'err.message_cap': ['Daily message limit for this neighbour reached. Try again tomorrow.', 'Had mesej harian untuk jiran ini sudah dicapai. Cuba lagi esok.', '今天发给这位邻居的讯息已达上限，明天再试。'],
+  'err.blocked_by_you': ['You blocked this neighbour. Unblock them to send a message.', 'Anda menyekat jiran ini. Nyahsekat mereka untuk menghantar mesej.', '你封锁了这位邻居，解除封锁后才能发讯息。'],
+  'err.quiet_mode': ['This neighbour has quiet mode on. Renovation notices and concerns still reach them.', 'Jiran ini dalam mod senyap. Notis ubah suai dan kebimbangan masih sampai kepada mereka.', '这位邻居开着安静模式，装修通知和问题仍会送达。'],
+  'err.waves_off': ['This neighbour has turned waves off. You can still send a message.', 'Jiran ini telah mematikan lambaian. Anda masih boleh menghantar mesej.', '这位邻居关掉了招呼功能，你仍可以发讯息。'],
+  'err.waved_today': ['You already waved today.', 'Anda sudah melambai hari ini.', '你今天已经打过招呼了。'],
+  'err.wave_cap': ['At most {n} waves a day.', 'Paling banyak {n} lambaian sehari.', '每天最多打 {n} 次招呼。'],
+  'err.react_not_yours': ['You can only react to messages in your own chats.', 'Anda hanya boleh bertindak balas kepada mesej dalam sembang anda sendiri.', '你只能对自己聊天里的讯息按表情。'],
+  'err.reaction_unknown': ['Unsupported reaction.', 'Reaksi tidak disokong.', '不支持这个表情。'],
+  'err.voice_too_long': ['Voice messages can be up to one minute.', 'Mesej suara boleh sehingga satu minit.', '语音讯息最长一分钟。'],
+  'err.voice_gone': ['Voice messages are deleted after {n} days.', 'Mesej suara dipadam selepas {n} hari.', '语音讯息在 {n} 天后删除。'],
+  'err.signin': ['Please sign in again with your digital key.', 'Sila log masuk semula dengan kunci digital anda.', '请用你的数字钥匙重新登入。'],
+  'err.signin_demo': ['Sign-in is part of pilot mode; the demo switches households instead.', 'Log masuk ialah sebahagian daripada mod perintis; demo menukar isi rumah sebaliknya.', '登入是试点模式的功能，演示版改用切换住户。'],
+  'err.helper_unauthorised': ['This helper isn’t authorised for this household.', 'Pembantu ini tidak dibenarkan untuk isi rumah ini.', '这位代办人没有获得这户的授权。'],
+  'err.helper_consent': ['The owner must agree before a helper is added.', 'Pemilik mesti bersetuju sebelum pembantu ditambah.', '要屋主同意才能新增代办人。'],
+  'err.helper_cap': ['At most {n} helpers per household.', 'Paling banyak {n} pembantu bagi setiap isi rumah.', '每户最多 {n} 位代办人。'],
+  'err.helper_not_found': ['That helper was not found.', 'Pembantu itu tidak dijumpai.', '找不到那位代办人。'],
+  'err.close_confirm': ['To close the account, type your unit exactly: {label}.', 'Untuk menutup akaun, taip unit anda dengan tepat: {label}.', '要退出，请一字不差地输入你的门牌：{label}。'],
+  'err.close_id_check': ['Check the owner’s ID first: closing deletes the household’s messages and photos.', 'Semak ID pemilik dahulu: menutup akaun memadam mesej dan foto isi rumah.', '先核对屋主的身份证：退出会删除这户的讯息和照片。'],
+  'err.demo_off': ['This is part of the demo only; demo mode is off.', 'Ini sebahagian daripada demo sahaja; mod demo dimatikan.', '这是演示功能，演示模式已关闭。'],
+  'err.demo_only': ['This is part of the demo only.', 'Ini sebahagian daripada demo sahaja.', '这是演示功能。'],
+  'err.demo_only_time': ['Simulated time is only available in demo mode.', 'Masa simulasi hanya tersedia dalam mod demo.', '模拟时间只在演示模式可用。'],
+  'err.demo_photo_unknown': ['No such demo photo.', 'Tiada foto demo seperti itu.', '没有这张示范照片。'],
+  'err.compare_not_yours': ['Both photos must belong to the household reporting the change.', 'Kedua-dua foto mesti milik isi rumah yang melaporkan perubahan.', '两张照片都必须属于报告变化的住户。'],
+  'err.compare_kinds': ['Compare a pre-work photo with a follow-up photo.', 'Bandingkan foto sebelum kerja dengan foto susulan.', '请用开工前照片和跟进照片对比。'],
+  'err.compare_order': ['The follow-up photo must be taken after the pre-work photo.', 'Foto susulan mesti diambil selepas foto sebelum kerja.', '跟进照片必须在开工前照片之后拍。'],
+  'err.compare_renovation': ['The follow-up photo is linked to a different renovation than the pre-work photo.', 'Foto susulan dipautkan kepada ubah suai yang berbeza daripada foto sebelum kerja.', '跟进照片和开工前照片关联的不是同一项装修。'],
+  'err.compare_no_image': ['No comparison image: the photos could not be matched.', 'Tiada imej perbandingan: foto tidak dapat dipadankan.', '没有对比图：两张照片对不上。'],
+  'err.case_not_found': ['That case was not found.', 'Kes itu tidak dijumpai.', '找不到那个案件。'],
+  'err.inspector_only': ['Only SDP’s inspector can record an inspector’s finding.', 'Hanya pemeriksa SDP boleh merekodkan dapatan pemeriksa.', '只有 SDP 检查员能记录检查结果。'],
+  'err.case_two_households': ['Only the two households in this case can decide it.', 'Hanya dua isi rumah dalam kes ini boleh memutuskannya.', '只有这个案件的两户能做决定。'],
+  'err.case_decided': ['This case has already been decided.', 'Kes ini sudah diputuskan.', '这个案件已经定案。'],
+  'err.case_no_renovation': ['No renovation is linked to this case.', 'Tiada ubah suai dipautkan kepada kes ini.', '这个案件没有关联任何装修。'],
+  'err.case_owner_only': ['Only the owner of the home can decide this about their own home.', 'Hanya pemilik rumah boleh memutuskan perkara ini tentang rumahnya sendiri.', '只有屋主能对自己的房子做这个决定。'],
+  'err.case_inspector_after': ['You can ask an SDP inspector once your neighbour says the renovation caused it.', 'Anda boleh meminta pemeriksa SDP setelah jiran anda mengatakan ubah suai yang menyebabkannya.', '等邻居表示是装修造成之后，你才能请 SDP 检查员。'],
+  'err.case_answer_owner': ['Only the renovating owner can answer that proposal.', 'Hanya pemilik yang mengubah suai boleh menjawab cadangan itu.', '只有装修户能回应这个提议。'],
+  'err.case_nothing_proposed': ['Nothing has been proposed for this case yet.', 'Belum ada cadangan untuk kes ini.', '这个案件还没有任何提议。'],
+  'err.case_why_disagree': ['Say briefly why you disagree.', 'Nyatakan secara ringkas mengapa anda tidak bersetuju.', '请简短说明为什么不同意。'],
+  'err.case_already_asked': ['You have already asked {label} to confirm.', 'Anda sudah meminta {label} mengesahkan.', '你已经请 {label} 确认过了。'],
+  'err.case_disagreed': ['{label} disagreed. Ask an SDP inspector to check instead.', '{label} tidak bersetuju. Minta pemeriksa SDP menyemak sebaliknya.', '{label} 不同意。请改为请 SDP 检查员查看。'],
+  'err.pass_owner_only': ['Only the renovating household can issue passes for it.', 'Hanya isi rumah yang mengubah suai boleh mengeluarkan pas untuknya.', '只有装修户能为这项装修发通行证。'],
+  'err.pass_cap': ['At most {n} active passes per renovation. Revoke one first.', 'Paling banyak {n} pas aktif bagi setiap ubah suai. Batalkan satu dahulu.', '每项装修最多 {n} 张有效通行证，先撤销一张。'],
+  'err.pass_not_found': ['That pass was not found.', 'Pas itu tidak dijumpai.', '找不到那张通行证。'],
+  'err.pass_revoke_issuer': ['Only the household that issued this pass can revoke it.', 'Hanya isi rumah yang mengeluarkan pas ini boleh membatalkannya.', '只有发出这张通行证的住户能撤销它。'],
+  'err.ticket_not_found': ['That warranty ticket was not found.', 'Tiket waranti itu tidak dijumpai.', '找不到那张保修单。'],
+  'err.ticket_not_waiting': ['This ticket is not waiting for a repair.', 'Tiket ini tidak menunggu pembaikan.', '这张单不在等待维修。'],
+  'err.export_nothing_new': ['Nothing new to export since the last download.', 'Tiada yang baharu untuk dieksport sejak muat turun terakhir.', '自上次下载以来没有新内容可导出。'],
+  'err.export_nothing': ['No tickets to export.', 'Tiada tiket untuk dieksport.', '没有可导出的保修单。'],
+  'err.repair_owner_only': ['Only the homeowner can confirm or reject this repair.', 'Hanya pemilik rumah boleh mengesahkan atau menolak pembaikan ini.', '只有屋主能确认或驳回这次维修。'],
+  'err.repair_none_waiting': ['There is no repair waiting for confirmation.', 'Tiada pembaikan yang menunggu pengesahan.', '没有等待确认的维修。'],
+  'err.repair_no_photo': ['No repair photo yet.', 'Belum ada foto pembaikan.', '还没有维修照片。'],
+  'err.reset_confirm': ['Confirm the reset to clear the demo data.', 'Sahkan set semula untuk mengosongkan data demo.', '请确认重置，才会清空示范资料。'],
+  'err.join_code_invalid': ['This join code isn’t valid any more. Ask the estate office for a new one.', 'Kod sertai ini tidak sah lagi. Minta kod baharu daripada pejabat estet.', '这个加入码已失效，请向物业办公室要一个新的。'],
+  'err.join_already': ['This household has already joined. A lost phone is handled at the estate office, with ID.', 'Isi rumah ini sudah menyertai. Telefon yang hilang dikendalikan di pejabat estet, dengan ID.', '这户已经加入了。手机遗失请带身份证到物业办公室处理。'],
+  'err.packs_cap': ['Print up to {n} welcome packs at a time: choose a shorter range of handover dates.', 'Cetak sehingga {n} pek alu-aluan pada satu masa: pilih julat tarikh penyerahan yang lebih pendek.', '一次最多列印 {n} 份礼包，请缩小交屋日期范围。'],
+  'err.import': ['{n} line(s) need fixing first.', '{n} baris perlu dibetulkan dahulu.', '有 {n} 行要先修正。'],
+  'err.join_consent': ['Keynection can only set up your household once you agree to the privacy notice.', 'Keynection hanya boleh menyediakan isi rumah anda setelah anda bersetuju dengan notis privasi.', '你同意隐私声明后，Keynection 才能为你设定住户。'],
+  'err.own_name_only': ['Records are signed with your own name.', 'Rekod ditandatangani dengan nama anda sendiri.', '纪录只能用你自己的名字签署。'],
+  'err.staff_not_household': ['Staff can’t act for a household.', 'Kakitangan tidak boleh bertindak bagi pihak isi rumah.', '职员不能代表住户操作。'],
+  'err.own_home_only': ['You can only act for your own home.', 'Anda hanya boleh bertindak untuk rumah anda sendiri.', '你只能为自己的家操作。'],
+  'err.paper_not_found': ['That paper notice was not found.', 'Notis bercetak itu tidak dijumpai.', '找不到那份纸本通知。'],
+  'err.paper_not_waiting': ['This notice isn’t waiting to be printed.', 'Notis ini tidak menunggu untuk dicetak.', '这份通知不在等待列印。'],
+  'err.paper_delivered': ['This notice was already delivered, or now arrives in the app.', 'Notis ini sudah dihantar, atau kini tiba dalam app.', '这份通知已经送达，或现在改由 app 送达。'],
+  'err.paper_sign_first': ['The owner needs to sign the paper renovation form first.', 'Pemilik perlu menandatangani borang ubah suai bercetak dahulu.', '屋主要先在纸本装修表格上签名。'],
+  'err.push_service': ['Notifications can only go through Google’s, Apple’s, Mozilla’s or Microsoft’s push service.', 'Notifikasi hanya boleh melalui perkhidmatan tolak Google, Apple, Mozilla atau Microsoft.', '通知只能经由 Google、Apple、Mozilla 或 Microsoft 的推送服务。'],
+  'err.push_keys': ['This phone’s notification keys aren’t valid. Please try again.', 'Kunci notifikasi telefon ini tidak sah. Sila cuba lagi.', '这部手机的通知金钥无效，请再试一次。'],
+  'err.planner_empty': ['Add at least one lorong or one block.', 'Tambah sekurang-kurangnya satu lorong atau satu blok.', '至少加一条 lorong 或一栋。'],
+  'err.planner_cap': ['The prototype sets up phases of up to {n} homes at a time.', 'Prototaip menyediakan fasa sehingga {n} rumah pada satu masa.', '原型一次最多设定 {n} 户的 phase。'],
+  'err.not_found': ['Not found.', 'Tidak dijumpai.', '找不到。'],
 }
 
 // Tamil for what a resident receives in their own language: the printed renovation notice, noisy-work hours and the
@@ -928,7 +1100,7 @@ const TA: Record<string, string> = {
   'join.p4t': 'உங்கள் உரிமைகள்',
   'join.p4': 'எப்போது வேண்டுமானாலும் உங்கள் தகவல்களைப் பதிவிறக்கலாம், திருத்தலாம், அல்லது "Me" பக்கத்தில் உங்கள் கணக்கை மூடலாம் (நிர்வாக அலுவலகத்திடமும் கேட்கலாம்).',
   'join.p5t': 'AI மொழிபெயர்ப்பு',
-  'join.p5': 'அண்டைவீட்டார் தங்கள் சொந்த மொழியில் படிக்க, நீங்கள் அவர்களுக்குத் தட்டச்சு செய்வது ஒரு AI சேவையால் (Anthropic நிறுவனத்தின் Claude, மலேசியாவுக்கு வெளியே செயலாக்கப்படுகிறது) மொழிபெயர்க்கப்படும். நீங்கள் எழுதும் சொற்கள் மட்டுமே அனுப்பப்படும். உதவியாளரிடம் கேட்கும்போது, உங்கள் சொந்தப் பதிவுகளும் (அறிவிப்புகள், உத்தரவாதச் சீட்டுகள், வழக்கின் நிலை) அண்டைவீட்டாரின் வீட்டு எண்களும் உங்கள் கேள்வியுடன் AI-க்கு அனுப்பப்படும்; அண்டைவீட்டாரின் பெயர்களும் அவர்கள் எழுதியவையும் அனுப்பப்படாது. உங்கள் அண்டைவீட்டார் உங்கள் மூலச் சொற்களை எப்போதும் பார்க்கலாம்; அமைதியான சொற்றொடர் எப்போதும் ஒரு பரிந்துரை மட்டுமே.',
+  'join.p5': 'அண்டைவீட்டார் தங்கள் சொந்த மொழியில் படிக்க, நீங்கள் அவர்களுக்குத் தட்டச்சு செய்வது ஒரு AI சேவையால் (Anthropic நிறுவனத்தின் Claude, மலேசியாவுக்கு வெளியே செயலாக்கப்படுகிறது) மொழிபெயர்க்கப்படும். நீங்கள் எழுதும் சொற்கள் மட்டுமே அனுப்பப்படும். உதவியாளரிடம் கேட்கும்போது, உங்கள் சொந்தப் பதிவுகளும் (அறிவிப்புகள், உத்தரவாதச் சீட்டுகள், வழக்கின் நிலை) அண்டைவீட்டாரின் வீட்டு எண்களும் உங்கள் கேள்வியுடன் AI-க்கு அனுப்பப்படும்; அண்டைவீட்டாரின் பெயர்களும் அவர்கள் எழுதியவையும் அனுப்பப்படாது. உங்கள் அண்டைவீட்டார் உங்கள் மூலச் சொற்களை எப்போதும் பார்க்கலாம்; அமைதியான சொற்றொடர் எப்போதும் ஒரு பரிந்துரை மட்டுமே. உங்கள் ஒரு வரி அறிமுகமும் நிர்வாக அலுவலகத்தின் அறிவிப்புகளும் இதே முறையில் மொழிபெயர்க்கப்படும்; ஒவ்வொரு அண்டைவீட்டாரும் அவற்றைத் தங்கள் மொழியிலேயே படிப்பார்கள்.',
   'join.p5.gemini': 'அண்டைவீட்டார் தங்கள் சொந்த மொழியில் படிக்க, நீங்கள் அவர்களுக்குத் தட்டச்சு செய்வது ஒரு AI சேவையால் (Google நிறுவனத்தின் Gemini, மலேசியாவுக்கு வெளியே செயலாக்கப்படுகிறது) மொழிபெயர்க்கப்படும். இந்த டெமோ Google-இன் இலவச சேவையைப் பயன்படுத்துகிறது; அனுப்பப்படுவதை Google தனது தயாரிப்புகளை மேம்படுத்தப் பயன்படுத்தக்கூடும், எனவே இங்கே கற்பனையான விவரங்களை மட்டுமே தட்டச்சு செய்யுங்கள். நீங்கள் எழுதும் சொற்கள் மட்டுமே அனுப்பப்படும். உதவியாளரிடம் கேட்கும்போது, உங்கள் சொந்தப் பதிவுகளும் (அறிவிப்புகள், உத்தரவாதச் சீட்டுகள், வழக்கின் நிலை) அண்டைவீட்டாரின் வீட்டு எண்களும் உங்கள் கேள்வியுடன் AI-க்கு அனுப்பப்படும்; அண்டைவீட்டாரின் பெயர்களும் அவர்கள் எழுதியவையும் அனுப்பப்படாது. உங்கள் அண்டைவீட்டார் உங்கள் மூலச் சொற்களை எப்போதும் பார்க்கலாம்; அமைதியான சொற்றொடர் எப்போதும் ஒரு பரிந்துரை மட்டுமே.',
   'join.consent': 'இந்தத் தனியுரிமை அறிவிப்பை ({version}) படித்தேன், ஒப்புக்கொள்கிறேன்.',
   'join.wa': 'WhatsApp-இல் சுருக்கமான அறிவிப்புகளை அனுப்புங்கள் (செய்திகளின் உள்ளடக்கம் ஒருபோதும் இருக்காது)',
@@ -1027,8 +1199,15 @@ export function langChosen(): boolean {
   return remembered('uiLang') !== null
 }
 
+// What the page says it is written in, so browsers pick the right fonts (Chinese glyphs, not Japanese ones) and screen
+// readers the right voice. Dates and numbers use LOCALE instead.
+const HTML_LANG: Record<UiLang, string> = { en: 'en-MY', ms: 'ms-MY', zh: 'zh-Hans' }
+
 export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, set] = useState<UiLang>(initial)
+  useEffect(() => { document.documentElement.lang = HTML_LANG[lang] }, [lang])
+  // A refusal from the server arrives as a code: said here in the interface language, the English record otherwise.
+  useEffect(() => { onErrorText((code, values, record) => (D[`err.${code}`] ? translate(lang, `err.${code}`, values) : record)) }, [lang])
   const setLang = useCallback((l: UiLang) => {
     set(l)
     remember('uiLang', l)
@@ -1041,6 +1220,22 @@ export function LangProvider({ children }: { children: ReactNode }) {
 export function EnglishOnly({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({ lang: 'en' as UiLang, setLang: () => {}, t: tEn }), [])
   return <LangContext.Provider value={value}>{children}</LangContext.Provider>
+}
+
+/** The language this household reads the screens in: the interface language, except that a Tamil-reading household on
+ *  the English screens reads Tamil (the screens themselves have no Tamil). Quick replies and the assistant use the same rule. */
+export function readLang(ui: UiLang, me: { lang: Lang }): Lang {
+  return ui === 'en' && me.lang === 'ta' ? 'ta' : ui
+}
+
+/** A neighbour's one-line bio for this reader: in their reading language when that wording exists, otherwise as written.
+ *  `from` names the language it was written in whenever what is shown is a translation, so the screen can say so. */
+export function bioFor(n: { bio?: string; bio_lang?: Lang | null; bio_in?: Partial<Record<Lang, string>> }, lang: Lang): { text: string; from: Lang | null } {
+  if (!n.bio) return { text: '', from: null }
+  const own = n.bio_lang ?? 'en'
+  if (lang === own) return { text: n.bio, from: null }
+  const translated = n.bio_in?.[lang]
+  return translated ? { text: translated, from: own } : { text: n.bio, from: null }
 }
 
 export const useLang = () => useContext(LangContext)

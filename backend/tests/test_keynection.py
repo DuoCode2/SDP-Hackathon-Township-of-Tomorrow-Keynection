@@ -72,8 +72,11 @@ def test_demo_notices_do_not_point_to_the_hidden_contractor_passes():
     # The passes are built but switched off in the demo (estate systems already offer them), so no notice may send
     # residents looking for them.
     from app import seed
-    for _, title, body in seed.demo_notices():
-        assert "pass" not in f"{title} {body}".lower()
+    for n in seed.demo_notices():
+        assert "pass" not in f"{n['title']} {n['body']}".lower()
+        for lang, text in n["translations"].items():  # in every reading language, with the day in that language too
+            assert lang in ("ms", "zh", "ta") and text["title"] and text["body"] and "pass" not in text["body"].lower()
+            assert not ("Thursday" in text["body"] or "Saturday" in text["body"])
 
 
 def test_nobody_can_pose_as_the_service():

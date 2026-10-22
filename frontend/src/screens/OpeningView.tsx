@@ -50,7 +50,7 @@ export default function OpeningView({ units, onPick, onDone }: {
       await api.wave(me.id, first.id)
       celebrate('👋', t('celebrate.wave', { name: first.resident_name }))
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not wave', 'error')
+      toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     }
     onDone()
   }

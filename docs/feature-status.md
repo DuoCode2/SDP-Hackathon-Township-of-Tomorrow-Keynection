@@ -22,6 +22,7 @@
 | Noisy hours planned around neighbours' private quiet times; two-sided works warning | Live (plain rules, no AI) | Step 3 "When"; Neighbours → Your quiet times | — |
 | One sentence → notice fields (type of work, dates, hours, contractor), approvals never filled by AI | Live with a key | Step 1 "Just say it in one sentence" | A key on the server; a data-processing agreement for a pilot |
 | Typed words arrive in the reader's language; calmer wording offered when heated | Live with a key | Chats, notices; "Translated by AI" | Same |
+| A neighbour's one-line bio and the estate office's notices arrive in the reader's language, with the original one tap away (the demo cast's and the demo notices' wording is the team's; a bio or notice typed later is translated by the AI) | Live (demo cast); live with a key (new text) | Neighbour cards; Chats → Estate Office; Channels → WhatsApp preview; "Translated from …" | Same |
 | Insults refused outright, no "send anyway": a word list in English, Malay and Chinese, and with a key the AI's own judgement of abuse in any language | Live; the AI part with a key | Chats | Same |
 | Pre-work photo sealed (fingerprint, metadata stripped); follow-up aligned and compared; change boxed | Live (computer vision: OpenCV alignment and a darkening rule, not machine learning) | Photos & repairs | In-app camera only, so a gallery photo can't pass as new |
 | Triage suggestion by time order; decision by people, nothing pre-selected | Live | Photos & repairs → case | A real inspector role |
@@ -33,7 +34,7 @@
 | **WhatsApp phone** | **Simulated** — the text is generated from real data in the reader's language, nothing is sent | Label on the phone: *Step one · preview, nothing is sent* | SDP's WhatsApp Business account; templates ready in `docs/whatsapp-templates.md` |
 | **SDP App phone** | **Simulated** — an illustrative layout, not SDP's actual app | Label: *Step two · illustration* | SDP's app team |
 | **Scheduled reminders** (photograph 3 days before; check the day after) | **Simulated** in the demo (shown on the WhatsApp preview); real as push notifications in a pilot | "Scheduled" tag on the preview | A deployed pilot |
-| Guide panel with the two routes, AI on/off line, "Show every feature" | Live (demo tool) | Top-right | Not shown in a pilot |
+| Guide panel with the two routes, AI on/off line, "Show every feature", in English, Malay and Chinese, following the interface language | Live (demo tool) | Top-right | Not shown in a pilot |
 | Shared demo: starts over after 20 quiet minutes; daily caps loosened | Live (demo only) | Guide's top line | A pilot never resets |
 | Error boundary (no blank page on a screen error) | Live | Only if a screen throws | — |
 
@@ -79,4 +80,4 @@
 | A real SDP inspector role | Pilot |
 | Tamil on every screen (Tamil is a reading language today) | Interface stays English / Malay / Chinese for the demo |
 | Encryption at rest; an access log the household can see | Pilot |
-| Translation of estate notices and concern notes | Known gap, new scope |
+| Translation of concern notes (the estate team's free-text reminders and closing notes) | Known gap, new scope; estate notices themselves are translated since 22 Oct 2026 |

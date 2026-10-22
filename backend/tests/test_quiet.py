@@ -139,9 +139,10 @@ def test_noisy_hours_outside_the_house_rule_are_refused(client):
     # or sends the notice; the planner never falls back to hours the rule forbids.
     late = {"noisy_from": "20:00", "noisy_to": "23:00"}
     r = client.get("/api/units/T-12/quiet-plan", params={**RENO, **late})
-    assert r.status_code == 422 and r.json()["detail"] == quiet.HOUSE_RULE_HOURS
+    assert r.status_code == 422 and r.json()["detail"]["message"] == quiet.HOUSE_RULE_HOURS and r.json()["detail"]["code"] == "house_rule_hours"
     r = _notice(client, **late)
-    assert r.status_code == 422 and r.json()["detail"][0]["msg"].endswith(quiet.HOUSE_RULE_HOURS)
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "house_rule_hours"  # the form's own check answers the same way
+    assert r.json()["detail"]["message"] == quiet.HOUSE_RULE_HOURS and r.json()["detail"]["values"] == {"from": quiet.LEGAL_FROM, "to": quiet.LEGAL_TO}
     # Starting before the rule's hours is refused too, even when the day ends inside them.
     assert client.get("/api/units/T-12/quiet-plan", params={**RENO, "noisy_from": "08:00"}).status_code == 422
     assert _notice(client, noisy_from="08:00").status_code == 422

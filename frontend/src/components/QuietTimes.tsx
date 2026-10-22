@@ -43,7 +43,7 @@ export default function QuietTimesCard({ unitId }: { unitId: string }) {
       setRows(null)
       toast(t('qt.saved'))
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not save', 'error')
+      toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     } finally {
       setBusy(false)
     }

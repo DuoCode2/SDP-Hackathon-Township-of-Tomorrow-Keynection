@@ -48,6 +48,8 @@ def test_a_newer_keynection_adds_to_a_pilot_database_and_keeps_every_record(tmp_
     db.init_db(conn, keep_data=True)
     assert conn.execute("SELECT label FROM units WHERE id = 'L-1'").fetchone()[0] == "No. 1"
     assert "street" in [r["name"] for r in conn.execute("PRAGMA table_info(units)")]
+    assert "translations" in [r["name"] for r in conn.execute("PRAGMA table_info(notices)")]  # 17: every reader's language
+    assert {"bio_lang", "bio_translations"} <= {r["name"] for r in conn.execute("PRAGMA table_info(profiles)")}
     assert conn.execute("SELECT COUNT(*) FROM auth_challenges").fetchone()[0] == 0  # the missing table is back
     assert conn.execute("SELECT COUNT(*) FROM phases").fetchone()[0] == 1  # and no fictional phase was added
     assert conn.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION

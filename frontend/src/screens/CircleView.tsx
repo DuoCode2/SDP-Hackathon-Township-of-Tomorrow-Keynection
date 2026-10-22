@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Camera, Eye, Hammer, Languages, Lock, Map as MapIcon, MessagesSquare, UserPlus, Users, X } from 'lucide-react'
-import { api, type ContactRequest, type Directory, type NearbyHome, type RenovationTask, type UnitInfo } from '../api'
-import { refusal, useDates, useT, type Translate } from '../i18n'
+import { api, type ContactRequest, type Directory, type Lang, type NearbyHome, type RenovationTask, type UnitInfo } from '../api'
+import { bioFor, readLang, refusal, useDates, useLang, useT, type Translate } from '../i18n'
 import PlanMap from '../components/PlanMap'
 import { LANG_TAG, roleOf } from '../components/Cast'
 import { Avatar, Badge, Card, CardHead, ScreenTitle, Segmented, Sheet, Skeleton, useCelebrate, useToast } from '../ui'
@@ -58,6 +58,7 @@ export { replayWelcome } from '../welcome'
 /** Who lives around you and who you can talk to: people first, the plan one tap away. */
 export default function CircleView({ me, units, version, onChange, onViewAs, onOpenChat, onOpenEvidence }: Props) {
   const t = useT()
+  const reads = readLang(useLang().lang, me)  // bios arrive in this language
   const showAll = useShowAll()  // contact requests beyond the five homes are an extra, shown on request
   const toast = useToast()
   const celebrate = useCelebrate()
@@ -105,7 +106,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
       celebrate('👋', t('celebrate.wave', { name: n.resident_name }))
       onChange()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not wave', 'error')
+      toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     }
   }
 
@@ -131,7 +132,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
 
       {!dir ? <Card><Skeleton lines={6} /></Card> : mode === 'people' ? (
         <>
-          <div className="stories" role="list" aria-label="Your circle">
+          <div className="stories" role="list" aria-label={t('circle.list')}>
             {circle.map((n) => (
               <button key={n.id} role="listitem" className={`story ${!n.joined ? 'off' : works.has(n.id) ? 'works' : n.known ? 'known' : 'new'}`} onClick={() => setProfile(n)}>
                 <span className="story-ring"><Avatar name={n.resident_name} size={58} /></span>
@@ -199,7 +200,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
                   </span>
                   <span className="lang-tag">{LANG_TAG[n.lang]}</span>
                 </button>
-                {n.bio && <p className="person-bio">{n.bio}</p>}
+                <Bio n={n} lang={reads} />
                 <div className={`person-status ${works.has(n.id) ? 'works' : n.known ? 'known' : ''}`}>
                   {works.has(n.id) ? <><Hammer size={12} /> {t('status.renovating')}</> : t(n.known ? 'status.known' : n.hello_sent ? 'status.helloSent' : 'status.notMet')}
                 </div>
@@ -270,7 +271,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
       )}
 
       {profile && (
-        <ProfileSheet n={profile} works={works.has(profile.id)} onClose={() => setProfile(null)}
+        <ProfileSheet n={profile} lang={reads} works={works.has(profile.id)} onClose={() => setProfile(null)}
           onMessage={() => { setProfile(null); onOpenChat(profile.id) }} onWave={() => wave(profile)} onViewAs={() => { setProfile(null); onViewAs(profile.id) }} />
       )}
       {introOpen && <IntroWizard open onClose={() => setIntroOpen(false)} me={me} circle={circle} onSent={() => { celebrate('👋', t('celebrate.hello')); onChange() }} />}
@@ -282,9 +283,23 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
   )
 }
 
+/** A neighbour's one-line bio in the reader's language, saying where the wording came from when it is a translation. */
+function Bio({ n, lang, quote }: { n: Member; lang: Lang; quote?: boolean }) {
+  const t = useT()
+  const { text, from } = bioFor(n, lang)
+  if (!text) return null
+  return (
+    <>
+      <p className={quote ? 'profile-bio' : 'person-bio'}>{quote ? `“${text}”` : text}</p>
+      {from && <small className="bio-from">{t(n.bio_by_ai ? 'bio.byAi' : 'bio.translated', { lang: t(`lang.${from}`) })}</small>}
+    </>
+  )
+}
+
 /** A neighbour's mini profile, like tapping someone's picture in a social app. */
-function ProfileSheet({ n, works, onClose, onMessage, onWave, onViewAs }: {
+function ProfileSheet({ n, lang, works, onClose, onMessage, onWave, onViewAs }: {
   n: Member
+  lang: Lang
   works: boolean
   onClose: () => void
   onMessage: () => void
@@ -312,7 +327,7 @@ function ProfileSheet({ n, works, onClose, onMessage, onWave, onViewAs }: {
         <span className={`story-ring big ${works ? 'works' : n.known ? 'known' : 'new'}`}><Avatar name={n.resident_name} size={84} /></span>
         <h2>{n.resident_name}</h2>
         <div className="profile-sub">{n.label} · {shares(t, n.relation)}</div>
-        {n.bio && <p className="profile-bio">“{n.bio}”</p>}
+        <Bio n={n} lang={lang} quote />
         <div className="profile-facts">
           <span><Languages size={13} /> {t('profile.reads', { lang: langName(t, n.lang) })}</span>
           <span>{t(n.known ? 'status.known' : 'status.notMet')}</span>
@@ -415,7 +430,7 @@ function HomePanel({ id, me, units, dir, reqs, works, onClose, onMessage, onView
 
   return (
     <Card className="home-panel">
-      <button className="icon-btn home-panel-close" onClick={onClose} aria-label="Close"><X size={14} /></button>
+      <button className="icon-btn home-panel-close" onClick={onClose} aria-label={t('common.close')}><X size={14} /></button>
       {body}
       {id !== me.id && <button className="link-btn demo-link" onClick={() => onViewAs(id)}><Eye size={13} /> {t('panel.viewAs')}</button>}
     </Card>
@@ -440,7 +455,7 @@ function RequestSheet({ home, me, onClose, onSent }: { home: NearbyHome; me: Uni
       onClose()
     } catch (e) {
       if (refusal(e)) setTone(refusal(e))
-      else toast(e instanceof Error ? e.message : 'Could not send', 'error')
+      else toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     } finally {
       setBusy(false)
     }

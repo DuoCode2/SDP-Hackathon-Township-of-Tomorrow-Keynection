@@ -26,6 +26,7 @@ from urllib.parse import parse_qs, urlparse
 
 import httpx
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -101,7 +102,7 @@ def staff_only() -> None:
     them; in pilot mode only a signed-in staff member (the guard checks the session before the request body)."""
     actor = _current_actor.get()
     if not demo_mode() and not (actor and actor.is_staff):
-        raise HTTPException(403, "This is for the estate office and SDP staff.")
+        raise refuse(403, "staff_only", "This is for the estate office and SDP staff.")
 
 
 @asynccontextmanager
@@ -282,13 +283,29 @@ class BodyLimit:
             if message["type"] == "http.request":
                 seen += len(message.get("body", b""))
                 if seen > self.limit:
-                    raise HTTPException(413, "Request too large. Photos must be under 12 MB.")
+                    raise refuse(413, "too_large", "Request too large. Photos must be under 12 MB.")
             return message
 
         await self.app(scope, counted, send)
 
 
 app = FastAPI(title="Keynection prototype API", version="0.2.0", lifespan=lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def _invalid_form(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """A form that fails its checks: the first problem, as a code the screen can say in the reader's language (one of
+    VALIDATION, raised by a model validator), else pydantic's own wording for the field, under the code "invalid"."""
+    errors = exc.errors()
+    first = errors[0] if errors else {}
+    msg = str(first.get("msg", "invalid request"))
+    token = msg.removeprefix("Value error, ")
+    if token in VALIDATION:
+        message, values = VALIDATION[token]
+        return JSONResponse({"detail": {"code": token, "message": message, "values": values}}, status_code=422)
+    field = ".".join(str(x) for x in first.get("loc", []) if x not in ("body", "query", "path"))
+    return JSONResponse({"detail": {"code": "invalid", "message": f"{field}: {msg}" if field else msg,
+                                    "values": {"field": field, "problem": msg}, "errors": errors[:5]}}, status_code=422)
 
 
 async def _sign_in_guard(request: Request) -> None:
@@ -525,7 +542,7 @@ def get_conn() -> Iterator[sqlite3.Connection]:
 def _unit_row(conn: sqlite3.Connection, unit_id: str) -> sqlite3.Row:
     row = conn.execute("SELECT * FROM units WHERE id = ?", (unit_id,)).fetchone()
     if row is None:
-        raise HTTPException(404, f"unit {unit_id} not found")
+        raise refuse(404, "unit_not_found", f"unit {unit_id} not found", unit=unit_id)
     return row
 
 
@@ -548,7 +565,8 @@ def _require_joined(conn: sqlite3.Connection, unit_id: str, message: str | None 
     row = _unit_row(conn, unit_id)
     if row["joined_at"] is None:
         raise HTTPException(409, {"code": "not_joined", "message": message or
-                                  f"{row['label']} isn't on Keynection yet. The estate office delivers formal notices to them on paper."})
+                                  f"{row['label']} isn't on Keynection yet. The estate office delivers formal notices to them on paper.",
+                                  "values": {"label": row["label"]}})
     return row
 
 
@@ -596,6 +614,76 @@ def _intro_in(row: sqlite3.Row, lang: str) -> dict[str, str | None] | None:
     return json.loads(row["translations"] or "{}").get(lang)
 
 
+READ_LANGS = set(ai.LANG_FOR_AI)
+
+
+def _notice_in(row: sqlite3.Row, lang: str) -> dict[str, Any]:
+    """An estate notice for a reader of lang: its wording in that language when there is one (the team's for the
+    demo notices, the AI's for a notice the estate team posts later), otherwise the English record."""
+    found = json.loads(row["translations"] or "{}").get(lang) if lang != "en" else None
+    if not found or not found.get("title") or not found.get("body"):
+        return {"title": row["title"], "body": row["body"], "translated": False, "by_ai": False}
+    return {"title": found["title"], "body": found["body"], "translated": True, "by_ai": bool(found.get("by_ai"))}
+
+
+def _notice_json(row: sqlite3.Row, lang: str) -> dict[str, Any]:
+    """A notice as a reader of lang sees it; the English record comes along as original when it was translated."""
+    shown = _notice_in(row, lang)
+    out = {k: row[k] for k in ("id", "phase_id", "audience", "author", "created_at")} | shown
+    if shown["translated"]:
+        out["original"] = {"title": row["title"], "body": row["body"]}
+    return out
+
+
+def _translate_estate_notice(notice_id: int, title: str, body: str) -> None:
+    """After the estate team's notice is saved: its title and body in the other three reading languages, written onto
+    it, so each household reads it in theirs (in Chats and on WhatsApp). Until then, and with no answer, the English
+    record is shown."""
+    got = ai.translate_texts(ESTATE, [title, body], READ_LANGS - {"en"},
+                             what="an estate office notice to the residents of a township: first its title, then its body")
+    if not got:
+        return
+    translations = {lang: {"title": texts[0], "body": texts[1], "by_ai": True} for lang, texts in got.items()}
+    conn = db.connect(db_path())
+    try:  # matched on the words too, in case the notice was edited or the demo reset meanwhile
+        conn.execute("UPDATE notices SET translations = ? WHERE id = ? AND title = ? AND body = ?",
+                     (json.dumps(translations, ensure_ascii=False), notice_id, title, body))
+        conn.commit()
+    except sqlite3.Error:
+        log.warning("notice %s: its translation could not be saved", notice_id)
+    finally:
+        conn.close()
+
+
+def _bio_json(conn: sqlite3.Connection, unit_id: str) -> dict[str, Any]:
+    """A household's one-line bio for its neighbours' screens: as written, the language it was written in, and the
+    same line in the other reading languages (the team's for the demo cast, the AI's for a line a resident types), so
+    the screen shows each neighbour the one they read and says where it came from."""
+    p, unit = _profile_row(conn, unit_id), _unit_row(conn, unit_id)
+    found = json.loads(p["bio_translations"] or "{}") if p["bio"] else {}
+    return {"bio": p["bio"], "bio_lang": (p["bio_lang"] or unit["lang"]) if p["bio"] else None, "bio_by_ai": bool(found.get("by_ai")),
+            "bio_in": {k: v for k, v in found.items() if k in READ_LANGS and isinstance(v, str) and v}}
+
+
+def _translate_bio(unit_id: str, bio: str, lang: str) -> None:
+    """After a resident saves their bio: the same line in the other three reading languages, written onto the profile."""
+    got = ai.translate_texts(unit_id, [bio], READ_LANGS - {lang},
+                             what="a resident's one-line introduction of themselves to their neighbours")
+    if not got:
+        return
+    translations: dict[str, Any] = {found_lang: texts[0] for found_lang, texts in got.items()}
+    translations["by_ai"] = True
+    conn = db.connect(db_path())
+    try:  # only onto the same words: a bio saved again meanwhile starts from scratch
+        conn.execute("UPDATE profiles SET bio_translations = ? WHERE unit_id = ? AND bio = ?",
+                     (json.dumps(translations, ensure_ascii=False), unit_id, bio))
+        conn.commit()
+    except sqlite3.Error:
+        log.warning("bio of %s: its translation could not be saved", unit_id)
+    finally:
+        conn.close()
+
+
 def _photo_json(row: sqlite3.Row) -> dict[str, Any]:
     return {"id": row["id"], "unit_id": row["unit_id"], "kind": row["kind"], "subject": row["subject"],
             "renovation_intro_id": row["renovation_intro_id"], "sha256": row["sha256"], "width": row["width"],
@@ -606,7 +694,7 @@ def _photo_json(row: sqlite3.Row) -> dict[str, Any]:
 def _photo_row(conn: sqlite3.Connection, photo_id: str) -> sqlite3.Row:
     row = conn.execute("SELECT * FROM photos WHERE id = ?", (photo_id,)).fetchone() if PHOTO_ID.match(photo_id) else None
     if row is None:
-        raise HTTPException(404, "photo not found")
+        raise refuse(404, "photo_not_found", "photo not found")
     return row
 
 
@@ -615,6 +703,31 @@ PHOTO_ERRORS = {
     "too_many_pixels": (413, "Photo resolution is too high."),
     "unsupported_format": (415, "Please use a JPEG, PNG or WebP photo."),
     "not_an_image": (400, "That file is not a readable photo."),
+}
+
+
+def refuse(status: int, code: str, message: str, **values: Any) -> HTTPException:
+    """A refusal the screen can say in the reader's language: a code, the values its sentence needs, and the English
+    sentence as the record (and for anyone calling the API by hand). The app looks the code up in its own wording
+    (err.<code>) and falls back to the sentence when it has none."""
+    detail: dict[str, Any] = {"code": code, "message": message}
+    if values:
+        detail["values"] = values
+    return HTTPException(status, detail)
+
+
+# A form that fails its own checks answers the same way: the validator names the problem by code, the handler below
+# writes the sentence and the values the screen needs. (Field-level problems keep pydantic's own wording.)
+VALIDATION: dict[str, tuple[str, dict[str, Any]]] = {
+    "dates_invalid": ("start and end must be real calendar dates", {}),
+    "dates_order": ("end date is before start date", {}),
+    "reno_too_long": (f"a renovation notice can cover at most {MAX_RENOVATION_DAYS} days; send a new one after that", {"n": MAX_RENOVATION_DAYS}),
+    "noisy_order": ("noisy hours end before they start", {}),
+    "house_rule_hours": (quiet.HOUSE_RULE_HOURS, {"from": quiet.LEGAL_FROM, "to": quiet.LEGAL_TO}),
+    "break_outside": ("a quiet break must sit inside the noisy hours", {}),
+    "breaks_overlap": ("quiet breaks overlap", {}),
+    "message_or_quick": ("send either a message or a quick reply", {}),
+    **{code: (text, values) for code, (text, values) in quiet.PROBLEMS.items()},
 }
 
 
@@ -627,16 +740,16 @@ def _store_photo(conn: sqlite3.Connection, unit_id: str, raw: bytes, kind: str, 
             " WHERE r.intro_id = ? AND r.unit_id = ?", (renovation_intro_id, unit_id)
         ).fetchone()
         if linked is None:
-            raise HTTPException(403, "Only neighbours notified of this renovation can attach photos to it.")
+            raise refuse(403, "photo_not_notified", "Only neighbours notified of this renovation can attach photos to it.")
         # A hello lands in the inbox the same way a notice does, but a photo is evidence against someone's
         # works: it can only hang off a renovation notice, never off a plain hello.
         if linked["renovation"] is None:
-            raise HTTPException(422, "Photos can only be attached to a renovation notice, not to a hello.")
+            raise refuse(422, "photo_hello", "Photos can only be attached to a renovation notice, not to a hello.")
     try:
         photo = vision.ingest(raw)
     except vision.PhotoError as exc:
-        status, message = PHOTO_ERRORS.get(str(exc), (400, "That file is not a readable photo."))
-        raise HTTPException(status, message) from exc
+        status, message = PHOTO_ERRORS.get(str(exc), PHOTO_ERRORS["not_an_image"])
+        raise refuse(status, f"photo_{exc}" if str(exc) in PHOTO_ERRORS else "photo_not_an_image", message) from exc
 
     photo_id = uuid.uuid4().hex
     folder = data_dir("photos")
@@ -709,7 +822,7 @@ class QuietTimesIn(BaseModel):
     def fair(self) -> "QuietTimesIn":
         problem = quiet.check_windows([w.model_dump() for w in self.windows])
         if problem:
-            raise ValueError(problem)
+            raise ValueError(problem)  # a code from quiet.PROBLEMS; the handler writes the sentence
         return self
 
 
@@ -738,22 +851,22 @@ class Renovation(BaseModel):
         try:
             start, end = date.fromisoformat(self.start), date.fromisoformat(self.end)
         except ValueError:
-            raise ValueError("start and end must be real calendar dates") from None
+            raise ValueError("dates_invalid") from None
         if end < start:
-            raise ValueError("end date is before start date")
+            raise ValueError("dates_order")
         if (end - start).days > MAX_RENOVATION_DAYS:
-            raise ValueError(f"a renovation notice can cover at most {MAX_RENOVATION_DAYS} days; send a new one after that")
+            raise ValueError("reno_too_long")
         if self.noisy_to <= self.noisy_from:
-            raise ValueError("noisy hours end before they start")
+            raise ValueError("noisy_order")
         # The estate's house rule: noisy work only inside the hours it allows. Which days is the owner's own choice
         # (weekdays_only). HH:MM strings compare in time order because HHMM keeps them zero-padded, 24-hour.
         if self.noisy_from < quiet.LEGAL_FROM or self.noisy_to > quiet.LEGAL_TO:
-            raise ValueError(quiet.HOUSE_RULE_HOURS)
+            raise ValueError("house_rule_hours")
         breaks = sorted((b.start, b.end) for b in self.quiet_breaks)
         if any(not self.noisy_from < a < b < self.noisy_to for a, b in breaks):
-            raise ValueError("a quiet break must sit inside the noisy hours")
+            raise ValueError("break_outside")
         if any(breaks[i][1] > breaks[i + 1][0] for i in range(len(breaks) - 1)):
-            raise ValueError("quiet breaks overlap")
+            raise ValueError("breaks_overlap")
         return self
 
 
@@ -845,7 +958,7 @@ def _phase_id(conn: sqlite3.Connection, phase_id: str | None) -> str:
     or in a pilot the household's own phase, or the only phase there is."""
     if phase_id:
         if conn.execute("SELECT 1 FROM phases WHERE id = ?", (phase_id,)).fetchone() is None:
-            raise HTTPException(404, "phase not found")
+            raise refuse(404, "phase_not_found", "phase not found")
         return phase_id
     if demo_mode():
         return "demo"
@@ -1012,11 +1125,11 @@ def quiet_plan(unit_id: str, start: str = Query(..., pattern=DATE), end: str = Q
     try:
         first, last = date.fromisoformat(start), date.fromisoformat(end)
     except ValueError:
-        raise HTTPException(422, "start and end must be real calendar dates") from None
+        raise refuse(422, "dates_invalid", "start and end must be real calendar dates") from None
     if last < first or noisy_to <= noisy_from:
-        raise HTTPException(422, "The dates or the noisy hours are the wrong way round.")
+        raise refuse(422, "dates_order", "The dates or the noisy hours are the wrong way round.")
     if noisy_from < quiet.LEGAL_FROM or noisy_to > quiet.LEGAL_TO:  # the house rule, the same check the notice gets
-        raise HTTPException(422, quiet.HOUSE_RULE_HOURS)
+        raise refuse(422, "house_rule_hours", quiet.HOUSE_RULE_HOURS, **{"from": quiet.LEGAL_FROM, "to": quiet.LEGAL_TO})
     me, _, phase_units = _phase(conn, unit_id)
     zone = [n.unit_id for n in impact_zone(_to_unit(me), phase_units, works_type)]
     plan = quiet.plan(noisy_from, noisy_to, [_quiet_times(conn, u) for u in zone])
@@ -1045,7 +1158,7 @@ def renovation_draft(body: RenovationTextIn, conn: sqlite3.Connection = Depends(
     if not ai.enabled():
         raise HTTPException(501, {"code": "ai_off", "message": "AI isn't switched on here. Fill in the steps below."})
     if not ai.spend(body.unit_id):
-        raise HTTPException(429, "That's all the AI help for today. Fill in the steps below.")
+        raise refuse(429, "ai_cap", "That's all the AI help for today. Fill in the steps below.")
     draft = ai.draft_renovation(body.text.strip(), me["kind"], date.fromisoformat(_today()), MAX_RENOVATION_DAYS)
     if draft is None:
         raise HTTPException(424, {"code": "ai_busy", "message": "The AI didn't answer in time. Try again, or fill in the steps below."})
@@ -1191,16 +1304,16 @@ def assistant_transcribe(unit_id: str = Form(..., pattern=UNIT_ID), lang: str | 
     kind = (file.content_type or "").split(";")[0].strip()
     ext = VOICE_TYPES.get(kind)
     if ext is None:
-        raise HTTPException(415, "Please send an audio recording.")
+        raise refuse(415, "audio_type", "Please send an audio recording.")
     raw = file.file.read(voice.MAX_BYTES + 1)
     if len(raw) > voice.MAX_BYTES:
-        raise HTTPException(413, f"Say it in up to {voice.MAX_SECONDS} seconds.")
+        raise refuse(413, "audio_too_long", f"Say it in up to {voice.MAX_SECONDS} seconds.", n=voice.MAX_SECONDS)
     if len(raw) < 64:
-        raise HTTPException(400, "That recording is empty.")
+        raise refuse(400, "audio_empty", "That recording is empty.")
     if not _looks_like_audio(raw, ext):
-        raise HTTPException(415, "Please send an audio recording.")
+        raise refuse(415, "audio_type", "Please send an audio recording.")
     if not voice.spend(me["id"], "listen"):
-        raise HTTPException(429, "That's all the listening for today. Typing works just the same.")
+        raise refuse(429, "stt_cap", "That's all the listening for today. Typing works just the same.")
     text = voice.transcribe(raw, kind, lang)
     if text is None:
         raise HTTPException(424, {"code": "stt_busy", "message": "Didn't catch that. Try again, or type it."})
@@ -1226,7 +1339,7 @@ def assistant_speak(body: SpeakIn, conn: sqlite3.Connection = Depends(get_conn))
     audio = voice.remembered(text)
     if audio is None:
         if not voice.spend(me["id"], "speak"):
-            raise HTTPException(429, "That's all the spoken replies for today. They are on screen as always.")
+            raise refuse(429, "tts_cap", "That's all the spoken replies for today. They are on screen as always.")
         audio = voice.speak(text)
     if audio is None:
         raise HTTPException(424, {"code": "tts_busy", "message": "The reply couldn't be spoken. It is on screen as always."})
@@ -1249,7 +1362,8 @@ def send_intro(body: IntroIn, later: BackgroundTasks, conn: sqlite3.Connection =
                         (body.from_unit_id, since)).fetchone()[0]
     limit = daily_cap(MAX_RENOVATION_NOTICES_PER_DAY if body.renovation else MAX_HELLOS_PER_DAY)
     if sent >= limit:
-        raise HTTPException(429, f"At most {limit} {'renovation notices' if body.renovation else 'hellos'} a day. Try again tomorrow.")
+        raise refuse(429, "notice_cap" if body.renovation else "hello_cap",
+                     f"At most {limit} {'renovation notices' if body.renovation else 'hellos'} a day. Try again tomorrow.", n=limit)
     sent_by = _delegate_name(conn, body.from_unit_id, body.delegate_id)
     return _register_intro(conn, body.from_unit_id, body.message, body.lang,
                            body.renovation.model_dump() if body.renovation else None, body.to_unit_ids, sent_by, later)
@@ -1262,7 +1376,7 @@ def _register_intro(conn: sqlite3.Connection, from_unit_id: str, message: str, l
         # The same rule the app shows: structural work waits for its approval (JMB/MC in strata, the council otherwise).
         approved = (renovation.get("management_approval") if me["kind"] == "apartment" else renovation.get("council_permit")) == "approved"
         if not approved:
-            raise HTTPException(422, "Structural work needs approval first: the council (PBT) permit, or the JMB/MC in a strata building.")
+            raise refuse(422, "structural_approval", "Structural work needs approval first: the council (PBT) permit, or the JMB/MC in a strata building.")
     if renovation:
         # The notice goes to everyone the work can affect; the sender cannot leave anyone out. Homes not on
         # Keynection are still on the list: the estate office prints their notice and records the delivery.
@@ -1272,16 +1386,16 @@ def _register_intro(conn: sqlite3.Connection, from_unit_id: str, message: str, l
         if to_unit_ids is not None:
             allowed = {n["id"] for n in circle}
             if not set(to_unit_ids) <= allowed:
-                raise HTTPException(403, "An introduction can only go to the homes in your circle that are on Keynection.")
+                raise refuse(403, "intro_outside_circle", "An introduction can only go to the homes in your circle that are on Keynection.")
             circle = [n for n in circle if n["id"] in to_unit_ids]
         if not circle:
-            raise HTTPException(422, "Pick at least one neighbour.")
+            raise refuse(422, "intro_nobody", "Pick at least one neighbour.")
     shown = [n["id"] for n in circle]  # who the sender is told the hello went to
     if not renovation:
         # Same gate as a chat message: quiet mode holds a hello back, and so does the sender's own block.
         circle = [n for n in circle if not _profile_row(conn, n["id"])["quiet_mode"] and not _blocked(conn, from_unit_id, n["id"])]
         if not circle:
-            raise HTTPException(409, "These neighbours have quiet mode on right now. Try again later.")
+            raise refuse(409, "intro_quiet", "These neighbours have quiet mode on right now. Try again later.")
         shown = [n["id"] for n in circle]
         # Someone who blocked the sender never gets it, and the sender isn't told (that would reveal the block).
         circle = [n for n in circle if not _blocked(conn, n["id"], from_unit_id)]
@@ -1353,7 +1467,7 @@ def wave_back(intro_id: int, body: AckIn, conn: sqlite3.Connection = Depends(get
         (db.now(), intro_id, body.unit_id),
     )
     if cur.rowcount == 0:
-        raise HTTPException(404, "this unit did not receive that introduction")
+        raise refuse(404, "intro_not_received", "this unit did not receive that introduction")
     conn.commit()
     return {"intro_id": intro_id, "unit_id": body.unit_id, "acked": True}
 
@@ -1366,7 +1480,8 @@ def neighbour_card(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
     for n in circle:
         if not n["joined"]:
             # Not on Keynection yet: no name (resident_name is the unit label), no language, no bio, nothing to tap.
-            out.append({**n, "lang": None, "known": False, "hello_sent": False, "bio": "", "waved_today": False, "allow_waves": False})
+            out.append({**n, "lang": None, "known": False, "hello_sent": False, "bio": "", "bio_lang": None, "bio_in": {},
+                        "bio_by_ai": False, "waved_today": False, "allow_waves": False})
             continue
         they_replied = conn.execute(
             "SELECT 1 FROM intro_recipients r JOIN intros i ON i.id = r.intro_id"
@@ -1388,7 +1503,7 @@ def neighbour_card(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
             (unit_id, n["id"]),
         ).fetchone() is not None
         out.append({**n, "known": they_replied or i_replied or _mutual(conn, unit_id, n["id"]), "hello_sent": hello_sent,
-                    "bio": _profile_row(conn, n["id"])["bio"],
+                    **_bio_json(conn, n["id"]),
                     "waved_today": waved, "allow_waves": bool(_profile_row(conn, n["id"])["allow_waves"])})
     return {"unit_id": unit_id, "neighbours": out, "known_count": sum(n["known"] for n in out),
             "not_joined": sum(not n["joined"] for n in out)}
@@ -1438,7 +1553,7 @@ class MessageIn(BaseModel):
     @model_validator(mode="after")
     def one_kind(self) -> "MessageIn":
         if bool(self.body and self.body.strip()) == bool(self.quick_key):
-            raise ValueError("send either a message or a quick reply")
+            raise ValueError("message_or_quick")
         return self
 
 
@@ -1510,8 +1625,8 @@ def _require_neighbours(conn: sqlite3.Connection, unit_id: str, other_id: str) -
     _require_joined(conn, other_id)
     n = next((x for x in _talk_partners(conn, unit_id) if x["id"] == other_id), None)
     if n is None:
-        raise HTTPException(403, "You can only talk with your circle, homes a renovation notice connects you with, "
-                                 "or neighbours who accepted your contact request.")
+        raise refuse(403, "chat_outside", "You can only talk with your circle, homes a renovation notice connects you with, "
+                     "or neighbours who accepted your contact request.")
     return n
 
 
@@ -1560,7 +1675,7 @@ def _message_json(row: sqlite3.Row, viewer_lang: str, reactions: list[dict[str, 
 def _concern_row(conn: sqlite3.Connection, concern_id: int) -> sqlite3.Row:
     row = conn.execute("SELECT * FROM concerns WHERE id = ?", (concern_id,)).fetchone()
     if row is None:
-        raise HTTPException(404, "concern not found")
+        raise refuse(404, "concern_not_found", "concern not found")
     return row
 
 
@@ -1722,7 +1837,7 @@ def send_message(body: MessageIn, conn: sqlite3.Connection = Depends(get_conn)) 
     translations = None
     if body.quick_key:
         if body.quick_key not in talk.QUICK_REPLIES:
-            raise HTTPException(404, "unknown quick reply")
+            raise refuse(404, "quick_unknown", "unknown quick reply")
         kind, text = "quick", talk.quick_text(body.quick_key, sender["lang"])
     else:
         kind, text = "text", (body.body or "").strip()
@@ -1753,9 +1868,9 @@ def send_message(body: MessageIn, conn: sqlite3.Connection = Depends(get_conn)) 
 def report_message(message_id: int, body: ReportIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     row = conn.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
     if row is None:
-        raise HTTPException(404, "message not found")
+        raise refuse(404, "message_not_found", "message not found")
     if row["kind"] == "system" or row["to_unit_id"] != body.unit_id:
-        raise HTTPException(403, "You can only report messages sent to you.")
+        raise refuse(403, "report_not_yours", "You can only report messages sent to you.")
     existing = conn.execute("SELECT id, status FROM reports WHERE message_id = ? AND reporter_unit_id = ?",
                             (message_id, body.unit_id)).fetchone()
     if existing:
@@ -1783,7 +1898,7 @@ def share_contact(unit_id: str, body: ContactIn, conn: sqlite3.Connection = Depe
     """Phone numbers are exchanged only when both households have agreed."""
     _require_neighbours(conn, unit_id, body.other_unit_id)
     if _blocked(conn, unit_id, body.other_unit_id) or _blocked(conn, body.other_unit_id, unit_id):
-        raise HTTPException(409, "Contact sharing isn't available with this neighbour.")
+        raise refuse(409, "numbers_unavailable", "Contact sharing isn't available with this neighbour.")
     before = _contact_state(conn, unit_id, body.other_unit_id)
     conn.execute("INSERT OR IGNORE INTO contact_consents (unit_id, other_unit_id, created_at) VALUES (?, ?, ?)",
                  (unit_id, body.other_unit_id, db.now()))
@@ -1801,16 +1916,16 @@ def raise_concern(body: ConcernIn, conn: sqlite3.Connection = Depends(get_conn))
     _require_joined(conn, body.from_unit_id)
     intro = conn.execute("SELECT * FROM intros WHERE id = ?", (body.intro_id,)).fetchone()
     if intro is None or intro["renovation"] is None:
-        raise HTTPException(404, "renovation not found")
+        raise refuse(404, "renovation_not_found", "renovation not found")
     if conn.execute("SELECT 1 FROM intro_recipients WHERE intro_id = ? AND unit_id = ?",
                     (body.intro_id, body.from_unit_id)).fetchone() is None:
-        raise HTTPException(403, "Only neighbours notified of this renovation can raise a concern about it.")
+        raise refuse(403, "concern_not_notified", "Only neighbours notified of this renovation can raise a concern about it.")
     open_count = conn.execute(
         "SELECT COUNT(*) FROM concerns WHERE intro_id = ? AND from_unit_id = ? AND status IN ('open', 'acknowledged', 'escalated')",
         (body.intro_id, body.from_unit_id),
     ).fetchone()[0]
     if open_count >= MAX_OPEN_CONCERNS:
-        raise HTTPException(429, f"You already have {MAX_OPEN_CONCERNS} open concerns about this renovation.")
+        raise refuse(429, "concern_cap", f"You already have {MAX_OPEN_CONCERNS} open concerns about this renovation.", n=MAX_OPEN_CONCERNS)
     if talk.tone_problem(body.note):
         raise HTTPException(422, {"code": "tone", "message": TONE_MESSAGE})
     acted_by = _delegate_name(conn, body.from_unit_id, body.delegate_id)
@@ -1842,9 +1957,9 @@ def _concern_step(conn: sqlite3.Connection, row: sqlite3.Row, status: str, stamp
 def acknowledge_concern(concern_id: int, body: ConcernActionIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     row = _concern_row(conn, concern_id)
     if body.unit_id != row["to_unit_id"]:
-        raise HTTPException(403, "Only the renovating household can respond to this concern.")
+        raise refuse(403, "concern_respond_owner", "Only the renovating household can respond to this concern.")
     if row["status"] != "open":
-        raise HTTPException(409, "This concern has already been answered.")
+        raise refuse(409, "concern_answered", "This concern has already been answered.")
     return _concern_step(conn, row, "acknowledged", "acknowledged_at", "concern_acknowledged", "response_note", body.note)
 
 
@@ -1852,9 +1967,9 @@ def acknowledge_concern(concern_id: int, body: ConcernActionIn, conn: sqlite3.Co
 def resolve_concern(concern_id: int, body: ConcernActionIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     row = _concern_row(conn, concern_id)
     if body.unit_id != row["to_unit_id"]:
-        raise HTTPException(403, "Only the renovating household can mark this concern as sorted.")
+        raise refuse(403, "concern_sorted_owner", "Only the renovating household can mark this concern as sorted.")
     if row["status"] not in ("open", "acknowledged"):
-        raise HTTPException(409, "This concern can't be marked as sorted now.")
+        raise refuse(409, "concern_not_sortable", "This concern can't be marked as sorted now.")
     return _concern_step(conn, row, "resolved", "resolved_at", "concern_resolved", "response_note", body.note or row["response_note"] or "")
 
 
@@ -1863,12 +1978,12 @@ def escalate_concern(concern_id: int, body: ConcernActionIn, conn: sqlite3.Conne
     """Step 3: the neighbour who raised it can hand it to SDP's estate team."""
     row = _concern_row(conn, concern_id)
     if body.unit_id != row["from_unit_id"]:
-        raise HTTPException(403, "Only the household that raised the concern can escalate it.")
+        raise refuse(403, "concern_escalate_raiser", "Only the household that raised the concern can escalate it.")
     if row["status"] not in ("open", "acknowledged", "resolved"):
-        raise HTTPException(409, "This concern is already with the estate team or closed.")
+        raise refuse(409, "concern_already_escalated", "This concern is already with the estate team or closed.")
     waited = datetime.now(timezone.utc) - datetime.fromisoformat(row["created_at"])
     if row["status"] == "open" and waited < ESCALATE_AFTER and not demo_mode():
-        raise HTTPException(409, "Give your neighbour 24 hours to respond before escalating.")
+        raise refuse(409, "concern_wait", "Give your neighbour 24 hours to respond before escalating.", hours=24)
     return _concern_step(conn, row, "escalated", "escalated_at", "concern_escalated", "estate_note", body.note)
 
 
@@ -1891,7 +2006,7 @@ def estate_concerns(phase_id: str | None = None, conn: sqlite3.Connection = Depe
 def estate_action(concern_id: int, body: EstateActionIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     row = _concern_row(conn, concern_id)
     if row["status"] != "escalated":
-        raise HTTPException(409, "Only escalated concerns are handled by the estate team.")
+        raise refuse(409, "concern_not_escalated", "Only escalated concerns are handled by the estate team.")
     label = talk.CONCERN_CATEGORIES[row["category"]].lower()
     if body.action == "remind":
         conn.execute("UPDATE concerns SET reminders = reminders + 1, estate_note = ? WHERE id = ?", (body.note, concern_id))
@@ -1936,7 +2051,7 @@ def reported_voice(report_id: int, conn: sqlite3.Connection = Depends(get_conn))
     row = conn.execute("SELECT m.media_id FROM reports r JOIN messages m ON m.id = r.message_id WHERE r.id = ? AND m.kind = 'voice'",
                        (report_id,)).fetchone()
     if row is None or not row["media_id"]:
-        raise HTTPException(404, "voice message not found")
+        raise refuse(404, "voice_not_found", "voice message not found")
     ext = row["media_id"].rsplit(".", 1)[-1]
     media = next((k for k, v in VOICE_TYPES.items() if v == ext), "application/octet-stream")
     return FileResponse(data_dir("voice") / row["media_id"], media_type=media, headers={"Cache-Control": "no-store"})
@@ -1947,9 +2062,9 @@ def review_report(report_id: int, body: ReviewIn, conn: sqlite3.Connection = Dep
     row = conn.execute("SELECT r.*, m.from_unit_id, m.to_unit_id FROM reports r JOIN messages m ON m.id = r.message_id"
                        " WHERE r.id = ?", (report_id,)).fetchone()
     if row is None:
-        raise HTTPException(404, "report not found")
+        raise refuse(404, "report_not_found", "report not found")
     if row["status"] != "open":
-        raise HTTPException(409, "This report has already been reviewed.")
+        raise refuse(409, "report_reviewed", "This report has already been reviewed.")
     conn.execute("UPDATE reports SET status = ?, reviewed_at = ? WHERE id = ?", (body.outcome, db.now(), report_id))
     if body.outcome == "warned":
         # Only the sender sees the warning; the reporter's identity is never revealed.
@@ -2006,22 +2121,22 @@ def request_contact(body: ContactRequestIn, conn: sqlite3.Connection = Depends(g
     me, rows, phase_units = _phase(conn, body.from_unit_id)
     ring2 = {n.unit_id for n in street_or_block(_to_unit(me), phase_units)}
     if body.to_unit_id in {n["id"] for n in _circle(conn, body.from_unit_id)}:
-        raise HTTPException(409, "This home is already in your circle: message them directly.")
+        raise refuse(409, "request_in_circle", "This home is already in your circle: message them directly.")
     if body.to_unit_id not in ring2:
-        raise HTTPException(403, "Contact requests only reach your own lorong or block. For anything else, ask the estate office.")
+        raise refuse(403, "request_too_far", "Contact requests only reach your own lorong or block. For anything else, ask the estate office.")
     target = _profile_row(conn, body.to_unit_id)
     if _blocked(conn, body.to_unit_id, body.from_unit_id) or not target["accept_requests"] or target["quiet_mode"]:
-        raise HTTPException(409, "This household isn't accepting requests.")
+        raise refuse(409, "request_declined_all", "This household isn't accepting requests.")
     last = _request_between(conn, body.from_unit_id, body.to_unit_id)
     if last is not None and last["status"] in ("pending", "accepted"):
-        raise HTTPException(409, "There is already a request between you.")
+        raise refuse(409, "request_exists", "There is already a request between you.")
     if last is not None and last["status"] == "declined" and last["from_unit_id"] == body.from_unit_id:
-        raise HTTPException(409, "This household declined your earlier request.")
+        raise refuse(409, "request_declined", "This household declined your earlier request.")
     since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
     sent = conn.execute("SELECT COUNT(*) FROM contact_requests WHERE from_unit_id = ? AND created_at > ?",
                         (body.from_unit_id, since)).fetchone()[0]
     if sent >= MAX_REQUESTS_PER_DAY:
-        raise HTTPException(429, f"At most {MAX_REQUESTS_PER_DAY} contact requests a day.")
+        raise refuse(429, "request_cap", f"At most {MAX_REQUESTS_PER_DAY} contact requests a day.", n=MAX_REQUESTS_PER_DAY)
     if talk.tone_problem(body.note):
         raise HTTPException(422, {"code": "tone", "message": TONE_MESSAGE})
     cur = conn.execute("INSERT INTO contact_requests (from_unit_id, to_unit_id, reason, note, created_at) VALUES (?, ?, ?, ?, ?)",
@@ -2043,11 +2158,11 @@ def contact_requests(unit_id: str, conn: sqlite3.Connection = Depends(get_conn))
 def respond_contact(request_id: int, body: RespondIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     row = conn.execute("SELECT * FROM contact_requests WHERE id = ?", (request_id,)).fetchone()
     if row is None:
-        raise HTTPException(404, "request not found")
+        raise refuse(404, "request_not_found", "request not found")
     if row["to_unit_id"] != body.unit_id:
-        raise HTTPException(403, "Only the household that received the request can answer it.")
+        raise refuse(403, "request_answer_receiver", "Only the household that received the request can answer it.")
     if row["status"] != "pending":
-        raise HTTPException(409, "This request has already been answered.")
+        raise refuse(409, "request_answered", "This request has already been answered.")
     conn.execute("UPDATE contact_requests SET status = ?, responded_at = ? WHERE id = ?",
                  ("accepted" if body.accept else "declined", db.now(), request_id))
     conn.commit()
@@ -2059,31 +2174,40 @@ def _audiences(unit: sqlite3.Row) -> tuple[str, ...]:
 
 
 @app.get("/api/units/{unit_id}/notices")
-def notices_for(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+def notices_for(unit_id: str, lang: ReadLang | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+    """The notices for this household's street or block and the whole phase, in its reading language; `lang` is the
+    language the screens are in when someone has switched them (the English-reading owner showing a Malay-reading
+    relative, or a judge trying the interface in Chinese)."""
     me = _unit_row(conn, unit_id)
     a = _audiences(me)
     rows = conn.execute(f"SELECT * FROM notices WHERE phase_id = ? AND audience IN ({','.join('?' * len(a))}) ORDER BY id DESC",
                         (me["phase_id"], *a)).fetchall()
-    return [dict(r) for r in rows]
+    return [_notice_json(r, lang or me["lang"]) for r in rows]
 
 
 @app.get("/api/notices")
 def all_notices(phase_id: str | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
-    return [dict(r) for r in conn.execute("SELECT * FROM notices WHERE phase_id = ? ORDER BY id DESC", (_phase_id(conn, phase_id),))]
+    """The estate team's list: the English record of each notice."""
+    return [_notice_json(r, "en") for r in conn.execute("SELECT * FROM notices WHERE phase_id = ? ORDER BY id DESC", (_phase_id(conn, phase_id),))]
 
 
 @app.post("/api/notices", status_code=201, dependencies=[Depends(staff_only)])
-def post_notice(body: NoticeIn, phase_id: str | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
-    """Estate team only. One-way: residents cannot reply to the whole township. A street or block must be in the phase."""
+def post_notice(body: NoticeIn, later: BackgroundTasks, phase_id: str | None = None,
+                conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Estate team only. One-way: residents cannot reply to the whole township. A street or block must be in the phase.
+    Written in English (the record); the AI puts it into the other reading languages after it is saved."""
     phase_id = _phase_id(conn, phase_id)
     phase = _phase_json(conn, conn.execute("SELECT * FROM phases WHERE id = ?", (phase_id,)).fetchone())
     kind, _, place = body.audience.partition(":")
     if kind != "phase" and place not in phase["streets" if kind == "street" else "blocks"]:
-        raise HTTPException(422, f"{place} isn't a {kind} in {phase['name']}.")
+        raise refuse(422, "notice_place", f"{place} isn't a {kind} in {phase['name']}.", place=place, kind=kind, phase=phase["name"])
+    title, text = body.title.strip(), body.body.strip()
     cur = conn.execute("INSERT INTO notices (phase_id, audience, title, body, author, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                       (phase_id, body.audience, body.title.strip(), body.body.strip(), ESTATE, db.now()))
+                       (phase_id, body.audience, title, text, ESTATE, db.now()))
     conn.commit()
-    return dict(conn.execute("SELECT * FROM notices WHERE id = ?", (cur.lastrowid,)).fetchone())
+    if ai.enabled():
+        later.add_task(_translate_estate_notice, cur.lastrowid, title, text)
+    return _notice_json(conn.execute("SELECT * FROM notices WHERE id = ?", (cur.lastrowid,)).fetchone(), "en")
 
 
 
@@ -2123,7 +2247,7 @@ def _check_daily_limit(conn: sqlite3.Connection, sender: str, recipient: str) ->
     sent = conn.execute("SELECT COUNT(*) FROM messages WHERE from_unit_id = ? AND to_unit_id = ? AND created_at > ?",
                         (sender, recipient, since)).fetchone()[0]
     if sent >= MAX_MESSAGES_PER_DAY:
-        raise HTTPException(429, "Daily message limit for this neighbour reached. Try again tomorrow.")
+        raise refuse(429, "message_cap", "Daily message limit for this neighbour reached. Try again tomorrow.")
 
 
 def _looks_like_audio(raw: bytes, ext: str) -> bool:
@@ -2144,9 +2268,9 @@ def _looks_like_audio(raw: bytes, ext: str) -> bool:
 def _check_can_reach(conn: sqlite3.Connection, sender: str, recipient: str) -> None:
     """Shared gate for messages, voice notes and waves."""
     if _blocked(conn, sender, recipient):
-        raise HTTPException(409, "You blocked this neighbour. Unblock them to send a message.")
+        raise refuse(409, "blocked_by_you", "You blocked this neighbour. Unblock them to send a message.")
     if _profile_row(conn, recipient)["quiet_mode"]:
-        raise HTTPException(409, "This neighbour has quiet mode on. Renovation notices and concerns still reach them.")
+        raise refuse(409, "quiet_mode", "This neighbour has quiet mode on. Renovation notices and concerns still reach them.")
 
 
 def _reactions(conn: sqlite3.Connection, message_id: int) -> list[dict[str, Any]]:
@@ -2160,15 +2284,15 @@ def wave(body: WaveIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str
     _require_neighbours(conn, body.from_unit_id, body.to_unit_id)
     _check_can_reach(conn, body.from_unit_id, body.to_unit_id)
     if not _profile_row(conn, body.to_unit_id)["allow_waves"]:
-        raise HTTPException(409, "This neighbour has turned waves off. You can still send a message.")
+        raise refuse(409, "waves_off", "This neighbour has turned waves off. You can still send a message.")
     recent = (datetime.now(timezone.utc) - wave_window()).isoformat(timespec="seconds")
     if conn.execute("SELECT 1 FROM waves WHERE from_unit_id = ? AND to_unit_id = ? AND created_at > ?",
                     (body.from_unit_id, body.to_unit_id, recent)).fetchone():
-        raise HTTPException(409, "You already waved today.")
+        raise refuse(409, "waved_today", "You already waved today.")
     since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
     if conn.execute("SELECT COUNT(*) FROM waves WHERE from_unit_id = ? AND created_at > ?",
                     (body.from_unit_id, since)).fetchone()[0] >= daily_cap(MAX_WAVES_PER_DAY):
-        raise HTTPException(429, f"At most {daily_cap(MAX_WAVES_PER_DAY)} waves a day.")
+        raise refuse(429, "wave_cap", f"At most {daily_cap(MAX_WAVES_PER_DAY)} waves a day.", n=daily_cap(MAX_WAVES_PER_DAY))
     cur = conn.execute("INSERT INTO waves (from_unit_id, to_unit_id, created_at) VALUES (?, ?, ?)",
                        (body.from_unit_id, body.to_unit_id, db.now()))
     conn.commit()
@@ -2179,11 +2303,11 @@ def wave(body: WaveIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str
 def react(message_id: int, body: ReactIn, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
     row = conn.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
     if row is None:
-        raise HTTPException(404, "message not found")
+        raise refuse(404, "message_not_found", "message not found")
     if body.unit_id not in (row["from_unit_id"], row["to_unit_id"]) or row["kind"] == "system":
-        raise HTTPException(403, "You can only react to messages in your own chats.")
+        raise refuse(403, "react_not_yours", "You can only react to messages in your own chats.")
     if body.emoji not in REACTIONS:
-        raise HTTPException(422, "Unsupported reaction.")
+        raise refuse(422, "reaction_unknown", "Unsupported reaction.")
     current = conn.execute("SELECT emoji FROM reactions WHERE message_id = ? AND unit_id = ?", (message_id, body.unit_id)).fetchone()
     conn.execute("DELETE FROM reactions WHERE message_id = ? AND unit_id = ?", (message_id, body.unit_id))
     if current is None or current["emoji"] != body.emoji:  # same emoji again removes it
@@ -2205,14 +2329,14 @@ def send_voice(from_unit_id: str = Form(..., pattern=UNIT_ID), to_unit_id: str =
     _check_daily_limit(conn, from_unit_id, to_unit_id)
     ext = VOICE_TYPES.get((file.content_type or "").split(";")[0].strip())
     if ext is None:
-        raise HTTPException(415, "Please send an audio recording.")
+        raise refuse(415, "audio_type", "Please send an audio recording.")
     raw = file.file.read(MAX_VOICE_BYTES + 1)
     if len(raw) > MAX_VOICE_BYTES:
-        raise HTTPException(413, "Voice messages can be up to one minute.")
+        raise refuse(413, "voice_too_long", "Voice messages can be up to one minute.")
     if len(raw) < 64:
-        raise HTTPException(400, "That recording is empty.")
+        raise refuse(400, "audio_empty", "That recording is empty.")
     if not _looks_like_audio(raw, ext):
-        raise HTTPException(415, "Please send an audio recording.")
+        raise refuse(415, "audio_type", "Please send an audio recording.")
     media_id = f"{uuid.uuid4().hex}.{ext}"
     (data_dir("voice") / media_id).write_bytes(raw)
     withheld = int(_blocked(conn, to_unit_id, from_unit_id))
@@ -2230,9 +2354,9 @@ def send_voice(from_unit_id: str = Form(..., pattern=UNIT_ID), to_unit_id: str =
 def voice_file(message_id: int, unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> FileResponse:
     row = conn.execute("SELECT * FROM messages WHERE id = ? AND kind = 'voice'", (message_id,)).fetchone()
     if row is None or unit_id not in (row["from_unit_id"], row["to_unit_id"]) or (row["withheld"] and unit_id == row["to_unit_id"]):
-        raise HTTPException(404, "voice message not found")
+        raise refuse(404, "voice_not_found", "voice message not found")
     if not row["media_id"]:
-        raise HTTPException(410, f"Voice messages are deleted after {VOICE_RETENTION_DAYS} days.")
+        raise refuse(410, "voice_gone", f"Voice messages are deleted after {VOICE_RETENTION_DAYS} days.", n=VOICE_RETENTION_DAYS)
     ext = row["media_id"].rsplit(".", 1)[-1]
     media = next((k for k, v in VOICE_TYPES.items() if v == ext), "application/octet-stream")
     return FileResponse(data_dir("voice") / row["media_id"], media_type=media, headers={"Cache-Control": "private, max-age=86400"})
@@ -2256,7 +2380,7 @@ def get_profile(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> d
 
 
 @app.put("/api/units/{unit_id}/profile")
-def update_profile(unit_id: str, body: ProfileIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+def update_profile(unit_id: str, body: ProfileIn, later: BackgroundTasks, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     _require_joined(conn, unit_id)
     _profile_row(conn, unit_id)
     if body.name is not None:
@@ -2264,7 +2388,13 @@ def update_profile(unit_id: str, body: ProfileIn, conn: sqlite3.Connection = Dep
         conn.execute("UPDATE units SET resident_name = ? WHERE id = ?", (body.name.strip(), unit_id))
     if body.bio is not None:
         _check_shared_text(body.bio)
-        conn.execute("UPDATE profiles SET bio = ? WHERE unit_id = ?", (body.bio.strip(), unit_id))
+        bio = body.bio.strip()
+        # New words, new translations: the old ones go at once, the AI's come after the answer so nobody waits for it.
+        lang = _unit_row(conn, unit_id)["lang"]
+        conn.execute("UPDATE profiles SET bio = ?, bio_lang = ?, bio_translations = NULL WHERE unit_id = ?",
+                     (bio, lang if bio else None, unit_id))
+        if bio and ai.enabled():
+            later.add_task(_translate_bio, unit_id, bio, lang)
     for field in ("accept_requests", "allow_waves", "quiet_mode", "easy_mode", "whatsapp_alerts"):
         value = getattr(body, field)
         if value is not None:
@@ -2276,9 +2406,9 @@ def update_profile(unit_id: str, body: ProfileIn, conn: sqlite3.Connection = Dep
 
 
 @app.get("/api/units/{unit_id}/official")
-def official_account(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
-    """The estate office as a read-only account in the chat list (like a WhatsApp channel)."""
-    notices = notices_for(unit_id, conn)
+def official_account(unit_id: str, lang: ReadLang | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """The estate office as a read-only account in the chat list (like a WhatsApp channel); `lang` as for the notices."""
+    notices = notices_for(unit_id, lang, conn)
     last_read = int(_profile_row(conn, unit_id)["notices_read_at"] or 0)  # id of the newest notice already seen
     conn.commit()
     name = f"{_place_name(conn, _unit_row(conn, unit_id)['phase_id'])} Estate Office"
@@ -2363,7 +2493,7 @@ def _delegate_name(conn: sqlite3.Connection, unit_id: str, delegate_id: int | No
         return None
     row = conn.execute("SELECT * FROM delegates WHERE id = ? AND unit_id = ? AND revoked_at IS NULL", (delegate_id, unit_id)).fetchone()
     if row is None:
-        raise HTTPException(403, "This helper isn't authorised for this household.")
+        raise refuse(403, "helper_unauthorised", "This helper isn't authorised for this household.")
     return f"{row['name']} ({row['relation']})"
 
 
@@ -2383,11 +2513,11 @@ def add_delegate(unit_id: str, body: DelegateIn, conn: sqlite3.Connection = Depe
     """The owner authorises a family member to use Keynection for them (for residents who are not online)."""
     _require_joined(conn, unit_id)
     if not body.consent:
-        raise HTTPException(422, "The owner must agree before a helper is added.")
+        raise refuse(422, "helper_consent", "The owner must agree before a helper is added.")
     _check_name(body.name)
     active = conn.execute("SELECT COUNT(*) FROM delegates WHERE unit_id = ? AND revoked_at IS NULL", (unit_id,)).fetchone()[0]
     if active >= MAX_DELEGATES:
-        raise HTTPException(409, f"At most {MAX_DELEGATES} helpers per household.")
+        raise refuse(409, "helper_cap", f"At most {MAX_DELEGATES} helpers per household.", n=MAX_DELEGATES)
     cur = conn.execute("INSERT INTO delegates (unit_id, name, relation, created_at) VALUES (?, ?, ?, ?)",
                        (unit_id, body.name.strip(), body.relation, db.now()))
     db.append_event(conn, unit_id, "delegate_added", {"delegate_id": cur.lastrowid, "name": body.name.strip(), "relation": body.relation})
@@ -2399,7 +2529,7 @@ def add_delegate(unit_id: str, body: DelegateIn, conn: sqlite3.Connection = Depe
 def revoke_delegate(delegate_id: int, body: RevokeIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, bool]:
     row = conn.execute("SELECT * FROM delegates WHERE id = ?", (delegate_id,)).fetchone()
     if row is None or row["unit_id"] != body.unit_id:
-        raise HTTPException(404, "helper not found")
+        raise refuse(404, "helper_not_found", "helper not found")
     if row["revoked_at"] is None:
         conn.execute("UPDATE delegates SET revoked_at = ? WHERE id = ?", (db.now(), delegate_id))
         db.append_event(conn, body.unit_id, "delegate_removed", {"delegate_id": delegate_id, "name": row["name"]})
@@ -2504,7 +2634,7 @@ def close_my_account(unit_id: str, body: CloseIn, response: Response, conn: sqli
     _pilot_only()
     row = _require_joined(conn, unit_id)
     if body.confirm.strip().casefold() != row["label"].casefold():
-        raise HTTPException(422, f"To close the account, type your unit exactly: {row['label']}.")
+        raise refuse(422, "close_confirm", f"To close the account, type your unit exactly: {row['label']}.", label=row["label"])
     privacy.close_account(conn, unit_id, "household", _folders())
     response.delete_cookie(auth.SESSION_COOKIE, path="/")
     return {"closed": True}
@@ -2521,7 +2651,7 @@ def estate_close_account(body: EstateCloseIn, conn: sqlite3.Connection = Depends
     """For an owner who asks at the counter (no phone, lost access): only after checking their ID, on record."""
     _pilot_only()
     if not body.id_checked:
-        raise HTTPException(422, "Check the owner's ID first: closing deletes the household's messages and photos.")
+        raise refuse(422, "close_id_check", "Check the owner's ID first: closing deletes the household's messages and photos.")
     _check_shared_text(body.staff_name)
     _require_joined(conn, body.unit_id)
     privacy.close_account(conn, body.unit_id, f"estate office ({body.staff_name.strip()})", _folders())
@@ -2567,7 +2697,7 @@ def upload_photo(
 @app.get("/api/demo/photos")
 def demo_photos() -> list[str]:
     if not demo_mode():
-        raise HTTPException(403, "demo mode is off")
+        raise refuse(403, "demo_off", "demo mode is off")
     return sorted(p.stem for p in DEMO_PHOTO_DIR.glob("*.jpg"))
 
 
@@ -2575,9 +2705,9 @@ def demo_photos() -> list[str]:
 def use_demo_photo(unit_id: str, body: DemoPhotoIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     """Same pipeline as a real upload, using one of the synthetic sample photos (keeps live demos stable)."""
     if not demo_mode():
-        raise HTTPException(403, "demo mode is off")
+        raise refuse(403, "demo_off", "demo mode is off")
     if body.name not in demo_photos():
-        raise HTTPException(404, "no such demo photo")
+        raise refuse(404, "demo_photo_unknown", "no such demo photo")
     raw = (DEMO_PHOTO_DIR / f"{body.name}.jpg").read_bytes()
     return _store_photo(conn, unit_id, raw, body.kind, body.subject, body.renovation_intro_id)
 
@@ -2587,7 +2717,7 @@ def photo_file(photo_id: str, size: Literal["full", "thumb"] = "full",
                conn: sqlite3.Connection = Depends(get_conn)) -> FileResponse:
     row = _photo_row(conn, photo_id)
     if not _may_see_photo(conn, row):
-        raise HTTPException(404, "photo not found")  # not 403: don't confirm that someone else's photo exists
+        raise refuse(404, "photo_not_found", "photo not found")  # not 403: don't confirm that someone else's photo exists
     name = f"{row['id']}_thumb.jpg" if size == "thumb" else f"{row['id']}.jpg"
     return FileResponse(data_dir("photos") / name, media_type="image/jpeg",
                         headers={"Cache-Control": "private, max-age=31536000, immutable"})
@@ -2598,15 +2728,15 @@ def report_incident(body: IncidentIn, conn: sqlite3.Connection = Depends(get_con
     baseline = _photo_row(conn, body.baseline_photo_id)
     followup = _photo_row(conn, body.followup_photo_id)
     if baseline["unit_id"] != body.reporter_unit_id or followup["unit_id"] != body.reporter_unit_id:
-        raise HTTPException(403, "Both photos must belong to the household reporting the change.")
+        raise refuse(403, "compare_not_yours", "Both photos must belong to the household reporting the change.")
     if baseline["kind"] != "baseline" or followup["kind"] != "followup":
-        raise HTTPException(400, "Compare a pre-work photo with a follow-up photo.")
+        raise refuse(400, "compare_kinds", "Compare a pre-work photo with a follow-up photo.")
     if followup["created_at"] < baseline["created_at"]:
-        raise HTTPException(400, "The follow-up photo must be taken after the pre-work photo.")
+        raise refuse(400, "compare_order", "The follow-up photo must be taken after the pre-work photo.")
     # The case's renovation (and so who answers for it) comes from the pre-work photo. A follow-up either
     # carries no renovation or the same one; it can't point the case at someone else's works.
     if followup["renovation_intro_id"] not in (None, baseline["renovation_intro_id"]):
-        raise HTTPException(400, "The follow-up photo is linked to a different renovation than the pre-work photo.")
+        raise refuse(400, "compare_renovation", "The follow-up photo is linked to a different renovation than the pre-work photo.")
 
     folder = data_dir("photos")
     comp = vision.compare((folder / f"{baseline['id']}.jpg").read_bytes(), (folder / f"{followup['id']}.jpg").read_bytes())
@@ -2640,10 +2770,10 @@ def incident_image(incident_id: int, kind: Literal["before", "after", "overlay"]
     incident = conn.execute("SELECT i.reporter_unit_id, n.from_unit_id AS owner FROM incidents i"
                             " LEFT JOIN intros n ON n.id = i.renovation_intro_id WHERE i.id = ?", (incident_id,)).fetchone()
     if incident is None or not _may_see(incident["reporter_unit_id"], incident["owner"]):
-        raise HTTPException(404, "incident not found")
+        raise refuse(404, "case_not_found", "incident not found")
     path = data_dir("compare") / f"{incident_id}_{kind}.jpg"
     if not path.exists():
-        raise HTTPException(404, "no comparison image (the photos could not be matched)")
+        raise refuse(404, "compare_no_image", "no comparison image (the photos could not be matched)")
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=31536000, immutable"})
 
 
@@ -2674,9 +2804,9 @@ def decide(incident_id: int, body: DecisionIn, conn: sqlite3.Connection = Depend
     Nobody on a resident's phone can record an SDP inspector's finding."""
     row = conn.execute("SELECT * FROM incidents WHERE id = ?", (incident_id,)).fetchone()
     if row is None:
-        raise HTTPException(404, "incident not found")
+        raise refuse(404, "case_not_found", "incident not found")
     if body.decided_by == "sdp_inspector":
-        raise HTTPException(403, "Only SDP's inspector can record an inspector's finding.")
+        raise refuse(403, "inspector_only", "Only SDP's inspector can record an inspector's finding.")
     intro = _intro(conn, row["renovation_intro_id"])
     reporter, renovator = row["reporter_unit_id"], intro["from_unit_id"] if intro else None
     if body.unit_id == reporter:
@@ -2684,19 +2814,19 @@ def decide(incident_id: int, body: DecisionIn, conn: sqlite3.Connection = Depend
     elif body.unit_id == renovator:
         role = "renovating_owner"
     else:
-        raise HTTPException(403, "Only the two households in this case can decide it.")
+        raise refuse(403, "case_two_households", "Only the two households in this case can decide it.")
     if row["status"] == "decided":
-        raise HTTPException(409, "This case has already been decided.")
+        raise refuse(409, "case_decided", "This case has already been decided.")
     acted_by = _delegate_name(conn, body.unit_id, body.delegate_id)
     note, decision, now = body.note.strip(), body.decision, db.now()
     if decision == "renovation" and renovator is None:
-        raise HTTPException(400, "No renovation is linked to this case.")
+        raise refuse(400, "case_no_renovation", "No renovation is linked to this case.")
     if role == "renovating_owner" and decision in ("warranty", "no_action"):
-        raise HTTPException(403, "Only the owner of the home can decide this about their own home.")
+        raise refuse(403, "case_owner_only", "Only the owner of the home can decide this about their own home.")
     # Asking an inspector is the renovating owner's answer to being blamed, not a way to close a case the
     # neighbour has not decided on yet. Until the neighbour proposes, the case is the neighbour's to decide.
     if role == "renovating_owner" and decision == "inspect" and row["status"] not in ("proposed", "disputed"):
-        raise HTTPException(403, "You can ask an SDP inspector once your neighbour says the renovation caused it.")
+        raise refuse(403, "case_inspector_after", "You can ask an SDP inspector once your neighbour says the renovation caused it.")
 
     case = f"Case #{incident_id:03d}"
     me = _unit_row(conn, body.unit_id)
@@ -2708,11 +2838,11 @@ def decide(incident_id: int, body: DecisionIn, conn: sqlite3.Connection = Depend
     my_note = "decision_note" if role == "reporter" else "response_note"
     if decision == "dispute":
         if role != "renovating_owner":
-            raise HTTPException(403, "Only the renovating owner can answer that proposal.")
+            raise refuse(403, "case_answer_owner", "Only the renovating owner can answer that proposal.")
         if row["status"] != "proposed":
-            raise HTTPException(409, "Nothing has been proposed for this case yet.")
+            raise refuse(409, "case_nothing_proposed", "Nothing has been proposed for this case yet.")
         if not note:
-            raise HTTPException(422, "Say briefly why you disagree.")
+            raise refuse(422, "case_why_disagree", "Say briefly why you disagree.")
         conn.execute("UPDATE incidents SET status = 'disputed', response_note = ? WHERE id = ?", (note, incident_id))
         stage, payload_decision, decided_by = "disputed", "renovation", None
         told, text = reporter, (f"{case}: {who} disagrees that the renovation caused it: “{note}”. "
@@ -2720,9 +2850,9 @@ def decide(incident_id: int, body: DecisionIn, conn: sqlite3.Connection = Depend
         code, values = "case_disputed", {**values, "note": note}
     elif decision == "renovation" and role == "reporter":
         if row["status"] == "proposed":
-            raise HTTPException(409, f"You have already asked {intro['from_label']} to confirm.")
+            raise refuse(409, "case_already_asked", f"You have already asked {intro['from_label']} to confirm.", label=intro["from_label"])
         if row["status"] == "disputed":  # no back-and-forth: after a "no", an inspector settles it
-            raise HTTPException(409, f"{intro['from_label']} disagreed. Ask an SDP inspector to check instead.")
+            raise refuse(409, "case_disagreed", f"{intro['from_label']} disagreed. Ask an SDP inspector to check instead.", label=intro["from_label"])
         conn.execute("UPDATE incidents SET status = 'proposed', decision_note = ?, proposed_at = ? WHERE id = ?",
                      (note, now, incident_id))
         stage, payload_decision, decided_by = "proposed", "renovation", None
@@ -2805,12 +2935,12 @@ def issue_pass(intro_id: int, body: PassIn, conn: sqlite3.Connection = Depends(g
     leak cannot be turned into working passes."""
     intro = conn.execute("SELECT * FROM intros WHERE id = ?", (intro_id,)).fetchone()
     if intro is None or intro["renovation"] is None:
-        raise HTTPException(404, "renovation not found")
+        raise refuse(404, "renovation_not_found", "renovation not found")
     if intro["from_unit_id"] != body.unit_id:
-        raise HTTPException(403, "Only the renovating household can issue passes for it.")
+        raise refuse(403, "pass_owner_only", "Only the renovating household can issue passes for it.")
     active = conn.execute("SELECT COUNT(*) FROM passes WHERE intro_id = ? AND status = 'active'", (intro_id,)).fetchone()[0]
     if active >= MAX_ACTIVE_PASSES:
-        raise HTTPException(409, f"At most {MAX_ACTIVE_PASSES} active passes per renovation. Revoke one first.")
+        raise refuse(409, "pass_cap", f"At most {MAX_ACTIVE_PASSES} active passes per renovation. Revoke one first.", n=MAX_ACTIVE_PASSES)
     reno = json.loads(intro["renovation"])
     token = secrets.token_urlsafe(24)
     name = body.contractor_name or reno.get("contractor") or "Contractor"
@@ -2832,9 +2962,9 @@ def issue_pass(intro_id: int, body: PassIn, conn: sqlite3.Connection = Depends(g
 def revoke_pass(pass_id: int, body: OwnerIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     row = conn.execute("SELECT * FROM passes WHERE id = ?", (pass_id,)).fetchone()
     if row is None:
-        raise HTTPException(404, "pass not found")
+        raise refuse(404, "pass_not_found", "pass not found")
     if row["unit_id"] != body.unit_id:
-        raise HTTPException(403, "Only the household that issued this pass can revoke it.")
+        raise refuse(403, "pass_revoke_issuer", "Only the household that issued this pass can revoke it.")
     if row["status"] == "active":
         conn.execute("UPDATE passes SET status = 'revoked', revoked_at = ? WHERE id = ?", (db.now(), pass_id))
         db.append_event(conn, body.unit_id, "contractor_pass_revoked", {"pass_id": pass_id, "contractor": row["contractor_name"]})
@@ -2864,7 +2994,7 @@ def _gate_decision(row: sqlite3.Row | None, at: datetime) -> tuple[bool, str, st
 def gate_scan(body: ScanIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     """What the guardhouse tablet does when it scans a contractor QR."""
     if body.at and not demo_mode():
-        raise HTTPException(403, "simulated time is only available in demo mode")
+        raise refuse(403, "demo_only_time", "simulated time is only available in demo mode")
     at = datetime.strptime(body.at, "%Y-%m-%dT%H:%M") if body.at else datetime.now(MALAYSIA).replace(tzinfo=None)
     row = conn.execute("SELECT * FROM passes WHERE token_hash = ?", (_token_hash(body.token),)).fetchone()
     allowed, reason, code, values = _gate_decision(row, at)
@@ -2886,10 +3016,10 @@ def contractor_view(token: str, conn: sqlite3.Connection = Depends(get_conn)) ->
     """Everything a contractor holding the pass may see, and nothing else: no owner phone, no neighbour
     names, no photos, no other homes (the 'limited access' homeowners ask for in SDP App reviews)."""
     if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", token):
-        raise HTTPException(404, "pass not found")
+        raise refuse(404, "pass_not_found", "pass not found")
     row = conn.execute("SELECT * FROM passes WHERE token_hash = ?", (_token_hash(token),)).fetchone()
     if row is None:
-        raise HTTPException(404, "pass not found")
+        raise refuse(404, "pass_not_found", "pass not found")
     unit = _unit_row(conn, row["unit_id"])
     reno = json.loads(conn.execute("SELECT renovation FROM intros WHERE id = ?", (row["intro_id"],)).fetchone()[0])
     photos = conn.execute("SELECT COUNT(*) FROM photos WHERE renovation_intro_id = ? AND kind = 'baseline'",
@@ -2981,13 +3111,13 @@ def _ticket_json(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
 def _ticket_row(conn: sqlite3.Connection, ticket_id: int) -> sqlite3.Row:
     row = conn.execute("SELECT * FROM warranty_tickets WHERE id = ?", (ticket_id,)).fetchone()
     if row is None:
-        raise HTTPException(404, "warranty ticket not found")
+        raise refuse(404, "ticket_not_found", "warranty ticket not found")
     return row
 
 
 def _submit_repair(conn: sqlite3.Connection, ticket: sqlite3.Row, raw: bytes, subcontractor: str) -> dict[str, Any]:
     if ticket["status"] != "open":
-        raise HTTPException(409, "This ticket is not waiting for a repair.")
+        raise refuse(409, "ticket_not_waiting", "This ticket is not waiting for a repair.")
     photo = _store_photo(conn, ticket["unit_id"], raw, "repair", ticket["subject"], None)
     reference = ticket["baseline_photo_id"] or ticket["defect_photo_id"]
     folder = data_dir("photos")
@@ -3056,7 +3186,8 @@ def warranty_export(body: WarrantyExportIn, phase_id: str | None = None, conn: s
     rows = conn.execute(f"SELECT w.* FROM warranty_tickets w JOIN units u ON u.id = w.unit_id WHERE u.phase_id = ? AND {where}"
                         " ORDER BY w.id", (phase_id,)).fetchall()
     if not rows:
-        raise HTTPException(409, "Nothing new to export since the last download." if body.which == "new" else "No tickets to export.")
+        raise refuse(409, "export_nothing_new" if body.which == "new" else "export_nothing",
+                     "Nothing new to export since the last download." if body.which == "new" else "No tickets to export.")
     place = _place_name(conn, phase_id)
     folder = data_dir("photos")
     sheet, pack_buf = io.StringIO(), io.BytesIO()
@@ -3147,9 +3278,9 @@ def submit_repair(ticket_id: int, subcontractor: str = Form(..., min_length=1, m
 @app.post("/api/warranty/{ticket_id}/repair/demo")
 def submit_demo_repair(ticket_id: int, body: RepairDemoIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     if not demo_mode():
-        raise HTTPException(403, "demo mode is off")
+        raise refuse(403, "demo_off", "demo mode is off")
     if body.name not in demo_photos():
-        raise HTTPException(404, "no such demo photo")
+        raise refuse(404, "demo_photo_unknown", "no such demo photo")
     return _submit_repair(conn, _ticket_row(conn, ticket_id), (DEMO_PHOTO_DIR / f"{body.name}.jpg").read_bytes(), body.subcontractor)
 
 
@@ -3158,9 +3289,9 @@ def owner_response(ticket_id: int, body: OwnerResponseIn, conn: sqlite3.Connecti
     """Only the homeowner can close a warranty repair. Rejecting sends it back to SDP."""
     ticket = _ticket_row(conn, ticket_id)
     if ticket["unit_id"] != body.unit_id:
-        raise HTTPException(403, "Only the homeowner can confirm or reject this repair.")
+        raise refuse(403, "repair_owner_only", "Only the homeowner can confirm or reject this repair.")
     if ticket["status"] != "repair_submitted":
-        raise HTTPException(409, "There is no repair waiting for confirmation.")
+        raise refuse(409, "repair_none_waiting", "There is no repair waiting for confirmation.")
     acted = _delegate_name(conn, body.unit_id, body.delegate_id)
     extra = {"acted_by": acted} if acted else {}
     if body.decision == "accept":
@@ -3182,12 +3313,12 @@ def warranty_image(ticket_id: int, kind: Literal["before", "after", "overlay"],
                    conn: sqlite3.Connection = Depends(get_conn)) -> FileResponse:
     ticket = _ticket_row(conn, ticket_id)
     if not _may_see(ticket["unit_id"]):
-        raise HTTPException(404, "warranty ticket not found")
+        raise refuse(404, "ticket_not_found", "warranty ticket not found")
     if not ticket["repair_photo_id"]:
-        raise HTTPException(404, "no repair photo yet")
+        raise refuse(404, "repair_no_photo", "no repair photo yet")
     path = data_dir("compare") / f"w{ticket_id}_{ticket['repair_photo_id'][:12]}_{kind}.jpg"
     if not path.exists():
-        raise HTTPException(404, "no comparison image")
+        raise refuse(404, "compare_no_image", "no comparison image")
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=31536000, immutable"})
 
 
@@ -3209,9 +3340,9 @@ class DemoResetIn(BaseModel):
 def reset_demo(body: DemoResetIn | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
     """Wipe and re-seed the fictional demo data (for rehearsals). Disabled when KEYNECTION_DEMO_MODE=0."""
     if not demo_mode():
-        raise HTTPException(403, "demo mode is off")
+        raise refuse(403, "demo_off", "demo mode is off")
     if not (body and body.confirm):
-        raise HTTPException(400, "Send {\"confirm\": true} to reset the demo data.")
+        raise refuse(400, "reset_confirm", "Send {\"confirm\": true} to reset the demo data.")
     with _idle_lock:  # one rebuild at a time: two judges pressing it, or this and the quiet-spell one
         _reset_demo_data(conn)
     return {"status": "reset"}
@@ -3325,7 +3456,7 @@ def _join_code(conn: sqlite3.Connection, token: str) -> sqlite3.Row:
     row = conn.execute("SELECT * FROM join_codes WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?",
                        (_token_hash(token), db.now())).fetchone()
     if row is None:
-        raise HTTPException(404, "This join code isn't valid any more. Ask the estate office for a new one.")
+        raise refuse(404, "join_code_invalid", "This join code isn't valid any more. Ask the estate office for a new one.")
     return row
 
 
@@ -3336,7 +3467,7 @@ def issue_join_code(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) 
     _require_sign_in_or_demo()
     row = _unit_row(conn, unit_id)
     if row["joined_at"] is not None:
-        raise HTTPException(409, "This household has already joined. A lost phone is handled at the estate office, with ID.")
+        raise refuse(409, "join_already", "This household has already joined. A lost phone is handled at the estate office, with ID.")
     expires = (datetime.now(timezone.utc) + timedelta(days=JOIN_CODE_DAYS)).isoformat(timespec="seconds")
     token = _new_join_code(conn, unit_id, expires)
     conn.commit()
@@ -3375,7 +3506,7 @@ def issue_join_sheet(phase_id: str, body: JoinSheetIn, conn: sqlite3.Connection 
     if body.handover_to:
         rows = [r for r in rows if r["handover_date"] <= body.handover_to.isoformat()]
     if len(rows) > MAX_SHEET:
-        raise HTTPException(422, f"Print up to {MAX_SHEET} welcome packs at a time: choose a shorter range of handover dates.")
+        raise refuse(422, "packs_cap", f"Print up to {MAX_SHEET} welcome packs at a time: choose a shorter range of handover dates.", n=MAX_SHEET)
     today = datetime.now(timezone.utc).date()
     codes = []
     for r in rows:
@@ -3420,6 +3551,7 @@ def phase_import_save(body: PhaseImportIn, conn: sqlite3.Connection = Depends(ge
     report = _checked_list(conn, body)
     if report.errors:
         raise HTTPException(422, {"code": "import", "message": f"{len(report.errors) + report.more_errors} line(s) need fixing first.",
+                                  "values": {"n": len(report.errors) + report.more_errors},
                                   "report": report.json()})
     actor = _current_actor.get()
     phase_id = body.phase_id or phase_import.new_phase_id(conn, body.name)
@@ -3444,7 +3576,7 @@ def join_lookup(body: JoinLookupIn, conn: sqlite3.Connection = Depends(get_conn)
 def join(body: JoinIn, request: Request, response: Response, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     code = _join_code(conn, body.token)
     if not body.consent:
-        raise HTTPException(422, "Keynection can only set up your household once you agree to the privacy notice.")
+        raise refuse(422, "join_consent", "Keynection can only set up your household once you agree to the privacy notice.")
     name = body.display_name.strip()
     _check_name(name)
     unit_id = code["unit_id"]
@@ -3510,7 +3642,7 @@ async def _check_access(request: Request) -> None:
     if name in PUBLIC_ENDPOINTS:
         return
     if name in DEMO_ENDPOINTS:
-        raise HTTPException(403, "This is part of the demo only.")
+        raise refuse(403, "demo_only", "This is part of the demo only.")
     conn = db.connect(db_path())
     try:
         actor = auth.actor_for(conn, request.cookies.get(auth.SESSION_COOKIE))
@@ -3523,15 +3655,15 @@ async def _check_access(request: Request) -> None:
         return
     if name in STAFF_ENDPOINTS:
         if not actor.is_staff:
-            raise HTTPException(403, "This is for the estate office and SDP staff.")
+            raise refuse(403, "staff_only", "This is for the estate office and SDP staff.")
         signed = (await _json_body(request)).get("staff_name")
         if isinstance(signed, str) and signed.strip().casefold() != actor.name.strip().casefold():
-            raise HTTPException(403, "Records are signed with your own name.")
+            raise refuse(403, "own_name_only", "Records are signed with your own name.")
         return
     if actor.is_staff:
-        raise HTTPException(403, "Staff can't act for a household.")
+        raise refuse(403, "staff_not_household", "Staff can't act for a household.")
     if any(unit != actor.unit_id for unit in await _claimed_units(request)):
-        raise HTTPException(403, "You can only act for your own home.")
+        raise refuse(403, "own_home_only", "You can only act for your own home.")
 
 
 def _may_see(*units: str | None) -> bool:
@@ -3568,7 +3700,7 @@ def _relying_party(request: Request) -> tuple[str, list[str]]:
 
 def _pilot_only() -> None:
     if demo_mode():
-        raise HTTPException(409, "Sign-in is part of pilot mode (KEYNECTION_DEMO_MODE=0); the demo switches households instead.")
+        raise refuse(409, "signin_demo", "Sign-in is part of pilot mode (KEYNECTION_DEMO_MODE=0); the demo switches households instead.")
 
 
 def _me_json(conn: sqlite3.Connection, actor: auth.Actor | None) -> dict[str, Any]:
@@ -3746,7 +3878,7 @@ def front_desk(phase_id: str | None = None, conn: sqlite3.Connection = Depends(g
 def _paper_row(conn: sqlite3.Connection, notice_id: int) -> sqlite3.Row:
     row = conn.execute("SELECT * FROM paper_notices WHERE id = ?", (notice_id,)).fetchone()
     if row is None:
-        raise HTTPException(404, "paper notice not found")
+        raise refuse(404, "paper_not_found", "paper notice not found")
     return row
 
 
@@ -3756,7 +3888,7 @@ def paper_printed(notice_id: int, body: StaffIn, conn: sqlite3.Connection = Depe
     _check_shared_text(body.staff_name)
     row = _paper_row(conn, notice_id)
     if row["status"] != "to_print":
-        raise HTTPException(409, "This notice isn't waiting to be printed.")
+        raise refuse(409, "paper_not_waiting", "This notice isn't waiting to be printed.")
     conn.execute("UPDATE paper_notices SET status = 'printed', printed_at = ? WHERE id = ?", (db.now(), notice_id))
     conn.commit()
     return _paper_json(conn, _paper_row(conn, notice_id))
@@ -3769,7 +3901,7 @@ def paper_delivered(notice_id: int, body: StaffIn, conn: sqlite3.Connection = De
     _check_shared_text(body.staff_name)
     row = _paper_row(conn, notice_id)
     if row["status"] not in ("to_print", "printed"):
-        raise HTTPException(409, "This notice was already delivered, or now arrives in the app.")
+        raise refuse(409, "paper_delivered", "This notice was already delivered, or now arrives in the app.")
     staff = f"Estate office ({body.staff_name.strip()})"
     conn.execute("UPDATE paper_notices SET status = 'delivered', delivered_at = ?, delivered_by = ? WHERE id = ?",
                  (db.now(), staff, notice_id))
@@ -3788,7 +3920,7 @@ def estate_register_renovation(body: EstateRenovationIn, later: BackgroundTasks,
     Same rules as in the app: everyone the work can affect is told, and the staff member's name goes on record."""
     _require_sign_in_or_demo()
     if not body.owner_signed:
-        raise HTTPException(422, "The owner needs to sign the paper renovation form first.")
+        raise refuse(422, "paper_sign_first", "The owner needs to sign the paper renovation form first.")
     _check_shared_text(body.staff_name)
     _require_joined(conn, body.unit_id, "Help the owner join first: their consent is needed before Keynection holds their renovation.")
     staff = f"Estate office ({body.staff_name.strip()})"
@@ -3865,7 +3997,8 @@ def _alerts(conn: sqlite3.Connection, unit_id: str) -> list[dict[str, Any]]:
     audiences = _audiences(me)
     for r in conn.execute(f"SELECT * FROM notices WHERE phase_id = ? AND audience IN ({','.join('?' * len(audiences))})",
                           (me["phase_id"], *audiences)):
-        add(r["created_at"], "notice", f"notice:{r['id']}", ("open",), title=r["title"], body=r["body"])
+        shown = _notice_in(r, lang)
+        add(r["created_at"], "notice", f"notice:{r['id']}", ("open",), title=shown["title"], body=shown["body"])
     for r in conn.execute("SELECT * FROM intros WHERE from_unit_id = ? AND renovation IS NOT NULL", (unit_id,)):
         reno = json.loads(r["renovation"])
         add(_at_local(date.fromisoformat(reno["end"]) + timedelta(days=1), "10:00"), "reno_done_owner", f"intro:{r['id']}:owner",
@@ -4046,9 +4179,9 @@ def push_subscribe(body: PushSubscriptionIn, conn: sqlite3.Connection = Depends(
     """This phone turns notifications on. A phone that turns them on again (or for someone else) is updated."""
     actor = _signed_in()
     if not push.allowed(body.endpoint):
-        raise HTTPException(422, "Notifications can only go through Google's, Apple's, Mozilla's or Microsoft's push service.")
+        raise refuse(422, "push_service", "Notifications can only go through Google's, Apple's, Mozilla's or Microsoft's push service.")
     if not push.valid_keys(body.keys.get("p256dh", ""), body.keys.get("auth", "")):
-        raise HTTPException(422, "This phone's notification keys aren't valid. Please try again.")
+        raise refuse(422, "push_keys", "This phone's notification keys aren't valid. Please try again.")
     conn.execute("INSERT INTO push_subscriptions (subject, endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?)"
                  " ON CONFLICT(endpoint) DO UPDATE SET subject = excluded.subject, p256dh = excluded.p256dh,"
                  " auth = excluded.auth, created_at = excluded.created_at, failures = 0",
@@ -4097,9 +4230,9 @@ def planner_preview(body: PlannerIn) -> dict[str, Any]:
     """Work out every household's circle and notice zones for a new phase. Read-only: nothing is saved."""
     homes = home_count(body.lorongs, body.houses_per_row, body.facing, body.blocks, body.floors, body.units_per_floor)
     if homes == 0:
-        raise HTTPException(422, "Add at least one lorong or one block.")
+        raise refuse(422, "planner_empty", "Add at least one lorong or one block.")
     if homes > MAX_HOMES:
-        raise HTTPException(422, f"The prototype sets up phases of up to {MAX_HOMES} homes at a time.")
+        raise refuse(422, "planner_cap", f"The prototype sets up phases of up to {MAX_HOMES} homes at a time.", n=MAX_HOMES)
     return plan_phase(body.lorongs, body.houses_per_row, body.facing, body.blocks, body.floors, body.units_per_floor)
 
 
@@ -4119,10 +4252,10 @@ WAKE_NAME = re.compile(r"^[a-z0-9-]+\.(js|wasm|data)$")
 @app.get("/wake/{name}")
 def wake_file(name: str, request: Request) -> Response:
     if not WAKE_NAME.match(name):
-        raise HTTPException(404, "Not found")
+        raise refuse(404, "not_found", "Not found")
     folder = next((d for d in WAKE_DIRS if (d / name).is_file() or (d / f"{name}.gz").is_file()), None)
     if folder is None:
-        raise HTTPException(404, "Not found")
+        raise refuse(404, "not_found", "Not found")
     media = WAKE_TYPES[Path(name).suffix]
     cache = {"Cache-Control": "public, max-age=86400", "Vary": "Accept-Encoding"}
     packed = folder / f"{name}.gz"

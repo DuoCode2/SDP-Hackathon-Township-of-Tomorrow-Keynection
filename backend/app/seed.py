@@ -50,22 +50,81 @@ def _next(weekday: int, after: date) -> date:
     return d + timedelta(days=(weekday - d.weekday()) % 7)
 
 
-def _day(d: date) -> str:
+def _day(d: date, lang: str = "en") -> str:
+    """A date as a notice says it, in the reader's language: 'Thursday 29 Oct', 'Khamis 29 Okt', '10月29日（星期四）'."""
+    if lang == "zh":
+        return f"{d.month}月{d.day}日（{_WEEKDAYS['zh'][d.weekday()]}）"
+    if lang in ("ms", "ta"):
+        return f"{_WEEKDAYS[lang][d.weekday()]} {d.day} {_MONTHS[lang][d.month - 1]}"
     return f"{d:%A} {d.day} {d:%b}"
 
 
-def demo_notices() -> list[tuple[str, str, str]]:
-    """Community notices (ring 3): one-way, from the estate team. Fictional examples."""
+_WEEKDAYS = {
+    "ms": ["Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu", "Ahad"],
+    "zh": ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"],
+    "ta": ["திங்கள்", "செவ்வாய்", "புதன்", "வியாழன்", "வெள்ளி", "சனி", "ஞாயிறு"],
+}
+_MONTHS = {
+    "ms": ["Jan", "Feb", "Mac", "Apr", "Mei", "Jun", "Jul", "Ogo", "Sep", "Okt", "Nov", "Dis"],
+    "ta": ["ஜன.", "பிப்.", "மார்.", "ஏப்.", "மே", "ஜூன்", "ஜூலை", "ஆக.", "செப்.", "அக்.", "நவ.", "டிச."],
+}
+
+
+def demo_notices() -> list[dict]:
+    """Community notices (ring 3): one-way, from the estate team. Fictional examples. The record is English; each
+    comes with the team's own Malay, Chinese and Tamil wording, so a reader of any of the four languages gets the
+    notice (in Chats and on WhatsApp) in theirs. A notice the estate team posts later is translated by the AI."""
     today = today_my()
+    tank, drain = _next(5, today), _next(3, today)
     return [
-        ("block:A", "Block A water tank cleaning",
-         f"Water supply to Block A pauses on {_day(_next(5, today))}, 9am to 1pm. Please store water the night before."),
-        ("street:Jalan Demo 1", "Drain clearing on Jalan Demo 1",
-         f"Contractors will clear the roadside drains on {_day(_next(3, today))}. Please keep cars off the drain covers."),
-        ("phase", "Renovation hours in Taman Demo",
-         "Noisy renovation work only Monday to Saturday, 9am to 6pm, and never on Sundays or public holidays. "
-         "Register your renovation in Keynection so your neighbours hear about it from you first."),
+        {
+            "audience": "block:A", "title": "Block A water tank cleaning",
+            "body": f"Water supply to Block A pauses on {_day(tank)}, 9am to 1pm. Please store water the night before.",
+            "translations": {
+                "ms": {"title": "Pencucian tangki air Blok A",
+                       "body": f"Bekalan air ke Blok A terhenti pada {_day(tank, 'ms')}, 9 pagi hingga 1 tengah hari. "
+                               "Sila simpan air pada malam sebelumnya."},
+                "zh": {"title": "A 座水箱清洗",
+                       "body": f"{_day(tank, 'zh')}上午 9 点到下午 1 点，A 座暂停供水。请在前一晚先储水。"},
+                "ta": {"title": "A தொகுதி நீர்த் தொட்டி சுத்தம்",
+                       "body": f"{_day(tank, 'ta')} காலை 9 முதல் மதியம் 1 வரை A தொகுதிக்கு நீர் விநியோகம் நிறுத்தப்படும். "
+                               "முந்தைய இரவே தண்ணீர் சேமித்து வைக்கவும்."},
+            },
+        },
+        {
+            "audience": "street:Jalan Demo 1", "title": "Drain clearing on Jalan Demo 1",
+            "body": f"Contractors will clear the roadside drains on {_day(drain)}. Please keep cars off the drain covers.",
+            "translations": {
+                "ms": {"title": "Pembersihan longkang di Jalan Demo 1",
+                       "body": f"Kontraktor akan membersihkan longkang tepi jalan pada {_day(drain, 'ms')}. "
+                               "Sila jangan letak kereta di atas penutup longkang."},
+                "zh": {"title": "Jalan Demo 1 清理沟渠",
+                       "body": f"{_day(drain, 'zh')}承包商会清理路边沟渠。请不要把车停在沟渠盖上。"},
+                "ta": {"title": "Jalan Demo 1 சாக்கடை சுத்தம்",
+                       "body": f"{_day(drain, 'ta')} அன்று ஒப்பந்ததாரர்கள் சாலையோர சாக்கடைகளைச் சுத்தம் செய்வார்கள். "
+                               "சாக்கடை மூடிகள் மீது கார்களை நிறுத்த வேண்டாம்."},
+            },
+        },
+        {
+            "audience": "phase", "title": "Renovation hours in Taman Demo",
+            "body": "Noisy renovation work only Monday to Saturday, 9am to 6pm, and never on Sundays or public holidays. "
+                    "Register your renovation in Keynection so your neighbours hear about it from you first.",
+            "translations": {
+                "ms": {"title": "Waktu ubah suai di Taman Demo",
+                       "body": "Kerja ubah suai yang bising hanya Isnin hingga Sabtu, 9 pagi hingga 6 petang, dan tidak sekali-kali "
+                               "pada hari Ahad atau cuti umum. Daftarkan ubah suai anda dalam Keynection supaya jiran mendengarnya "
+                               "daripada anda dahulu."},
+                "zh": {"title": "Taman Demo 装修时段",
+                       "body": "吵闹的装修只能在星期一至六早上 9 点到傍晚 6 点进行，星期日和公共假期不能施工。"
+                               "请在 Keynection 登记装修，让邻居先从你这里听到。"},
+                "ta": {"title": "Taman Demo புதுப்பிப்பு நேரம்",
+                       "body": "சத்தமான புதுப்பிப்பு வேலை திங்கள் முதல் சனி வரை, காலை 9 முதல் மாலை 6 வரை மட்டுமே; ஞாயிறு மற்றும் "
+                               "பொது விடுமுறை நாட்களில் கூடாது. உங்கள் புதுப்பிப்பை Keynection-இல் பதிவு செய்யுங்கள், "
+                               "அண்டைவீட்டார் முதலில் உங்களிடமிருந்தே கேட்கட்டும்."},
+            },
+        },
     ]
+
 
 _SOUTH_NAMES = ["Farid", "Siti", "Aiman", "Kumar", "Wei Jie", "Nurul"]
 _NORTH_NAMES = ["Ah Hock", "Priya", "Hafiz", "Mei Ling", "Daniel", "Aisyah"]
@@ -91,19 +150,62 @@ _LANG = {
 }
 
 
-# Short, harmless "about me" lines. The profile screen warns residents not to share schedules or travel dates.
-BIOS = {
-    "Aiman": "Just moved in. Happy to help with Wi-Fi and computers.",
-    "Siti": "Two kids and a cat. Say hi if you see us at the playground!",
-    "Kumar": "Gardener. Ask me about mango trees.",
-    "Priya": "Teacher. Always up for a teh tarik chat.",
-    "Hafiz": "Works shifts: a quick message before noisy work really helps.",
-    "Mei Ling": "Bakes on weekends and shares the extras.",
-    "Sofia": "Re-doing the bathroom in October. Sorry in advance!",
-    "Arjun": "Works from home. Big on football.",
-    "Suresh": "Retired engineer, happy to look at a leak with you.",
-    "Ah Hock": "Retired. Voice messages are easiest for me; my daughter helps with the app.",
+# Short, harmless "about me" lines, each in all four reading languages. The profile screen warns residents not to
+# share schedules or travel dates. A household's own bio is the one in its reading language (Siti writes Malay, Kumar
+# Tamil, Mei Ling Chinese); the other three are stored with it, so each neighbour reads it in theirs and the card
+# says which language it was written in. For a bio a resident types later, the AI writes the other three.
+BIOS: dict[str, dict[str, str]] = {
+    "Aiman": {"en": "Just moved in. Happy to help with Wi-Fi and computers.",
+              "ms": "Baru pindah. Sudi tolong hal Wi-Fi dan komputer.",
+              "zh": "刚搬进来。Wi-Fi 和电脑的事乐意帮忙。",
+              "ta": "இப்போதுதான் குடிவந்தேன். Wi-Fi, கணினி விஷயங்களில் உதவ மகிழ்ச்சி."},
+    "Siti": {"en": "Two kids and a cat. Say hi if you see us at the playground!",
+             "ms": "Dua orang anak dan seekor kucing. Tegur kami kalau jumpa di taman permainan!",
+             "zh": "两个孩子和一只猫。在游乐场看到我们就打个招呼吧！",
+             "ta": "இரண்டு குழந்தைகள், ஒரு பூனை. விளையாட்டு மைதானத்தில் பார்த்தால் ஹாய் சொல்லுங்கள்!"},
+    "Kumar": {"en": "Gardener. Ask me about mango trees.",
+              "ms": "Tukang kebun. Tanya saya tentang pokok mangga.",
+              "zh": "园丁。关于芒果树的事可以问我。",
+              "ta": "தோட்டக்காரன். மா மரங்களைப் பற்றி என்னிடம் கேளுங்கள்."},
+    "Priya": {"en": "Teacher. Always up for a teh tarik chat.",
+              "ms": "Cikgu. Sentiasa boleh sembang sambil minum teh tarik.",
+              "zh": "老师。随时可以边喝拉茶边聊天。",
+              "ta": "ஆசிரியை. தேநீர் குடித்தபடி பேச எப்போதும் தயார்."},
+    "Hafiz": {"en": "Works shifts: a quick message before noisy work really helps.",
+              "ms": "Kerja syif: mesej ringkas sebelum kerja bising sangat membantu.",
+              "zh": "轮班工作：吵闹施工前先传个短讯，帮助很大。",
+              "ta": "ஷிஃப்ட் வேலை: சத்தமான வேலைக்கு முன் ஒரு சிறு செய்தி பெரிதும் உதவும்."},
+    "Mei Ling": {"en": "Bakes on weekends and shares the extras.",
+                 "ms": "Membakar kuih pada hujung minggu dan berkongsi lebihan.",
+                 "zh": "周末会烘焙，多出来的会分给大家。",
+                 "ta": "வார இறுதியில் பேக்கிங் செய்வேன்; மிச்சத்தைப் பகிர்வேன்."},
+    "Sofia": {"en": "Re-doing the bathroom in October. Sorry in advance!",
+              "ms": "Ubah suai bilik air pada bulan Oktober. Maaf awal-awal!",
+              "zh": "十月要翻新浴室。先说声不好意思！",
+              "ta": "அக்டோபரில் குளியலறையைப் புதுப்பிக்கிறேன். முன்கூட்டியே மன்னிக்கவும்!"},
+    "Arjun": {"en": "Works from home. Big on football.",
+              "ms": "Bekerja dari rumah. Peminat bola sepak.",
+              "zh": "在家工作。超爱足球。",
+              "ta": "வீட்டிலிருந்து வேலை. கால்பந்து பிரியர்."},
+    "Suresh": {"en": "Retired engineer, happy to look at a leak with you.",
+               "ms": "Jurutera bersara, sudi tengok kebocoran bersama anda.",
+               "zh": "退休工程师，乐意陪你看看漏水。",
+               "ta": "ஓய்வு பெற்ற பொறியாளர்; கசிவைச் சேர்ந்து பார்க்க மகிழ்ச்சி."},
+    "Ah Hock": {"en": "Retired. Voice messages are easiest for me; my daughter helps with the app.",
+                "ms": "Sudah bersara. Mesej suara paling senang untuk saya; anak perempuan saya tolong dengan app ini.",
+                "zh": "退休了。语音讯息对我最方便；女儿帮我用这个 app。",
+                "ta": "ஓய்வு பெற்றவன். குரல் செய்திகள்தான் எனக்கு எளிது; மகள் இந்த app-க்கு உதவுகிறாள்."},
 }
+
+
+def bio_texts(name: str, lang: str) -> tuple[str, dict[str, str]]:
+    """A demo household's bio as written (in its reading language) and the same line in the other three languages."""
+    texts = BIOS.get(name)
+    if not texts:
+        return "", {}
+    own = texts.get(lang) or texts["en"]
+    return own, {k: v for k, v in texts.items() if v != own}
+
 
 # Times a household needs quiet, used only to plan the noisy hours of renovations that reach it. Nobody else sees
 # them, or why: Siti next door to Aiman has a baby who naps after lunch, Hafiz across the road sleeps after night shifts.

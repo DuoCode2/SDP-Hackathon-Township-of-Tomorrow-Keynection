@@ -1,6 +1,6 @@
 # How Keynection is tested
 
-> **给队员的中文摘要**：测试分五层，底层是 408 个自动测试（后端，用 AI 替身，永远不连真的 AI），往上是前端的严格类型检查、浏览器自动走完评审路线并截图、人工按 `test-plan.md` 核对、真手机核对；每次推送到 GitHub 都自动跑前两层。最后一节老实写了还没测到的东西。**数字只在这里写一次**，README 和其他文件引用这一页。
+> **给队员的中文摘要**：测试分五层，底层是 420 个自动测试（后端，用 AI 替身，永远不连真的 AI），往上是前端的严格类型检查、浏览器自动走完评审路线并截图、人工按 `test-plan.md` 核对、真手机核对；每次推送到 GitHub 都自动跑前两层。最后一节老实写了还没测到的东西。**数字只在这里写一次**，README 和其他文件引用这一页。
 
 ```
                      ┌───────────────────────────┐
@@ -12,23 +12,23 @@
                      ├───────────────────────────┤
                      │  Front end: strict types    │  npm run build (TypeScript strict, Vite)
                      ├───────────────────────────┤
-                     │  408 server tests           │  backend/tests (pytest), ~3½ min, every push (CI)
+                     │  420 server tests           │  backend/tests (pytest), ~3½ min, every push (CI)
                      └───────────────────────────┘
 ```
 
-## Layer 1 — 408 automated server tests
+## Layer 1 — 420 automated server tests
 
-`cd backend && .venv/Scripts/python -m pytest -q` — 408 collected, all passing on 21 Oct 2026 (about 3½ minutes on a laptop). Each test gets its own SQLite database in a temporary folder; the AI is a **stand-in** (`tests/conftest.py`), so no test ever reaches Anthropic or Google. The count below is what pytest collects (parametrised cases counted separately).
+`cd backend && .venv/Scripts/python -m pytest -q` — 420 collected, all passing on 22 Oct 2026 (about 3½ minutes on a laptop). Each test gets its own SQLite database in a temporary folder; the AI is a **stand-in** (`tests/conftest.py`), so no test ever reaches Anthropic or Google. The count below is what pytest collects (parametrised cases counted separately).
 
 | What they protect | Files | Tests |
 |---|---|---|
 | **Plain rules** — noisy hours planned around quiet times (owner keeps ≥ 4 h, inside the council's hours, private, capped), two-sided works, reminders; triage by time order with reason codes; three layers of neighbours and notice ranges; the house behind a terrace told about wet, hacking and structural works; phase setup from a site plan; photo alignment and change detection; the home-log hash chain under concurrent writes | `test_quiet.py`, `test_triage.py`, `test_neighbours.py`, `test_rings.py`, `test_vision.py`, `test_ledger.py`, `test_pilot_phase.py` | 17 + 7 + 6 + 16 + 11 + 4 + 17 = **78** |
 | **Who may do what** — only owners close tickets, only recipients report, only raisers escalate; residents can't record an inspector's finding; blocks, quiet mode, daily caps; staff screens closed without staff sign-in; nobody writes to a home log by hand; in a pilot the server decides identity on every household endpoint; the site password gate; PDPA deletion, closure, backups | `test_decisions.py`, `test_hello_safety.py`, `test_talk.py`, `test_layers_2_4.py`, `test_staff_gating.py`, `test_signin.py`, `test_site_gate.py`, `test_privacy.py`, `test_care.py` | 13 + 11 + 22 + 14 + 12 + 13 + 13 + 13 + 13 = **124** |
-| **Languages** — quick replies and notices in English, Malay, Chinese and Tamil; dates and hours written per reader; every server-generated line carries a code so the screen can show it in the reader's language | `test_keynection.py`, `test_codes.py`, `test_talk.py` (shared above) | 11 + 11 = **22** |
+| **Languages** — quick replies and notices in English, Malay, Chinese and Tamil; dates and hours written per reader; every server-generated line carries a code so the screen can show it in the reader's language | `test_keynection.py`, `test_codes.py`, `test_reader_language.py` (the estate notices and the neighbours' bios in every reading language, the team's wording for the demo cast and the AI's for new text, the screen language override; every refusal from the server as a code with its values, and a cross-check that the app has wording for each code), `test_talk.py` (shared above) | 11 + 11 + 11 = **33** |
 | **AI, with the stand-in** — one sentence → notice fields, rule-breaking answers dropped; translation and calmer wording per reader; an insult refused outright, on the word list or on Claude's own judgement, with no "send anyway"; no key / no answer / network down → everything works as before; daily allowance; only the text leaves; the official SDK is exercised with the network swapped out; Gemini is demo-only, and a 503 is tried once more; the assistant reads one sentence into one of six intents and its fields, answers house-rule questions from a fixed text, counts status lines on the server, falls back to key words without AI, keeps the last six turns as history, and sends only the household's own records and its neighbours' unit numbers; the assistant's voice through the gateway — a short real recording is passed on and dropped, Malay and Chinese asked for by Deepgram's own detect_language, only English replies are spoken and cut at a sentence, the same reply from memory, daily allowances per home, the key never logged, off in a pilot | `test_ai.py`, `test_assistant.py`, `test_voice.py` | 35 + 19 + 34 = **88** |
 | **Pilot mode** — passkey sign-in, re-entry codes, CSV import that refuses a bad row, welcome packs, push subscriptions and encryption, Procore export, the first staff member, start-up self-checks, no rebuild of a pilot's data | `test_signin.py` (above), `test_pilot_setup.py`, `test_pilot_data.py`, `test_procore.py`, `test_push.py`, `test_join.py` | 7 + 6 + 7 + 10 + 13 = **43** |
-| **Demo and surface** — waves, reactions, voice notes, profiles, the official account; evidence API; the shared demo that starts over after a quiet spell with loosened caps; old `JIRAN_` names still working; health check; `.env.example` complete and honest | `test_social.py`, `test_evidence_api.py`, `test_shared_demo.py`, `test_rename.py`, `test_api.py`, `test_env_example.py` | 15 + 15 + 8 + 6 + 5 + 4 = **53** |
-| | **Total (32 files)** | **408** |
+| **Demo and surface** — waves, reactions, voice notes, profiles, the official account; evidence API; the shared demo that starts over after a quiet spell with loosened caps; old `JIRAN_` names still working; health check; `.env.example` complete and honest | `test_social.py`, `test_evidence_api.py`, `test_shared_demo.py`, `test_rename.py`, `test_api.py`, `test_env_example.py` | 15 + 15 + 8 + 6 + 6 + 4 = **54** |
+| | **Total (33 files)** | **420** |
 
 Three files answer the question judges ask most, "who is stopped from doing what": `test_staff_gating.py` (every SDP screen closes without a staff sign-in; nobody can write to a home log directly), `test_decisions.py` (propose, agree, disagree, inspector: who may take each step), `test_hello_safety.py` (blocks, quiet mode, tone, contact details, daily caps, approvals before structural works).
 
@@ -80,7 +80,7 @@ Last full run 21 Oct 2026: all seventeen tests in the ten scripts passing, no br
 | Gap | Why | Plan |
 |---|---|---|
 | A real push notification on a real phone | Needs a deployed pilot server with its own address | First week of a pilot |
-| The real AI with a real key | Tests use the stand-in. Walked locally with Claude Haiku 5.5 on 20 Oct 2026 (notice draft, chat check, notice translation, every assistant intent); the online demo's key is still Gemini's | Set `ANTHROPIC_API_KEY` on Render and walk the route once online |
+| The real AI with a real key | Tests use the stand-in. Walked locally with Claude Haiku 5.5 on 20 Oct 2026 (notice draft, chat check, notice translation, every assistant intent); the online demo runs Claude Sonnet 5.5 (`ANTHROPIC_API_KEY` set on Render on 21 Oct 2026) | Walk the route once online after every deploy |
 | WhatsApp delivery | Simulated on purpose; needs SDP's WhatsApp Business account | Templates ready in `docs/whatsapp-templates.md` |
 | Tamil wording | Written with AI help | A native speaker's review before a pilot |
 | Load and many users at once | One SQLite file, one worker, one township | Fine for a pilot phase; measured if it grows |
