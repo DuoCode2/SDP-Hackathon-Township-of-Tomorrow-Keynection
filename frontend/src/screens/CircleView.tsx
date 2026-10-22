@@ -262,7 +262,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
         <div className="cols">
           <Card className="drawing">
             <div className="plan-head">
-              <CardHead icon={<MapIcon size={16} />} title="Taman Demo · Phase 1" sub={t('map.sub')} />
+              <CardHead icon={<MapIcon size={16} />} title={t('place.demoPhase')} sub={t('map.sub')} />
               <Segmented value={view} onChange={setView} options={[{ id: 'terrace', label: 'Jalan Demo 1' }, { id: 'apartment', label: t('place.block', { b: 'A' }) }]} />
             </div>
             <PlanMap units={units} me={me} circle={circle} ring2={nearby.map((n) => n.id)} names={names} works={dir.works}

@@ -2052,7 +2052,7 @@ button.ring-row:hover { background: var(--surface-2); }
 .tour-foot { display: flex; align-items: center; gap: 8px; padding: 10px 0 calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line);
   position: sticky; bottom: -28px; z-index: 2; background: var(--paper); margin-bottom: -28px; } /* over the sheet's bottom padding, stuck or not */
 .tour-foot > .small { flex: 1; text-align: center; }
-.tour-back { flex: none; }
+.tour-back { flex: none; width: 42px; height: 42px; } /* as tall as the buttons beside it: a full-size target */
 .tour-back:disabled { visibility: hidden; }
 .tour-actions { display: inline-flex; gap: 8px; justify-content: flex-end; margin-left: auto; }
 .tour-actions .btn { white-space: nowrap; }

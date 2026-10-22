@@ -389,7 +389,7 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
           </nav>
         ))}
         <dl className="title-block" aria-label={t('tb.label')}>
-          <div className="tb-wide"><dt>{t('tb.project')}</dt><dd><Building2 size={12} /> {pinned ? place.name : 'Taman Demo · Phase 1'}</dd></div>
+          <div className="tb-wide"><dt>{t('tb.project')}</dt><dd><Building2 size={12} /> {pinned ? place.name : t('place.demoPhase')}</dd></div>
           <div><dt>{t('tb.sheet')}</dt><dd>{page.no} / {String(shownNav.length).padStart(2, '0')}</dd></div>
           <div><dt>{t('tb.rev')}</dt><dd>0.5</dd></div>
           <div className="tb-wide"><dt>{t(pinned ? 'tb.signedInAs' : 'tb.viewingAs')}</dt><dd>{curUnit ? `${curUnit.resident_name} · ${curUnit.label}` : '–'}</dd></div>

@@ -87,6 +87,7 @@ const D: Record<string, Entry> = {
   'ring2.more': ['Show all {n} homes on {place}', 'Tunjukkan semua {n} rumah di {place}', '显示 {place} 全部 {n} 户'], 'ring2.less': ['Show the nearest levels only', 'Tunjukkan tingkat terdekat sahaja', '只显示最近的楼层'],
   'ring2.nearLevels': ['Your level and the ones above and below', 'Tingkat anda serta di atas dan di bawah', '你这层和上下各一层'],
   'status.requested': ['Requested', 'Sudah diminta', '已请求'], 'status.wantsConnect': ['Wants to connect', 'Mahu berhubung', '想联系你'], 'status.closed': ['Closed', 'Ditutup', '已关闭'],
+  'place.demoPhase': ['Taman Demo · Phase 1', 'Taman Demo · Fasa 1', 'Taman Demo · 第 1 期'],
   'map.sub': ['Tap a home to see what you may do', 'Ketik rumah untuk lihat apa yang boleh dibuat', '点房子看你可以做什么'],
   'legend.you': ['You', 'Anda', '你'], 'legend.circle': ['Circle', 'Bulatan', '邻里圈'], 'legend.wall': ['Shared wall / slab', 'Dinding / lantai berkongsi', '共用墙／楼板'],
   'legend.works': ['Works you were told about', 'Kerja yang dimaklumkan', '通知过你的装修'],
