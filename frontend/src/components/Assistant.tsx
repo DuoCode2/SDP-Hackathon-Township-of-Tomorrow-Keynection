@@ -106,6 +106,28 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
   const [phase, setPhase] = useState<'idle' | 'waking' | 'listening' | 'transcribing' | 'speaking'>('idle')
   const [level, setLevel] = useState(0)
   const [woke, setWoke] = useState(false)
+  // On a phone the orb floats over the cards' right-hand buttons. While the page scrolls down it tucks below the edge
+  // and comes back once the scrolling stops or turns upward, so no button is ever under it when the reader taps.
+  const [tucked, setTucked] = useState(false)
+  useEffect(() => {
+    const phone = window.matchMedia('(max-width: 899.98px)')
+    let last = 0
+    let timer = 0
+    const onScroll = (e: Event) => {
+      if (!phone.matches || !(e.target instanceof Element) || !e.target.classList.contains('content')) return
+      const y = e.target.scrollTop
+      if (y > last + 4) setTucked(true)
+      else if (y < last - 4) setTucked(false)
+      last = y
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => setTucked(false), 700)
+    }
+    document.addEventListener('scroll', onScroll, true)
+    return () => {
+      document.removeEventListener('scroll', onScroll, true)
+      window.clearTimeout(timer)
+    }
+  }, [])
   const [speakingId, setSpeakingId] = useState<number | null>(null)
   const speaking = useRef<Speaking | null>(null)
   const cancelled = useRef(false)
@@ -504,7 +526,7 @@ export default function Assistant({ me, units, tab, onGo, onChanged }: {
       {/* The assistant's face in the corner: an orb, still when hands-free is off, breathing while it listens for
           "Hello Neighbour", blooming when it hears it, moving with the voice while it listens or speaks with the chat
           out of the way (a page it opened on a phone). A pill with its name for a few seconds, then the orb alone. */}
-      <button className={`assistant-fab ${easy ? 'big' : ''} ${open ? 'on' : ''} ${wake === 'listening' ? 'wake' : ''} ${woke ? 'woke' : ''} ${named && !open ? 'named' : ''} ${!open && phase !== 'idle' ? phase : ''}`}
+      <button className={`assistant-fab ${easy ? 'big' : ''} ${open ? 'on' : ''} ${wake === 'listening' ? 'wake' : ''} ${woke ? 'woke' : ''} ${named && !open ? 'named' : ''} ${!open && phase !== 'idle' ? phase : ''} ${tucked && !open ? 'tucked' : ''}`}
         style={{ '--level': level } as React.CSSProperties}
         onClick={() => (open ? close() : setOpen(true))} aria-label={t('assistant.open')} aria-expanded={open}
         title={wake === 'listening' ? `${t('assistant.open')} · ${t('assistant.wake.fab')}` : t('assistant.open')}>

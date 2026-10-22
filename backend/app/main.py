@@ -1306,10 +1306,14 @@ def _status_lines(conn: sqlite3.Connection, me: sqlite3.Row) -> dict[str, str]:
         left = "" if r["status"] == "closed" else (f" · {-clock['days_left']} days overdue" if clock["overdue"]
                                                   else f" · {clock['days_left']} days left")
         tickets.append(f"#{r['id']} · {STATUS_NAME[r['status']].lower()}{left}")
-    mine = [(json.loads(r["renovation"]), r["told"]) for r in conn.execute(
-        "SELECT i.renovation, (SELECT COUNT(*) FROM intro_recipients x WHERE x.intro_id = i.id) AS told FROM intros i"
+    mine = [(json.loads(r["renovation"]), r["told"], r["id"]) for r in conn.execute(
+        "SELECT i.id, i.renovation, (SELECT COUNT(*) FROM intro_recipients x WHERE x.intro_id = i.id) AS told FROM intros i"
         " WHERE i.from_unit_id = ? AND i.renovation IS NOT NULL ORDER BY i.id DESC", (unit_id,))]
-    mine = [f"“{reno['scope']}” {span(reno)}, {told} homes told" for reno, told in mine if reno["end"] >= today][:2]
+    # The homes by unit number, so "which neighbours were told" gets an answer, never a name.
+    told_labels = lambda intro_id: ", ".join(r["label"] for r in conn.execute(  # noqa: E731
+        "SELECT u.label FROM intro_recipients x JOIN units u ON u.id = x.unit_id WHERE x.intro_id = ? ORDER BY u.label", (intro_id,)))
+    mine = [f"“{reno['scope']}” {span(reno)}, {told} homes told ({told_labels(intro_id)})" for reno, told, intro_id in mine
+            if reno["end"] >= today][:2]
     waiting = []
     for c in conn.execute("SELECT n.status, n.reporter_unit_id, i.from_unit_id AS renovator FROM incidents n"
                           " LEFT JOIN intros i ON i.id = n.renovation_intro_id"
@@ -1594,7 +1598,7 @@ def neighbour_card(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
         if not n["joined"]:
             # Not on Keynection yet: no name (resident_name is the unit label), no language, no bio, nothing to tap.
             out.append({**n, "lang": None, "known": False, "hello_sent": False, "bio": "", "bio_lang": None, "bio_in": {},
-                        "bio_by_ai": False, "waved_today": False, "allow_waves": False})
+                        "bio_by_ai": False, "waved_today": False, "waved_you": False, "allow_waves": False})
             continue
         they_replied = conn.execute(
             "SELECT 1 FROM intro_recipients r JOIN intros i ON i.id = r.intro_id"
@@ -1609,6 +1613,9 @@ def neighbour_card(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
         recent = (datetime.now(timezone.utc) - wave_window()).isoformat(timespec="seconds")
         waved = conn.execute("SELECT 1 FROM waves WHERE from_unit_id = ? AND to_unit_id = ? AND created_at > ?",
                              (unit_id, n["id"], recent)).fetchone() is not None
+        # Their wave to me, still unanswered: the card says so and its button reads "Wave back" instead of "Wave".
+        waved_me = conn.execute("SELECT 1 FROM waves WHERE from_unit_id = ? AND to_unit_id = ? AND created_at > ?",
+                                (n["id"], unit_id, recent)).fetchone() is not None
         # My hello has reached them but nobody has replied yet: the card says "hello sent" rather than "not met yet",
         # so the owner does not send it twice.
         # A wave is a hello too: the card and the circle's banner count it, so a wave is not followed by "say hi".
@@ -1620,7 +1627,8 @@ def neighbour_card(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
         ).fetchone() is not None
         out.append({**n, "known": they_replied or i_replied or _mutual(conn, unit_id, n["id"]), "hello_sent": hello_sent,
                     **_bio_json(conn, n["id"]),
-                    "waved_today": waved, "allow_waves": bool(_profile_row(conn, n["id"])["allow_waves"])})
+                    "waved_today": waved, "waved_you": waved_me and not waved,
+                    "allow_waves": bool(_profile_row(conn, n["id"])["allow_waves"])})
     return {"unit_id": unit_id, "neighbours": out, "known_count": sum(n["known"] for n in out),
             "not_joined": sum(not n["joined"] for n in out)}
 
@@ -3081,7 +3089,8 @@ def works(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[st
     ]
     rules, codes = house_rules_for(me["kind"])
     return {"mine": mine, "nearby": nearby, "gate_hours": f"{GATE_OPEN}-{GATE_CLOSE}, Mon-Sat",
-            "gate_open": GATE_OPEN, "gate_close": GATE_CLOSE, "house_rules": rules, "house_rule_codes": codes}
+            "gate_open": GATE_OPEN, "gate_close": GATE_CLOSE, "noisy_open": quiet.LEGAL_FROM, "noisy_close": quiet.LEGAL_TO,
+            "house_rules": rules, "house_rule_codes": codes}
 
 
 @app.post("/api/intros/{intro_id}/passes", status_code=201)

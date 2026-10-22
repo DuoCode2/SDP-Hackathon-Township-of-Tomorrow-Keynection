@@ -183,6 +183,9 @@ export interface Works {
   gate_hours: string
   gate_open: string
   gate_close: string
+  /** The house rule's noisy-work window (09:00–18:00): shown next to the gate hours so nobody has to add them up. */
+  noisy_open?: string
+  noisy_close?: string
   house_rules: string[]
   house_rule_codes: string[]
 }

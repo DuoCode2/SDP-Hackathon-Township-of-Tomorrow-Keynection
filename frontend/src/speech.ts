@@ -25,11 +25,14 @@ export function canSpeak(lang: string, serverSpeaks: boolean): boolean {
 
 /** Speak one reply. `done` settles when it has finished, was stopped, or could not be spoken. */
 export function speak(text: string, lang: string, { unitId, serverSpeaks }: { unitId: string; serverSpeaks: boolean }): Speaking {
-  let stopNow = () => undefined as void
+  // Stop can be pressed while the server's audio is still on its way: remembered here, so nothing plays after it.
+  let stopped = false
+  let stopNow = () => { stopped = true }
   const done = (async () => {
     if (lang === 'en' && serverSpeaks) {
       try {
         const blob = await api.speak(unitId, text, lang)
+        if (stopped) return
         const url = URL.createObjectURL(blob)
         const audio = new Audio(url)
         await new Promise<void>((resolve) => {
@@ -45,7 +48,7 @@ export function speak(text: string, lang: string, { unitId, serverSpeaks }: { un
       }
     }
     const voice = browserVoice(lang)
-    if (!voice) return
+    if (!voice || stopped) return
     await new Promise<void>((resolve) => {
       const u = new SpeechSynthesisUtterance(text)
       u.voice = voice

@@ -43,7 +43,7 @@ function photoTasksDue(tasks: RenovationTask[]): (RenovationTask & { days: numbe
     .sort((a, b) => a.days - b.days)
 }
 
-type Member = Directory['circle'][number] & { waved_today?: boolean; allow_waves?: boolean }
+type Member = Directory['circle'][number] & { waved_today?: boolean; waved_you?: boolean; allow_waves?: boolean }
 
 const SHARES: Record<string, string> = {
   left: 'share.wall', right: 'share.wall', above: 'share.above', below: 'share.below',
@@ -151,7 +151,7 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
               <button key={n.id} role="listitem" className={`story ${!n.joined ? 'off' : works.has(n.id) ? 'works' : n.known ? 'known' : 'new'}`} onClick={() => setProfile(n)}>
                 <span className="story-ring"><Avatar name={n.resident_name} size={58} /></span>
                 <b>{n.resident_name}</b>
-                <small>{!n.joined ? t('nj.story') : works.has(n.id) ? t('story.renovating') : n.known ? t('story.known') : n.hello_sent ? t('story.helloSent') : t('story.sayHi')}</small>
+                <small>{!n.joined ? t('nj.story') : works.has(n.id) ? t('story.renovating') : n.known ? t('story.known') : n.waved_you ? t('story.wavedYou') : n.hello_sent ? t('story.helloSent') : t('story.sayHi')}</small>
               </button>
             ))}
           </div>
@@ -216,15 +216,16 @@ export default function CircleView({ me, units, version, onChange, onViewAs, onO
                 </button>
                 <Bio n={n} lang={reads} />
                 <div className={`person-status ${works.has(n.id) ? 'works' : n.known ? 'known' : ''}`}>
-                  {works.has(n.id) ? <><Hammer size={12} /> {t('status.renovating')}</> : t(n.known ? 'status.known' : n.hello_sent ? 'status.helloSent' : 'status.notMet')}
+                  {works.has(n.id) ? <><Hammer size={12} /> {t('status.renovating')}</> : n.waved_you ? t('wave.theirs', { name: n.resident_name }) : t(n.known ? 'status.known' : n.hello_sent ? 'status.helloSent' : 'status.notMet')}
                 </div>
                 <div className="btn-row">
-                  {/* Not met yet: a wave is the easy first step, so it leads. Once you know each other, you talk. */}
+                  {/* Not met yet: a wave is the easy first step, so it leads. Once you know each other, you talk. Their wave
+                      waiting for yours: "Wave back" leads. A hello already out: the wave stays, but no longer as the loud button. */}
                   <button className={`btn btn-sm ${n.known ? 'btn-primary' : ''}`} onClick={() => onOpenChat(n.id)}><MessagesSquare size={14} /> {t('btn.message')}</button>
                   {!n.known && (
-                    <button className="btn btn-sm btn-primary" disabled={n.waved_today || n.allow_waves === false} onClick={() => wave(n)}
+                    <button className={`btn btn-sm ${n.waved_you || !n.hello_sent ? 'btn-primary' : ''}`} disabled={n.waved_today || n.allow_waves === false} onClick={() => wave(n)}
                       title={n.allow_waves === false ? t('wave.off') : undefined}>
-                      👋 {t(n.waved_today ? 'btn.waved' : 'btn.wave')}
+                      👋 {t(n.waved_today ? 'btn.waved' : n.waved_you ? 'wave.back' : 'btn.wave')}
                     </button>
                   )}
                 </div>

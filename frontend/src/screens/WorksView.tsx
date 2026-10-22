@@ -219,7 +219,7 @@ function Schedule({ me, data, all, noisy, onChange, onOpenEvidence }: { me: Unit
         </Card>
 
         <Card>
-          <CardHead icon={<ListChecks size={16} />} title={t('wk.rules')} sub={t('wk.gateHours', { open: data.gate_open, close: data.gate_close })} />
+          <CardHead icon={<ListChecks size={16} />} title={t('wk.rules')} sub={t('wk.gateHours', { open: data.gate_open, close: data.gate_close, nfrom: data.noisy_open ?? '09:00', nto: data.noisy_close ?? '18:00' })} />
           <ul className="rules">
             {data.house_rules.map((r, i) => ({ r, code: data.house_rule_codes?.[i] }))
               .filter(({ code }) => SHOW_CONTRACTOR_PASSES || code !== 'carry_pass')  // "this pass" means nothing without passes
