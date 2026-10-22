@@ -32,7 +32,7 @@ export default function ConcernCard({ concern: c, viewer, estate = false, onChan
       setNote('')
       onChanged()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not update', 'error')
+      toast(e instanceof Error ? e.message : local('err.tryAgain'), 'error')
     } finally {
       setBusy(false)
     }

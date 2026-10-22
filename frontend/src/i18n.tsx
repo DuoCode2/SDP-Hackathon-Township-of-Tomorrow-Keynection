@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, type Lang } from './api'
 import { remember, remembered } from './storage'
 
@@ -568,7 +568,7 @@ const D: Record<string, Entry> = {
   'push.staffTitle': ['Notifications on this device', 'Pemberitahuan di peranti ini', '这台装置的通知'],
   'push.staffOn': ['On: reported messages, concerns passed to the estate office and new warranty tickets reach this device.', 'Hidup: mesej yang dilaporkan, kebimbangan yang dibawa ke pejabat estet dan tiket waranti baharu sampai ke peranti ini.', '已开启：被检举的讯息、转交物业的问题和新的保修单会传到这台装置。'],
   'join.p5t': ['AI translation', 'Terjemahan AI', 'AI 翻译'],
-  'join.p5': ['So neighbours can read you in their own language, what you type to them is translated by an AI service (Claude, by Anthropic, processed outside Malaysia). Only the words you write are sent. When you ask the assistant, your own records (notices, warranty tickets, case status) and your neighbours’ unit numbers go to the AI with your request; your neighbours’ names and what they wrote do not. Your neighbour can always see your own words, and a calmer wording is only ever a suggestion. A message the AI judges to be abuse is refused and never sent.', 'Supaya jiran boleh membacanya dalam bahasa mereka sendiri, apa yang anda taip kepada mereka diterjemah oleh perkhidmatan AI (Claude, oleh Anthropic, diproses di luar Malaysia). Hanya perkataan yang anda tulis dihantar. Apabila anda bertanya kepada pembantu, rekod anda sendiri (notis, tiket waranti, status kes) dan nombor unit jiran anda dihantar kepada AI bersama permintaan anda; nama jiran dan apa yang mereka tulis tidak dihantar. Jiran anda sentiasa boleh melihat kata-kata asal anda, dan ayat yang lebih tenang hanyalah cadangan. Mesej yang dinilai AI sebagai cacian ditolak dan tidak dihantar.', '为了让邻居用自己的语言读你写的话，你打给他们的字会由 AI 服务（Anthropic 的 Claude，在马来西亚境外处理）翻译。只送出你写的文字。问助手时，你自己的记录（通知、保修单、案件状态）和邻居的门牌会随你的问题一起送去 AI；邻居的名字和他们写的话不会。邻居随时看得到你的原文；比较平和的说法永远只是建议。被 AI 判定为辱骂的讯息会被拒绝，不会送出。'],
+  'join.p5': ['So neighbours can read you in their own language, what you type to them is translated by an AI service (Claude, by Anthropic, processed outside Malaysia). Only the words you write are sent. When you ask the assistant, your own records (notices, warranty tickets, case status) and your neighbours’ unit numbers go to the AI with your request; your neighbours’ names and what they wrote do not. Your neighbour can always see your own words, and a calmer wording is only ever a suggestion. A message the AI judges to be abuse is refused and never sent. Your one-line introduction and the estate office’s notices are translated the same way, so every neighbour reads them in their own language.', 'Supaya jiran boleh membacanya dalam bahasa mereka sendiri, apa yang anda taip kepada mereka diterjemah oleh perkhidmatan AI (Claude, oleh Anthropic, diproses di luar Malaysia). Hanya perkataan yang anda tulis dihantar. Apabila anda bertanya kepada pembantu, rekod anda sendiri (notis, tiket waranti, status kes) dan nombor unit jiran anda dihantar kepada AI bersama permintaan anda; nama jiran dan apa yang mereka tulis tidak dihantar. Jiran anda sentiasa boleh melihat kata-kata asal anda, dan ayat yang lebih tenang hanyalah cadangan. Mesej yang dinilai AI sebagai cacian ditolak dan tidak dihantar. Pengenalan satu baris anda dan notis pejabat estet diterjemah dengan cara yang sama, supaya setiap jiran membacanya dalam bahasa mereka sendiri.', '为了让邻居用自己的语言读你写的话，你打给他们的字会由 AI 服务（Anthropic 的 Claude，在马来西亚境外处理）翻译。只送出你写的文字。问助手时，你自己的记录（通知、保修单、案件状态）和邻居的门牌会随你的问题一起送去 AI；邻居的名字和他们写的话不会。邻居随时看得到你的原文；比较平和的说法永远只是建议。被 AI 判定为辱骂的讯息会被拒绝，不会送出。你的一句自我介绍和物业办公室的公告也用同样的方式翻译，让每位邻居都能用自己的语言阅读。'],
   'join.p5.gemini': ['So neighbours can read you in their own language, what you type to them is translated by an AI service (Gemini, by Google, processed outside Malaysia). This demo uses Google’s free service, which may use what is sent to improve Google’s products: type only made-up details here. Only the words you write are sent. When you ask the assistant, your own records (notices, warranty tickets, case status) and your neighbours’ unit numbers go to the AI with your request; your neighbours’ names and what they wrote do not. Your neighbour can always see your own words, and a calmer wording is only ever a suggestion. A message the AI judges to be abuse is refused and never sent.', 'Supaya jiran boleh membacanya dalam bahasa mereka sendiri, apa yang anda taip kepada mereka diterjemah oleh perkhidmatan AI (Gemini, oleh Google, diproses di luar Malaysia). Demo ini menggunakan perkhidmatan percuma Google, yang mungkin menggunakan apa yang dihantar untuk menambah baik produk Google: taip butiran rekaan sahaja di sini. Hanya perkataan yang anda tulis dihantar. Apabila anda bertanya kepada pembantu, rekod anda sendiri (notis, tiket waranti, status kes) dan nombor unit jiran anda dihantar kepada AI bersama permintaan anda; nama jiran dan apa yang mereka tulis tidak dihantar. Jiran anda sentiasa boleh melihat kata-kata asal anda, dan ayat yang lebih tenang hanyalah cadangan. Mesej yang dinilai AI sebagai cacian ditolak dan tidak dihantar.', '为了让邻居用自己的语言读你写的话，你打给他们的字会由 AI 服务（Google 的 Gemini，在马来西亚境外处理）翻译。这个演示用的是 Google 的免费服务，送去的内容可能会被 Google 用来改进产品，所以这里只输入虚构的内容。只送出你写的文字。问助手时，你自己的记录（通知、保修单、案件状态）和邻居的门牌会随你的问题一起送去 AI；邻居的名字和他们写的话不会。邻居随时看得到你的原文；比较平和的说法永远只是建议。被 AI 判定为辱骂的讯息会被拒绝，不会送出。'],
   'join.consent': ['I have read this privacy notice ({version}) and agree to it.', 'Saya telah membaca notis privasi ini ({version}) dan bersetuju.', '我已阅读这份隐私声明（{version}）并同意。'],
   'join.wa': ['Send me short alerts on WhatsApp (never the content of messages)', 'Hantar notifikasi ringkas melalui WhatsApp (tanpa isi mesej)', '用 WhatsApp 发简短通知给我（不会有讯息内容）'],
@@ -895,6 +895,27 @@ const D: Record<string, Entry> = {
 
   'cmp.drag': ['Drag to compare', 'Seret untuk membanding', '拖动比较'], 'cmp.detect': ['Detect', 'Kesan', '标示'], 'cmp.raw': ['Raw', 'Asal', '原图'],
   'cmp.line': ['Line', 'Garis', '线'], 'cmp.patch': ['Patch', 'Tompok', '斑块'], 'cmp.aligning': ['Aligning · comparing', 'Menyelaras · membanding', '对齐 · 比较中'],
+  // chrome and fallbacks that used to be English whatever the interface language
+  'brand.sub': ['EVERY KEY · FIVE NEIGHBOURS', 'SETIAP KUNCI · LIMA JIRAN', '每一把钥匙 · 五户邻居'],
+  'top.live': ['LIVE', 'LANGSUNG', '实时'], 'top.liveTitle': ['Prototype running live', 'Prototaip sedang berjalan', '原型正在实时运行'],
+  'top.sheet': ['Sheet {n}', 'Helaian {n}', '第 {n} 页'], 'top.leftPane': ['left pane', 'anak tetingkap kiri', '左边'], 'top.rightPane': ['right pane', 'anak tetingkap kanan', '右边'],
+  'top.bothSidesTitle': ['See both sides of the shared wall at once', 'Lihat kedua-dua belah dinding kongsi serentak', '同时看共用墙的两边'],
+  'split.wall': ['SHARED WALL', 'DINDING KONGSI', '共用墙'],
+  'tb.label': ['Drawing title block', 'Blok tajuk lukisan', '图纸标题栏'], 'tb.project': ['Project', 'Projek', '项目'], 'tb.sheet': ['Sheet', 'Helaian', '页'], 'tb.rev': ['Rev', 'Sem', '版'],
+  'tb.viewingAs': ['Viewing as', 'Melihat sebagai', '目前视角'], 'tb.signedInAs': ['Signed in as', 'Log masuk sebagai', '登入身份'], 'tb.data': ['Data', 'Data', '资料'],
+  'tb.fictional': ['Fictional · runs offline', 'Rekaan · berjalan luar talian', '虚构 · 离线可用'], 'tb.pilot': ['Pilot · real households', 'Perintis · isi rumah sebenar', '试点 · 真实住户'],
+  'nav.repairDot': ['Repair waiting for you', 'Pembaikan menunggu anda', '有维修等你确认'],
+  'offline.demoHint': ['(Demo: is the backend running?)', '(Demo: adakah pelayan sedang berjalan?)', '（演示：后端服务器开着吗？）'],
+  'err.tryAgain': ['That did not go through. Please try again.', 'Tidak berjaya. Sila cuba lagi.', '没有成功，请再试一次。'],
+  'thread.back': ['Back to list', 'Kembali ke senarai', '返回列表'],
+  'chat.renovating': ['Renovating', 'Sedang ubah suai', '正在装修'], 'chat.openConcern': ['Open concern', 'Kebimbangan terbuka', '有未解决的问题'],
+  'voice.cancelRec': ['Cancel recording', 'Batal rakaman', '取消录音'], 'voice.send': ['Send voice message', 'Hantar mesej suara', '发送语音讯息'],
+  'voice.play': ['Play voice message', 'Main mesej suara', '播放语音讯息'], 'voice.pause': ['Pause', 'Jeda', '暂停'],
+  'voice.unsupported': ['Voice messages need a microphone and a browser that can record.', 'Mesej suara memerlukan mikrofon dan pelayar yang boleh merakam.', '语音讯息需要麦克风和能录音的浏览器。'],
+  'voice.noMic': ['Microphone permission was not given.', 'Kebenaran mikrofon tidak diberikan.', '没有获得麦克风权限。'],
+  'circle.list': ['Your circle', 'Bulatan anda', '你的邻里圈'], 'common.close': ['Close', 'Tutup', '关闭'],
+  // a neighbour's one-line bio shown in the reader's language: where it came from
+  'bio.translated': ['Translated from {lang}', 'Diterjemah daripada {lang}', '译自{lang}'], 'bio.byAi': ['Translated by AI from {lang}', 'Diterjemah oleh AI daripada {lang}', 'AI 译自{lang}'],
 }
 
 // Tamil for what a resident receives in their own language: the printed renovation notice, noisy-work hours and the
@@ -928,7 +949,7 @@ const TA: Record<string, string> = {
   'join.p4t': 'உங்கள் உரிமைகள்',
   'join.p4': 'எப்போது வேண்டுமானாலும் உங்கள் தகவல்களைப் பதிவிறக்கலாம், திருத்தலாம், அல்லது "Me" பக்கத்தில் உங்கள் கணக்கை மூடலாம் (நிர்வாக அலுவலகத்திடமும் கேட்கலாம்).',
   'join.p5t': 'AI மொழிபெயர்ப்பு',
-  'join.p5': 'அண்டைவீட்டார் தங்கள் சொந்த மொழியில் படிக்க, நீங்கள் அவர்களுக்குத் தட்டச்சு செய்வது ஒரு AI சேவையால் (Anthropic நிறுவனத்தின் Claude, மலேசியாவுக்கு வெளியே செயலாக்கப்படுகிறது) மொழிபெயர்க்கப்படும். நீங்கள் எழுதும் சொற்கள் மட்டுமே அனுப்பப்படும். உதவியாளரிடம் கேட்கும்போது, உங்கள் சொந்தப் பதிவுகளும் (அறிவிப்புகள், உத்தரவாதச் சீட்டுகள், வழக்கின் நிலை) அண்டைவீட்டாரின் வீட்டு எண்களும் உங்கள் கேள்வியுடன் AI-க்கு அனுப்பப்படும்; அண்டைவீட்டாரின் பெயர்களும் அவர்கள் எழுதியவையும் அனுப்பப்படாது. உங்கள் அண்டைவீட்டார் உங்கள் மூலச் சொற்களை எப்போதும் பார்க்கலாம்; அமைதியான சொற்றொடர் எப்போதும் ஒரு பரிந்துரை மட்டுமே.',
+  'join.p5': 'அண்டைவீட்டார் தங்கள் சொந்த மொழியில் படிக்க, நீங்கள் அவர்களுக்குத் தட்டச்சு செய்வது ஒரு AI சேவையால் (Anthropic நிறுவனத்தின் Claude, மலேசியாவுக்கு வெளியே செயலாக்கப்படுகிறது) மொழிபெயர்க்கப்படும். நீங்கள் எழுதும் சொற்கள் மட்டுமே அனுப்பப்படும். உதவியாளரிடம் கேட்கும்போது, உங்கள் சொந்தப் பதிவுகளும் (அறிவிப்புகள், உத்தரவாதச் சீட்டுகள், வழக்கின் நிலை) அண்டைவீட்டாரின் வீட்டு எண்களும் உங்கள் கேள்வியுடன் AI-க்கு அனுப்பப்படும்; அண்டைவீட்டாரின் பெயர்களும் அவர்கள் எழுதியவையும் அனுப்பப்படாது. உங்கள் அண்டைவீட்டார் உங்கள் மூலச் சொற்களை எப்போதும் பார்க்கலாம்; அமைதியான சொற்றொடர் எப்போதும் ஒரு பரிந்துரை மட்டுமே. உங்கள் ஒரு வரி அறிமுகமும் நிர்வாக அலுவலகத்தின் அறிவிப்புகளும் இதே முறையில் மொழிபெயர்க்கப்படும்; ஒவ்வொரு அண்டைவீட்டாரும் அவற்றைத் தங்கள் மொழியிலேயே படிப்பார்கள்.',
   'join.p5.gemini': 'அண்டைவீட்டார் தங்கள் சொந்த மொழியில் படிக்க, நீங்கள் அவர்களுக்குத் தட்டச்சு செய்வது ஒரு AI சேவையால் (Google நிறுவனத்தின் Gemini, மலேசியாவுக்கு வெளியே செயலாக்கப்படுகிறது) மொழிபெயர்க்கப்படும். இந்த டெமோ Google-இன் இலவச சேவையைப் பயன்படுத்துகிறது; அனுப்பப்படுவதை Google தனது தயாரிப்புகளை மேம்படுத்தப் பயன்படுத்தக்கூடும், எனவே இங்கே கற்பனையான விவரங்களை மட்டுமே தட்டச்சு செய்யுங்கள். நீங்கள் எழுதும் சொற்கள் மட்டுமே அனுப்பப்படும். உதவியாளரிடம் கேட்கும்போது, உங்கள் சொந்தப் பதிவுகளும் (அறிவிப்புகள், உத்தரவாதச் சீட்டுகள், வழக்கின் நிலை) அண்டைவீட்டாரின் வீட்டு எண்களும் உங்கள் கேள்வியுடன் AI-க்கு அனுப்பப்படும்; அண்டைவீட்டாரின் பெயர்களும் அவர்கள் எழுதியவையும் அனுப்பப்படாது. உங்கள் அண்டைவீட்டார் உங்கள் மூலச் சொற்களை எப்போதும் பார்க்கலாம்; அமைதியான சொற்றொடர் எப்போதும் ஒரு பரிந்துரை மட்டுமே.',
   'join.consent': 'இந்தத் தனியுரிமை அறிவிப்பை ({version}) படித்தேன், ஒப்புக்கொள்கிறேன்.',
   'join.wa': 'WhatsApp-இல் சுருக்கமான அறிவிப்புகளை அனுப்புங்கள் (செய்திகளின் உள்ளடக்கம் ஒருபோதும் இருக்காது)',
@@ -1027,8 +1048,13 @@ export function langChosen(): boolean {
   return remembered('uiLang') !== null
 }
 
+// What the page says it is written in, so browsers pick the right fonts (Chinese glyphs, not Japanese ones) and screen
+// readers the right voice. Dates and numbers use LOCALE instead.
+const HTML_LANG: Record<UiLang, string> = { en: 'en-MY', ms: 'ms-MY', zh: 'zh-Hans' }
+
 export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, set] = useState<UiLang>(initial)
+  useEffect(() => { document.documentElement.lang = HTML_LANG[lang] }, [lang])
   const setLang = useCallback((l: UiLang) => {
     set(l)
     remember('uiLang', l)
@@ -1041,6 +1067,22 @@ export function LangProvider({ children }: { children: ReactNode }) {
 export function EnglishOnly({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({ lang: 'en' as UiLang, setLang: () => {}, t: tEn }), [])
   return <LangContext.Provider value={value}>{children}</LangContext.Provider>
+}
+
+/** The language this household reads the screens in: the interface language, except that a Tamil-reading household on
+ *  the English screens reads Tamil (the screens themselves have no Tamil). Quick replies and the assistant use the same rule. */
+export function readLang(ui: UiLang, me: { lang: Lang }): Lang {
+  return ui === 'en' && me.lang === 'ta' ? 'ta' : ui
+}
+
+/** A neighbour's one-line bio for this reader: in their reading language when that wording exists, otherwise as written.
+ *  `from` names the language it was written in whenever what is shown is a translation, so the screen can say so. */
+export function bioFor(n: { bio?: string; bio_lang?: Lang | null; bio_in?: Partial<Record<Lang, string>> }, lang: Lang): { text: string; from: Lang | null } {
+  if (!n.bio) return { text: '', from: null }
+  const own = n.bio_lang ?? 'en'
+  if (lang === own) return { text: n.bio, from: null }
+  const translated = n.bio_in?.[lang]
+  return translated ? { text: translated, from: own } : { text: n.bio, from: null }
 }
 
 export const useLang = () => useContext(LangContext)

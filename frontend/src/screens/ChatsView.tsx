@@ -5,10 +5,10 @@ import {
   TriangleAlert, Volume2, X,
 } from 'lucide-react'
 import {
-  api, ApiError, type ChatIntro, type ChatMessage, type ChatWave, type ConcernCategory, type Conversation, type Official, type Preview,
+  api, ApiError, type ChatIntro, type ChatMessage, type ChatWave, type ConcernCategory, type Conversation, type Notice, type Official, type Preview,
   type Thread, type UnitInfo,
 } from '../api'
-import { byWho, noisyHours, refusal, subjectText, useDates, useT, type Translate } from '../i18n'
+import { byWho, noisyHours, readLang, refusal, subjectText, useDates, useLang, useT, type Translate } from '../i18n'
 import { useHelper } from '../helper'
 import { useAi, usePilot, usePlace } from '../features'
 import { LANG_TAG } from '../components/Cast'
@@ -72,11 +72,12 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
   const [wide, setWide] = useState(false)
   const [convos, setConvos] = useState<Conversation[] | null>(null)
   const [official, setOfficial] = useState<Official | null>(null)
+  const reads = readLang(useLang().lang, me)  // the estate notices arrive in the language the screens are in
 
   const load = useCallback(() => {
     api.conversations(me.id).then(setConvos).catch(() => setConvos([]))
-    api.official(me.id).then(setOfficial).catch(() => setOfficial(null))
-  }, [me.id])
+    api.official(me.id, reads).then(setOfficial).catch(() => setOfficial(null))
+  }, [me.id, reads])
   useEffect(() => { load() }, [load, version])
 
   useLayoutEffect(() => {
@@ -129,8 +130,8 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
             </span>
             <span className="chat-row-flags">
               {c.unread > 0 && <span className="unread">{c.unread}</span>}
-              {c.renovating && <Hammer size={13} className="flag-works" aria-label="Renovating" />}
-              {c.open_concerns > 0 && <MessageSquareWarning size={13} className="flag-concern" aria-label="Open concern" />}
+              {c.renovating && <Hammer size={13} className="flag-works" aria-label={t('chat.renovating')} />}
+              {c.open_concerns > 0 && <MessageSquareWarning size={13} className="flag-concern" aria-label={t('chat.openConcern')} />}
               {c.contact === 'mutual' && <Phone size={12} className="flag-phone" aria-label="Numbers shared" />}
             </span>
           </button>
@@ -165,7 +166,7 @@ function OfficialThread({ me, data, onRead, onBack }: { me: UnitInfo; data: Offi
   return (
     <div className="thread">
       <header className="thread-head">
-        {onBack && <button className="icon-btn" onClick={onBack} aria-label="Back to list"><ArrowLeft size={16} /></button>}
+        {onBack && <button className="icon-btn" onClick={onBack} aria-label={t('thread.back')}><ArrowLeft size={16} /></button>}
         <span className="official-avatar lg"><Building2 size={20} /></span>
         <div className="grow">
           <b>{t('estate.full', { place: place.name })} <BadgeCheck size={14} className="verified" /></b>
@@ -181,13 +182,31 @@ function OfficialThread({ me, data, onRead, onBack }: { me: UnitInfo; data: Offi
               <Stamp tone="blue" tilt={0}>{n.audience === 'phase' ? t('audience.phase') : n.audience.startsWith('street:') ? n.audience.slice(7) : t('place.block', { b: n.audience.slice(6) })}</Stamp>
               <small>{dates.date(n.created_at)} · {dates.time(new Date(n.created_at))}</small>
             </div>
-            <b>{n.title}</b>
-            <p>{n.body}</p>
+            <OfficialNotice n={n} />
           </div>
         ))}
       </div>
       <div className="composer-blocked readonly"><Lock size={14} /> {t('estate.footer')}</div>
     </div>
+  )
+}
+
+/** One estate notice in the reader's language; when it is a translation, the English record is one tap away. */
+function OfficialNotice({ n }: { n: Notice }) {
+  const t = useT()
+  const [original, setOriginal] = useState(false)
+  const shown = original && n.original ? n.original : n
+  return (
+    <>
+      <b>{shown.title}</b>
+      <p>{shown.body}</p>
+      {n.translated && (
+        <button className={`msg-tr notice-tr ${n.by_ai ? 'by-ai' : ''}`} onClick={() => setOriginal((o) => !o)}>
+          {n.by_ai ? <><Sparkles size={11} /> {t(original ? 'thread.originalAi' : 'thread.byAi')}</>
+            : t(original ? 'thread.original' : 'thread.translated', { lang: t('lang.en') })}
+        </button>
+      )}
+    </>
   )
 }
 
@@ -226,7 +245,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
       await api.sendVoice(me.id, other, blob, seconds, helper?.id)
       onChange()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not send voice message', 'error')
+      toast(e instanceof Error ? e.message : tr('err.tryAgain'), 'error')
     }
   }
   const rec = useRecorder(sendVoice, (msg) => toast(msg, 'error'))
@@ -265,7 +284,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
       if (e instanceof ApiError && e.suggestion && (e.code === 'calmer' || e.code === 'tone')) {
         setCalmer({ said: msg.body ?? '', suggestion: e.suggestion, hard: e.code === 'tone' })
       } else if (refusal(e)) setTone(refusal(e))
-      else toast(e instanceof Error ? e.message : 'Could not send', 'error')
+      else toast(e instanceof Error ? e.message : tr('err.tryAgain'), 'error')
     } finally {
       setSending(false)
     }
@@ -277,7 +296,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
       celebrate('👋', tr('celebrate.wave', { name: n.resident_name }))
       onChange()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not wave', 'error')
+      toast(e instanceof Error ? e.message : tr('err.tryAgain'), 'error')
     }
   }
 
@@ -310,7 +329,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
   return (
     <div className="thread" onClick={() => picker !== null && setPicker(null)}>
       <header className="thread-head">
-        {onBack && <button className="icon-btn" onClick={onBack} aria-label="Back to list"><ArrowLeft size={16} /></button>}
+        {onBack && <button className="icon-btn" onClick={onBack} aria-label={tr('thread.back')}><ArrowLeft size={16} /></button>}
         <Avatar name={n.resident_name} size={40} />
         <div className="grow">
           <b>{n.resident_name} <i>· {n.label}</i></b>
@@ -453,11 +472,11 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
           {!pilot && <button type="button" className="btn btn-sm demo-link" style={{ alignSelf: 'flex-start' }} onClick={() => { setText('Rumah awak bising macam kilang! Tak reti hormat jiran ke?'); setTone(null); setCalmer(null) }}>{tr('thread.tryHeated')}</button>}
           {rec.state === 'recording' ? (
             <div className="compose-row recording">
-              <button className="icon-btn" onClick={rec.cancel} aria-label="Cancel recording"><X size={16} /></button>
+              <button className="icon-btn" onClick={rec.cancel} aria-label={tr('voice.cancelRec')}><X size={16} /></button>
               <span className="rec-dot" />
               <span className="rec-time">{Math.floor(rec.secs / 60)}:{String(Math.floor(rec.secs % 60)).padStart(2, '0')} / 1:00</span>
               <span className="grow rec-hint">{tr('thread.recording')}</span>
-              <button className="send-btn" onClick={rec.stop} aria-label="Send voice message"><SendHorizontal size={17} /></button>
+              <button className="send-btn" onClick={rec.stop} aria-label={tr('voice.send')}><SendHorizontal size={17} /></button>
             </div>
           ) : (
             <div className="compose-row">
@@ -503,6 +522,7 @@ function WaveItem({ item, mine, name, canWaveBack, onWaveBack }: { item: ChatWav
 
 /** Voice note player: play/pause, simple bars, duration. */
 function VoiceNote({ src, duration, seed }: { src: string; duration: number; seed: number }) {
+  const t = useT()
   const audio = useRef<HTMLAudioElement>(null)
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -515,7 +535,7 @@ function VoiceNote({ src, duration, seed }: { src: string; duration: number; see
   }
   return (
     <div className="voice">
-      <button className="voice-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Play voice message'}>{playing ? <Pause size={15} /> : <Play size={15} />}</button>
+      <button className="voice-play" onClick={toggle} aria-label={t(playing ? 'voice.pause' : 'voice.play')}>{playing ? <Pause size={15} /> : <Play size={15} />}</button>
       <div className="voice-bars" aria-hidden>
         {bars.map((h, i) => <i key={i} style={{ height: `${h}%` }} className={i / bars.length < progress ? 'on' : ''} />)}
       </div>
@@ -529,6 +549,7 @@ function VoiceNote({ src, duration, seed }: { src: string; duration: number; see
 
 /** Record up to a minute with the browser's own recorder. Nothing is kept unless it's sent. */
 function useRecorder(onDone: (blob: Blob, seconds: number) => void, onError: (message: string) => void) {
+  const t = useT()
   const [state, setState] = useState<'idle' | 'recording'>('idle')
   const [secs, setSecs] = useState(0)
   const rec = useRef<MediaRecorder | null>(null)
@@ -546,7 +567,7 @@ function useRecorder(onDone: (blob: Blob, seconds: number) => void, onError: (me
 
   async function begin() {
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      onError('Voice messages need a microphone and a browser that can record.')
+      onError(t('voice.unsupported'))
       return
     }
     let stream: MediaStream
@@ -555,7 +576,7 @@ function useRecorder(onDone: (blob: Blob, seconds: number) => void, onError: (me
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch {
       holdWake('voice-note', false)
-      onError('Microphone permission was not given.')
+      onError(t('voice.noMic'))
       return
     }
     const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].find((x) => MediaRecorder.isTypeSupported(x))
@@ -660,7 +681,7 @@ function ConcernSheet({ open, onClose, me, t, helperId, onRaised }: {
       onRaised()
     } catch (e) {
       if (refusal(e)) setTone(refusal(e))
-      else toast(e instanceof Error ? e.message : 'Could not send', 'error')
+      else toast(e instanceof Error ? e.message : tr('err.tryAgain'), 'error')
     } finally {
       setBusy(false)
     }
@@ -719,7 +740,7 @@ function ReportSheet({ message, me, name, onClose }: { message: ChatMessage | nu
       toast(t('report.sent', { name }))
       onClose()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not report', 'error')
+      toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     }
   }
   return (

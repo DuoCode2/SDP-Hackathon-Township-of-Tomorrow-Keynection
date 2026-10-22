@@ -87,8 +87,9 @@ function storedShowAll(): boolean {
 // The guide opens in the browser's language: Chinese for the team, English for judges and SDP. A pick in the guide is kept.
 function storedLang(): GuideLang {
   const kept = remembered('guideLang')
-  if (kept === 'en' || kept === 'zh') return kept
-  return navigator.language?.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+  if (kept === 'en' || kept === 'zh' || kept === 'ms') return kept
+  const spoken = navigator.language?.toLowerCase() ?? ''
+  return spoken.startsWith('zh') ? 'zh' : spoken.startsWith('ms') ? 'ms' : 'en'
 }
 
 export default function App() {
@@ -107,6 +108,7 @@ export default function App() {
 function Gate() {
   const [me, setMe] = useState<AuthMe | null>(null)
   const [down, setDown] = useState(false)
+  const { t } = useLang()
   // A welcome-pack QR (?join=…) or an estate-office code (?code=…): read once, then taken out of the address bar so
   // the one-time code doesn't stay in the browser history or get shared by accident.
   const [link, setLink] = useState<{ join?: string; code?: string }>(() => {
@@ -146,8 +148,8 @@ function Gate() {
     return down ? (
       <div className="boot">
         <div className="card offline-banner" role="alert">
-          <strong>Can't reach Keynection right now.</strong>
-          <button className="btn btn-sm btn-primary" onClick={refresh}>Try again</button>
+          <strong>{t('offline.title')}</strong>
+          <button className="btn btn-sm btn-primary" onClick={refresh}>{t('offline.retry')}</button>
         </div>
       </div>
     ) : <div className="boot" aria-busy="true" />
@@ -288,10 +290,10 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
     remember('guideLang', l)
   }
 
-  // One switch for the interface; the guide follows it (it has English and Chinese).
+  // One switch for the interface; the guide follows it (English, Malay and Chinese alike).
   const pickUiLang = (l: UiLang) => {
     setUiLang(l)
-    pickLang(l === 'zh' ? 'zh' : 'en')
+    pickLang(l)
   }
 
   // Guide steps: in split view, drive the pane that already shows that household.
@@ -336,7 +338,7 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
           </span>
         )}
         {!compact && <Icon size={16} strokeWidth={on ? 2.3 : 1.8} className="nav-icon" />}
-        {repair && <span className="dot" aria-label="Repair waiting for you" />}
+        {repair && <span className="dot" aria-label={t('nav.repairDot')} />}
       </button>
     )
   }
@@ -355,7 +357,7 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
           <div className="brand-mark"><Logo size={24} /></div>
           <div>
             <div className="brand-name">Keynection</div>
-            <div className="brand-sub">EVERY KEY · FIVE NEIGHBOURS</div>
+            <div className="brand-sub">{t('brand.sub')}</div>
           </div>
         </div>
         {NAV.filter((g) => shownNav.some((i) => i.group === g.group)).map((g) => (
@@ -364,12 +366,12 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
             {shownNav.filter((i) => i.group === g.group).map((i) => navButton(i, false))}
           </nav>
         ))}
-        <dl className="title-block" aria-label="Drawing title block">
-          <div className="tb-wide"><dt>Project</dt><dd><Building2 size={12} /> {pinned ? place.name : 'Taman Demo · Phase 1'}</dd></div>
-          <div><dt>Sheet</dt><dd>{page.no} / {String(shownNav.length).padStart(2, '0')}</dd></div>
-          <div><dt>Rev</dt><dd>0.5</dd></div>
-          <div className="tb-wide"><dt>{pinned ? 'Signed in as' : 'Viewing as'}</dt><dd>{curUnit ? `${curUnit.resident_name} · ${curUnit.label}` : '–'}</dd></div>
-          <div className="tb-wide"><dt>Data</dt><dd>{pinned ? 'Pilot · real households' : 'Fictional · runs offline'}</dd></div>
+        <dl className="title-block" aria-label={t('tb.label')}>
+          <div className="tb-wide"><dt>{t('tb.project')}</dt><dd><Building2 size={12} /> {pinned ? place.name : 'Taman Demo · Phase 1'}</dd></div>
+          <div><dt>{t('tb.sheet')}</dt><dd>{page.no} / {String(shownNav.length).padStart(2, '0')}</dd></div>
+          <div><dt>{t('tb.rev')}</dt><dd>0.5</dd></div>
+          <div className="tb-wide"><dt>{t(pinned ? 'tb.signedInAs' : 'tb.viewingAs')}</dt><dd>{curUnit ? `${curUnit.resident_name} · ${curUnit.label}` : '–'}</dd></div>
+          <div className="tb-wide"><dt>{t('tb.data')}</dt><dd>{t(pinned ? 'tb.pilot' : 'tb.fictional')}</dd></div>
         </dl>
         {curUnit && (
           <button className="side-home" onClick={() => visible('me') && setTab('me')}>
@@ -391,10 +393,10 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
             <div className="brand-name">Keynection</div>
           </div>
           <div className="crumb desktop-only">
-            <span className="crumb-sheet">Sheet {page.no}</span>
+            <span className="crumb-sheet">{t('top.sheet', { n: page.no })}</span>
             <span className="crumb-sep">—</span>
             <b>{t(`nav.${page.id}`)}</b>
-            {split && <span className="crumb-pane">{focus === 0 ? 'left pane' : 'right pane'}</span>}
+            {split && <span className="crumb-pane">{t(focus === 0 ? 'top.leftPane' : 'top.rightPane')}</span>}
           </div>
           <div className="topbar-right">
             <LiveClock />
@@ -407,7 +409,7 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
             {!split && !pinned && <CastPicker units={units} me={cur.me} onPick={setMe} />}
             {canSplit && !pinned && (
               <button className={`split-btn ${split ? 'on' : ''}`} onClick={toggleSplit} aria-pressed={split}
-                aria-label={t('top.bothSides')} title="See both sides of the shared wall at once">
+                aria-label={t('top.bothSides')} title={t('top.bothSidesTitle')}>
                 <Columns2 size={16} /> <span className="desktop-only">{t('top.bothSides')}</span>
               </button>
             )}
@@ -424,7 +426,7 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
           {offline && (
             <div className="card offline-banner" role="alert" style={{ margin: 16 }}>
               <strong>{t('offline.title')}</strong>
-              <p className="muted small">{t('offline.body')} {!pinned && <span className="mono">(Demo: is the backend running?)</span>}</p>
+              <p className="muted small">{t('offline.body')} {!pinned && <span className="mono">{t('offline.demoHint')}</span>}</p>
               <button className="btn btn-sm btn-primary" onClick={changed}>{t('offline.retry')}</button>
             </div>
           )}
@@ -433,7 +435,7 @@ function Shell({ pinned, embed }: { pinned?: string; embed?: string }) {
               {shown.map((p, i) => [
                 i === 1 && (
                   <div key="wall" className="wall" aria-hidden>
-                    <span>SHARED WALL</span>
+                    <span>{t('split.wall')}</span>
                   </div>
                 ),
                 <Pane key={i} index={i} pane={p} units={units} active={focus === i} split version={version} onChange={changed}
@@ -654,14 +656,15 @@ function Pane({ index, pane, units, active, split, version, onChange, onFocus, o
 
 function LiveClock() {
   const dates = useDates()
+  const { t } = useLang()
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000)
     return () => clearInterval(id)
   }, [])
   return (
-    <span className="clock desktop-only" title="Prototype running live">
-      <span className="pulse" /> LIVE · {dates.time(now)}
+    <span className="clock desktop-only" title={t('top.liveTitle')}>
+      <span className="pulse" /> {t('top.live')} · {dates.time(now)}
     </span>
   )
 }

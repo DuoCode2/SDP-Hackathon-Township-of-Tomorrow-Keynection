@@ -252,7 +252,7 @@ export default function RenovationWizard({ open, onClose, me, units, names, onSe
       onSent()
       close()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not send', 'error')
+      toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     } finally {
       setSending(false)
     }

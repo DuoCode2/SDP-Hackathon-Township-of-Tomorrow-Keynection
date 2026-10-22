@@ -50,7 +50,7 @@ export default function MeView({ me, version, onChange, onGo }: { me: UnitInfo; 
       onChange()
     } catch (e) {
       if (refusal(e)) setTone(refusal(e))
-      else toast(e instanceof Error ? e.message : 'Could not save', 'error')
+      else toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     } finally {
       setSaving(false)
     }
@@ -264,7 +264,7 @@ function Helpers({ me, version, onChange }: { me: UnitInfo; version: number; onC
       onChange()
     } catch (e) {
       if (refusal(e)) setWhy(refusal(e))
-      else toast(e instanceof Error ? e.message : 'Could not add', 'error')
+      else toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     } finally {
       setBusy(false)
     }
@@ -339,7 +339,7 @@ function YourData({ me }: { me: UnitInfo }) {
       setTimeout(() => URL.revokeObjectURL(url), 2000)
       toast(t('data.downloading'))
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not prepare your data', 'error')
+      toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     } finally {
       setBusy(false)
     }

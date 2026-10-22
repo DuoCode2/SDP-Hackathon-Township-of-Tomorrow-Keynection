@@ -95,7 +95,7 @@ export interface NearbyHome extends Omit<UnitInfo, 'resident_name' | 'lang' | 'h
 }
 
 export interface Directory {
-  circle: (Neighbour & { known: boolean; hello_sent?: boolean; bio?: string; lang: Lang | null })[]
+  circle: (Neighbour & { known: boolean; hello_sent?: boolean; bio?: string; bio_lang?: Lang | null; bio_in?: Partial<Record<Lang, string>>; bio_by_ai?: boolean; lang: Lang | null })[]
   nearby: NearbyHome[]
   works: string[]
   ring2_label: string
@@ -122,6 +122,8 @@ export interface ContactRequest {
   mine: boolean
 }
 
+/** An estate notice as this household reads it: in its own language when that wording exists (the team's for the demo
+ *  notices, the AI's for one the estate team posts), with the English record as original. */
 export interface Notice {
   id: number
   audience: string
@@ -129,6 +131,9 @@ export interface Notice {
   body: string
   author: string
   created_at: string
+  translated: boolean
+  by_ai: boolean
+  original?: { title: string; body: string }
 }
 
 // Server text comes as English (the record) plus a code and values the app shows in the reader's language.
@@ -887,7 +892,8 @@ export const api = {
   contactRequests: (unitId: string) => request<{ incoming: ContactRequest[]; outgoing: ContactRequest[] }>(`/api/units/${unitId}/contact-requests`),
   respondContact: (id: number, unitId: string, accept: boolean) =>
     request<ContactRequest>(`/api/contact-requests/${id}/respond`, json('POST', { unit_id: unitId, accept })),
-  notices: (unitId: string) => request<Notice[]>(`/api/units/${unitId}/notices`),
+  /** `lang`: the language the screens are in, when it differs from the household's reading language. */
+  notices: (unitId: string, lang?: Lang) => request<Notice[]>(`/api/units/${unitId}/notices${lang ? `?lang=${lang}` : ''}`),
   allNotices: () => request<Notice[]>(inPhase('/api/notices')),
   postNotice: (audience: string, title: string, body: string) => request<Notice>(inPhase('/api/notices'), json('POST', { audience, title, body })),
   wave: (from: string, to: string) => request('/api/waves', json('POST', { from_unit_id: from, to_unit_id: to })),
@@ -906,7 +912,7 @@ export const api = {
   profile: (unitId: string) => request<Profile>(`/api/units/${unitId}/profile`),
   updateProfile: (unitId: string, patch: Partial<Omit<Profile, 'unit_id' | 'blocked'>> & { name?: string }) =>
     request<Profile>(`/api/units/${unitId}/profile`, json('PUT', patch)),
-  official: (unitId: string) => request<Official>(`/api/units/${unitId}/official`),
+  official: (unitId: string, lang?: Lang) => request<Official>(`/api/units/${unitId}/official${lang ? `?lang=${lang}` : ''}`),
   delegates: (unitId: string) => request<Delegate[]>(`/api/units/${unitId}/delegates`),
   addDelegate: (unitId: string, name: string, relation: Delegate['relation'], consent: boolean) =>
     request<Delegate>(`/api/units/${unitId}/delegates`, json('POST', { name, relation, consent })),

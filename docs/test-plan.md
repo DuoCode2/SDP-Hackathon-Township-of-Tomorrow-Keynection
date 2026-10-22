@@ -1,8 +1,8 @@
 # Manual test plan: the judge route and the safety boundaries
 
-> **给队员的中文摘要**：这是人能读的测试清单，和 `evidence/device-check/README.md` 用同一套编号（K00–K15 是评审 3 分钟路线，每一步一条；K16–K21 是六条安全边界；K22–K23 是没开 AI 时的替代走法和共用演示的自动重置）。每一条写明怎么做、应该看到什么、在哪台设备核对过。评审看不懂 408 个自动测试，但看得懂这一页。做法：开始前清掉浏览器里这个网站的储存资料（或用无痕模式），这样看到的才是评审第一眼的样子。
+> **给队员的中文摘要**：这是人能读的测试清单，和 `evidence/device-check/README.md` 用同一套编号（K00–K15 是评审 3 分钟路线，每一步一条；K16–K21 是六条安全边界；K22–K23 是没开 AI 时的替代走法和共用演示的自动重置）。每一条写明怎么做、应该看到什么、在哪台设备核对过。评审看不懂 417 个自动测试，但看得懂这一页。做法：开始前清掉浏览器里这个网站的储存资料（或用无痕模式），这样看到的才是评审第一眼的样子。
 
-Keynection has 408 automated server tests (`testing-overview.md`). This page is the part a person walks through: the 3-minute judge route step by step, then the boundaries that protect residents. The numbering is shared with the real-device record in `evidence/device-check/README.md`, so one table serves both.
+Keynection has 417 automated server tests (`testing-overview.md`). This page is the part a person walks through: the 3-minute judge route step by step, then the boundaries that protect residents. The numbering is shared with the real-device record in `evidence/device-check/README.md`, so one table serves both.
 
 ## Before you start
 
@@ -29,7 +29,7 @@ Keynection has 408 automated server tests (`testing-overview.md`). This page is 
 | K11 | Aiman's Chats | Read the new message | Shown in English with "Translated by AI"; the original Malay appears on tap (AI off: original only). On Siti's side her message now carries two ticks (one tick until Aiman opened the thread) |
 | K12 | Siti → Photos & repairs | **Use sample** (pre-work photo) → **Sample crack** | The follow-up photo is aligned and compared; the crack is boxed; the suggestion says the crack was there **before** the works, so it goes to the warranty, not to Aiman; no option is pre-selected |
 | K13 | Impact (SDP) | Open the Impact model | The census question with Selangor 13.2% and Malaysia 6.5%; the state can be changed; every cost assumption is editable and labelled |
-| K14 | Guide (top-right) | Open it, switch 中文 / English | The six route steps are listed and clickable; clicking one jumps to that screen and household; the AI on/off line is at the top |
+| K14 | Guide (top-right) | Open it, switch 中文 / EN / BM (it also follows the interface language in the top bar) | The six route steps are listed and clickable; clicking one jumps to that screen and household; the AI on/off line is at the top |
 | K15 | iPhone only | Share → Add to Home Screen → open from the icon | Opens full-screen, like an app |
 
 ## B. Safety boundaries (K16–K21)

@@ -85,7 +85,7 @@ export default function JoinView({ me, onJoined, pilot = false, initialToken, on
       try { sessionStorage.setItem(joinKey(me.id), r.token) } catch { /* private window */ }
       setToken(r.token)
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not get a code', 'error')
+      toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     }
   }
 
@@ -106,7 +106,7 @@ export default function JoinView({ me, onJoined, pilot = false, initialToken, on
     } catch (e) {
       if (refusal(e)) { setWhy(refusal(e)); setStep(1) }
       else if (e instanceof ApiError && e.status === 404) { setExpired(true); setToken(null); setInfo(null); if (me) forget(me.id) }
-      else toast(e instanceof Error ? e.message : 'Could not join', 'error')
+      else toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     } finally {
       setBusy(false)
     }

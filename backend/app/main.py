@@ -596,6 +596,76 @@ def _intro_in(row: sqlite3.Row, lang: str) -> dict[str, str | None] | None:
     return json.loads(row["translations"] or "{}").get(lang)
 
 
+READ_LANGS = set(ai.LANG_FOR_AI)
+
+
+def _notice_in(row: sqlite3.Row, lang: str) -> dict[str, Any]:
+    """An estate notice for a reader of lang: its wording in that language when there is one (the team's for the
+    demo notices, the AI's for a notice the estate team posts later), otherwise the English record."""
+    found = json.loads(row["translations"] or "{}").get(lang) if lang != "en" else None
+    if not found or not found.get("title") or not found.get("body"):
+        return {"title": row["title"], "body": row["body"], "translated": False, "by_ai": False}
+    return {"title": found["title"], "body": found["body"], "translated": True, "by_ai": bool(found.get("by_ai"))}
+
+
+def _notice_json(row: sqlite3.Row, lang: str) -> dict[str, Any]:
+    """A notice as a reader of lang sees it; the English record comes along as original when it was translated."""
+    shown = _notice_in(row, lang)
+    out = {k: row[k] for k in ("id", "phase_id", "audience", "author", "created_at")} | shown
+    if shown["translated"]:
+        out["original"] = {"title": row["title"], "body": row["body"]}
+    return out
+
+
+def _translate_estate_notice(notice_id: int, title: str, body: str) -> None:
+    """After the estate team's notice is saved: its title and body in the other three reading languages, written onto
+    it, so each household reads it in theirs (in Chats and on WhatsApp). Until then, and with no answer, the English
+    record is shown."""
+    got = ai.translate_texts(ESTATE, [title, body], READ_LANGS - {"en"},
+                             what="an estate office notice to the residents of a township: first its title, then its body")
+    if not got:
+        return
+    translations = {lang: {"title": texts[0], "body": texts[1], "by_ai": True} for lang, texts in got.items()}
+    conn = db.connect(db_path())
+    try:  # matched on the words too, in case the notice was edited or the demo reset meanwhile
+        conn.execute("UPDATE notices SET translations = ? WHERE id = ? AND title = ? AND body = ?",
+                     (json.dumps(translations, ensure_ascii=False), notice_id, title, body))
+        conn.commit()
+    except sqlite3.Error:
+        log.warning("notice %s: its translation could not be saved", notice_id)
+    finally:
+        conn.close()
+
+
+def _bio_json(conn: sqlite3.Connection, unit_id: str) -> dict[str, Any]:
+    """A household's one-line bio for its neighbours' screens: as written, the language it was written in, and the
+    same line in the other reading languages (the team's for the demo cast, the AI's for a line a resident types), so
+    the screen shows each neighbour the one they read and says where it came from."""
+    p, unit = _profile_row(conn, unit_id), _unit_row(conn, unit_id)
+    found = json.loads(p["bio_translations"] or "{}") if p["bio"] else {}
+    return {"bio": p["bio"], "bio_lang": (p["bio_lang"] or unit["lang"]) if p["bio"] else None, "bio_by_ai": bool(found.get("by_ai")),
+            "bio_in": {k: v for k, v in found.items() if k in READ_LANGS and isinstance(v, str) and v}}
+
+
+def _translate_bio(unit_id: str, bio: str, lang: str) -> None:
+    """After a resident saves their bio: the same line in the other three reading languages, written onto the profile."""
+    got = ai.translate_texts(unit_id, [bio], READ_LANGS - {lang},
+                             what="a resident's one-line introduction of themselves to their neighbours")
+    if not got:
+        return
+    translations: dict[str, Any] = {found_lang: texts[0] for found_lang, texts in got.items()}
+    translations["by_ai"] = True
+    conn = db.connect(db_path())
+    try:  # only onto the same words: a bio saved again meanwhile starts from scratch
+        conn.execute("UPDATE profiles SET bio_translations = ? WHERE unit_id = ? AND bio = ?",
+                     (json.dumps(translations, ensure_ascii=False), unit_id, bio))
+        conn.commit()
+    except sqlite3.Error:
+        log.warning("bio of %s: its translation could not be saved", unit_id)
+    finally:
+        conn.close()
+
+
 def _photo_json(row: sqlite3.Row) -> dict[str, Any]:
     return {"id": row["id"], "unit_id": row["unit_id"], "kind": row["kind"], "subject": row["subject"],
             "renovation_intro_id": row["renovation_intro_id"], "sha256": row["sha256"], "width": row["width"],
@@ -1365,7 +1435,8 @@ def neighbour_card(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
     for n in circle:
         if not n["joined"]:
             # Not on Keynection yet: no name (resident_name is the unit label), no language, no bio, nothing to tap.
-            out.append({**n, "lang": None, "known": False, "hello_sent": False, "bio": "", "waved_today": False, "allow_waves": False})
+            out.append({**n, "lang": None, "known": False, "hello_sent": False, "bio": "", "bio_lang": None, "bio_in": {},
+                        "bio_by_ai": False, "waved_today": False, "allow_waves": False})
             continue
         they_replied = conn.execute(
             "SELECT 1 FROM intro_recipients r JOIN intros i ON i.id = r.intro_id"
@@ -1387,7 +1458,7 @@ def neighbour_card(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
             (unit_id, n["id"]),
         ).fetchone() is not None
         out.append({**n, "known": they_replied or i_replied or _mutual(conn, unit_id, n["id"]), "hello_sent": hello_sent,
-                    "bio": _profile_row(conn, n["id"])["bio"],
+                    **_bio_json(conn, n["id"]),
                     "waved_today": waved, "allow_waves": bool(_profile_row(conn, n["id"])["allow_waves"])})
     return {"unit_id": unit_id, "neighbours": out, "known_count": sum(n["known"] for n in out),
             "not_joined": sum(not n["joined"] for n in out)}
@@ -2058,31 +2129,40 @@ def _audiences(unit: sqlite3.Row) -> tuple[str, ...]:
 
 
 @app.get("/api/units/{unit_id}/notices")
-def notices_for(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+def notices_for(unit_id: str, lang: ReadLang | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
+    """The notices for this household's street or block and the whole phase, in its reading language; `lang` is the
+    language the screens are in when someone has switched them (the English-reading owner showing a Malay-reading
+    relative, or a judge trying the interface in Chinese)."""
     me = _unit_row(conn, unit_id)
     a = _audiences(me)
     rows = conn.execute(f"SELECT * FROM notices WHERE phase_id = ? AND audience IN ({','.join('?' * len(a))}) ORDER BY id DESC",
                         (me["phase_id"], *a)).fetchall()
-    return [dict(r) for r in rows]
+    return [_notice_json(r, lang or me["lang"]) for r in rows]
 
 
 @app.get("/api/notices")
 def all_notices(phase_id: str | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
-    return [dict(r) for r in conn.execute("SELECT * FROM notices WHERE phase_id = ? ORDER BY id DESC", (_phase_id(conn, phase_id),))]
+    """The estate team's list: the English record of each notice."""
+    return [_notice_json(r, "en") for r in conn.execute("SELECT * FROM notices WHERE phase_id = ? ORDER BY id DESC", (_phase_id(conn, phase_id),))]
 
 
 @app.post("/api/notices", status_code=201, dependencies=[Depends(staff_only)])
-def post_notice(body: NoticeIn, phase_id: str | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
-    """Estate team only. One-way: residents cannot reply to the whole township. A street or block must be in the phase."""
+def post_notice(body: NoticeIn, later: BackgroundTasks, phase_id: str | None = None,
+                conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Estate team only. One-way: residents cannot reply to the whole township. A street or block must be in the phase.
+    Written in English (the record); the AI puts it into the other reading languages after it is saved."""
     phase_id = _phase_id(conn, phase_id)
     phase = _phase_json(conn, conn.execute("SELECT * FROM phases WHERE id = ?", (phase_id,)).fetchone())
     kind, _, place = body.audience.partition(":")
     if kind != "phase" and place not in phase["streets" if kind == "street" else "blocks"]:
         raise HTTPException(422, f"{place} isn't a {kind} in {phase['name']}.")
+    title, text = body.title.strip(), body.body.strip()
     cur = conn.execute("INSERT INTO notices (phase_id, audience, title, body, author, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                       (phase_id, body.audience, body.title.strip(), body.body.strip(), ESTATE, db.now()))
+                       (phase_id, body.audience, title, text, ESTATE, db.now()))
     conn.commit()
-    return dict(conn.execute("SELECT * FROM notices WHERE id = ?", (cur.lastrowid,)).fetchone())
+    if ai.enabled():
+        later.add_task(_translate_estate_notice, cur.lastrowid, title, text)
+    return _notice_json(conn.execute("SELECT * FROM notices WHERE id = ?", (cur.lastrowid,)).fetchone(), "en")
 
 
 
@@ -2255,7 +2335,7 @@ def get_profile(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> d
 
 
 @app.put("/api/units/{unit_id}/profile")
-def update_profile(unit_id: str, body: ProfileIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+def update_profile(unit_id: str, body: ProfileIn, later: BackgroundTasks, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     _require_joined(conn, unit_id)
     _profile_row(conn, unit_id)
     if body.name is not None:
@@ -2263,7 +2343,13 @@ def update_profile(unit_id: str, body: ProfileIn, conn: sqlite3.Connection = Dep
         conn.execute("UPDATE units SET resident_name = ? WHERE id = ?", (body.name.strip(), unit_id))
     if body.bio is not None:
         _check_shared_text(body.bio)
-        conn.execute("UPDATE profiles SET bio = ? WHERE unit_id = ?", (body.bio.strip(), unit_id))
+        bio = body.bio.strip()
+        # New words, new translations: the old ones go at once, the AI's come after the answer so nobody waits for it.
+        lang = _unit_row(conn, unit_id)["lang"]
+        conn.execute("UPDATE profiles SET bio = ?, bio_lang = ?, bio_translations = NULL WHERE unit_id = ?",
+                     (bio, lang if bio else None, unit_id))
+        if bio and ai.enabled():
+            later.add_task(_translate_bio, unit_id, bio, lang)
     for field in ("accept_requests", "allow_waves", "quiet_mode", "easy_mode", "whatsapp_alerts"):
         value = getattr(body, field)
         if value is not None:
@@ -2275,9 +2361,9 @@ def update_profile(unit_id: str, body: ProfileIn, conn: sqlite3.Connection = Dep
 
 
 @app.get("/api/units/{unit_id}/official")
-def official_account(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
-    """The estate office as a read-only account in the chat list (like a WhatsApp channel)."""
-    notices = notices_for(unit_id, conn)
+def official_account(unit_id: str, lang: ReadLang | None = None, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """The estate office as a read-only account in the chat list (like a WhatsApp channel); `lang` as for the notices."""
+    notices = notices_for(unit_id, lang, conn)
     last_read = int(_profile_row(conn, unit_id)["notices_read_at"] or 0)  # id of the newest notice already seen
     conn.commit()
     name = f"{_place_name(conn, _unit_row(conn, unit_id)['phase_id'])} Estate Office"
@@ -3864,7 +3950,8 @@ def _alerts(conn: sqlite3.Connection, unit_id: str) -> list[dict[str, Any]]:
     audiences = _audiences(me)
     for r in conn.execute(f"SELECT * FROM notices WHERE phase_id = ? AND audience IN ({','.join('?' * len(audiences))})",
                           (me["phase_id"], *audiences)):
-        add(r["created_at"], "notice", f"notice:{r['id']}", ("open",), title=r["title"], body=r["body"])
+        shown = _notice_in(r, lang)
+        add(r["created_at"], "notice", f"notice:{r['id']}", ("open",), title=shown["title"], body=shown["body"])
     for r in conn.execute("SELECT * FROM intros WHERE from_unit_id = ? AND renovation IS NOT NULL", (unit_id,)):
         reno = json.loads(r["renovation"])
         add(_at_local(date.fromisoformat(reno["end"]) + timedelta(days=1), "10:00"), "reno_done_owner", f"intro:{r['id']}:owner",

@@ -45,7 +45,7 @@ export default function IntroWizard({ open, onClose, me, circle, onSent, pick }:
       onSent()
       close()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not send', 'error')
+      toast(e instanceof Error ? e.message : t('err.tryAgain'), 'error')
     } finally {
       setSending(false)
     }

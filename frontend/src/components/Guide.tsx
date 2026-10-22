@@ -26,7 +26,7 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, show
         return (
           <li key={i}>
             <button className={here ? 'here' : ''} onClick={() => onGo(s.tab, s.unit, { split: s.split, peer: s.peer })}
-              aria-label={`${lang === 'zh' ? `第 ${i + 1} 步` : `Step ${i + 1}`}: ${s.text[lang]}`}>
+              aria-label={`${UI.step[lang].replace('{n}', String(i + 1))}: ${s.text[lang]}`}>
               <span className="route-n">{i + 1}</span>
               <span>{s.text[lang]}</span>
             </button>
@@ -41,14 +41,15 @@ export default function Guide({ tab, me, lang, open, onLang, onClose, onGo, show
       <aside className={`guide ${open ? 'open' : ''}`} aria-label={UI.guide[lang]} aria-hidden={!open}>
         <div className="guide-head">
           <div className="guide-heading"><Compass size={16} /> {UI.guide[lang]}</div>
-          <div className="toggle" role="group" aria-label="Language">
+          <div className="toggle" role="group" aria-label={UI.language[lang]}>
             <button className={lang === 'zh' ? 'on' : ''} onClick={() => onLang('zh')}>中文</button>
             <button className={lang === 'en' ? 'on' : ''} onClick={() => onLang('en')}>EN</button>
+            <button className={lang === 'ms' ? 'on' : ''} onClick={() => onLang('ms')}>BM</button>
           </div>
           <button className="icon-btn" onClick={onClose} title={UI.close[lang]} aria-label={UI.close[lang]}><X size={16} /></button>
         </div>
 
-        <div className="guide-body" lang={lang === 'zh' ? 'zh-Hans' : 'en'}>
+        <div className="guide-body" lang={lang === 'zh' ? 'zh-Hans' : lang === 'ms' ? 'ms' : 'en'}>
           <p className="guide-about">{UI.about[lang]}</p>
 
           <div className="section-label">{UI.judgeRoute[lang]}</div>

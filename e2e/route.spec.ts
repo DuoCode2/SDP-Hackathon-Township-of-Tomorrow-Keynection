@@ -149,13 +149,17 @@ test('the 3-minute judge route, with a screenshot per step', async ({ page }) =>
     await shot(page, 'K13-impact')
   })
 
-  await test.step('K14 The Guide in both languages', async () => {
+  await test.step('K14 The Guide in all three interface languages', async () => {
     const guide = page.locator('aside.guide')
     await guide.locator('.guide-body').evaluate((el) => el.scrollTo({ top: 0 })) // the hints above the route in frame
     await guide.locator('.guide-head .toggle').getByRole('button', { name: '中文', exact: true }).click()
     await expect(guide).toContainText('3 分钟评审路线')
     await expect(guide).toContainText('不会真的发出') // what "preview" and "illustration" mean
     await shot(page, 'K14-guide-zh')
+    await guide.locator('.guide-head .toggle').getByRole('button', { name: 'BM', exact: true }).click()
+    await expect(guide).toContainText('Laluan juri 3 minit')
+    await expect(guide).toContainText('tidak menghantar apa-apa dan bukan app sebenar SDP')
+    await shot(page, 'K14-guide-ms')
     await guide.locator('.guide-head .toggle').getByRole('button', { name: 'EN', exact: true }).click()
     await expect(guide).toContainText('3-minute judge route')
     await expect(guide).toContainText('send nothing and are not SDP’s real app')

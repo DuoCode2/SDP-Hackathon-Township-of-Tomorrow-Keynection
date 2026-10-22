@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from . import ledger
-from .seed import BIOS, CONSENT_VERSION, EASY_MODE, NOT_JOINED, PHASE, QUIET_TIMES, SEED_HELPERS, demo_notices, demo_units, handover_date
+from .seed import BIOS, CONSENT_VERSION, bio_texts, EASY_MODE, NOT_JOINED, PHASE, QUIET_TIMES, SEED_HELPERS, demo_notices, demo_units, handover_date
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS phases (
@@ -224,6 +224,8 @@ CREATE TABLE IF NOT EXISTS reactions (
 CREATE TABLE IF NOT EXISTS profiles (
     unit_id TEXT PRIMARY KEY REFERENCES units(id),
     bio TEXT NOT NULL DEFAULT '',
+    bio_lang TEXT,  -- the reading language the bio was written in (the household's at the time), so a later language change does not relabel it
+    bio_translations TEXT,  -- JSON {lang: text, "by_ai": true}: the bio in the other reading languages (team-written for the demo cast, the AI's for a bio a resident types)
     accept_requests INTEGER NOT NULL DEFAULT 1,
     allow_waves INTEGER NOT NULL DEFAULT 1,
     quiet_mode INTEGER NOT NULL DEFAULT 0,
@@ -326,6 +328,7 @@ CREATE TABLE IF NOT EXISTS notices (
     audience TEXT NOT NULL,
     title TEXT NOT NULL,
     body TEXT NOT NULL,
+    translations TEXT,  -- JSON {lang: {title, body, by_ai?}}: the notice in each reading language; the English record stays the record
     author TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
@@ -359,7 +362,7 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 16  # 16: units.back_row (the row behind a terrace house)
+SCHEMA_VERSION = 17  # 17: notices.translations, profiles.bio_lang and bio_translations (every reader's language)
 TABLES = ("settings", "deliveries", "push_subscriptions", "auth_challenges", "webauthn_handles", "passkeys", "sessions", "access_codes", "staff", "paper_notices", "join_codes", "delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
           "warranty_tickets", "gate_logs", "passes", "incidents", "photos",
           "intro_recipients", "intros", "events", "units", "phases")
@@ -447,15 +450,19 @@ def _seed(conn: sqlite3.Connection) -> None:
         # Every home history starts with SDP's handover record.
         append_event(conn, u["id"], "handover", {"note": "Vacant possession; SDP handover inspection recorded",
                                                  "vacant_possession": handover})
-        conn.execute("INSERT INTO profiles (unit_id, bio, easy_mode, quiet_times) VALUES (?, ?, ?, ?)",
-                     (u["id"], BIOS.get(u["resident_name"], "") if joined else "", int(u["id"] in EASY_MODE),
+        # The bio is written in the household's own reading language; the other three come with it, so every neighbour
+        # reads it in theirs from the first open (BIOS in seed.py).
+        bio, bio_in = bio_texts(u["resident_name"], u["lang"]) if joined else ("", {})
+        conn.execute("INSERT INTO profiles (unit_id, bio, bio_lang, bio_translations, easy_mode, quiet_times) VALUES (?, ?, ?, ?, ?, ?)",
+                     (u["id"], bio, u["lang"] if bio else None, json.dumps(bio_in, ensure_ascii=False) if bio_in else None, int(u["id"] in EASY_MODE),
                       json.dumps(QUIET_TIMES.get(u["resident_name"], []) if joined else [])))
     for unit_id, name, relation in SEED_HELPERS:
         cur = conn.execute("INSERT INTO delegates (unit_id, name, relation, created_at) VALUES (?, ?, ?, ?)", (unit_id, name, relation, now()))
         append_event(conn, unit_id, "delegate_added", {"delegate_id": cur.lastrowid, "name": name, "relation": relation})
-    for audience, title, body in demo_notices():
-        conn.execute("INSERT INTO notices (phase_id, audience, title, body, author, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                     (PHASE["id"], audience, title, body, "SDP Estate Team", now()))
+    for n in demo_notices():
+        conn.execute("INSERT INTO notices (phase_id, audience, title, body, translations, author, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                     (PHASE["id"], n["audience"], n["title"], n["body"], json.dumps(n["translations"], ensure_ascii=False),
+                      "SDP Estate Team", now()))
 
 
 def append_event(conn: sqlite3.Connection, unit_id: str, event_type: str, payload: dict[str, Any]) -> dict[str, Any]:

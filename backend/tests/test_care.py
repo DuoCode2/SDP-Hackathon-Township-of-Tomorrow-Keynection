@@ -169,8 +169,13 @@ def test_demo_dates_are_worked_out_from_today(monkeypatch):
 
     monkeypatch.setattr(seed, "today_my", lambda: date(2027, 2, 24))  # a Wednesday
     assert seed.handover_date() == "2027-02-10"
-    bodies = [body for _, _, body in seed.demo_notices()]
+    notices = seed.demo_notices()
+    bodies = [n["body"] for n in notices]
     assert "Saturday 27 Feb" in bodies[0] and "Thursday 4 Mar" in bodies[1]
+    # The same days in each reader's language, never left in English inside a translation.
+    assert "Sabtu 27 Feb" in notices[0]["translations"]["ms"]["body"] and "Khamis 4 Mac" in notices[1]["translations"]["ms"]["body"]
+    assert "2月27日（星期六）" in notices[0]["translations"]["zh"]["body"] and "3月4日（星期四）" in notices[1]["translations"]["zh"]["body"]
+    assert "சனி 27 பிப்." in notices[0]["translations"]["ta"]["body"] and "வியாழன் 4 மார்." in notices[1]["translations"]["ta"]["body"]
     # The third notice is a standing rule with no date in it, so it can't go stale either.
     assert "Sundays" in bodies[2] and not any(m in bodies[2] for m in ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
                                                                         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))

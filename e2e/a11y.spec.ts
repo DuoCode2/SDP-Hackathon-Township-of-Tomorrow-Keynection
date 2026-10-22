@@ -27,7 +27,7 @@ async function unnamed(page: Page, where: string, selector = 'button'): Promise<
 
 async function closeGuide(page: Page) {
   const guide = page.locator('aside.guide')
-  if (await guide.evaluate((el) => el.classList.contains('open'))) await guide.getByRole('button', { name: /^(Hide guide|收起导览)$/ }).click()
+  if (await guide.evaluate((el) => el.classList.contains('open'))) await guide.getByRole('button', { name: /^(Hide guide|收起导览|Sembunyikan panduan)$/ }).click()
 }
 
 test('every button on the judge route has a name, on a desktop and on a phone', async ({ page }) => {
