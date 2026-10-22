@@ -64,7 +64,7 @@ def test_chat_list_previews_come_as_data_too(client):
     assert previews["T-12"] == {"kind": "renovation"}
     assert client.post("/api/waves", json={"from_unit_id": "T-10", "to_unit_id": "T-11"}).status_code == 201  # Farid, next door
     previews = {c["id"]: c["last_preview"] for c in client.get("/api/units/T-11/conversations").json()}
-    assert previews["T-10"] == {"kind": "wave"}
+    assert previews["T-10"] == {"kind": "wave", "from": "T-10"}  # whose wave, so the list says "waved at you"
     client.post("/api/concerns", json={"from_unit_id": "T-11", "intro_id": intro_id, "category": "debris"})
     previews = {c["id"]: c["last_preview"] for c in client.get("/api/units/T-11/conversations").json()}
     assert previews["T-12"] == {"kind": "concern", "category": "debris"}

@@ -887,6 +887,12 @@ class AckIn(BaseModel):
     unit_id: str = Field(..., pattern=UNIT_ID)
 
 
+class PermitIn(BaseModel):
+    unit_id: str = Field(..., pattern=UNIT_ID)
+    council_permit: Literal["approved", "applied", "not_needed"]
+    permit_ref: str | None = Field(None, max_length=40, pattern=r"^[A-Za-z0-9/ .-]*$")
+
+
 class DemoPhotoIn(BaseModel):
     name: str = Field(..., pattern=r"^[a-z_]{1,40}$")
     kind: Literal["baseline", "followup"]
@@ -1452,7 +1458,7 @@ def _translate_intro(intro_id: int, from_unit_id: str, message: str, scope: str 
 
 @app.get("/api/units/{unit_id}/inbox")
 def inbox(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> list[dict[str, Any]]:
-    _unit_row(conn, unit_id)
+    me = _unit_row(conn, unit_id)
     rows = conn.execute(
         "SELECT i.*, r.relation, r.acked_at, u.label AS from_label, u.resident_name AS from_name"
         " FROM intro_recipients r JOIN intros i ON i.id = r.intro_id JOIN units u ON u.id = i.from_unit_id"
@@ -1460,7 +1466,19 @@ def inbox(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -> list[di
         (unit_id,),
     ).fetchall()
     return [{**dict(r), "relation_to_me": inverse_relation(r["relation"]),
-             "renovation": json.loads(r["renovation"]) if r["renovation"] else None} for r in rows]
+             "renovation": _reno_for_reader(r, me["lang"])} for r in rows]
+
+
+def _reno_for_reader(row: sqlite3.Row, lang: str) -> dict[str, Any] | None:
+    """A notice's renovation as its reader sees it: the work described in their language when Claude translated the
+    notice (Works and Photos then agree with the chat), the English record kept as original_scope."""
+    if not row["renovation"]:
+        return None
+    reno = json.loads(row["renovation"])
+    scope = ((_intro_in(row, lang) or {}).get("scope") or "").strip() if lang != "en" else ""
+    if scope and scope != reno.get("scope"):
+        return {**reno, "scope": scope, "original_scope": reno.get("scope")}
+    return reno
 
 
 @app.post("/api/intros/{intro_id}/ack")
@@ -1473,6 +1491,28 @@ def wave_back(intro_id: int, body: AckIn, conn: sqlite3.Connection = Depends(get
         raise refuse(404, "intro_not_received", "this unit did not receive that introduction")
     conn.commit()
     return {"intro_id": intro_id, "unit_id": body.unit_id, "acked": True}
+
+
+@app.post("/api/intros/{intro_id}/permit")
+def set_permit(intro_id: int, body: PermitIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """The renovating household states its council (PBT) permit after the notice went out: the review step says
+    "add the reference later from Works", so Works has to be able to take it. Only the owner can; the notified homes
+    see the permit on the notice from then on, and the home log records the change."""
+    intro = conn.execute("SELECT * FROM intros WHERE id = ?", (intro_id,)).fetchone()
+    if intro is None or intro["renovation"] is None:
+        raise refuse(404, "renovation_not_found", "renovation not found")
+    if intro["from_unit_id"] != body.unit_id:
+        raise refuse(403, "permit_owner_only", "Only the renovating household can state its permit.")
+    reno = json.loads(intro["renovation"])
+    ref = (body.permit_ref or "").strip() or None
+    if body.council_permit == "not_needed":
+        ref = None
+    reno.update(council_permit=body.council_permit, permit_ref=ref)
+    conn.execute("UPDATE intros SET renovation = ? WHERE id = ?", (json.dumps(reno), intro_id))
+    db.append_event(conn, body.unit_id, "renovation_permit_stated",
+                    {"intro_id": intro_id, "council_permit": body.council_permit, "permit_ref": ref})
+    conn.commit()
+    return {"intro_id": intro_id, "renovation": reno}
 
 
 @app.get("/api/units/{unit_id}/card")
@@ -1501,9 +1541,12 @@ def neighbour_card(unit_id: str, conn: sqlite3.Connection = Depends(get_conn)) -
                              (unit_id, n["id"], recent)).fetchone() is not None
         # My hello has reached them but nobody has replied yet: the card says "hello sent" rather than "not met yet",
         # so the owner does not send it twice.
+        # A wave is a hello too: the card and the circle's banner count it, so a wave is not followed by "say hi".
         hello_sent = conn.execute(
             "SELECT 1 FROM intro_recipients r JOIN intros i ON i.id = r.intro_id WHERE i.from_unit_id = ? AND r.unit_id = ?",
             (unit_id, n["id"]),
+        ).fetchone() is not None or conn.execute(
+            "SELECT 1 FROM waves WHERE from_unit_id = ? AND to_unit_id = ?", (unit_id, n["id"]),
         ).fetchone() is not None
         out.append({**n, "known": they_replied or i_replied or _mutual(conn, unit_id, n["id"]), "hello_sent": hello_sent,
                     **_bio_json(conn, n["id"]),
@@ -1771,7 +1814,7 @@ def _preview_data(item: dict[str, Any] | None) -> dict[str, Any] | None:
     if item["type"] == "intro":
         return {"kind": "renovation"} if item["renovation"] else {"kind": "text", "text": item["text"]}
     if item["type"] == "wave":
-        return {"kind": "wave"}
+        return {"kind": "wave", "from": item["from_unit_id"]}  # whose wave: "you waved" or "waved at you"
     if item.get("kind") == "voice":
         return {"kind": "voice", "duration": item["duration"]}
     if item.get("kind") == "system" and item.get("code"):
@@ -1823,7 +1866,9 @@ def _quick_keys(conn: sqlite3.Connection, me: sqlite3.Row | dict[str, Any], othe
     mine = [r for r in _renovations_from(conn, me["id"], other["id"]) if r["end"] >= today]
     if mine:
         return list(talk.OWNER_REPLIES)
-    keys = list(talk.QUICK_REPLIES)
+    theirs = [r for r in _renovations_from(conn, other["id"], me["id"]) if r["end"] >= today]
+    # No works between us yet: the lines are a first hello, not answers to a notice nobody has sent.
+    keys = list(talk.QUICK_REPLIES) if theirs else list(talk.HELLO_REPLIES)
     if (_unit_row(conn, other["id"])["handover_date"] or "") < (me["handover_date"] or ""):
         keys.remove("welcome")  # they were here first: it is not mine to welcome them
     return keys

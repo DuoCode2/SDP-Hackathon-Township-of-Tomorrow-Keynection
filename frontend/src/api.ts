@@ -47,6 +47,8 @@ export interface Renovation {
   contractor_cidb_registered?: boolean | null
   council_permit?: 'approved' | 'applied' | 'not_needed' | null
   permit_ref?: string | null
+  /** The owner's own wording when `scope` is the reader's translation of it (Works, Photos). */
+  original_scope?: string | null
   works_type?: WorksType
   management_approval?: 'approved' | 'pending' | null
   /** Times inside the noisy hours kept quiet for neighbours, planned from their quiet times. */
@@ -432,7 +434,7 @@ export interface Official {
 export type ContactState = 'none' | 'requested_by_me' | 'requested_by_them' | 'mutual'
 
 export type Preview =
-  | { kind: 'renovation' } | { kind: 'wave' } | { kind: 'text'; text: string } | { kind: 'voice'; duration: number }
+  | { kind: 'renovation' } | { kind: 'wave'; from?: string } | { kind: 'text'; text: string } | { kind: 'voice'; duration: number }
   | { kind: 'concern'; category: string } | { kind: 'system'; code: string; values: Record<string, string>; text: string }
 
 export interface Conversation extends Neighbour {
@@ -851,6 +853,9 @@ export const api = {
     request<{ id: number; recipients: string[] }>('/api/intros', json('POST', body)),
   inbox: (unitId: string) => request<InboxItem[]>(`/api/units/${unitId}/inbox`),
   waveBack: (introId: number, unitId: string) => request(`/api/intros/${introId}/ack`, json('POST', { unit_id: unitId })),
+  /** The renovating household states its council permit after the notice went out. */
+  setPermit: (introId: number, unitId: string, councilPermit: 'approved' | 'applied' | 'not_needed', permitRef: string | null) =>
+    request<{ intro_id: number; renovation: Renovation }>(`/api/intros/${introId}/permit`, json('POST', { unit_id: unitId, council_permit: councilPermit, permit_ref: permitRef })),
 
   evidence: (unitId: string) => request<Evidence>(`/api/units/${unitId}/evidence`),
   uploadPhoto: (unitId: string, file: File, kind: Photo['kind'], subject: string, renovationIntroId?: number) => {

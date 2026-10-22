@@ -41,11 +41,11 @@ function systemText(t: Translate, m: Pick<ChatMessage, 'code' | 'values' | 'text
 const ESTATE_AUTHOR = 'SDP Estate Team'
 
 /** The last item of a chat, for the chat list, in the reader's language. */
-function previewText(t: Translate, p: Preview | null, names: Record<string, string>): string | null {
+function previewText(t: Translate, p: Preview | null, names: Record<string, string>, me?: string): string | null {
   if (!p) return null
   switch (p.kind) {
     case 'renovation': return t('pv.renovation')
-    case 'wave': return t('pv.wave')
+    case 'wave': return t(p.from && p.from !== me ? 'pv.waveTheirs' : 'pv.waveMine')
     case 'voice': return t('pv.voice', { n: p.duration })
     case 'concern': return t('pv.concern', { what: t(`cat.${p.category}`) })
     case 'system': return systemText(t, p, names)
@@ -103,7 +103,6 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
             <div className="eyebrow">{t('chats.eyebrow')}</div>
             <h2>{t('chats.title')}</h2>
           </div>
-          <span className="lang-tag" title={t('profile.reads', { lang: langName(t, me.lang) })}>{LANG_TAG[me.lang]}</span>
         </div>
         <div className="chat-privacy"><Lock size={12} /> {t('chats.privacy')}</div>
 
@@ -134,7 +133,7 @@ export default function ChatsView({ me, version, onChange, peer, onPeer }: {
                 {c.last_at && <small>{dates.time(new Date(c.last_at))}</small>}
               </span>
               <span className="chat-row-rel">{t(`rel.${c.relation}`)}{c.relation === 'left' || c.relation === 'right' ? ` · ${t('share.wallShort')}` : c.relation === 'above' || c.relation === 'below' ? ` · ${t('share.slab')}` : ''}</span>
-              <span className="chat-row-last">{c.blocked ? t('chats.blocked') : previewText(t, c.last_preview, { [c.id]: c.resident_name }) ?? c.last ?? t('chats.sayHello')}</span>
+              <span className="chat-row-last">{c.blocked ? t('chats.blocked') : previewText(t, c.last_preview, { [c.id]: c.resident_name }, me.id) ?? c.last ?? t('chats.sayHello')}</span>
             </span>
             <span className="chat-row-flags">
               {c.unread > 0 && <span className="unread">{c.unread}</span>}
@@ -395,7 +394,7 @@ function ChatThread({ me, other, version, onChange, onRead, onBack }: {
         <div className="sys-note"><ShieldCheck size={12} /> {tr('thread.private')}</div>
         {t.items.length === 0 && <div className="sys-note">{tr('thread.empty')}</div>}
         {t.items.map((item) => {
-          const day = dates.date(item.created_at)
+          const day = dates.day(item.created_at)
           const sep = day !== lastDay ? <div className="day-sep"><span>{day}</span></div> : null
           lastDay = day
           const key = `${item.type}-${item.id}`

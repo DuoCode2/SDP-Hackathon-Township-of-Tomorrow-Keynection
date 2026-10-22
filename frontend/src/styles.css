@@ -727,7 +727,7 @@ span.msg-tr { text-decoration: none; }
 .tl-bar { position: absolute; z-index: 1; top: 3px; bottom: 3px; border-radius: 4px; background: var(--hatch), linear-gradient(90deg, var(--works-2), var(--works)); box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--works) 70%, transparent); }
 .tl-bar.mine { background: var(--grad); box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--accent) 70%, transparent); }
 .tl-label { font-size: 11.5px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tl-label small { display: block; font-family: var(--mono); font-size: 9px; color: var(--muted); font-weight: 500; }
+.tl-label small { display: block; font-family: var(--mono); font-size: 9px; color: var(--muted); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
 .tl-today { position: absolute; z-index: 3; top: -4px; bottom: -4px; width: 1.5px; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 .permit { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 9px; font-size: 12.5px; font-weight: 600; border: 1px solid; }
 .permit .mono { margin-left: auto; font-size: 10.5px; }
@@ -2030,3 +2030,44 @@ button.ring-row:hover { background: var(--surface-2); }
 /* The block beyond the circle: the nearest levels first, a button for the rest. */
 .section-sub { font-size: 12.5px; color: var(--muted); margin: -6px 0 2px; }
 .nearby-more { align-self: flex-start; }
+
+/* ---------- the first-day tour ---------- */
+.tour { display: flex; flex-direction: column; gap: 10px; }
+.tour-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tour-dots { display: inline-flex; gap: 6px; }
+.tour-dots button { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 50%; background: var(--line-2); transition: background 160ms, transform 160ms; }
+.tour-dots button.on { background: var(--accent); transform: scale(1.25); }
+.tour-skip { font-size: 12.5px; color: var(--muted); }
+.tour-card { animation: enter 220ms var(--ease) both; }
+.tour-plain { padding-top: 18px; padding-bottom: 10px; }
+.tour-plain > p { max-width: 460px; }
+.tour-icon { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 22px; color: #fff; animation: pop 400ms var(--ease) both; }
+.tour-icon.works { background: linear-gradient(135deg, var(--works-2), var(--works)); box-shadow: 0 12px 24px -12px color-mix(in srgb, var(--works) 70%, transparent); }
+.tour-icon.photos { background: var(--grad-strong); box-shadow: var(--glow); }
+.tour-icon.ask { background: var(--brand-grad); box-shadow: var(--brand-glow); }
+.tour-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--line); }
+.tour-foot > .small { flex: 1; text-align: center; }
+.tour-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 599.98px) {
+  .tour-foot > .small { display: none; }
+  .tour-actions { margin-left: auto; }
+}
+
+/* the Guide's door to the resident's tour */
+.guide-tour { display: flex; align-items: center; gap: 10px; width: 100%; margin: 2px 0 14px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--brand-line); background: var(--brand-bg); color: var(--text); text-align: left; transition: background 160ms; }
+.guide-tour:hover { background: var(--brand-bg-2); }
+.guide-tour svg { flex: none; color: var(--brand); }
+.guide-tour span { display: flex; flex-direction: column; gap: 1px; }
+.guide-tour b { font-size: 13px; }
+.guide-tour small { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+
+/* the owner's next step on Works */
+.next-step { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 9px 11px; border-radius: 10px; background: var(--amber-bg); border: 1px solid var(--amber-line); color: var(--amber); font-size: 12.5px; font-weight: 600; }
+.next-step .btn { margin-left: auto; }
+.permit .link { margin-left: auto; font-size: 12px; }
+
+/* a phone's composer: the concern button sits above the box instead of squeezing it */
+@media (max-width: 599.98px) {
+  .compose-row { flex-wrap: wrap; }
+  .compose-row .concern-btn { flex-basis: 100%; justify-content: center; }
+}

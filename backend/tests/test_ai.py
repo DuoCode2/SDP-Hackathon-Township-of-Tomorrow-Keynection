@@ -282,6 +282,12 @@ def test_renovation_notice_reaches_each_neighbour_in_their_language(client, clau
     # A home not on Keynection gets its printed notice in its own language too.
     for p in client.get("/api/estate/frontdesk").json()["paper_notices"]:
         assert p["message"] == f"[{p['lang']}] notice" if p["lang"] != "en" else p["message"] == "Hi, we're extending the kitchen."
+    # Works and Photos say the same work as the chat does, in the reader's language; the owner keeps their words.
+    near = client.get("/api/units/T-13/works").json()["nearby"][0]["renovation"]
+    assert near["scope"] == "[ta] kitchen" and near["original_scope"] == "Extend kitchen (rear wall)"
+    task = next(x for x in client.get("/api/units/T-11/evidence").json()["renovations"] if not x["mine"])
+    assert task["renovation"]["scope"] == "[ms] kitchen"
+    assert client.get("/api/units/T-12/works").json()["mine"][0]["renovation"]["scope"] == "Extend kitchen (rear wall)"
 
 
 def test_the_notice_is_saved_and_answered_before_it_is_translated(client, claude, tmp_path):

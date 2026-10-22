@@ -49,6 +49,10 @@ def test_a_hello_that_nobody_has_answered_shows_as_sent_not_as_not_met(client):
     # Siti's side is untouched: she received a hello, she did not send one.
     siti = {n["id"]: n for n in client.get("/api/units/T-11/card").json()["neighbours"]}
     assert siti["T-12"]["hello_sent"] is False
+    # A wave is a hello too: after waving at Priya the card does not ask Aiman to say hi to her again.
+    assert client.post("/api/waves", json={"from_unit_id": "T-12", "to_unit_id": "T-21"}).status_code == 201
+    waved = {n["id"]: n for n in client.get("/api/units/T-12/card").json()["neighbours"]}
+    assert waved["T-21"]["hello_sent"] is True and waved["T-21"]["known"] is False
 
 
 def test_someone_outside_the_circle_cannot_wave_back(client):

@@ -18,6 +18,8 @@ export interface PageGuide {
 export const UI: Record<string, Text> = {
   guide: { zh: '功能导览', en: 'Guide', ms: 'Panduan' },
   thisPage: { zh: '这一页', en: 'This page', ms: 'Halaman ini' },
+  tourBtn: { zh: '打开住户的第一天导览', en: 'Open the resident’s first-day tour', ms: 'Buka lawatan hari pertama penduduk' },
+  residentTour: { zh: '新住户在手机上看到的那四张卡：邻居、装修、拍照、助手', en: 'The four cards a new owner sees on their phone: neighbours, works, the photo, the assistant', ms: 'Empat kad yang dilihat pemilik baharu di telefon: jiran, kerja, foto, pembantu' },
   features: { zh: '可以做什么', en: 'What you can do', ms: 'Apa yang boleh dibuat' },
   why: { zh: '为什么重要', en: 'Why it matters', ms: 'Mengapa ia penting' },
   route: { zh: '完整演示路线（约 7 分钟）', en: 'Full demo route (about 7 minutes)', ms: 'Laluan demo penuh (lebih kurang 7 minit)' },
