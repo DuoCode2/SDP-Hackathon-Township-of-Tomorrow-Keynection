@@ -2,15 +2,13 @@
 
 [![Tests](https://github.com/DuoCode2/SDP-Hackathon-Township-of-Tomorrow-Keynection/actions/workflows/ci.yml/badge.svg)](https://github.com/DuoCode2/SDP-Hackathon-Township-of-Tomorrow-Keynection/actions/workflows/ci.yml)
 
-> **给队员的中文摘要**：这是给评审（SDP 数码团队）和导师看的英文主页，顺序是：为什么做、3 分钟评审路线、跟现有方案差在哪、为 SDP 而做的地方、主线以外还有什么、哪些是真做哪些是模拟、怎么运行、附录目录、老实说的限制、AI 披露。团队自己的完整中文说明（设计、试点模式、安全清单、结构、待办、Git）一个字没删，搬到了 [`docs/团队说明.md`](docs/团队说明.md)。数字的来源：测试数只在 [`docs/testing-overview.md`](docs/testing-overview.md) 写一次（这一页不写测试数）；普查、纠纷案例、画面数这些以 [`docs/judging-criteria-map.md`](docs/judging-criteria-map.md) 最后一节为准。三张截图在 `docs/images/`，是浏览器自动走路线时拍的、裁掉了右边的导览面板；有 AI 文字的画面等金钥放上去再拍。
-
 Sime Darby Property University Hackathon 2026 · People track. **Every key comes with five neighbours.**
 
 Keynection helps a new owner in an SDP township get to know the five homes beside and opposite them from the day they collect the keys. The renovation season that follows is when neighbours become friends or enemies, so the renovation notice doubles as the first introduction. If a crack or a leak does appear, sealed photos, a fair triage and the warranty clock are there in the background: a safety net, not the hero.
 
 ![Key day: Aiman's home screen is the five homes beside and opposite him, worked out from the site plan](docs/images/key-day-five-homes.png)
 
-**Live demo**: https://keynection.onrender.com (shared password given privately). It runs on Render's free tier, so the first open after a quiet spell takes about 40 seconds. All judges share one database; it returns to the starting point after 20 quiet minutes. Everything in it is fictional: households, unit numbers, names and photographs are invented or drawn by a program; there is no SDP data and no real resident.
+**Live demo**: https://keynection.agenticcs.net, behind a shared password: judges open it with the one-click link in our submission form and on the slides. The old address, keynection.onrender.com, forwards here. All judges share one database; it returns to the starting point after 20 quiet minutes. Everything in it is fictional: households, unit numbers, names and photographs are invented or drawn by a program; there is no SDP data and no real resident.
 
 ## Why
 
@@ -57,7 +55,7 @@ Nobody is left out: **Easy mode** (bigger text, fewer options, visible only to t
 
 ![Impact model: the census question is the main measure; the cost lines below it are labelled assumptions SDP can change](docs/images/impact-model-census.png)
 
-For scale (21 Oct 2026): 18 screens, 106 API endpoints, 3 interface languages plus Tamil, three research reports (4, 10 and 16 Oct), and automated tests plus the front-end build on every push (layers and counts in [`docs/testing-overview.md`](docs/testing-overview.md)).
+For scale (23 Oct 2026): 18 screens, 109 API endpoints, 3 interface languages plus Tamil, three research reports (4, 10 and 16 Oct), and automated tests plus the front-end build on every push (layers and counts in [`docs/testing-overview.md`](docs/testing-overview.md)).
 
 ## Beyond the main story
 
@@ -177,3 +175,5 @@ This code was written with the help of Claude (Anthropic), declared under clause
 ## Team notes
 
 The full Chinese write-up (design, pilot mode, security list, every known limitation, structure, to-do, git) is [`docs/团队说明.md`](docs/团队说明.md).
+
+> **给队员的中文摘要**：这是给评审（SDP 数码团队）和导师看的英文主页，顺序是：为什么做、3 分钟评审路线、跟现有方案差在哪、为 SDP 而做的地方、主线以外还有什么、哪些是真做哪些是模拟、怎么运行、附录目录、老实说的限制、AI 披露。团队自己的完整中文说明（设计、试点模式、安全清单、结构、待办、Git）一个字没删，搬到了 [`docs/团队说明.md`](docs/团队说明.md)。数字的来源：测试数只在 [`docs/testing-overview.md`](docs/testing-overview.md) 写一次（这一页不写测试数）；普查、纠纷案例、画面数这些以 [`docs/judging-criteria-map.md`](docs/judging-criteria-map.md) 最后一节为准。三张截图在 `docs/images/`，是浏览器自动走路线时拍的、裁掉了右边的导览面板；有 AI 文字的画面等金钥放上去再拍。
