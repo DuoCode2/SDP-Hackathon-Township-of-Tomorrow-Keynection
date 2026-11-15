@@ -8,7 +8,7 @@ Keynection helps a new owner in an SDP township get to know the five homes besid
 
 ![Key day: Aiman's home screen is the five homes beside and opposite him, worked out from the site plan](docs/images/key-day-five-homes.png)
 
-**Live demo**: https://keynection.agenticcs.net, behind a shared password: judges open it with the one-click link in our submission form and on the slides. The old address, keynection.onrender.com, forwards here. All judges share one database; it returns to the starting point after 20 quiet minutes. Everything in it is fictional: households, unit numbers, names and photographs are invented or drawn by a program; there is no SDP data and no real resident.
+**Live demo**: https://keynection.agenticcs.net, behind a shared password: judges open it with the one-click link in our submission form and on the slides. All judges share one database; it returns to the starting point after 20 quiet minutes. Everything in it is fictional: households, unit numbers, names and photographs are invented or drawn by a program; there is no SDP data and no real resident.
 
 ## Why
 

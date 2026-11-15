@@ -4,7 +4,7 @@
 
 Six criteria, weights and wording from the official hackathon page (re-read 16 Oct 2026, unchanged). For each: where the prototype answers it, which step of the 3-minute judge route shows it, the evidence file behind it, and what is still missing.
 
-Demo: https://keynection.onrender.com (shared password given privately; first open after a quiet spell takes about 40 s). The 3-minute route is the top of the Guide panel (top-right), one click per step.
+Demo: https://keynection.agenticcs.net (shared password given privately). The 3-minute route is the top of the Guide panel (top-right), one click per step.
 
 | # | Criterion (weight) | Official wording | Where the prototype answers it | Judge route step | Evidence | Still missing |
 |---|---|---|---|---|---|---|
