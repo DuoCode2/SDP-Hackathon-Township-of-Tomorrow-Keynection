@@ -1,9 +1,13 @@
 import pytest
+from datetime import date, timedelta
 from fastapi.testclient import TestClient
 
 from app import talk
 
-RENO = {"scope": "Extend kitchen (rear wall)", "start": "2026-10-15", "end": "2026-10-30",
+# The notice's dates are worked out from today, like the demo's: a stale literal start/end stops counting as a
+# renovation in flight (the thread falls back to hello replies) once `end` slips into the past.
+START, END = (date.today() + timedelta(days=10)).isoformat(), (date.today() + timedelta(days=25)).isoformat()
+RENO = {"scope": "Extend kitchen (rear wall)", "start": START, "end": END,
         "council_permit": "approved", "permit_ref": "PBT/2026/0412"}
 
 
