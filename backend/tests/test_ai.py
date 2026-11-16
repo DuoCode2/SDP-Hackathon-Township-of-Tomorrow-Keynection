@@ -624,3 +624,144 @@ def test_the_request_through_the_gateway_names_the_group_and_asks_no_fallback_be
                           purpose="chat-check") is not None
     assert sent and sent[0]["body"]["model"] == "keynection/chat-check"
     assert "server-side-fallback" not in sent[0]["beta"], "the gateway's group does the falling back"
+
+
+# ---------- through the gateway: the group, never the model id (review of 2026-11-16) ----------
+
+def test_gateway_mode_names_the_group_even_when_production_names_a_model(monkeypatch):
+    # Production sets KEYNECTION_AI_MODEL=claude-sonnet-5-5. Through the gateway the key allows only keynection/*, so
+    # sending that model id would be refused and every AI call would quietly come back empty.
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://llm.example.test")
+    monkeypatch.setenv("KEYNECTION_AI_MODEL", "claude-sonnet-5-5")
+    for purpose in ("notice", "chat-check", "translate", "assistant"):
+        assert ai.model_name(purpose) == f"keynection/{purpose}"
+    monkeypatch.delenv("ANTHROPIC_BASE_URL")
+    assert ai.model_name("chat-check") == "claude-sonnet-5-5"
+
+
+@pytest.mark.parametrize("base, gateway", [
+    ("https://api.anthropic.com", False), ("https://api.anthropic.com/v1", False), ("https://API.anthropic.com/", False),
+    ("https://llm.sunflowerstech.weiliu.me", True), ("https://api.anthropic.com.example.test", True), ("", False)])
+def test_only_anthropics_own_host_is_direct(monkeypatch, base, gateway):
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", base)
+    assert ai.through_gateway() is gateway
+
+
+# ---------- each home's daily allowance: calls and dollars, kept across a restart ----------
+
+def test_a_call_is_counted_at_its_worst_case(monkeypatch):
+    # Every byte sent counts as a token, and the whole output allowance as written, at the answering model's price.
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://llm.example.test")
+    assert ai.worst_usd("ab", 10, "chat-check") == pytest.approx((2 * 2.0 + 10 * 10.0) / 1e6)  # Sonnet 5.5
+    assert ai.worst_usd("你好", 0, "chat-check") == pytest.approx(6 * 2.0 / 1e6)  # six bytes of UTF-8
+    monkeypatch.delenv("ANTHROPIC_BASE_URL")
+    monkeypatch.setenv("KEYNECTION_AI_MODEL", "claude-opus-5-5")
+    assert ai.worst_usd("ab", 10, "notice") == pytest.approx((2 * 4.0 + 10 * 20.0) / 1e6)
+    monkeypatch.setenv("KEYNECTION_AI_MODEL", "claude-fable-5-1")  # no price here: counted at the dearest
+    assert ai.worst_usd("ab", 10, "notice") == pytest.approx((2 * 5.0 + 10 * 25.0) / 1e6)
+
+
+def test_a_home_is_held_to_its_daily_dollars(client, claude, monkeypatch):
+    claude.answers["RenovationDraft"] = _draft()
+    monkeypatch.setenv("KEYNECTION_AI_HOME_DAILY_USD", str(ai.renovation_usd("bathroom") * 1.5))
+    assert client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom"}).status_code == 200
+    # It has calls left, but a second would take it past its dollars.
+    assert client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom"}).status_code == 429
+    assert client.post("/api/ai/renovation-draft", json={"unit_id": "T-11", "text": "bathroom"}).status_code == 200
+
+
+def test_the_allowance_outlives_a_restart(client, claude, monkeypatch):
+    monkeypatch.setattr(ai, "CALLS_PER_HOME_PER_DAY", 1)
+    claude.answers["RenovationDraft"] = _draft()
+    assert client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom"}).status_code == 200
+    assert client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom"}).status_code == 429
+    ai.reset()  # what a restart forgets: everything held in memory
+    from app.main import app
+
+    with TestClient(app) as again:  # the same database, the server started afresh
+        assert again.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom"}).status_code == 429
+        assert again.post("/api/ai/renovation-draft", json={"unit_id": "T-11", "text": "bathroom"}).status_code == 200
+
+
+# ---------- a fall-back to the word list is heard about, not silent ----------
+
+@pytest.fixture()
+def relay(monkeypatch):
+    """A stand-in for the ntfy relay on this computer: what the site would push, nothing leaves it."""
+    import http.server
+    import json
+    import threading
+
+    got: list[dict] = []
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            got.append({"auth": self.headers.get("Authorization"),
+                        "body": json.loads(self.rfile.read(int(self.headers["Content-Length"])))})
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
+    monkeypatch.setenv("KEYNECTION_ALERT_URL", f"http://127.0.0.1:{server.server_port}/")
+    monkeypatch.setenv("KEYNECTION_ALERT_TOKEN", "test-relay-token")
+    yield got
+    server.shutdown()
+
+
+def _settle(got, n):
+    import time
+
+    deadline = time.monotonic() + 5
+    while len(got) < n and time.monotonic() < deadline:
+        time.sleep(0.02)
+    time.sleep(0.3)  # and long enough for a push that should not have been sent to arrive
+    return got
+
+
+def test_an_ai_that_cannot_be_reached_alerts_once_an_hour(monkeypatch, relay):
+    import httpx2
+
+    def unreachable(request):
+        raise httpx2.ConnectError("no route to the AI")
+
+    _sdk(monkeypatch, unreachable)
+    assert ai.check_message("T-12", "Good morning!", "ms") is None
+    assert ai.check_message("T-12", "Good evening!", "ms") is None  # the same outage: no second push
+    assert len(_settle(relay, 1)) == 1
+    assert relay[0]["auth"] == "Bearer test-relay-token"
+    assert "not answering" in relay[0]["body"]["title"] and "word list only" in relay[0]["body"]["message"]
+
+
+def test_a_home_past_its_allowance_alerts_once_a_day(monkeypatch, relay):
+    monkeypatch.setattr(ai, "CALLS_PER_HOME_PER_DAY", 1)
+    assert ai.spend("T-12", 0.001) is True
+    assert ai.spend("T-12", 0.001) is False
+    assert ai.spend("T-12", 0.001) is False
+    assert len(_settle(relay, 1)) == 1 and "T-12" in relay[0]["body"]["title"]
+    assert ai.spend("T-11", 1000.0) is False  # past its dollars on the first call: its own alert
+    assert len(_settle(relay, 2)) == 2 and "T-11" in relay[1]["body"]["title"]
+
+
+def test_without_relay_settings_an_alert_is_only_logged(monkeypatch, caplog):
+    import logging
+
+    from app import opsalert
+
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
+    with caplog.at_level(logging.WARNING, logger="keynection.alert"):
+        assert opsalert.notify("ai_unavailable", "Keynection: the AI is not answering", "test") is None
+    assert "ALERT ai_unavailable" in caplog.text
+
+
+def test_a_message_checked_by_the_word_list_only_says_so_in_the_log(client, claude, caplog):
+    import logging
+
+    claude.answers["MessageCheck"] = None
+    with caplog.at_level(logging.WARNING, logger="keynection"):
+        assert client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "Hi there"}).status_code == 201
+    assert "checked by the word list only" in caplog.text

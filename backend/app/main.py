@@ -111,6 +111,7 @@ async def lifespan(_: FastAPI):
     _last_request = None  # a fresh start never counts as a quiet spell
     conn = db.connect(db_path())
     db.init_db(conn, keep_data=not demo_mode())  # a pilot's records are never rebuilt
+    ai.use_db(db_path())  # each home's daily AI allowance is counted in the database, so a restart keeps it
     _expire_voice(conn)
     conn.close()
     try:
@@ -1236,7 +1237,7 @@ def renovation_draft(body: RenovationTextIn, conn: sqlite3.Connection = Depends(
     # off or slow and the steps below still work (the app looks at the code, not the status).
     if not ai.enabled():
         raise HTTPException(501, {"code": "ai_off", "message": "AI isn't switched on here. Fill in the steps below."})
-    if not ai.spend(body.unit_id):
+    if not ai.spend(body.unit_id, ai.renovation_usd(body.text.strip())):
         raise refuse(429, "ai_cap", "That's all the AI help for today. Fill in the steps below.")
     draft = ai.draft_renovation(body.text.strip(), me["kind"], date.fromisoformat(_today()), MAX_RENOVATION_DAYS)
     if draft is None:
@@ -1992,6 +1993,8 @@ def send_message(body: MessageIn, conn: sqlite3.Connection = Depends(get_conn)) 
         reader_lang = _unit_row(conn, body.to_unit_id)["lang"]
         # One look by Claude: the reader's translation, and a calmer wording if it sounds heated.
         check = ai.check_message(body.from_unit_id, text, reader_lang) if ai.enabled() else None
+        if check is None and ai.enabled():  # the AI gave no answer (failed, slow, or the home's allowance is used up)
+            log.warning("message %s -> %s checked by the word list only: no AI answer", body.from_unit_id, body.to_unit_id)
         calmer = {"suggestion": check.calmer} if check and check.heated and check.calmer else {}
         # Insults are never sent: the word list first, then Claude's own judgement of abuse in any language.
         if talk.tone_problem(text) or (check is not None and check.insult):

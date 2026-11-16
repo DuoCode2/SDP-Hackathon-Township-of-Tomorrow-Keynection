@@ -343,6 +343,15 @@ CREATE TABLE IF NOT EXISTS events (
 );
 -- Backstop for append_event's lock: a home's log can never have two records chained onto the same one.
 CREATE UNIQUE INDEX IF NOT EXISTS events_one_chain ON events (unit_id, prev_hash);
+-- Each home's AI use per day (ai.spend): calls, and their worst-case cost in millionths of a dollar. Kept here so a
+-- restart or a deploy does not hand the day's allowance back; rows older than a week are deleted as it goes.
+CREATE TABLE IF NOT EXISTS ai_usage (
+    home TEXT NOT NULL,
+    day TEXT NOT NULL,
+    calls INTEGER NOT NULL DEFAULT 0,
+    usd_micros INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (home, day)
+);
 """
 
 
@@ -362,8 +371,8 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 17  # 17: notices.translations, profiles.bio_lang and bio_translations (every reader's language)
-TABLES = ("settings", "deliveries", "push_subscriptions", "auth_challenges", "webauthn_handles", "passkeys", "sessions", "access_codes", "staff", "paper_notices", "join_codes", "delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
+SCHEMA_VERSION = 18  # 18: ai_usage (each home's daily AI allowance outlives a restart). 17: notices.translations, profiles.bio_lang and bio_translations (every reader's language)
+TABLES = ("ai_usage", "settings", "deliveries", "push_subscriptions", "auth_challenges", "webauthn_handles", "passkeys", "sessions", "access_codes", "staff", "paper_notices", "join_codes", "delegates", "profiles", "reactions", "waves", "notices", "contact_requests", "contact_consents", "reports", "blocks", "concerns", "messages",
           "warranty_tickets", "gate_logs", "passes", "incidents", "photos",
           "intro_recipients", "intros", "events", "units", "phases")
 

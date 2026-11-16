@@ -16,13 +16,14 @@ def no_real_ai(monkeypatch):
         monkeypatch.delenv(name, raising=False)
     # Server settings, under both names (the old JIRAN_ ones are still read): each test sets what it needs.
     for name in ("DB_PATH", "DEMO_MODE", "SITE_PASSWORD", "MOVED_TO", "STATIC_DIR", "ALLOWED_ORIGINS", "VOICE_KEY",
-                 "VOICE_URL", "STT_MODEL", "TTS_MODEL", "TTS_VOICE"):
+                 "VOICE_URL", "STT_MODEL", "TTS_MODEL", "TTS_VOICE", "ALERT_URL", "ALERT_TOKEN", "AI_HOME_DAILY_USD"):
         for prefix in ("KEYNECTION_", "JIRAN_"):
             monkeypatch.delenv(prefix + name, raising=False)
-    from app import ai, voice
+    from app import ai, opsalert, voice
 
     ai.reset()
     voice.reset()
+    opsalert.reset()
 
 
 @pytest.fixture()
