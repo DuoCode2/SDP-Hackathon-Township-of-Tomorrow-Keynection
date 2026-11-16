@@ -19,6 +19,7 @@ unit numbers of the homes around it, never a neighbour's name or words.
 """
 from __future__ import annotations
 
+import ipaddress
 import logging
 import os
 import re
@@ -27,8 +28,10 @@ import time
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
+from contextvars import ContextVar
 from datetime import date, timedelta
 from typing import Any, Literal, TypeVar
+from urllib.parse import urlparse
 
 import httpx
 from pydantic import BaseModel, Field
@@ -44,7 +47,8 @@ try:
 except ImportError:  # set up before Gemini was an option: only Claude can answer
     genai = None  # type: ignore[assignment]
 
-from .settings import demo_mode
+from . import db, opsalert
+from .settings import demo_mode, setting
 
 log = logging.getLogger("keynection.ai")
 
@@ -55,6 +59,23 @@ GEMINI_MODEL = "gemini-3.5-flash"  # on Google's free tier: the demo only (see p
 # Anthropic recommends for that case instead of returning the refusal.
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"}
 CALLS_PER_HOME_PER_DAY = 40  # keeps a public demo's bill small; past it, everything still works without AI
+# Each home's AI in dollars a day (KEYNECTION_AI_HOME_DAILY_USD), counted at each call's worst case: every byte sent
+# as a token and the whole of the call's output allowance, at list price. The site's own ceiling is the gateway key's
+# ($5 a day, $25 per 30 days); this one keeps a single home from using it up (2026-11-16). Kept in the database, so a
+# restart or a deploy does not hand it back.
+HOME_DAILY_USD = 0.60
+# One visitor's AI per day in dollars on the demo (KEYNECTION_AI_VISITOR_DAILY_USD), counted like a home's. The demo
+# has no sign-in: a request may name any household, and its reset button starts the households' allowance over, so
+# the per-home allowance alone does not stop one person from spending the site's day (2026-11-16). A visitor is an
+# address, Cloudflare's CF-Connecting-IP (the app is reachable only through the tunnel), an IPv6 address by its /64.
+# Counted in this process's memory only: never written down, not given back by a demo reset, and given back by a
+# restart, which a visitor cannot cause. The pilot signs households in and does not use it.
+VISITOR_DAILY_USD = 1.00
+# List prices per million tokens (input, output). The keynection/* gateway groups are Claude Sonnet 5.5 on both legs.
+PRICES = {"claude-sonnet-5-5": (2.0, 10.0), "claude-opus-5-5": (4.0, 20.0)}
+DEAREST_PRICE = (5.0, 25.0)  # a model with no row above is counted at this
+# Each call's output allowance, in tokens (the same numbers its worst case is counted with).
+CHAT_MAX_OUT, NOTICE_MAX_OUT, TEXTS_MAX_OUT, ASSISTANT_MAX_OUT, RENOVATION_MAX_OUT = 800, 8000, 4000, 1500, 4000
 CACHE_SIZE = 500
 GEMINI_RETRY_WAIT = 2.0  # seconds before the one retry after a 503: the free tier under load usually clears in a moment
 Lang = Literal["en", "ms", "zh", "ta"]
@@ -76,13 +97,35 @@ def provider() -> Literal["anthropic", "gemini"] | None:
     return None
 
 
+# Through DuoCode's LLM gateway (2026-11-16): the anthropic SDK reads ANTHROPIC_BASE_URL, and with it pointing anywhere
+# but Anthropic's own API each kind of call names a gateway group instead of a model, so which model answers (and its
+# fallback, and the site-wide daily budget on the gateway key) is the gateway's to change, not a deploy. Each group can
+# be named here; the defaults are the gateway's (2026-11-16: Claude Sonnet 5.5 on the Team credit, then the Startups
+# credit; the model production ran directly, KEYNECTION_AI_MODEL=claude-sonnet-5-5).
+GATEWAY_MODELS = {
+    "notice": ("KEYNECTION_AI_MODEL_NOTICE", "keynection/notice"),
+    "chat-check": ("KEYNECTION_AI_MODEL_CHAT_CHECK", "keynection/chat-check"),
+    "translate": ("KEYNECTION_AI_MODEL_TRANSLATE", "keynection/translate"),
+    "assistant": ("KEYNECTION_AI_MODEL_ASSISTANT", "keynection/assistant"),
+}
+
+
+def through_gateway() -> bool:
+    """ANTHROPIC_BASE_URL set to any host but Anthropic's own (its path, such as /v1, does not matter)."""
+    base = (os.environ.get("ANTHROPIC_BASE_URL") or "").strip()
+    return bool(base) and (urlparse(base).hostname or "").lower() != "api.anthropic.com"
+
+
 def enabled() -> bool:
     return provider() is not None
 
 
-def model_name() -> str:
+def model_name(purpose: str | None = None) -> str:
     if provider() == "gemini":
         return os.environ.get("KEYNECTION_GEMINI_MODEL", GEMINI_MODEL)
+    if through_gateway():
+        env_name, group = GATEWAY_MODELS[purpose or "notice"]
+        return os.environ.get(env_name) or group
     return os.environ.get("KEYNECTION_AI_MODEL", DEFAULT_MODEL)
 
 
@@ -99,10 +142,13 @@ _use_fallback = True  # switched off for this run if the account turns the fallb
 GEMINI_THINKING = {"low": "LOW", "medium": "MEDIUM", "high": "HIGH"}
 
 
-def _ask(system: str, text: str, schema: type[T], *, effort: str, max_tokens: int, timeout: float) -> T | None:
-    """The answer in the shape of schema, or None when there is none to use: the caller carries on without AI."""
-    ask = _ask_gemini if provider() == "gemini" else _ask_claude
-    return ask(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout)
+def _ask(system: str, text: str, schema: type[T], *, effort: str, max_tokens: int, timeout: float,
+         purpose: str) -> T | None:
+    """The answer in the shape of schema, or None when there is none to use: the caller carries on without AI.
+    `purpose` (a key of GATEWAY_MODELS) picks the gateway group when the calls go through the gateway."""
+    if provider() == "gemini":
+        return _ask_gemini(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout)
+    return _ask_claude(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout, purpose=purpose)
 
 
 def _claude() -> Any:
@@ -129,9 +175,10 @@ def _why(e: Exception) -> str:
 _workers = ThreadPoolExecutor(max_workers=8, thread_name_prefix="ai")
 
 
-def _ask_claude(system: str, text: str, schema: type[T], *, effort: str, max_tokens: int, timeout: float) -> T | None:
+def _ask_claude(system: str, text: str, schema: type[T], *, effort: str, max_tokens: int, timeout: float,
+                purpose: str = "notice") -> T | None:
     global _use_fallback
-    model = model_name()
+    model = model_name(purpose)
     fallback: dict[str, Any] = {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"} \
         if _use_fallback and model in FALLBACK_MODELS else {}
     started = time.monotonic()
@@ -149,26 +196,32 @@ def _ask_claude(system: str, text: str, schema: type[T], *, effort: str, max_tok
         ).result(timeout=timeout)
     except FutureTimeout:
         log.warning("Claude took longer than %gs (%s); carrying on without AI", timeout, schema.__name__)
+        _unavailable(f"Claude took longer than {timeout:g}s ({schema.__name__})")
         return None
     except anthropic.BadRequestError as e:
         if fallback:  # perhaps an account without the fallback option: ask once more without it
             _use_fallback = False
-            answer = _ask_claude(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout)
+            answer = _ask_claude(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout,
+                                 purpose=purpose)
             if answer is None:  # refused without it too: the option was not the reason, so keep asking with it
                 _use_fallback = True
             else:
                 log.warning("The fallback option was refused (%s); asking without it from now on", _why(e))
             return answer
         log.warning("Claude refused the request (request %s: %s); carrying on without AI", e.request_id, _why(e))
+        _unavailable(f"Claude refused a request ({_why(e)})")
         return None
     except anthropic.APIStatusError as e:
         log.warning("Claude answered %s (request %s: %s); carrying on without AI", e.status_code, e.request_id, _why(e))
+        _unavailable(f"Claude answered {e.status_code} ({_why(e)})")
         return None
     except anthropic.APIConnectionError:  # no network, or no answer in time
         log.warning("Claude could not be reached; carrying on without AI")
+        _unavailable("Claude could not be reached")
         return None
     except (anthropic.AnthropicError, ValueError):  # an answer that doesn't fit the schema
         log.exception("Claude's answer could not be read; carrying on without AI")
+        _unavailable("Claude's answer could not be read")
         return None
     # How long each call takes and what it costs, so slow or expensive calls show up in the server log.
     usage = response.usage
@@ -176,6 +229,7 @@ def _ask_claude(system: str, text: str, schema: type[T], *, effort: str, max_tok
              getattr(usage, "input_tokens", "?"), getattr(usage, "output_tokens", "?"), model, response.stop_reason)
     if response.stop_reason != "end_turn" or response.parsed_output is None:  # declined, or cut off
         log.warning("Claude stopped early (%s); carrying on without AI", response.stop_reason)
+        _unavailable(f"Claude stopped early ({response.stop_reason})")
         return None
     return response.parsed_output
 
@@ -229,11 +283,16 @@ def _ask_gemini(system: str, text: str, schema: type[T], *, effort: str, max_tok
 
 # Requests are served on several threads at once, so the allowance and the memory share one lock.
 _lock = threading.Lock()
-_calls: dict[tuple[str, str], int] = {}
+_calls: dict[tuple[str, str], tuple[int, int]] = {}  # (home, day) -> (calls, worst-case micro-dollars), without a database
+_db_path: str | None = None
+_visitor: ContextVar[str | None] = ContextVar("keynection_ai_visitor", default=None)
+_visitors: dict[tuple[str, str], int] = {}  # (visitor, day) -> worst-case micro-dollars, demo only
 _checked: OrderedDict[tuple[str, str], MessageCheck] = OrderedDict()
 
 
 def reset() -> None:
+    """What the demo's start-over forgets. Not where the allowance is counted: a demo reset rebuilds ai_usage with
+    the households, and counting goes on in the database, so a restart after it still keeps the day."""
     global _use_fallback
     with _lock:
         _calls.clear()
@@ -241,17 +300,133 @@ def reset() -> None:
     _use_fallback = True
 
 
-def spend(home: str) -> bool:
-    """Count one call against this home's daily allowance; False when it is used up."""
-    today = date.today().isoformat()
+def visitor_bucket(address: str | None) -> str | None:
+    """Who a request is for the visitor allowance: its IPv4 address, or its IPv6 /64."""
+    if not address:
+        return None
+    try:
+        ip = ipaddress.ip_address(address.strip())
+    except ValueError:
+        return address.strip()[:64] or None
+    if ip.version == 6:
+        if ip.ipv4_mapped is not None:  # ::ffff:a.b.c.d is that IPv4 address
+            return str(ip.ipv4_mapped)
+        return str(ipaddress.ip_network(f"{ip}/64", strict=False))
+    return str(ip)
+
+
+def set_visitor(address: str | None) -> None:
+    """The visitor this request (and the work it leaves behind, such as a translation after the reply) is for."""
+    _visitor.set(visitor_bucket(address))
+
+
+def reset_visitors() -> None:
+    """Tests only: a demo reset (reset()) deliberately leaves the visitors' day alone."""
     with _lock:
-        for key in [k for k in _calls if k[1] != today]:
-            del _calls[key]
-        used = _calls.get((home, today), 0)
-        if used >= CALLS_PER_HOME_PER_DAY:
+        _visitors.clear()
+
+
+def visitor_daily_usd() -> float:
+    try:
+        return float(setting("AI_VISITOR_DAILY_USD") or VISITOR_DAILY_USD)
+    except ValueError:
+        return VISITOR_DAILY_USD
+
+
+def use_db(path: str | None) -> None:
+    """Keep each home's daily allowance in the app's database (table ai_usage), so it outlives a restart."""
+    global _db_path
+    _db_path = path
+
+
+def home_daily_usd() -> float:
+    try:
+        return float(setting("AI_HOME_DAILY_USD") or HOME_DAILY_USD)
+    except ValueError:
+        return HOME_DAILY_USD
+
+
+def _price(purpose: str | None) -> tuple[float, float]:
+    model = model_name(purpose)
+    if model.startswith("keynection/"):
+        return PRICES["claude-sonnet-5-5"]
+    return PRICES.get(model, DEAREST_PRICE)
+
+
+def worst_usd(prompt: str, max_tokens: int, purpose: str | None, *, extra_bytes: int = 0) -> float:
+    """The most one call can cost: every byte sent counted as a token (the worst a tokenizer does) and the whole of
+    its output allowance, at the list price of the model that answers it."""
+    price_in, price_out = _price(purpose)
+    return ((len(prompt.encode("utf-8")) + extra_bytes) * price_in + max_tokens * price_out) / 1_000_000
+
+
+def renovation_usd(text: str) -> float:
+    """draft_renovation's worst case: its prompt (the sentence, plus about 200 bytes of date and home) and output."""
+    return worst_usd(RENOVATION_SYSTEM + text, RENOVATION_MAX_OUT, "notice", extra_bytes=200)
+
+
+def spend(home: str, usd: float = 0.0) -> bool:
+    """Count one call, at its worst-case cost, against this home's daily allowance: CALLS_PER_HOME_PER_DAY calls and
+    home_daily_usd() dollars. False, and one alert a day for the home, when it would go past either."""
+    today = date.today().isoformat()
+    micros = max(0, round(usd * 1_000_000))
+    cap = round(home_daily_usd() * 1_000_000)
+    visitor = _visitor.get() if demo_mode() else None
+    if visitor is not None:  # held first, given back below if the home refuses
+        vcap = round(visitor_daily_usd() * 1_000_000)
+        with _lock:
+            for key in [k for k in _visitors if k[1] != today]:
+                del _visitors[key]
+            vused = _visitors.get((visitor, today), 0)
+            vok = vused + micros <= vcap
+            if vok:
+                _visitors[(visitor, today)] = vused + micros
+        if not vok:
+            opsalert.notify("visitor_allowance", "Keynection: a demo visitor has used their AI allowance for today",
+                            f"One visitor's address has used ${vused / 1e6:.2f} of ${vcap / 1e6:.2f} counted at worst-case "
+                            f"prices ({today}), across whichever households it named. Until tomorrow its messages are "
+                            "checked by the word list only and its notices go untranslated; other visitors are not "
+                            "affected.")
             return False
-        _calls[(home, today)] = used + 1
-        return True
+    if _db_path is None:
+        with _lock:
+            for key in [k for k in _calls if k[1] != today]:
+                del _calls[key]
+            calls, used = _calls.get((home, today), (0, 0))
+            ok = calls < CALLS_PER_HOME_PER_DAY and used + micros <= cap
+            if ok:
+                _calls[(home, today)] = (calls + 1, used + micros)
+    else:
+        conn = db.connect(_db_path)
+        try:
+            conn.execute("BEGIN IMMEDIATE")  # one check-and-count at a time, across threads and workers
+            conn.execute("DELETE FROM ai_usage WHERE day < ?", ((date.today() - timedelta(days=7)).isoformat(),))
+            row = conn.execute("SELECT calls, usd_micros FROM ai_usage WHERE home = ? AND day = ?", (home, today)).fetchone()
+            calls, used = (row["calls"], row["usd_micros"]) if row else (0, 0)
+            ok = calls < CALLS_PER_HOME_PER_DAY and used + micros <= cap
+            if ok:
+                conn.execute("INSERT INTO ai_usage (home, day, calls, usd_micros) VALUES (?, ?, 1, ?)"
+                             " ON CONFLICT (home, day) DO UPDATE SET calls = calls + 1, usd_micros = usd_micros + excluded.usd_micros",
+                             (home, today, micros))
+            conn.commit()
+        finally:
+            conn.close()
+    if not ok and visitor is not None:
+        with _lock:
+            _visitors[(visitor, today)] = max(0, _visitors.get((visitor, today), 0) - micros)
+    if not ok:
+        opsalert.notify("home_allowance", f"Keynection: home {home} has used its AI allowance for today",
+                        f"{calls} calls, ${used / 1e6:.2f} of ${cap / 1e6:.2f} counted at worst-case prices ({today}). Until "
+                        "tomorrow its messages are checked by the word list only and its notices go untranslated; other "
+                        "homes are not affected.", key=f"{home}|{today}", cooldown=86400)
+    return ok
+
+
+def _unavailable(why: str) -> None:
+    """The AI gave no answer: say so where the people running the site will see it, not only in the log."""
+    opsalert.notify("ai_unavailable", "Keynection: the AI is not answering",
+                    f"{why}. Until it answers again, typed messages are checked by the word list only, notices go out "
+                    "untranslated and the assistant falls back to key words. Nothing else is stopped.")
 
 
 def _remember(key: tuple[str, str], check: MessageCheck) -> None:
@@ -344,7 +519,8 @@ def draft_renovation(text: str, home_kind: str, today: date, max_days: int) -> d
     fill in, and named in "unsure"."""
     home = HOME_FOR_AI["apartment" if home_kind == "apartment" else "terrace"]
     asked = f"Today in Malaysia: {today:%A} {today.isoformat()}\nThe owner's home: {home}\n\n<owner>\n{text}\n</owner>"
-    d = _ask(RENOVATION_SYSTEM, asked, RenovationDraft, effort="medium", max_tokens=4000, timeout=30)
+    d = _ask(RENOVATION_SYSTEM, asked, RenovationDraft, effort="medium", max_tokens=RENOVATION_MAX_OUT, timeout=30,
+             purpose="notice")
     if d is None:
         return None
     unsure = []
@@ -406,10 +582,10 @@ def check_message(home: str, text: str, reader_lang: str) -> MessageCheck | None
     known = _recall(key)
     if known is not None:
         return known
-    if not spend(home):
-        return None
     asked = f"The reader's language: {LANG_FOR_AI[reader_lang]}\n\n<message>\n{text}\n</message>"
-    check = _ask(CHAT_SYSTEM, asked, MessageCheck, effort="low", max_tokens=800, timeout=10)
+    if not spend(home, worst_usd(CHAT_SYSTEM + asked, CHAT_MAX_OUT, "chat-check")):
+        return None
+    check = _ask(CHAT_SYSTEM, asked, MessageCheck, effort="low", max_tokens=CHAT_MAX_OUT, timeout=10, purpose="chat-check")
     if check is None:
         return None
     _remember(key, check)
@@ -443,11 +619,14 @@ class NoticeTranslations(BaseModel):
 def translate_notice(home: str, message: str, scope: str | None, to_langs: set[str]) -> dict[str, dict[str, str | None]]:
     """{language: {"message", "scope"}} for each reader's language; empty when there is no translation to use."""
     wanted = sorted(to_langs & set(LANG_FOR_AI))
-    if not wanted or not spend(home):
+    if not wanted:
         return {}
     asked = ("Translate into: " + ", ".join(f"{lang} ({LANG_FOR_AI[lang]})" for lang in wanted)
              + f"\n\n<message>\n{message}\n</message>" + (f"\n<work>\n{scope}\n</work>" if scope else ""))
-    answer = _ask(NOTICE_SYSTEM, asked, NoticeTranslations, effort="low", max_tokens=8000, timeout=40)
+    if not spend(home, worst_usd(NOTICE_SYSTEM + asked, NOTICE_MAX_OUT, "translate")):
+        return {}
+    answer = _ask(NOTICE_SYSTEM, asked, NoticeTranslations, effort="low", max_tokens=NOTICE_MAX_OUT, timeout=40,
+                  purpose="translate")
     if answer is None:
         return {}
     return {t.lang: {"message": t.message.strip()[:2000], "scope": ((t.scope or "").strip()[:120] or None) if scope else None}
@@ -476,11 +655,14 @@ def translate_texts(home: str, texts: list[str], to_langs: set[str], *, what: st
     answer is missing or does not line up with the texts is left out; with no answer at all, nothing is."""
     wanted = sorted(to_langs & set(LANG_FOR_AI))
     texts = [t.strip() for t in texts]
-    if not wanted or not texts or not all(texts) or not spend(home):
+    if not wanted or not texts or not all(texts):
         return {}
     asked = (f"The texts are {what}. Translate into: " + ", ".join(f"{lang} ({LANG_FOR_AI[lang]})" for lang in wanted)
              + "\n\n" + "\n\n".join(f'<text n="{i + 1}">\n{t}\n</text>' for i, t in enumerate(texts)))
-    answer = _ask(TEXTS_SYSTEM, asked, TextTranslations, effort="low", max_tokens=4000, timeout=40)
+    if not spend(home, worst_usd(TEXTS_SYSTEM + asked, TEXTS_MAX_OUT, "translate")):
+        return {}
+    answer = _ask(TEXTS_SYSTEM, asked, TextTranslations, effort="low", max_tokens=TEXTS_MAX_OUT, timeout=40,
+                  purpose="translate")
     if answer is None:
         return {}
     out: dict[str, list[str]] = {}
@@ -555,14 +737,14 @@ def plan_request(home: str, text: str, today: date, context: str, *, home_kind: 
     then filled in by draft_renovation, the same as the notice's own one-sentence box, so it is never done twice.
     knowledge: the rules a question may be answered from (knowledge.py), after the instructions. history: the chat so
     far, oldest first, as (who, words): the resident's own words and the assistant's replies, nothing else."""
-    if not spend(home):
-        return None
     said = "\n".join(f"{'Resident' if who == 'resident' else 'Assistant'}: {words}" for who, words in (history or []))
     earlier = f"\n\n<conversation>\n{said}\n</conversation>" if said else ""
     asked = f"Today in Malaysia: {today:%A} {today.isoformat()}\n{context}{earlier}\n\n<request>\n{text}\n</request>"
     system = f"{ASSISTANT_SYSTEM}\n\n{knowledge}" if knowledge else ASSISTANT_SYSTEM
+    if not spend(home, worst_usd(system + asked, ASSISTANT_MAX_OUT, "assistant")):
+        return None
     # 20 s: the first call after the server starts has taken about 15 s (12 s was too tight and fell back to key words)
-    p = _ask(system, asked, AssistantPlan, effort="low", max_tokens=1500, timeout=20)
+    p = _ask(system, asked, AssistantPlan, effort="low", max_tokens=ASSISTANT_MAX_OUT, timeout=20, purpose="assistant")
     if p is None:
         return None
     window = p.quiet_window
@@ -574,6 +756,6 @@ def plan_request(home: str, text: str, today: date, context: str, *, home_kind: 
             "hello_to": [h.strip()[:20] for h in p.hello_to if h.strip()][:8] if p.intent == "say_hello" else [],
             "status_topic": p.status_topic if p.intent == "check_status" else None,
             "missing": [m.strip()[:120] for m in p.missing if m.strip()][:5], "renovation": None}
-    if p.intent == "register_renovation" and spend(home):
+    if p.intent == "register_renovation" and spend(home, renovation_usd(text)):
         plan["renovation"] = draft_renovation(text, home_kind, today, max_days)
     return plan
