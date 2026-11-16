@@ -22,6 +22,7 @@ def no_real_ai(monkeypatch):
     from app import ai, opsalert, voice
 
     ai.reset()
+    ai.use_db(None)  # each test starts with the allowance in memory; a test client's start-up points it at its database
     voice.reset()
     opsalert.reset()
 

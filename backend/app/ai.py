@@ -280,12 +280,13 @@ _checked: OrderedDict[tuple[str, str], MessageCheck] = OrderedDict()
 
 
 def reset() -> None:
-    global _use_fallback, _db_path
+    """What the demo's start-over forgets. Not where the allowance is counted: a demo reset rebuilds ai_usage with
+    the households, and counting goes on in the database, so a restart after it still keeps the day."""
+    global _use_fallback
     with _lock:
         _calls.clear()
         _checked.clear()
     _use_fallback = True
-    _db_path = None
 
 
 def use_db(path: str | None) -> None:

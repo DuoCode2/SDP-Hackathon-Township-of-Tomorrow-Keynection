@@ -5,7 +5,7 @@ untranslated and the assistant falls back to key words; and when one home uses u
 fall-back nobody sees is a safety check turning off unseen (review of the gateway change, 2026-11-16).
 
 Each alert is a JSON push to an ntfy relay: KEYNECTION_ALERT_URL, with KEYNECTION_ALERT_TOKEN as a bearer token.
-Without both, and in the demo, it is only logged. A kind of alert is sent at most once per cooldown (an hour unless
+Without both it is only logged. The demo pushes too: the live site (keynection.agenticcs.net) runs in demo mode. A kind of alert is sent at most once per cooldown (an hour unless
 the caller says otherwise), so an outage is one push, not one per message. Nothing waits for the push."""
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import threading
 import time
 import urllib.request
 
-from .settings import demo_mode, setting
+from .settings import setting
 
 log = logging.getLogger("keynection.alert")
 
@@ -45,7 +45,7 @@ def notify(kind: str, title: str, message: str, *, key: str | None = None,
             return None
         _sent[ident] = now
     url, token = setting("ALERT_URL"), setting("ALERT_TOKEN")
-    if demo_mode() or not (url and token):
+    if not (url and token):
         return None
     sender = threading.Thread(target=_post, args=(url, token, title, message), daemon=True, name="keynection-alert")
     sender.start()

@@ -675,7 +675,8 @@ def test_the_allowance_outlives_a_restart(client, claude, monkeypatch):
     claude.answers["RenovationDraft"] = _draft()
     assert client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom"}).status_code == 200
     assert client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom"}).status_code == 429
-    ai.reset()  # what a restart forgets: everything held in memory
+    ai.reset()  # what a restart forgets: everything held in memory, where the allowance is counted included
+    ai.use_db(None)
     from app.main import app
 
     with TestClient(app) as again:  # the same database, the server started afresh
@@ -765,3 +766,58 @@ def test_a_message_checked_by_the_word_list_only_says_so_in_the_log(client, clau
     with caplog.at_level(logging.WARNING, logger="keynection"):
         assert client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "Hi there"}).status_code == 201
     assert "checked by the word list only" in caplog.text
+
+
+# ---------- review of 84a424f5: the live site is the demo ----------
+
+def test_a_demo_reset_keeps_counting_in_the_database(client, claude, monkeypatch):
+    # The demo starts over (the button, or a quiet spell): its households and their day's allowance start over with
+    # it, and the allowance is then still counted in the database, so a restart after the reset keeps the day.
+    monkeypatch.setattr(ai, "CALLS_PER_HOME_PER_DAY", 1)
+    claude.answers["RenovationDraft"] = _draft()
+    assert client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom"}).status_code == 200
+    assert client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom"}).status_code == 429
+    assert client.post("/api/demo/reset", json={"confirm": True}).status_code == 200
+    assert client.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom"}).status_code == 200
+    ai.reset()
+    ai.use_db(None)  # a restart: nothing held in memory survives it
+    from app.main import app
+
+    with TestClient(app) as again:
+        assert again.post("/api/ai/renovation-draft", json={"unit_id": "T-12", "text": "bathroom"}).status_code == 429
+
+
+def test_the_live_site_pushes_too_though_it_runs_in_demo_mode(monkeypatch, relay):
+    import httpx2
+
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")  # keynection.agenticcs.net: compose.yaml sets it
+
+    def unreachable(request):
+        raise httpx2.ConnectError("no route to the AI")
+
+    _sdk(monkeypatch, unreachable)
+    assert ai.check_message("T-12", "Good morning!", "ms") is None
+    assert len(_settle(relay, 1)) == 1 and "not answering" in relay[0]["body"]["title"]
+
+
+def test_a_claude_that_takes_too_long_alerts(monkeypatch, relay):
+    # The likeliest failure on Sonnet: the chat check gives up after 10 s. Asked here with 0.2 s.
+    import time
+
+    def slow(request):
+        time.sleep(1.5)
+        return _reply(ANSWER)
+
+    _sdk(monkeypatch, slow)
+    assert ai._ask_claude(ai.CHAT_SYSTEM, "x", ai.MessageCheck, effort="low", max_tokens=ai.CHAT_MAX_OUT,
+                          timeout=0.2, purpose="chat-check") is None
+    assert len(_settle(relay, 1)) == 1 and "took longer than 0.2s" in relay[0]["body"]["message"]
+
+
+def test_a_check_answered_from_memory_is_not_charged_again(claude):
+    claude.answers["MessageCheck"] = ai.MessageCheck(insult=False, heated=False, calmer=None, calmer_translation=None,
+                                                     translation="Selamat pagi!")
+    for _ in range(3):
+        assert ai.check_message("T-12", "Good morning!", "ms").translation == "Selamat pagi!"
+    assert len(claude.calls) == 1
+    assert ai._calls[("T-12", date.today().isoformat())][0] == 1
