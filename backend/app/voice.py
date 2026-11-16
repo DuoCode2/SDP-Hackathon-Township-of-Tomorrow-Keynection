@@ -28,7 +28,7 @@ from .settings import demo_mode, setting
 
 log = logging.getLogger("keynection.voice")
 
-DEFAULT_URL = "https://llm.duocodetech.com/v1"  # DuoCode's LLM gateway (LiteLLM), OpenAI-style audio endpoints
+DEFAULT_URL = "https://llm.sunflowerstech.weiliu.me/v1"  # DuoCode's LLM gateway (LiteLLM), OpenAI-style audio endpoints
 STT_MODEL = "deepgram/nova-3"
 TTS_MODEL = "deepgram/aura-2"
 TTS_VOICE = "aura-2-thalia-en"

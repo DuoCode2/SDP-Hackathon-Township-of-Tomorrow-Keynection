@@ -564,3 +564,63 @@ def test_the_demo_with_gemini_shows_the_notice_that_names_google(client, monkeyp
     assert client.get("/api/ai").json() == {"on": True, "model": "gemini-3.5-flash", "provider": "gemini", "listen": False, "speak": False}
     token = client.post("/api/units/T-23/join-code").json()["token"]
     assert client.post("/api/join/lookup", json={"token": token}).json()["consent_version"] == CONSENT_VERSION_AI_GEMINI
+
+
+# ---------- through DuoCode's LLM gateway (ANTHROPIC_BASE_URL) ----------
+
+GATEWAY = "https://llm.gateway.invalid"
+
+
+def test_through_the_gateway_each_kind_of_call_names_its_group(monkeypatch):
+    for name in ("ANTHROPIC_BASE_URL", "KEYNECTION_AI_MODEL", *(env for env, _ in ai.GATEWAY_MODELS.values())):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(ai, "provider", lambda: "anthropic")
+    assert ai.model_name("chat-check") == ai.DEFAULT_MODEL, "Anthropic's own API: the model, as before"
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
+    assert not ai.through_gateway() and ai.model_name("notice") == ai.DEFAULT_MODEL
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", GATEWAY)
+    assert ai.through_gateway()
+    assert {p: ai.model_name(p) for p in ai.GATEWAY_MODELS} == {
+        "notice": "keynection/notice", "chat-check": "keynection/chat-check",
+        "translate": "keynection/translate", "assistant": "keynection/assistant"}
+    monkeypatch.setenv("KEYNECTION_AI_MODEL_TRANSLATE", "keynection/other")
+    assert ai.model_name("translate") == "keynection/other"
+    assert ai.status()["model"] == "keynection/notice"
+
+
+def test_every_call_names_its_purpose(client, claude, monkeypatch):
+    seen = []
+    real = claude.__call__
+
+    def recording(system, text, schema, **options):
+        seen.append((schema.__name__, options.get("purpose")))
+        return real(system, text, schema, **options)
+
+    monkeypatch.setattr(ai, "_ask", recording)
+    ai.check_message("T-12", "Good morning", "ms")
+    ai.translate_texts("T-12", ["Hello"], {"ms"}, what="bio")
+    want = {"MessageCheck": "chat-check", "TextTranslations": "translate"}
+    assert seen and all(want.get(s, p) == p for s, p in seen) and {s for s, _ in seen} >= set(want), seen
+    import inspect
+    source = inspect.getsource(ai)
+    for purpose in ai.GATEWAY_MODELS:
+        assert f'purpose="{purpose}"' in source, f"no call names {purpose}"
+
+
+def test_the_request_through_the_gateway_names_the_group_and_asks_no_fallback_beta(monkeypatch):
+    import json
+
+    sent = []
+
+    def handler(request):
+        sent.append({"body": json.loads(request.content), "beta": request.headers.get("anthropic-beta", "")})
+        return _reply(ANSWER)
+
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", GATEWAY)
+    monkeypatch.setattr(ai, "provider", lambda: "anthropic")
+    monkeypatch.setattr(ai, "_use_fallback", True)
+    _sdk(monkeypatch, handler)
+    assert ai._ask_claude(ai.CHAT_SYSTEM, "Good evening", ai.MessageCheck, effort="low", max_tokens=800, timeout=10,
+                          purpose="chat-check") is not None
+    assert sent and sent[0]["body"]["model"] == "keynection/chat-check"
+    assert "server-side-fallback" not in sent[0]["beta"], "the gateway's group does the falling back"

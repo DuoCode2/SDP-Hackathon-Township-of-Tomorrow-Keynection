@@ -76,13 +76,33 @@ def provider() -> Literal["anthropic", "gemini"] | None:
     return None
 
 
+# Through DuoCode's LLM gateway (2026-11-16): the anthropic SDK reads ANTHROPIC_BASE_URL, and with it pointing anywhere
+# but Anthropic's own API each kind of call names a gateway group instead of a model, so which model answers (and its
+# fallback, and the site-wide daily budget on the gateway key) is the gateway's to change, not a deploy. Each group can
+# be named here; the defaults are the gateway's (2026-11-16: Claude Opus 5.5 on the Team credit, then the Startups credit).
+GATEWAY_MODELS = {
+    "notice": ("KEYNECTION_AI_MODEL_NOTICE", "keynection/notice"),
+    "chat-check": ("KEYNECTION_AI_MODEL_CHAT_CHECK", "keynection/chat-check"),
+    "translate": ("KEYNECTION_AI_MODEL_TRANSLATE", "keynection/translate"),
+    "assistant": ("KEYNECTION_AI_MODEL_ASSISTANT", "keynection/assistant"),
+}
+
+
+def through_gateway() -> bool:
+    base = (os.environ.get("ANTHROPIC_BASE_URL") or "").strip().lower()
+    return bool(base) and "api.anthropic.com" not in base
+
+
 def enabled() -> bool:
     return provider() is not None
 
 
-def model_name() -> str:
+def model_name(purpose: str | None = None) -> str:
     if provider() == "gemini":
         return os.environ.get("KEYNECTION_GEMINI_MODEL", GEMINI_MODEL)
+    if through_gateway():
+        env_name, group = GATEWAY_MODELS[purpose or "notice"]
+        return os.environ.get(env_name) or group
     return os.environ.get("KEYNECTION_AI_MODEL", DEFAULT_MODEL)
 
 
@@ -99,10 +119,13 @@ _use_fallback = True  # switched off for this run if the account turns the fallb
 GEMINI_THINKING = {"low": "LOW", "medium": "MEDIUM", "high": "HIGH"}
 
 
-def _ask(system: str, text: str, schema: type[T], *, effort: str, max_tokens: int, timeout: float) -> T | None:
-    """The answer in the shape of schema, or None when there is none to use: the caller carries on without AI."""
-    ask = _ask_gemini if provider() == "gemini" else _ask_claude
-    return ask(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout)
+def _ask(system: str, text: str, schema: type[T], *, effort: str, max_tokens: int, timeout: float,
+         purpose: str) -> T | None:
+    """The answer in the shape of schema, or None when there is none to use: the caller carries on without AI.
+    `purpose` (a key of GATEWAY_MODELS) picks the gateway group when the calls go through the gateway."""
+    if provider() == "gemini":
+        return _ask_gemini(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout)
+    return _ask_claude(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout, purpose=purpose)
 
 
 def _claude() -> Any:
@@ -129,9 +152,10 @@ def _why(e: Exception) -> str:
 _workers = ThreadPoolExecutor(max_workers=8, thread_name_prefix="ai")
 
 
-def _ask_claude(system: str, text: str, schema: type[T], *, effort: str, max_tokens: int, timeout: float) -> T | None:
+def _ask_claude(system: str, text: str, schema: type[T], *, effort: str, max_tokens: int, timeout: float,
+                purpose: str = "notice") -> T | None:
     global _use_fallback
-    model = model_name()
+    model = model_name(purpose)
     fallback: dict[str, Any] = {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"} \
         if _use_fallback and model in FALLBACK_MODELS else {}
     started = time.monotonic()
@@ -153,7 +177,8 @@ def _ask_claude(system: str, text: str, schema: type[T], *, effort: str, max_tok
     except anthropic.BadRequestError as e:
         if fallback:  # perhaps an account without the fallback option: ask once more without it
             _use_fallback = False
-            answer = _ask_claude(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout)
+            answer = _ask_claude(system, text, schema, effort=effort, max_tokens=max_tokens, timeout=timeout,
+                                 purpose=purpose)
             if answer is None:  # refused without it too: the option was not the reason, so keep asking with it
                 _use_fallback = True
             else:
@@ -344,7 +369,7 @@ def draft_renovation(text: str, home_kind: str, today: date, max_days: int) -> d
     fill in, and named in "unsure"."""
     home = HOME_FOR_AI["apartment" if home_kind == "apartment" else "terrace"]
     asked = f"Today in Malaysia: {today:%A} {today.isoformat()}\nThe owner's home: {home}\n\n<owner>\n{text}\n</owner>"
-    d = _ask(RENOVATION_SYSTEM, asked, RenovationDraft, effort="medium", max_tokens=4000, timeout=30)
+    d = _ask(RENOVATION_SYSTEM, asked, RenovationDraft, effort="medium", max_tokens=4000, timeout=30, purpose="notice")
     if d is None:
         return None
     unsure = []
@@ -409,7 +434,7 @@ def check_message(home: str, text: str, reader_lang: str) -> MessageCheck | None
     if not spend(home):
         return None
     asked = f"The reader's language: {LANG_FOR_AI[reader_lang]}\n\n<message>\n{text}\n</message>"
-    check = _ask(CHAT_SYSTEM, asked, MessageCheck, effort="low", max_tokens=800, timeout=10)
+    check = _ask(CHAT_SYSTEM, asked, MessageCheck, effort="low", max_tokens=800, timeout=10, purpose="chat-check")
     if check is None:
         return None
     _remember(key, check)
@@ -447,7 +472,7 @@ def translate_notice(home: str, message: str, scope: str | None, to_langs: set[s
         return {}
     asked = ("Translate into: " + ", ".join(f"{lang} ({LANG_FOR_AI[lang]})" for lang in wanted)
              + f"\n\n<message>\n{message}\n</message>" + (f"\n<work>\n{scope}\n</work>" if scope else ""))
-    answer = _ask(NOTICE_SYSTEM, asked, NoticeTranslations, effort="low", max_tokens=8000, timeout=40)
+    answer = _ask(NOTICE_SYSTEM, asked, NoticeTranslations, effort="low", max_tokens=8000, timeout=40, purpose="translate")
     if answer is None:
         return {}
     return {t.lang: {"message": t.message.strip()[:2000], "scope": ((t.scope or "").strip()[:120] or None) if scope else None}
@@ -480,7 +505,7 @@ def translate_texts(home: str, texts: list[str], to_langs: set[str], *, what: st
         return {}
     asked = (f"The texts are {what}. Translate into: " + ", ".join(f"{lang} ({LANG_FOR_AI[lang]})" for lang in wanted)
              + "\n\n" + "\n\n".join(f'<text n="{i + 1}">\n{t}\n</text>' for i, t in enumerate(texts)))
-    answer = _ask(TEXTS_SYSTEM, asked, TextTranslations, effort="low", max_tokens=4000, timeout=40)
+    answer = _ask(TEXTS_SYSTEM, asked, TextTranslations, effort="low", max_tokens=4000, timeout=40, purpose="translate")
     if answer is None:
         return {}
     out: dict[str, list[str]] = {}
@@ -562,7 +587,7 @@ def plan_request(home: str, text: str, today: date, context: str, *, home_kind: 
     asked = f"Today in Malaysia: {today:%A} {today.isoformat()}\n{context}{earlier}\n\n<request>\n{text}\n</request>"
     system = f"{ASSISTANT_SYSTEM}\n\n{knowledge}" if knowledge else ASSISTANT_SYSTEM
     # 20 s: the first call after the server starts has taken about 15 s (12 s was too tight and fell back to key words)
-    p = _ask(system, asked, AssistantPlan, effort="low", max_tokens=1500, timeout=20)
+    p = _ask(system, asked, AssistantPlan, effort="low", max_tokens=1500, timeout=20, purpose="assistant")
     if p is None:
         return None
     window = p.quiet_window

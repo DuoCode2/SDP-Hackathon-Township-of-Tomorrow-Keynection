@@ -77,7 +77,7 @@ def test_the_words_come_back_and_only_the_recording_and_language_go(client, gate
     r = _say(client, lang="ms")
     assert r.status_code == 200 and r.json() == {"text": "retiling the bathroom next monday"}
     (sent,) = gateway.sent
-    assert sent["url"] == "https://llm.duocodetech.com/v1/audio/transcriptions"
+    assert sent["url"] == "https://llm.sunflowerstech.weiliu.me/v1/audio/transcriptions"
     assert sent["headers"] == {"Authorization": f"Bearer {KEY}"}
     # Model and language only: the gateway's Deepgram route refuses a prompt (400), and no names or homes go.
     assert sent["data"] == {"model": "deepgram/nova-3", "detect_language": "ms"}
@@ -165,7 +165,7 @@ def test_an_english_reply_is_spoken_and_only_the_words_go(client, gateway):
     r = _speak(client)
     assert r.status_code == 200 and r.headers["content-type"] == "audio/mpeg" and r.content == MP3
     (sent,) = gateway.sent
-    assert sent["url"] == "https://llm.duocodetech.com/v1/audio/speech"
+    assert sent["url"] == "https://llm.sunflowerstech.weiliu.me/v1/audio/speech"
     assert sent["headers"] == {"Authorization": f"Bearer {KEY}"}
     assert sent["json"] == {"model": "deepgram/aura-2", "input": "Your renovation notice reached five homes.",
                             "voice": "aura-2-thalia-en", "response_format": "mp3"}
