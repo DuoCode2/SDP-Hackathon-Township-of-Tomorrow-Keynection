@@ -821,3 +821,80 @@ def test_a_check_answered_from_memory_is_not_charged_again(claude):
         assert ai.check_message("T-12", "Good morning!", "ms").translation == "Selamat pagi!"
     assert len(claude.calls) == 1
     assert ai._calls[("T-12", date.today().isoformat())][0] == 1
+
+
+# ---------- the demo: one visitor, whichever households it names (2026-11-16) ----------
+
+ONE, OTHER = {"CF-Connecting-IP": "203.0.113.7"}, {"CF-Connecting-IP": "198.51.100.9"}
+
+
+def _reno(client, unit, headers):
+    return client.post("/api/ai/renovation-draft", json={"unit_id": unit, "text": "bathroom"}, headers=headers).status_code
+
+
+def test_a_demo_visitor_is_held_to_its_own_dollars_across_households(client, claude, monkeypatch):
+    claude.answers["RenovationDraft"] = _draft()
+    monkeypatch.setenv("KEYNECTION_AI_VISITOR_DAILY_USD", str(ai.renovation_usd("bathroom") * 1.5))
+    assert _reno(client, "T-12", ONE) == 200
+    assert _reno(client, "T-11", ONE) == 429  # another household, the same visitor
+    assert _reno(client, "T-11", OTHER) == 200  # another visitor
+
+
+def test_the_reset_button_does_not_hand_a_visitor_back_its_day(client, claude, monkeypatch):
+    claude.answers["RenovationDraft"] = _draft()
+    monkeypatch.setenv("KEYNECTION_AI_VISITOR_DAILY_USD", str(ai.renovation_usd("bathroom") * 1.5))
+    assert _reno(client, "T-12", ONE) == 200
+    assert client.post("/api/demo/reset", json={"confirm": True}, headers=ONE).status_code == 200
+    assert _reno(client, "T-12", ONE) == 429  # the household starts over; its visitor does not
+
+
+def test_a_visitor_is_an_ipv4_address_or_an_ipv6_64():
+    assert ai.visitor_bucket("203.0.113.7") == "203.0.113.7"
+    assert ai.visitor_bucket("2001:db8:1:2:aaaa::1") == ai.visitor_bucket("2001:db8:1:2:bbbb::9") == "2001:db8:1:2::/64"
+    assert ai.visitor_bucket("2001:db8:1:3::1") != ai.visitor_bucket("2001:db8:1:2::1")
+    assert ai.visitor_bucket("::ffff:203.0.113.7") == "203.0.113.7"
+    assert ai.visitor_bucket(None) is None and ai.visitor_bucket("") is None
+
+
+def test_the_pilot_counts_households_not_visitors(monkeypatch):
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "0")
+    monkeypatch.setenv("KEYNECTION_AI_VISITOR_DAILY_USD", "0.01")
+    ai.set_visitor("203.0.113.7")
+    assert ai.spend("T-12", 0.05) and ai.spend("T-11", 0.05)
+    assert not ai._visitors
+
+
+def test_a_home_that_refuses_gives_the_visitor_its_hold_back(monkeypatch):
+    monkeypatch.setattr(ai, "CALLS_PER_HOME_PER_DAY", 1)
+    ai.set_visitor("203.0.113.7")
+    assert ai.spend("T-12", 0.10)
+    assert not ai.spend("T-12", 0.10)  # the home's calls are used up: nothing is spent
+    assert ai._visitors[("203.0.113.7", date.today().isoformat())] == 100_000
+
+
+def test_a_visitor_past_its_allowance_alerts_once_without_its_address(monkeypatch, relay):
+    import json
+
+    monkeypatch.setenv("KEYNECTION_DEMO_MODE", "1")
+    monkeypatch.setenv("KEYNECTION_AI_VISITOR_DAILY_USD", "0.05")
+    ai.set_visitor("203.0.113.7")
+    assert ai.spend("T-12", 0.04)
+    assert not ai.spend("T-11", 0.04)
+    assert not ai.spend("T-13", 0.04)
+    assert len(_settle(relay, 1)) == 1 and "demo visitor" in relay[0]["body"]["title"]
+    assert "203.0.113" not in json.dumps(relay[0]["body"])
+
+
+def test_the_visitor_is_charged_for_work_done_after_the_reply(client, claude):
+    # A hello is translated after the reply (a background task), a typed message on the request's own thread.
+    claude.answers["NoticeTranslations"] = _translations
+    claude.answers["MessageCheck"] = ai.MessageCheck(insult=False, heated=False, calmer=None, calmer_translation=None,
+                                                     translation="Hai!")
+    today = date.today().isoformat()
+    client.post("/api/intros", json={"from_unit_id": "T-12", "message": "Hi! We just moved in.", "lang": "en"}, headers=ONE)
+    after_hello = ai._visitors.get(("203.0.113.7", today), 0)
+    assert after_hello > 0
+    assert client.post("/api/messages", json={"from_unit_id": "T-12", "to_unit_id": "T-11", "body": "Hi!"},
+                       headers=ONE).status_code == 201
+    assert ai._visitors[("203.0.113.7", today)] > after_hello
+    assert ("testclient", today) not in ai._visitors  # nothing on the peer's address when Cloudflare names one

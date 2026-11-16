@@ -19,6 +19,7 @@ unit numbers of the homes around it, never a neighbour's name or words.
 """
 from __future__ import annotations
 
+import ipaddress
 import logging
 import os
 import re
@@ -27,9 +28,10 @@ import time
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
+from contextvars import ContextVar
 from datetime import date, timedelta
-from urllib.parse import urlparse
 from typing import Any, Literal, TypeVar
+from urllib.parse import urlparse
 
 import httpx
 from pydantic import BaseModel, Field
@@ -62,6 +64,13 @@ CALLS_PER_HOME_PER_DAY = 40  # keeps a public demo's bill small; past it, everyt
 # ($5 a day, $25 per 30 days); this one keeps a single home from using it up (2026-11-16). Kept in the database, so a
 # restart or a deploy does not hand it back.
 HOME_DAILY_USD = 0.60
+# One visitor's AI per day in dollars on the demo (KEYNECTION_AI_VISITOR_DAILY_USD), counted like a home's. The demo
+# has no sign-in: a request may name any household, and its reset button starts the households' allowance over, so
+# the per-home allowance alone does not stop one person from spending the site's day (2026-11-16). A visitor is an
+# address, Cloudflare's CF-Connecting-IP (the app is reachable only through the tunnel), an IPv6 address by its /64.
+# Counted in this process's memory only: never written down, not given back by a demo reset, and given back by a
+# restart, which a visitor cannot cause. The pilot signs households in and does not use it.
+VISITOR_DAILY_USD = 1.00
 # List prices per million tokens (input, output). The keynection/* gateway groups are Claude Sonnet 5.5 on both legs.
 PRICES = {"claude-sonnet-5-5": (2.0, 10.0), "claude-opus-5-5": (4.0, 20.0)}
 DEAREST_PRICE = (5.0, 25.0)  # a model with no row above is counted at this
@@ -276,6 +285,8 @@ def _ask_gemini(system: str, text: str, schema: type[T], *, effort: str, max_tok
 _lock = threading.Lock()
 _calls: dict[tuple[str, str], tuple[int, int]] = {}  # (home, day) -> (calls, worst-case micro-dollars), without a database
 _db_path: str | None = None
+_visitor: ContextVar[str | None] = ContextVar("keynection_ai_visitor", default=None)
+_visitors: dict[tuple[str, str], int] = {}  # (visitor, day) -> worst-case micro-dollars, demo only
 _checked: OrderedDict[tuple[str, str], MessageCheck] = OrderedDict()
 
 
@@ -287,6 +298,39 @@ def reset() -> None:
         _calls.clear()
         _checked.clear()
     _use_fallback = True
+
+
+def visitor_bucket(address: str | None) -> str | None:
+    """Who a request is for the visitor allowance: its IPv4 address, or its IPv6 /64."""
+    if not address:
+        return None
+    try:
+        ip = ipaddress.ip_address(address.strip())
+    except ValueError:
+        return address.strip()[:64] or None
+    if ip.version == 6:
+        if ip.ipv4_mapped is not None:  # ::ffff:a.b.c.d is that IPv4 address
+            return str(ip.ipv4_mapped)
+        return str(ipaddress.ip_network(f"{ip}/64", strict=False))
+    return str(ip)
+
+
+def set_visitor(address: str | None) -> None:
+    """The visitor this request (and the work it leaves behind, such as a translation after the reply) is for."""
+    _visitor.set(visitor_bucket(address))
+
+
+def reset_visitors() -> None:
+    """Tests only: a demo reset (reset()) deliberately leaves the visitors' day alone."""
+    with _lock:
+        _visitors.clear()
+
+
+def visitor_daily_usd() -> float:
+    try:
+        return float(setting("AI_VISITOR_DAILY_USD") or VISITOR_DAILY_USD)
+    except ValueError:
+        return VISITOR_DAILY_USD
 
 
 def use_db(path: str | None) -> None:
@@ -327,6 +371,23 @@ def spend(home: str, usd: float = 0.0) -> bool:
     today = date.today().isoformat()
     micros = max(0, round(usd * 1_000_000))
     cap = round(home_daily_usd() * 1_000_000)
+    visitor = _visitor.get() if demo_mode() else None
+    if visitor is not None:  # held first, given back below if the home refuses
+        vcap = round(visitor_daily_usd() * 1_000_000)
+        with _lock:
+            for key in [k for k in _visitors if k[1] != today]:
+                del _visitors[key]
+            vused = _visitors.get((visitor, today), 0)
+            vok = vused + micros <= vcap
+            if vok:
+                _visitors[(visitor, today)] = vused + micros
+        if not vok:
+            opsalert.notify("visitor_allowance", "Keynection: a demo visitor has used their AI allowance for today",
+                            f"One visitor's address has used ${vused / 1e6:.2f} of ${vcap / 1e6:.2f} counted at worst-case "
+                            f"prices ({today}), across whichever households it named. Until tomorrow its messages are "
+                            "checked by the word list only and its notices go untranslated; other visitors are not "
+                            "affected.")
+            return False
     if _db_path is None:
         with _lock:
             for key in [k for k in _calls if k[1] != today]:
@@ -350,6 +411,9 @@ def spend(home: str, usd: float = 0.0) -> bool:
             conn.commit()
         finally:
             conn.close()
+    if not ok and visitor is not None:
+        with _lock:
+            _visitors[(visitor, today)] = max(0, _visitors.get((visitor, today), 0) - micros)
     if not ok:
         opsalert.notify("home_allowance", f"Keynection: home {home} has used its AI allowance for today",
                         f"{calls} calls, ${used / 1e6:.2f} of ${cap / 1e6:.2f} counted at worst-case prices ({today}). Until "

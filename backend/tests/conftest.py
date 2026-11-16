@@ -16,12 +16,15 @@ def no_real_ai(monkeypatch):
         monkeypatch.delenv(name, raising=False)
     # Server settings, under both names (the old JIRAN_ ones are still read): each test sets what it needs.
     for name in ("DB_PATH", "DEMO_MODE", "SITE_PASSWORD", "MOVED_TO", "STATIC_DIR", "ALLOWED_ORIGINS", "VOICE_KEY",
-                 "VOICE_URL", "STT_MODEL", "TTS_MODEL", "TTS_VOICE", "ALERT_URL", "ALERT_TOKEN", "AI_HOME_DAILY_USD"):
+                 "VOICE_URL", "STT_MODEL", "TTS_MODEL", "TTS_VOICE", "ALERT_URL", "ALERT_TOKEN", "AI_HOME_DAILY_USD",
+                 "AI_VISITOR_DAILY_USD"):
         for prefix in ("KEYNECTION_", "JIRAN_"):
             monkeypatch.delenv(prefix + name, raising=False)
     from app import ai, opsalert, voice
 
     ai.reset()
+    ai.reset_visitors()
+    ai.set_visitor(None)  # the visitor is per request; a test that sets one must not leave it for the next
     ai.use_db(None)  # each test starts with the allowance in memory; a test client's start-up points it at its database
     voice.reset()
     opsalert.reset()

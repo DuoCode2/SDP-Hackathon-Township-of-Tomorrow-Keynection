@@ -518,6 +518,9 @@ def _moved_to(request: Request) -> RedirectResponse | None:
 
 @app.middleware("http")
 async def guard(request: Request, call_next):
+    # Who is asking, for the demo's per-visitor AI allowance: the address Cloudflare saw (the app listens only on
+    # 127.0.0.1 and behind the tunnel, so the header is Cloudflare's), else the peer.
+    ai.set_visitor(request.headers.get("cf-connecting-ip") or (request.client.host if request.client else None))
     moved = _moved_to(request)
     if moved is not None:
         return moved
