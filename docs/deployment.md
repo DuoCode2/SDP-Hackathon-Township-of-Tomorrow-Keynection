@@ -40,6 +40,6 @@ push to main ──► Tests (GitHub Actions) ──green──► Deploy (GitHu
 (the deployer builds the image with `--build-arg GIT_COMMIT=<sha>`; the Dockerfile keeps it as `KEYNECTION_COMMIT`).
 
 https://keynection.agenticcs.net is the only site. The address the judges were given, https://keynection.onrender.com
-(Render, free tier), now sends every visit to the same page there (`KEYNECTION_MOVED_TO`; the password is the same),
-so links already shared keep working. "Keep the demo awake" keeps that forwarder awake on the judging days; after
-14 Nov the Render service is suspended and that workflow deleted.
+(Render, free tier), forwarded every visit here during judging (`KEYNECTION_MOVED_TO`); after the judging window
+ended on 14 Nov the Render service was suspended (bring it back with `POST /v1/services/<id>/resume` if it is ever
+needed) and the keep-awake workflow was deleted.
